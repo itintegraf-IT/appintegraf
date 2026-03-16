@@ -22,7 +22,7 @@ export default async function AdminUserEditPage({
   const id = parseInt((await params).id, 10);
   if (isNaN(id)) notFound();
 
-  const user = await prisma.users.findUnique({
+  const row = await prisma.users.findUnique({
     where: { id },
     select: {
       id: true,
@@ -38,10 +38,45 @@ export default async function AdminUserEditPage({
       is_active: true,
       display_in_list: true,
       role_id: true,
+      user_roles: {
+        take: 1,
+        select: { role_id: true, module_access: true },
+      },
     },
   });
 
-  if (!user) notFound();
+  if (!row) notFound();
+
+  const ur = row.user_roles?.[0];
+  let module_access: Record<string, string> = {};
+  if (ur?.module_access) {
+    try {
+      const decoded = JSON.parse(ur.module_access);
+      if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+        if (decoded.all === true) {
+          module_access = {
+            contacts: "admin",
+            equipment: "admin",
+            calendar: "admin",
+            planovani: "admin",
+            kiosk: "admin",
+            training: "admin",
+          };
+        } else {
+          module_access = decoded as Record<string, string>;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const { user_roles: _ur, ...rest } = row;
+  const user = {
+    ...rest,
+    role_id: ur?.role_id ?? row.role_id,
+    module_access,
+  };
 
   return (
     <>
@@ -61,7 +96,7 @@ export default async function AdminUserEditPage({
         </Link>
       </div>
 
-      <AdminUserForm user={user} />
+      <AdminUserForm user={user as Parameters<typeof AdminUserForm>[0]["user"]} />
     </>
   );
 }

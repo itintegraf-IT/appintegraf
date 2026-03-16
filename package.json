@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "migrate:planovani": "node migrations/planovani-igvyroba/migrate.mjs"
   },
   "dependencies": {
     "@prisma/adapter-mariadb": "^7.5.0",

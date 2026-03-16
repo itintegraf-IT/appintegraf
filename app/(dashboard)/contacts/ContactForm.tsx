@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -16,16 +16,12 @@ type ContactData = {
   landline2?: string | null;
   position?: string | null;
   department_name?: string | null;
-  role_id?: number | null;
   display_in_list?: boolean | null;
 };
-
-type Role = { id: number; name: string };
 
 export function ContactForm({ contact }: { contact?: ContactData }) {
   const router = useRouter();
   const isEdit = !!contact?.id;
-  const [roles, setRoles] = useState<Role[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -38,17 +34,8 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
     landline2: contact?.landline2 ?? "",
     position: contact?.position ?? "",
     department_name: contact?.department_name ?? "",
-    role_id: contact?.role_id ?? 1,
     display_in_list: contact?.display_in_list !== false,
-    password_custom: "",
   });
-
-  useEffect(() => {
-    fetch("/api/roles")
-      .then((r) => r.json())
-      .then(setRoles)
-      .catch(() => {});
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,12 +43,7 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
     setLoading(true);
 
     try {
-      const body: Record<string, unknown> = {
-        ...form,
-        password_custom: form.password_custom || (isEdit ? undefined : "heslo123"),
-      };
-      if (isEdit && !form.password_custom) delete body.password_custom;
-
+      const body: Record<string, unknown> = { ...form };
       const url = isEdit ? `/api/contacts/${contact!.id}` : "/api/contacts";
       const method = isEdit ? "PUT" : "POST";
       const res = await fetch(url, {
@@ -151,30 +133,6 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
               type="text"
               value={form.department_name}
               onChange={(e) => setForm({ ...form, department_name: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
-            <select
-              value={form.role_id}
-              onChange={(e) => setForm({ ...form, role_id: parseInt(e.target.value, 10) })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            >
-              {roles.map((r) => (
-                <option key={r.id} value={r.id}>{r.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              {isEdit ? "Nové heslo (nechte prázdné pro zachování)" : "Heslo"}
-            </label>
-            <input
-              type="password"
-              value={form.password_custom}
-              onChange={(e) => setForm({ ...form, password_custom: e.target.value })}
-              placeholder={isEdit ? "" : "heslo123 (výchozí)"}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>

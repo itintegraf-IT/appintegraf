@@ -42,6 +42,10 @@ export async function GET(
       role_id: true,
       created_at: true,
       roles: { select: { id: true, name: true } },
+      user_roles: {
+        take: 1,
+        select: { role_id: true, module_access: true },
+      },
     },
   });
 
@@ -49,7 +53,33 @@ export async function GET(
     return NextResponse.json({ error: "Uživatel nenalezen" }, { status: 404 });
   }
 
-  return NextResponse.json(user);
+  const ur = user.user_roles?.[0];
+  let module_access: Record<string, string> = {};
+  if (ur?.module_access) {
+    try {
+      const decoded = JSON.parse(ur.module_access);
+      if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+        if (decoded.all === true) {
+          module_access = {
+            contacts: "admin",
+            equipment: "admin",
+            calendar: "admin",
+            planovani: "admin",
+            kiosk: "admin",
+            training: "admin",
+          };
+        } else {
+          module_access = decoded as Record<string, string>;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+  const roleId = ur?.role_id ?? user.role_id;
+
+  const { user_roles: _, ...rest } = user;
+  return NextResponse.json({ ...rest, role_id: roleId, module_access });
 }
 
 export async function PUT(
@@ -86,6 +116,7 @@ export async function PUT(
     const display_in_list = bodyData.display_in_list !== false;
     const role_id = bodyData.role_id ?? null;
     const password_new = (bodyData.password_new as string) ?? "";
+    const module_access = (bodyData.module_access as Record<string, string>) ?? {};
 
     if (!first_name || !last_name || !email) {
       return NextResponse.json({ error: "Vyplňte jméno, příjmení a e-mail" }, { status: 400 });
@@ -98,6 +129,8 @@ export async function PUT(
       return NextResponse.json({ error: "E-mail již používá jiný uživatel" }, { status: 400 });
     }
 
+    const roleIdNum = role_id != null ? parseInt(String(role_id), 10) : null;
+
     const updateData: Record<string, unknown> = {
       first_name: String(first_name).trim(),
       last_name: String(last_name).trim(),
@@ -109,7 +142,7 @@ export async function PUT(
       department_name: department_name.trim() || null,
       is_active: !!is_active,
       display_in_list: !!display_in_list,
-      role_id: role_id != null ? parseInt(String(role_id), 10) : null,
+      role_id: roleIdNum,
     };
 
     if (password_new && password_new.length >= 6) {
@@ -121,6 +154,26 @@ export async function PUT(
       where: { id },
       data: updateData,
     });
+
+    if (roleIdNum) {
+      const role = await prisma.roles.findUnique({ where: { id: roleIdNum }, select: { name: true } });
+      const isAdminRole = role?.name?.toLowerCase() === "admin";
+      const moduleAccessJson = isAdminRole
+        ? JSON.stringify({ all: true })
+        : JSON.stringify(module_access);
+
+      const existing = await prisma.user_roles.findFirst({ where: { user_id: id } });
+      if (existing) {
+        await prisma.user_roles.update({
+          where: { id: existing.id },
+          data: { role_id: roleIdNum, module_access: moduleAccessJson },
+        });
+      } else {
+        await prisma.user_roles.create({
+          data: { user_id: id, role_id: roleIdNum, module_access: moduleAccessJson },
+        });
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (e) {

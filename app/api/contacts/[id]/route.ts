@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
-import bcrypt from "bcryptjs";
 
 export async function GET(
   _req: NextRequest,
@@ -36,8 +35,6 @@ export async function GET(
       qr_code: true,
       notes: true,
       display_in_list: true,
-      role_id: true,
-      roles: { select: { name: true } },
     },
   });
 
@@ -79,9 +76,7 @@ export async function PUT(
       landline2,
       position,
       department_name,
-      role_id,
       display_in_list,
-      password_custom,
     } = body;
 
     if (!username || !email || !first_name || !last_name) {
@@ -101,40 +96,21 @@ export async function PUT(
       );
     }
 
-    const updateData: Record<string, unknown> = {
-      username: username.trim(),
-      email: email.trim(),
-      first_name: first_name.trim(),
-      last_name: last_name.trim(),
-      phone: (phone ?? "").trim() || null,
-      landline: (landline ?? "").trim() || null,
-      landline2: (landline2 ?? "").trim() || null,
-      position: (position ?? "").trim() || null,
-      department_name: (department_name ?? "").trim() || null,
-      role_id: role_id ?? null,
-      display_in_list: display_in_list !== false,
-    };
-
-    if (password_custom && password_custom.length >= 4) {
-      updateData.password_hash = await bcrypt.hash(password_custom, 10);
-      updateData.password_custom = null;
-    }
-
     await prisma.users.update({
       where: { id },
-      data: updateData as never,
+      data: {
+        username: username.trim(),
+        email: email.trim(),
+        first_name: first_name.trim(),
+        last_name: last_name.trim(),
+        phone: (phone ?? "").trim() || null,
+        landline: (landline ?? "").trim() || null,
+        landline2: (landline2 ?? "").trim() || null,
+        position: (position ?? "").trim() || null,
+        department_name: (department_name ?? "").trim() || null,
+        display_in_list: display_in_list !== false,
+      },
     });
-
-    if (role_id) {
-      const existing = await prisma.user_roles.findFirst({
-        where: { user_id: id, role_id },
-      });
-      if (!existing) {
-        await prisma.user_roles.create({
-          data: { user_id: id, role_id },
-        });
-      }
-    }
 
     return NextResponse.json({ success: true });
   } catch (e) {

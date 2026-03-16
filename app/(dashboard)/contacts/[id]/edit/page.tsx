@@ -32,7 +32,6 @@ export default async function EditContactPage({
       landline2: true,
       position: true,
       department_name: true,
-      role_id: true,
       display_in_list: true,
     },
   });

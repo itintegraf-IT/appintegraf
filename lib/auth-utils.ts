@@ -85,8 +85,19 @@ export async function hasModuleAccess(
       }
     }
 
+    // Per-module úroveň: { "contacts": "read", "equipment": "write", ... }
+    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+      const perm = (decoded as Record<string, unknown>)[module];
+      if (perm === true) return true;
+      if (typeof perm === "string") {
+        const p = perm.toLowerCase();
+        if (access === "read" && ["read", "write", "admin"].includes(p)) return true;
+        if (access === "write" && ["write", "admin"].includes(p)) return true;
+        if (access === "admin" && p === "admin") return true;
+      }
+    }
+
     if (Array.isArray(decoded)) {
-      if (decoded.includes("*") || (decoded as unknown[]).some((x) => x === true && typeof x === "object")) continue;
       const moduleLower = module.toLowerCase();
       for (const item of decoded) {
         if (typeof item !== "string") continue;
@@ -101,15 +112,6 @@ export async function hasModuleAccess(
         ) {
           return true;
         }
-      }
-    }
-
-    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-      const perm = (decoded as Record<string, unknown>)[module];
-      if (perm === true) return true;
-      if (typeof perm === "string") {
-        const p = perm.toLowerCase();
-        if (p === access || (p === "write" && access === "read")) return true;
       }
     }
   }
@@ -173,6 +175,17 @@ function hasModuleAccessFromRoles(
       }
     }
 
+    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+      const perm = (decoded as Record<string, unknown>)[module];
+      if (perm === true) return true;
+      if (typeof perm === "string") {
+        const p = perm.toLowerCase();
+        if (access === "read" && ["read", "write", "admin"].includes(p)) return true;
+        if (access === "write" && ["write", "admin"].includes(p)) return true;
+        if (access === "admin" && p === "admin") return true;
+      }
+    }
+
     if (Array.isArray(decoded)) {
       const moduleLower = module.toLowerCase();
       for (const item of decoded) {
@@ -188,15 +201,6 @@ function hasModuleAccessFromRoles(
         ) {
           return true;
         }
-      }
-    }
-
-    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-      const perm = (decoded as Record<string, unknown>)[module];
-      if (perm === true) return true;
-      if (typeof perm === "string") {
-        const p = perm.toLowerCase();
-        if (p === access || (p === "write" && access === "read")) return true;
       }
     }
   }

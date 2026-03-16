@@ -3,9 +3,26 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays } from "lucide-react";
+
+const AVAILABLE_MODULES = [
+  { key: "contacts", label: "Kontakty", icon: Users },
+  { key: "equipment", label: "Majetek", icon: Laptop },
+  { key: "calendar", label: "Kalendář", icon: Calendar },
+  { key: "planovani", label: "Plánování výroby", icon: CalendarDays },
+  { key: "kiosk", label: "Kiosk Monitory", icon: Tv },
+  { key: "training", label: "IT Školení", icon: GraduationCap },
+] as const;
+
+const ACCESS_LEVELS = [
+  { value: "", label: "Bez přístupu" },
+  { value: "read", label: "Čtení" },
+  { value: "write", label: "Úpravy" },
+  { value: "admin", label: "Admin" },
+] as const;
 
 type Role = { id: number; name: string };
+type ModuleAccessMap = Record<string, string>;
 type User = {
   id?: number;
   username?: string;
@@ -20,6 +37,7 @@ type User = {
   is_active?: boolean | null;
   display_in_list?: boolean | null;
   role_id?: number | null;
+  module_access?: ModuleAccessMap;
 };
 
 export function AdminUserForm({ user }: { user?: User }) {
@@ -39,6 +57,7 @@ export function AdminUserForm({ user }: { user?: User }) {
     position: user?.position ?? "",
     department_name: user?.department_name ?? "",
     role_id: user?.role_id ?? 1,
+    module_access: (user?.module_access ?? {}) as ModuleAccessMap,
     is_active: user?.is_active !== false,
     display_in_list: user?.display_in_list !== false,
     password_custom: "",
@@ -64,12 +83,23 @@ export function AdminUserForm({ user }: { user?: User }) {
         position: user.position ?? "",
         department_name: user.department_name ?? "",
         role_id: user.role_id ?? 1,
+        module_access: user.module_access ?? {},
         is_active: user.is_active !== false,
         display_in_list: user.display_in_list !== false,
         password_custom: "",
       });
     }
   }, [user]);
+
+  const setModuleAccess = (moduleKey: string, level: string) => {
+    setForm((prev) => ({
+      ...prev,
+      module_access: {
+        ...prev.module_access,
+        [moduleKey]: level,
+      },
+    }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +111,7 @@ export function AdminUserForm({ user }: { user?: User }) {
       const method = isEdit ? "PUT" : "POST";
       const body: Record<string, unknown> = {
         ...form,
+        module_access: form.module_access,
         password_custom: form.password_custom || (isEdit ? undefined : "heslo123"),
       };
       if (isEdit) {
@@ -161,6 +192,15 @@ export function AdminUserForm({ user }: { user?: User }) {
           />
         </div>
         <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Oddělení</label>
+          <input
+            type="text"
+            value={form.department_name}
+            onChange={(e) => setForm({ ...form, department_name: e.target.value })}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2"
+          />
+        </div>
+        <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
           <select
             value={form.role_id}
@@ -171,15 +211,6 @@ export function AdminUserForm({ user }: { user?: User }) {
               <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </select>
-        </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Oddělení</label>
-          <input
-            type="text"
-            value={form.department_name}
-            onChange={(e) => setForm({ ...form, department_name: e.target.value })}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-          />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Pozice</label>
@@ -241,6 +272,42 @@ export function AdminUserForm({ user }: { user?: User }) {
             onChange={(e) => setForm({ ...form, landline: e.target.value })}
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
           />
+        </div>
+      </div>
+
+      {/* Moduly a úroveň přístupu – každý modul má vlastní úroveň */}
+      <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-6">
+        <h3 className="mb-2 text-lg font-semibold text-gray-900">Přístup k modulům</h3>
+        <p className="mb-4 text-sm text-gray-600">
+          U každého modulu nastavte úroveň přístupu. Čtení = pouze prohlížení, Úpravy = může přidávat a měnit, Admin = plný přístup v modulu.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {AVAILABLE_MODULES.map((mod) => {
+            const Icon = mod.icon;
+            const level = form.module_access[mod.key] ?? "";
+            return (
+              <div
+                key={mod.key}
+                className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-4"
+              >
+                <div className="flex items-center gap-2">
+                  <Icon className="h-5 w-5 shrink-0 text-gray-600" />
+                  <span className="text-sm font-medium">{mod.label}</span>
+                </div>
+                <select
+                  value={level}
+                  onChange={(e) => setModuleAccess(mod.key, e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  {ACCESS_LEVELS.map((opt) => (
+                    <option key={opt.value || "none"} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
         </div>
       </div>
 

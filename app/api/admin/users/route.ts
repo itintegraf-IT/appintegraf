@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
       position = "",
       department_name = "",
       role_id = 1,
+      module_access = {},
       is_active = true,
       display_in_list = true,
       password_custom = "heslo123",
@@ -96,6 +97,7 @@ export async function POST(req: NextRequest) {
 
     const qrCode = String(Math.floor(Math.random() * 1e12)).padStart(12, "0");
     const passwordHash = await bcrypt.hash(password_custom || "heslo123", 10);
+    const roleIdNum = role_id ? parseInt(String(role_id), 10) : 1;
 
     const user = await prisma.users.create({
       data: {
@@ -109,16 +111,22 @@ export async function POST(req: NextRequest) {
         landline2: landline2.trim() || null,
         position: position.trim() || null,
         department_name: department_name.trim() || null,
-        role_id: role_id ? parseInt(role_id, 10) : null,
+        role_id: roleIdNum,
         display_in_list: !!display_in_list,
         is_active: !!is_active,
         qr_code: qrCode,
       },
     });
 
+    const role = await prisma.roles.findUnique({ where: { id: roleIdNum }, select: { name: true } });
+    const isAdminRole = role?.name?.toLowerCase() === "admin";
+    const moduleAccessJson = isAdminRole
+      ? JSON.stringify({ all: true })
+      : JSON.stringify(module_access as Record<string, string>);
+
     try {
       await prisma.user_roles.create({
-        data: { user_id: user.id, role_id: role_id ? parseInt(role_id, 10) : 1 },
+        data: { user_id: user.id, role_id: roleIdNum, module_access: moduleAccessJson },
       });
     } catch {
       // ignore
