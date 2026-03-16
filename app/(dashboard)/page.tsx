@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { NotificationLink } from "./NotificationLink";
 import {
   LayoutDashboard,
   Users,
@@ -17,13 +18,16 @@ import {
   CalendarPlus,
   FileText,
   ClipboardList,
+  Clock,
+  ChevronRight,
+  Bell,
 } from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
 
-  const [stats, contactsRead, equipmentRead, calendarRead, kioskRead, trainingRead, trainingWrite, contactsWrite, equipmentWrite, kioskWrite] =
+  const [stats, contactsRead, equipmentRead, calendarRead, kioskRead, trainingRead, trainingWrite, contactsWrite, equipmentWrite, kioskWrite, pendingEvents, notifications] =
     await Promise.all([
       Promise.all([
         prisma.users.count({ where: { is_active: true } }),
@@ -45,6 +49,44 @@ export default async function DashboardPage() {
       hasModuleAccess(userId, "contacts", "write"),
       hasModuleAccess(userId, "equipment", "write"),
       hasModuleAccess(userId, "kiosk", "write"),
+      (async () => {
+        if (userId === 0) return [];
+        const canReadCalendar = await hasModuleAccess(userId, "calendar", "read");
+        if (!canReadCalendar) return [];
+        const managerDeptIds = await prisma.departments
+          .findMany({ where: { manager_id: userId }, select: { id: true } })
+          .then((r) => r.map((d) => d.id));
+        const events = await prisma.calendar_events.findMany({
+          where: {
+            OR: [
+              { deputy_id: userId, approval_status: "pending" },
+              ...(managerDeptIds.length > 0
+                ? [{
+                    approval_status: "deputy_approved",
+                    OR: [
+                      { department_id: { in: managerDeptIds } },
+                      { users: { department_id: { in: managerDeptIds } } },
+                    ],
+                  }]
+                : []),
+            ],
+          },
+          orderBy: { start_date: "asc" },
+          take: 10,
+          include: {
+            users: { select: { first_name: true, last_name: true } },
+          },
+        });
+        return events;
+      })(),
+      (async () => {
+        if (userId === 0) return [];
+        return prisma.notifications.findMany({
+          where: { user_id: userId, read_at: null },
+          orderBy: { created_at: "desc" },
+          take: 10,
+        });
+      })(),
     ]);
 
   const statCards = [
@@ -82,6 +124,76 @@ export default async function DashboardPage() {
         </h1>
         <p className="mt-1 text-gray-600">Vítejte v systému INTEGRAF</p>
       </div>
+
+      {/* Notifikace */}
+      {notifications.length > 0 && (
+        <div className="mb-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
+            <Bell className="h-5 w-5 text-gray-600" />
+            Notifikace ({notifications.length})
+          </h2>
+          <div className="space-y-2">
+            {notifications.map((n) => (
+              <NotificationLink
+                key={n.id}
+                id={n.id}
+                title={n.title}
+                message={n.message}
+                link={n.link}
+                readAt={n.read_at}
+                createdAt={n.created_at}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Události ke schválení */}
+      {calendarRead && pendingEvents.length > 0 && (
+        <div className="mb-8 rounded-xl border-2 border-amber-200 bg-amber-50/50 p-6">
+          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-amber-900">
+            <Clock className="h-5 w-5 text-amber-600" />
+            Události ke schválení ({pendingEvents.length})
+          </h2>
+          <div className="space-y-3">
+            {pendingEvents.map((e) => {
+              const creatorName = e.users
+                ? `${e.users.first_name} ${e.users.last_name}`
+                : "–";
+              const startDate = new Date(e.start_date);
+              const statusLabel =
+                e.approval_status === "pending"
+                  ? "Jako zástup"
+                  : "Jako vedoucí oddělení";
+              return (
+                <Link
+                  key={e.id}
+                  href={`/calendar/${e.id}`}
+                  className="flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-white p-4 transition-colors hover:border-amber-400 hover:bg-amber-50/50"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-gray-900">{e.title}</p>
+                    <p className="mt-0.5 text-sm text-gray-600">
+                      {creatorName} • {startDate.toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" })}
+                    </p>
+                    <span className="mt-2 inline-block rounded bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-900">
+                      {statusLabel}
+                    </span>
+                  </div>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-amber-600" />
+                </Link>
+              );
+            })}
+          </div>
+          <Link
+            href="/calendar?scope=mine"
+            className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-amber-800 hover:text-amber-900"
+          >
+            Zobrazit všechny v kalendáři
+            <ChevronRight className="h-4 w-4" />
+          </Link>
+        </div>
+      )}
 
       {/* Statistiky */}
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

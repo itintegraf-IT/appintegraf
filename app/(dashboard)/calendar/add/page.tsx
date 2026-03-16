@@ -4,12 +4,15 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { EVENT_TYPES, DEFAULT_EVENT_TYPE, requiresDeputy } from "../lib/event-types";
 
 type Department = { id: number; name: string; code: string | null };
+type Deputy = { id: number; first_name: string; last_name: string };
 
 export default function AddCalendarPage() {
   const router = useRouter();
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [deputies, setDeputies] = useState<Deputy[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -24,9 +27,11 @@ export default function AddCalendarPage() {
     description: "",
     start_date: defaultStart.toISOString().slice(0, 16),
     end_date: defaultEnd.toISOString().slice(0, 16),
-    event_type: "event",
+    event_type: DEFAULT_EVENT_TYPE,
     department_id: "",
+    deputy_id: "",
     is_public: false,
+    is_all_day: false,
     location: "",
     color: "#DC2626",
   });
@@ -38,10 +43,26 @@ export default function AddCalendarPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    fetch("/api/calendar/deputies")
+      .then((r) => r.json())
+      .then((data) => setDeputies(data.deputies ?? []))
+      .catch(() => {});
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    let startDate = form.start_date;
+    let endDate = form.end_date;
+    if (form.is_all_day) {
+      const start = form.start_date.slice(0, 10);
+      const end = form.end_date.slice(0, 10);
+      startDate = `${start}T00:00`;
+      endDate = `${end}T23:59`;
+    }
 
     try {
       const res = await fetch("/api/calendar", {
@@ -49,7 +70,10 @@ export default function AddCalendarPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          start_date: startDate,
+          end_date: endDate,
           department_id: form.department_id || null,
+          deputy_id: form.deputy_id || null,
         }),
       });
 
@@ -101,23 +125,79 @@ export default function AddCalendarPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
+          <div className="flex items-center gap-2 sm:col-span-2">
+            <input
+              type="checkbox"
+              id="add_is_all_day"
+              checked={form.is_all_day}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                if (checked) {
+                  const start = form.start_date.slice(0, 10);
+                  const end = form.end_date.slice(0, 10);
+                  setForm({
+                    ...form,
+                    is_all_day: true,
+                    start_date: `${start}T00:00`,
+                    end_date: `${end}T23:59`,
+                  });
+                } else {
+                  const start = form.start_date.slice(0, 10);
+                  setForm({
+                    ...form,
+                    is_all_day: false,
+                    start_date: `${start}T09:00`,
+                    end_date: `${start}T17:00`,
+                  });
+                }
+              }}
+              className="rounded"
+            />
+            <label htmlFor="add_is_all_day" className="text-sm text-gray-700">
+              Celý den
+            </label>
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Začátek *</label>
             <input
-              type="datetime-local"
+              type={form.is_all_day ? "date" : "datetime-local"}
               required
-              value={form.start_date}
-              onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+              value={form.is_all_day ? form.start_date.slice(0, 10) : form.start_date}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (form.is_all_day) {
+                  const end = form.end_date.slice(0, 10);
+                  setForm({
+                    ...form,
+                    start_date: `${v}T00:00`,
+                    end_date: `${end}T23:59`,
+                  });
+                } else {
+                  setForm({ ...form, start_date: v });
+                }
+              }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Konec *</label>
             <input
-              type="datetime-local"
+              type={form.is_all_day ? "date" : "datetime-local"}
               required
-              value={form.end_date}
-              onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+              value={form.is_all_day ? form.end_date.slice(0, 10) : form.end_date}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (form.is_all_day) {
+                  const start = form.start_date.slice(0, 10);
+                  setForm({
+                    ...form,
+                    start_date: `${start}T00:00`,
+                    end_date: `${v}T23:59`,
+                  });
+                } else {
+                  setForm({ ...form, end_date: v });
+                }
+              }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
@@ -125,15 +205,42 @@ export default function AddCalendarPage() {
             <label className="mb-1 block text-sm font-medium text-gray-700">Typ události</label>
             <select
               value={form.event_type}
-              onChange={(e) => setForm({ ...form, event_type: e.target.value })}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm({ ...form, event_type: v, deputy_id: requiresDeputy(v) ? form.deputy_id : "" });
+              }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             >
-              <option value="event">Událost</option>
-              <option value="meeting">Schůzka</option>
-              <option value="reminder">Připomínka</option>
-              <option value="deadline">Termín</option>
+              {EVENT_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
+                </option>
+              ))}
             </select>
           </div>
+          {requiresDeputy(form.event_type) && (
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Zástup *</label>
+              <select
+                required
+                value={form.deputy_id}
+                onChange={(e) => setForm({ ...form, deputy_id: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              >
+                <option value="">— Vyberte zástupa —</option>
+                {deputies.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.first_name} {d.last_name}
+                  </option>
+                ))}
+              </select>
+              {deputies.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">
+                  Nemáte přiřazeno oddělení nebo v oddělení nejsou další uživatelé.
+                </p>
+              )}
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Oddělení</label>
             <select

@@ -46,8 +46,9 @@ export async function POST(req: NextRequest) {
       description = "",
       start_date,
       end_date,
-      event_type = "event",
+      event_type = "jine",
       department_id = null,
+      deputy_id = null,
       is_public = false,
       location = "",
       color = "#DC2626",
@@ -58,11 +59,60 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = parseInt(session.user.id, 10);
+    const eventType = String(event_type).trim() || "jine";
+    let deputyIdNum: number | null = null;
+
+    if (eventType === "dovolena" || eventType === "osobni") {
+      if (!deputy_id) {
+        return NextResponse.json({ error: "U typu Dovolená a Osobní je zástup povinný" }, { status: 400 });
+      }
+      const parsed = parseInt(deputy_id, 10);
+      if (isNaN(parsed)) {
+        return NextResponse.json({ error: "Neplatný zástup" }, { status: 400 });
+      }
+      deputyIdNum = parsed;
+      const user = await prisma.users.findUnique({
+        where: { id: userId },
+        select: {
+          department_id: true,
+          user_secondary_departments: { select: { department_id: true } },
+        },
+      });
+      const deptIds: number[] = [];
+      if (user?.department_id) deptIds.push(user.department_id);
+      for (const s of user?.user_secondary_departments ?? []) {
+        if (!deptIds.includes(s.department_id)) deptIds.push(s.department_id);
+      }
+      const deputy = await prisma.users.findFirst({
+        where: {
+          id: deputyIdNum,
+          is_active: true,
+          OR: [
+            { department_id: { in: deptIds } },
+            { user_secondary_departments: { some: { department_id: { in: deptIds } } } },
+          ],
+        },
+      });
+      if (!deputy) {
+        return NextResponse.json({ error: "Uživatel nemůže být zástupem" }, { status: 400 });
+      }
+    }
+
     const start = new Date(start_date);
     const end = new Date(end_date);
     if (end <= start) {
       return NextResponse.json({ error: "Datum konce musí být po datu začátku" }, { status: 400 });
     }
+
+    const creator = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { first_name: true, last_name: true, department_id: true },
+    });
+    const creatorName = creator ? `${creator.first_name} ${creator.last_name}` : "Uživatel";
+
+    const resolvedDeptId = department_id
+      ? parseInt(department_id, 10)
+      : creator?.department_id ?? null;
 
     const event = await prisma.calendar_events.create({
       data: {
@@ -70,14 +120,38 @@ export async function POST(req: NextRequest) {
         description: description ? String(description).trim() : null,
         start_date: start,
         end_date: end,
-        event_type: String(event_type).trim() || "event",
+        event_type: eventType,
         created_by: userId,
-        department_id: department_id ? parseInt(department_id, 10) : null,
+        department_id: resolvedDeptId,
+        deputy_id: deputyIdNum,
+        requires_approval: deputyIdNum !== null,
+        approval_status: deputyIdNum !== null ? "pending" : null,
         is_public: !!is_public,
         location: location ? String(location).trim() : null,
         color: color ? String(color).trim() : "#DC2626",
       },
     });
+
+    if (deputyIdNum !== null) {
+      await prisma.calendar_approvals.create({
+        data: {
+          event_id: event.id,
+          approver_id: deputyIdNum,
+          approval_type: "deputy",
+          approval_order: 1,
+          status: "pending",
+        },
+      });
+      await prisma.notifications.create({
+        data: {
+          user_id: deputyIdNum,
+          title: "Událost čeká na schválení",
+          message: `${creatorName} vytvořil/a událost „${String(title).trim()}“ (${eventType === "dovolena" ? "Dovolená" : "Osobní"}), která vyžaduje vaše schválení.`,
+          type: "calendar_approval",
+          link: `/calendar/${event.id}`,
+        },
+      });
+    }
 
     return NextResponse.json({ success: true, id: event.id });
   } catch (e) {

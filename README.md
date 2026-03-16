@@ -48,6 +48,10 @@ Aplikace běží na [http://localhost:3000](http://localhost:3000).
 - `middleware.ts` – ochrana rout, přesměrování
 - `prisma/schema.prisma` – schéma z introspected DB
 
+## Dokumentace modulů
+
+- **[Modul Kalendář](docs/MODUL_KALENDAR.md)** – týdenní zobrazení, mřížka dnů × hodin, filtry (Globální/Osobní), CRUD událostí, export .ics
+
 ## Další kroky (Fáze 2)
 
 Migrace modulů – viz [MIGRACE_NEXTJS.md](../MIGRACE_NEXTJS.md) v kořeni projektu.

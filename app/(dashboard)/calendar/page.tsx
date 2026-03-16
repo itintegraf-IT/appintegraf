@@ -4,40 +4,99 @@ import { auth } from "@/auth";
 import { isAdmin } from "@/lib/auth-utils";
 import { Calendar, Plus, Download } from "lucide-react";
 import { CalendarNav } from "./CalendarNav";
+import { CalendarTabs } from "./CalendarTabs";
+import { CalendarViewToggle } from "./CalendarViewToggle";
+import { WeekCalendarGrid } from "./WeekCalendarGrid";
+import { MonthCalendarGrid } from "./MonthCalendarGrid";
+import { getCurrentWeek } from "./lib/week-utils";
+import { getMonthGridStart, getMonthGridEnd } from "./lib/month-utils";
 
 export default async function CalendarPage({
   searchParams,
 }: {
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; scope?: string; view?: string; month?: string }>;
 }) {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
   const admin = await isAdmin(userId);
 
   const params = await searchParams;
+  const scope = params.scope === "mine" ? "mine" : "all";
+  const view = params.view === "month" ? "month" : "week";
+
   const now = new Date();
-  const from = params.from ?? new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const to = params.to ?? new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+  let from: string;
+  let to: string;
+  let month: string | undefined;
+
+  if (view === "month") {
+    const monthParam = params.month;
+    if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+      month = monthParam;
+    } else {
+      month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    }
+    const monthDate = new Date(month + "-01");
+    const gridStart = getMonthGridStart(monthDate);
+    const gridEnd = getMonthGridEnd(monthDate);
+    from = gridStart.toISOString().slice(0, 10);
+    to = gridEnd.toISOString().slice(0, 10);
+  } else {
+    const { from: defaultFrom, to: defaultTo } = getCurrentWeek();
+    from = params.from ?? defaultFrom.toISOString().slice(0, 10);
+    to = params.to ?? defaultTo.toISOString().slice(0, 10);
+  }
 
   const fromDate = new Date(from);
   const toDate = new Date(to);
   toDate.setHours(23, 59, 59, 999);
 
+  const baseWhere = {
+    start_date: { lte: toDate } as const,
+    end_date: { gte: fromDate } as const,
+  };
+
+  let where: typeof baseWhere & { OR?: Array<Record<string, unknown>> } = baseWhere;
+  if (scope === "mine") {
+    const managerDeptIds = await prisma.departments
+      .findMany({
+        where: { manager_id: userId },
+        select: { id: true },
+      })
+      .then((r) => r.map((d) => d.id));
+
+    const orConditions: Array<Record<string, unknown>> = [
+      { created_by: userId },
+      { deputy_id: userId },
+    ];
+    if (managerDeptIds.length > 0) {
+      orConditions.push({
+        approval_status: "deputy_approved",
+        OR: [
+          { department_id: { in: managerDeptIds } },
+          { users: { department_id: { in: managerDeptIds } } },
+        ],
+      } as Record<string, unknown>);
+    }
+    where = { ...baseWhere, OR: orConditions };
+  }
+
   const events = await prisma.calendar_events.findMany({
-    where: {
-      start_date: { lte: toDate },
-      end_date: { gte: fromDate },
-    },
+    where,
     orderBy: { start_date: "asc" },
-    take: 100,
+    take: 200,
     include: {
       users: { select: { first_name: true, last_name: true } },
       departments: { select: { name: true } },
+      users_deputy: { select: { first_name: true, last_name: true } },
     },
   });
 
-  const formatDate = (d: Date) => new Date(d).toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" });
-  const formatTime = (d: Date) => new Date(d).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
+  const eventsForGrid = events.map((e) => ({
+    ...e,
+    start_date: e.start_date,
+    end_date: e.end_date,
+  }));
 
   return (
     <>
@@ -67,59 +126,18 @@ export default async function CalendarPage({
         </div>
       </div>
 
-      <CalendarNav from={from} to={to} />
-
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-gray-200 bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Název</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Datum</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Čas</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Typ</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Místo</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Vytvořil</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                    Žádné události v tomto období
-                  </td>
-                </tr>
-              ) : (
-                events.map((e) => (
-                  <tr key={e.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <Link href={`/calendar/${e.id}`} className="font-medium text-gray-900 hover:text-red-600">
-                        {e.title}
-                      </Link>
-                      {e.description && (
-                        <p className="mt-1 text-sm text-gray-500 line-clamp-2">{e.description}</p>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">{formatDate(e.start_date)}</td>
-                    <td className="px-4 py-3">
-                      {formatTime(e.start_date)} – {formatTime(e.end_date)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded px-2 py-0.5 text-sm" style={{ backgroundColor: `${e.color}20`, color: e.color ?? "#DC2626" }}>
-                        {e.event_type ?? "událost"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">{e.location ?? "-"}</td>
-                    <td className="px-4 py-3">
-                      {e.users ? `${e.users.first_name} ${e.users.last_name}` : "-"}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+      <div className="mb-4 flex flex-wrap items-center gap-4">
+        <CalendarTabs scope={scope} />
+        <CalendarViewToggle view={view} />
       </div>
+
+      <CalendarNav view={view} from={from} to={to} month={month} />
+
+      {view === "month" && month ? (
+        <MonthCalendarGrid events={eventsForGrid} month={month} userId={userId} />
+      ) : (
+        <WeekCalendarGrid events={eventsForGrid} from={from} to={to} userId={userId} />
+      )}
     </>
   );
 }

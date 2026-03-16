@@ -5,13 +5,13 @@ import { signOut } from "next-auth/react";
 import {
   LayoutDashboard,
   Search,
-  Bell,
   User,
   Settings,
   Wrench,
   LogOut,
   Menu,
 } from "lucide-react";
+import { NotificationsDropdown } from "./NotificationsDropdown";
 import { useState } from "react";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -90,20 +90,7 @@ export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
 
           <ThemeToggle />
 
-          <button
-            type="button"
-            className="relative rounded-lg p-2 hover:bg-[var(--accent)]"
-            style={{ color: "var(--foreground)" }}
-            aria-label="Notifikace"
-          >
-            <Bell className="h-5 w-5" />
-            <span
-              className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-medium"
-              style={{ background: "var(--destructive)", color: "white" }}
-            >
-              0
-            </span>
-          </button>
+          <NotificationsDropdown />
 
           <div className="relative">
             <button
