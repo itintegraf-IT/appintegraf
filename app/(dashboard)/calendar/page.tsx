@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { Calendar, Plus } from "lucide-react";
+import { auth } from "@/auth";
+import { isAdmin } from "@/lib/auth-utils";
+import { Calendar, Plus, Download } from "lucide-react";
 import { CalendarNav } from "./CalendarNav";
 
 export default async function CalendarPage({
@@ -8,6 +10,10 @@ export default async function CalendarPage({
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
 }) {
+  const session = await auth();
+  const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
+  const admin = await isAdmin(userId);
+
   const params = await searchParams;
   const now = new Date();
   const from = params.from ?? new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
@@ -43,13 +49,22 @@ export default async function CalendarPage({
           </h1>
           <p className="mt-1 text-gray-600">Události a termíny</p>
         </div>
-        <Link
-          href="/calendar/add"
-          className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
-        >
-          <Plus className="h-4 w-4" />
-          Nová událost
-        </Link>
+        <div className="flex gap-2">
+          <a
+            href={`/api/calendar/export?scope=${admin ? "all" : "mine"}`}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+          >
+            <Download className="h-4 w-4" />
+            Export .ics
+          </a>
+          <Link
+            href="/calendar/add"
+            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
+          >
+            <Plus className="h-4 w-4" />
+            Nová událost
+          </Link>
+        </div>
       </div>
 
       <CalendarNav from={from} to={to} />

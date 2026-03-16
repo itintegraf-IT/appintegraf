@@ -16,6 +16,8 @@ import {
   Users,
   LayoutGrid,
   List,
+  Download,
+  Upload,
 } from "lucide-react";
 
 type Contact = {
@@ -135,15 +137,34 @@ export function ContactsClient({
           </h1>
           <p className="mt-1 text-gray-600">Správa kontaktů v systému</p>
         </div>
-        {canWrite && (
-          <Link
-            href="/contacts/add"
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
+        <div className="flex flex-wrap gap-2">
+          <a
+            href="/api/contacts/export"
+            download="kontakty.csv"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
           >
-            <Plus className="h-4 w-4" />
-            Přidat kontakt
-          </Link>
-        )}
+            <Download className="h-4 w-4" />
+            Export CSV
+          </a>
+          {canWrite && (
+            <>
+              <Link
+                href="/contacts/import"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              >
+                <Upload className="h-4 w-4" />
+                Import CSV
+              </Link>
+              <Link
+                href="/contacts/add"
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
+              >
+                <Plus className="h-4 w-4" />
+                Přidat kontakt
+              </Link>
+            </>
+          )}
+        </div>
       </div>
 
       <form onSubmit={handleSearch} className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">

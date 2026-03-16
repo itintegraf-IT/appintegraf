@@ -32,6 +32,35 @@ async function getUserRoles(userId: number) {
 }
 
 /**
+ * Vrátí seznam oprávnění z module_access (pro kontrolu specifických stringů).
+ */
+export async function getModuleAccessItems(userId: number): Promise<string[]> {
+  const roles = await getUserRoles(userId);
+  const items: string[] = [];
+  for (const role of roles) {
+    const raw = role.module_access;
+    if (raw === null || raw === undefined) continue;
+    let decoded: unknown;
+    try {
+      decoded = typeof raw === "string" ? JSON.parse(raw) : raw;
+    } catch {
+      continue;
+    }
+    if (Array.isArray(decoded)) {
+      for (const x of decoded) {
+        if (typeof x === "string") items.push(x.toLowerCase().trim());
+      }
+    } else if (decoded && typeof decoded === "object") {
+      for (const [k, v] of Object.entries(decoded)) {
+        if (typeof v === "string") items.push(`${k.toLowerCase()}:${v.toLowerCase()}`);
+        else if (v === true) items.push(k.toLowerCase());
+      }
+    }
+  }
+  return [...new Set(items)];
+}
+
+/**
  * Kontrola, zda má uživatel přístup k modulu (kompatibilní s PHP hasModuleAccess)
  */
 export async function hasModuleAccess(
@@ -107,6 +136,7 @@ export async function getLayoutAccess(userId: number): Promise<{
   calendar: boolean;
   kiosk: boolean;
   training: boolean;
+  planovani: boolean;
 }> {
   const roles = await getUserRoles(userId);
   const admin = roles.some((r) => r.name?.toLowerCase() === "admin");
@@ -121,6 +151,7 @@ export async function getLayoutAccess(userId: number): Promise<{
     calendar: checkModule("calendar"),
     kiosk: checkModule("kiosk"),
     training: checkModule("training"),
+    planovani: checkModule("planovani"),
   };
 }
 

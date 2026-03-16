@@ -1,7 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { Header } from "@/components/layout/Header";
-import { Sidebar } from "@/components/layout/Sidebar";
+import { DashboardShell } from "@/components/layout/DashboardShell";
 import { getLayoutAccess } from "@/lib/auth-utils";
 
 export default async function DashboardLayout({
@@ -16,7 +15,7 @@ export default async function DashboardLayout({
   }
 
   const userId = parseInt(session.user.id, 10);
-  const { admin, contacts, equipment, calendar, kiosk, training } = await getLayoutAccess(userId);
+  const { admin, contacts, equipment, calendar, kiosk, training, planovani } = await getLayoutAccess(userId);
 
   const moduleAccess = {
     contacts,
@@ -24,14 +23,18 @@ export default async function DashboardLayout({
     calendar,
     kiosk,
     training,
+    planovani,
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header user={session.user} isAdmin={admin} />
-      <Sidebar user={session.user} isAdmin={admin} moduleAccess={moduleAccess} />
-      <main className="lg:pl-56 pt-14">
-        <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+    <div className="min-h-screen" style={{ background: "var(--background)" }}>
+      <DashboardShell
+        user={session.user}
+        isAdmin={admin}
+        moduleAccess={moduleAccess}
+      />
+      <main className="lg:pl-56 pt-14 print:pt-0 print:pl-0">
+        <div className="p-4 sm:p-6 lg:p-8 print:p-2">{children}</div>
       </main>
     </div>
   );

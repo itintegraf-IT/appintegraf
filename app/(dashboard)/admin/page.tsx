@@ -65,6 +65,12 @@ export default async function AdminPage() {
         >
           Oddělení
         </Link>
+        <Link
+          href="/admin/roles"
+          className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+        >
+          Role
+        </Link>
       </div>
 
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
