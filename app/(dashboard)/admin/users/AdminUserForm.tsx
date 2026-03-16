@@ -14,14 +14,15 @@ const AVAILABLE_MODULES = [
   { key: "training", label: "IT Školení", icon: GraduationCap },
 ] as const;
 
-const ACCESS_LEVELS = [
-  { value: "", label: "Bez přístupu" },
-  { value: "read", label: "Čtení" },
-  { value: "write", label: "Úpravy" },
+/** Mapování UI úrovní na hodnoty v DB (auth-utils: read/write/admin) */
+const PERMISSION_LEVELS = [
+  { value: "read", label: "Viewer" },
+  { value: "write", label: "Editor" },
   { value: "admin", label: "Admin" },
 ] as const;
 
 type Role = { id: number; name: string };
+type Department = { id: number; name: string; code?: string | null };
 type ModuleAccessMap = Record<string, string>;
 type User = {
   id?: number;
@@ -33,7 +34,9 @@ type User = {
   landline?: string | null;
   landline2?: string | null;
   position?: string | null;
+  department_id?: number | null;
   department_name?: string | null;
+  secondary_department_ids?: number[];
   is_active?: boolean | null;
   display_in_list?: boolean | null;
   role_id?: number | null;
@@ -44,6 +47,7 @@ export function AdminUserForm({ user }: { user?: User }) {
   const router = useRouter();
   const isEdit = !!user?.id;
   const [roles, setRoles] = useState<Role[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({
@@ -55,7 +59,8 @@ export function AdminUserForm({ user }: { user?: User }) {
     landline: user?.landline ?? "",
     landline2: user?.landline2 ?? "",
     position: user?.position ?? "",
-    department_name: user?.department_name ?? "",
+    department_id: user?.department_id ?? null,
+    secondary_department_ids: (user?.secondary_department_ids ?? []) as number[],
     role_id: user?.role_id ?? 1,
     module_access: (user?.module_access ?? {}) as ModuleAccessMap,
     is_active: user?.is_active !== false,
@@ -71,6 +76,13 @@ export function AdminUserForm({ user }: { user?: User }) {
   }, []);
 
   useEffect(() => {
+    fetch("/api/departments")
+      .then((r) => r.json())
+      .then((data) => setDepartments(Array.isArray(data) ? data : []))
+      .catch(() => setDepartments([]));
+  }, []);
+
+  useEffect(() => {
     if (user) {
       setForm({
         username: user.username ?? "",
@@ -81,7 +93,8 @@ export function AdminUserForm({ user }: { user?: User }) {
         landline: user.landline ?? "",
         landline2: user.landline2 ?? "",
         position: user.position ?? "",
-        department_name: user.department_name ?? "",
+        department_id: user.department_id ?? null,
+        secondary_department_ids: user.secondary_department_ids ?? [],
         role_id: user.role_id ?? 1,
         module_access: user.module_access ?? {},
         is_active: user.is_active !== false,
@@ -91,7 +104,19 @@ export function AdminUserForm({ user }: { user?: User }) {
     }
   }, [user]);
 
-  const setModuleAccess = (moduleKey: string, level: string) => {
+  const setModuleVisible = (moduleKey: string, visible: boolean) => {
+    setForm((prev) => {
+      const next = { ...prev.module_access };
+      if (visible) {
+        next[moduleKey] = "read"; // výchozí Viewer
+      } else {
+        delete next[moduleKey];
+      }
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setModulePermission = (moduleKey: string, level: string) => {
     setForm((prev) => ({
       ...prev,
       module_access: {
@@ -192,13 +217,82 @@ export function AdminUserForm({ user }: { user?: User }) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Oddělení</label>
-          <input
-            type="text"
-            value={form.department_name}
-            onChange={(e) => setForm({ ...form, department_name: e.target.value })}
+          <label className="mb-1 block text-sm font-medium text-gray-700">Hlavní oddělení</label>
+          <select
+            value={form.department_id ?? ""}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                department_id: e.target.value ? parseInt(e.target.value, 10) : null,
+              })
+            }
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
-          />
+          >
+            <option value="">— Nevybráno</option>
+            {departments.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Sekundární oddělení 1</label>
+          <select
+            value={form.secondary_department_ids[0] ?? ""}
+            onChange={(e) => {
+              const v = e.target.value ? parseInt(e.target.value, 10) : null;
+              setForm((prev) => {
+                const next = [...prev.secondary_department_ids];
+                if (v) next[0] = v;
+                else next.splice(0, 1);
+                return { ...prev, secondary_department_ids: next };
+              });
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2"
+          >
+            <option value="">— Nevybráno</option>
+            {departments
+              .filter(
+                (d) =>
+                  d.id === form.secondary_department_ids[0] ||
+                  (d.id !== form.department_id && d.id !== form.secondary_department_ids[1])
+              )
+              .map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+          </select>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Sekundární oddělení 2</label>
+          <select
+            value={form.secondary_department_ids[1] ?? ""}
+            onChange={(e) => {
+              const v = e.target.value ? parseInt(e.target.value, 10) : null;
+              setForm((prev) => {
+                const next = [...prev.secondary_department_ids];
+                if (v) next[1] = v;
+                else next.splice(1, 1);
+                return { ...prev, secondary_department_ids: next };
+              });
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2"
+          >
+            <option value="">— Nevybráno</option>
+            {departments
+              .filter(
+                (d) =>
+                  d.id === form.secondary_department_ids[1] ||
+                  (d.id !== form.department_id && d.id !== form.secondary_department_ids[0])
+              )
+              .map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+          </select>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
@@ -275,32 +369,41 @@ export function AdminUserForm({ user }: { user?: User }) {
         </div>
       </div>
 
-      {/* Moduly a úroveň přístupu – každý modul má vlastní úroveň */}
+      {/* Moduly – viditelnost a oprávnění */}
       <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-6">
         <h3 className="mb-2 text-lg font-semibold text-gray-900">Přístup k modulům</h3>
         <p className="mb-4 text-sm text-gray-600">
-          U každého modulu nastavte úroveň přístupu. Čtení = pouze prohlížení, Úpravy = může přidávat a měnit, Admin = plný přístup v modulu.
+          Zaškrtnutím povolíte uživateli přístup k modulu (zobrazí se v menu). U každého modulu nastavte úroveň: Viewer = pouze prohlížení, Editor = může přidávat a měnit, Admin = plný přístup v modulu.
         </p>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="space-y-3">
           {AVAILABLE_MODULES.map((mod) => {
             const Icon = mod.icon;
             const level = form.module_access[mod.key] ?? "";
+            const isVisible = !!level;
             return (
               <div
                 key={mod.key}
-                className="flex flex-col gap-2 rounded-lg border border-gray-200 bg-white p-4"
+                className="flex flex-wrap items-center gap-4 rounded-lg border border-gray-200 bg-white p-4"
               >
-                <div className="flex items-center gap-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isVisible}
+                    onChange={(e) => setModuleVisible(mod.key, e.target.checked)}
+                    className="rounded"
+                  />
                   <Icon className="h-5 w-5 shrink-0 text-gray-600" />
                   <span className="text-sm font-medium">{mod.label}</span>
-                </div>
+                </label>
                 <select
-                  value={level}
-                  onChange={(e) => setModuleAccess(mod.key, e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  value={isVisible ? level : ""}
+                  onChange={(e) => setModulePermission(mod.key, e.target.value)}
+                  disabled={!isVisible}
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {ACCESS_LEVELS.map((opt) => (
-                    <option key={opt.value || "none"} value={opt.value}>
+                  <option value="">—</option>
+                  {PERMISSION_LEVELS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>
                   ))}

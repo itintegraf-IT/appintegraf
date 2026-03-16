@@ -73,7 +73,8 @@ export async function POST(req: NextRequest) {
       landline = "",
       landline2 = "",
       position = "",
-      department_name = "",
+      department_id = null,
+      secondary_department_ids = [],
       role_id = 1,
       module_access = {},
       is_active = true,
@@ -99,6 +100,20 @@ export async function POST(req: NextRequest) {
     const passwordHash = await bcrypt.hash(password_custom || "heslo123", 10);
     const roleIdNum = role_id ? parseInt(String(role_id), 10) : 1;
 
+    const deptIdNum = department_id != null ? parseInt(String(department_id), 10) : null;
+    let department_name: string | null = null;
+    if (deptIdNum) {
+      const dept = await prisma.departments.findUnique({
+        where: { id: deptIdNum },
+        select: { name: true },
+      });
+      if (dept) department_name = dept.name;
+    }
+
+    const validSecondaryIds = (Array.isArray(secondary_department_ids) ? secondary_department_ids : [])
+      .filter((d): d is number => typeof d === "number" && !isNaN(d) && d > 0)
+      .slice(0, 2);
+
     const user = await prisma.users.create({
       data: {
         username: username.trim(),
@@ -110,13 +125,22 @@ export async function POST(req: NextRequest) {
         landline: landline.trim() || null,
         landline2: landline2.trim() || null,
         position: position.trim() || null,
-        department_name: department_name.trim() || null,
+        department_id: deptIdNum,
+        department_name,
         role_id: roleIdNum,
         display_in_list: !!display_in_list,
         is_active: !!is_active,
         qr_code: qrCode,
       },
     });
+
+    for (const deptId of validSecondaryIds) {
+      if (deptId !== deptIdNum) {
+        await prisma.user_secondary_departments.create({
+          data: { user_id: user.id, department_id: deptId },
+        });
+      }
+    }
 
     const role = await prisma.roles.findUnique({ where: { id: roleIdNum }, select: { name: true } });
     const isAdminRole = role?.name?.toLowerCase() === "admin";

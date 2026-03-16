@@ -34,6 +34,7 @@ export default async function AdminUserEditPage({
       landline: true,
       landline2: true,
       position: true,
+      department_id: true,
       department_name: true,
       is_active: true,
       display_in_list: true,
@@ -41,6 +42,10 @@ export default async function AdminUserEditPage({
       user_roles: {
         take: 1,
         select: { role_id: true, module_access: true },
+      },
+      user_secondary_departments: {
+        select: { department_id: true },
+        orderBy: { id: "asc" },
       },
     },
   });
@@ -71,9 +76,23 @@ export default async function AdminUserEditPage({
     }
   }
 
-  const { user_roles: _ur, ...rest } = row;
+  // Legacy: pokud má department_name ale ne department_id, zkusíme najít oddělení podle názvu
+  let department_id = row.department_id;
+  if (!department_id && row.department_name) {
+    const dept = await prisma.departments.findFirst({
+      where: { name: row.department_name },
+      select: { id: true },
+    });
+    if (dept) department_id = dept.id;
+  }
+
+  const secondary_department_ids = (row.user_secondary_departments ?? []).map((sd) => sd.department_id);
+
+  const { user_roles: _ur, user_secondary_departments: _usd, ...rest } = row;
   const user = {
     ...rest,
+    department_id,
+    secondary_department_ids,
     role_id: ur?.role_id ?? row.role_id,
     module_access,
   };

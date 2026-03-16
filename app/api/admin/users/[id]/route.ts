@@ -46,6 +46,10 @@ export async function GET(
         take: 1,
         select: { role_id: true, module_access: true },
       },
+      user_secondary_departments: {
+        select: { department_id: true },
+        orderBy: { id: "asc" },
+      },
     },
   });
 
@@ -78,8 +82,26 @@ export async function GET(
   }
   const roleId = ur?.role_id ?? user.role_id;
 
-  const { user_roles: _, ...rest } = user;
-  return NextResponse.json({ ...rest, role_id: roleId, module_access });
+  // Legacy: pokud má department_name ale ne department_id, zkusíme najít oddělení podle názvu
+  let department_id = user.department_id;
+  if (!department_id && user.department_name) {
+    const dept = await prisma.departments.findFirst({
+      where: { name: user.department_name },
+      select: { id: true },
+    });
+    if (dept) department_id = dept.id;
+  }
+
+  const secondary_department_ids = (user.user_secondary_departments ?? []).map((sd) => sd.department_id);
+
+  const { user_roles: _, user_secondary_departments: __, ...rest } = user;
+  return NextResponse.json({
+    ...rest,
+    department_id,
+    secondary_department_ids,
+    role_id: roleId,
+    module_access,
+  });
 }
 
 export async function PUT(
@@ -111,7 +133,8 @@ export async function PUT(
     const landline = (bodyData.landline as string) ?? "";
     const landline2 = (bodyData.landline2 as string) ?? "";
     const position = (bodyData.position as string) ?? "";
-    const department_name = (bodyData.department_name as string) ?? "";
+    const department_id = bodyData.department_id != null ? parseInt(String(bodyData.department_id), 10) : null;
+    const secondary_department_ids = (bodyData.secondary_department_ids as number[] | undefined) ?? [];
     const is_active = bodyData.is_active !== false;
     const display_in_list = bodyData.display_in_list !== false;
     const role_id = bodyData.role_id ?? null;
@@ -131,6 +154,20 @@ export async function PUT(
 
     const roleIdNum = role_id != null ? parseInt(String(role_id), 10) : null;
 
+    // department_name se synchronizuje z hlavního oddělení
+    let department_name: string | null = null;
+    if (department_id) {
+      const dept = await prisma.departments.findUnique({
+        where: { id: department_id },
+        select: { name: true },
+      });
+      if (dept) department_name = dept.name;
+    }
+
+    const validSecondaryIds = secondary_department_ids
+      .filter((d): d is number => typeof d === "number" && !isNaN(d) && d > 0)
+      .slice(0, 2); // max 2
+
     const updateData: Record<string, unknown> = {
       first_name: String(first_name).trim(),
       last_name: String(last_name).trim(),
@@ -139,7 +176,8 @@ export async function PUT(
       landline: landline.trim() || null,
       landline2: landline2.trim() || null,
       position: position.trim() || null,
-      department_name: department_name.trim() || null,
+      department_id,
+      department_name,
       is_active: !!is_active,
       display_in_list: !!display_in_list,
       role_id: roleIdNum,
@@ -154,6 +192,16 @@ export async function PUT(
       where: { id },
       data: updateData,
     });
+
+    // Sekundární oddělení – smazat stará a vytvořit nová
+    await prisma.user_secondary_departments.deleteMany({ where: { user_id: id } });
+    for (const deptId of validSecondaryIds) {
+      if (deptId !== department_id) {
+        await prisma.user_secondary_departments.create({
+          data: { user_id: id, department_id: deptId },
+        });
+      }
+    }
 
     if (roleIdNum) {
       const role = await prisma.roles.findUnique({ where: { id: roleIdNum }, select: { name: true } });
