@@ -23,12 +23,21 @@ export default async function ImlProductDetailPage({
   const id = parseInt((await params).id, 10);
   if (isNaN(id)) notFound();
 
-  const product = await prisma.iml_products.findUnique({
-    where: { id },
-    include: { iml_customers: { select: { id: true, name: true } } },
-  });
+  const [product, customFields] = await Promise.all([
+    prisma.iml_products.findUnique({
+      where: { id },
+      include: { iml_customers: { select: { id: true, name: true } } },
+    }),
+    prisma.iml_custom_fields.findMany({
+      where: { entity: "products", is_active: true },
+      orderBy: { sort_order: "asc" },
+    }),
+  ]);
 
   if (!product) notFound();
+
+  const customData = (product.custom_data as Record<string, unknown> | null) ?? {};
+  const hasCustomData = Object.keys(customData).length > 0;
 
   const fmt = (v: unknown) => (v != null && v !== "" ? String(v) : "-");
   const fmtNum = (v: unknown) => (v != null ? String(v) : "-");
@@ -164,6 +173,26 @@ export default async function ImlProductDetailPage({
             )}
           </div>
         </div>
+
+        {hasCustomData && (
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-sm font-semibold text-gray-700">Vlastní pole</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {customFields.map((f) => {
+                const val = customData[f.field_key];
+                if (val === undefined || val === null || val === "") return null;
+                return (
+                  <div key={f.id}>
+                    <p className="text-sm text-gray-500">{f.label}</p>
+                    <p className="font-medium">
+                      {typeof val === "boolean" ? (val ? "Ano" : "Ne") : String(val)}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

@@ -23,17 +23,26 @@ export default async function ImlOrderDetailPage({
   const id = parseInt((await params).id, 10);
   if (isNaN(id)) notFound();
 
-  const order = await prisma.iml_orders.findUnique({
-    where: { id },
-    include: {
-      iml_customers: true,
-      iml_order_items: {
-        include: { iml_products: { select: { id: true, ig_code: true, ig_short_name: true, client_name: true } } },
+  const [order, customFields] = await Promise.all([
+    prisma.iml_orders.findUnique({
+      where: { id },
+      include: {
+        iml_customers: true,
+        iml_order_items: {
+          include: { iml_products: { select: { id: true, ig_code: true, ig_short_name: true, client_name: true } } },
+        },
       },
-    },
-  });
+    }),
+    prisma.iml_custom_fields.findMany({
+      where: { entity: "orders", is_active: true },
+      orderBy: { sort_order: "asc" },
+    }),
+  ]);
 
   if (!order) notFound();
+
+  const customData = (order.custom_data as Record<string, unknown> | null) ?? {};
+  const hasCustomData = Object.keys(customData).length > 0;
 
   return (
     <>
@@ -91,6 +100,26 @@ export default async function ImlOrderDetailPage({
           )}
         </div>
       </div>
+
+      {hasCustomData && (
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-4 text-sm font-semibold text-gray-700">Vlastní pole</h3>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {customFields.map((f) => {
+              const val = customData[f.field_key];
+              if (val === undefined || val === null || val === "") return null;
+              return (
+                <div key={f.id}>
+                  <p className="text-sm text-gray-500">{f.label}</p>
+                  <p className="font-medium">
+                    {typeof val === "boolean" ? (val ? "Ano" : "Ne") : String(val)}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <h3 className="border-b border-gray-200 px-6 py-4 text-sm font-semibold text-gray-700">Položky</h3>

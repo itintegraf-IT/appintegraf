@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
 
 type Customer = { id: number; name: string };
 type Product = { id: number; ig_code: string | null; ig_short_name: string | null; client_name: string | null };
@@ -26,6 +27,7 @@ export default function ImlOrderEditPage() {
     notes: "",
   });
   const [items, setItems] = useState<{ product_id: string; product_name: string; quantity: string; unit_price: string }[]>([]);
+  const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
 
   useEffect(() => {
     Promise.all([
@@ -52,6 +54,14 @@ export default function ImlOrderEditPage() {
             unit_price: it.unit_price != null ? String(it.unit_price) : "",
           }))
         );
+        if (o.custom_data && typeof o.custom_data === "object") {
+          const cd = o.custom_data as Record<string, unknown>;
+          const init: Record<string, string | number | boolean> = {};
+          for (const [k, v] of Object.entries(cd)) {
+            if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") init[k] = v;
+          }
+          setCustomData(init);
+        }
       }
     }).catch(() => setError("Chyba při načítání"))
       .finally(() => setLoadingData(false));
@@ -96,6 +106,7 @@ export default function ImlOrderEditPage() {
           ...form,
           order_date: form.order_date,
           items: orderItems,
+          custom_data: Object.keys(customData).length > 0 ? customData : null,
         }),
       });
 
@@ -203,6 +214,14 @@ export default function ImlOrderEditPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
+        </div>
+
+        <div className="mt-6">
+          <CustomFieldsFormSection
+            entity="orders"
+            values={customData}
+            onChange={setCustomData}
+          />
         </div>
 
         <div className="mt-6">

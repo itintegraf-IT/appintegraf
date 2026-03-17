@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -66,18 +67,32 @@ export async function PUT(
 
   try {
     const body = await req.json();
-    const { order_date, status, notes, items } = body;
+    const { order_date, status, notes, items, custom_data } = body;
 
     const orderDate = order_date ? new Date(order_date) : existing.order_date;
     const newStatus = status != null ? String(status).trim() : existing.status;
     const newNotes = notes != null ? (notes ? String(notes).trim() : null) : existing.notes;
+    const parsedCustom = custom_data !== undefined ? parseOrderCustomData(custom_data) : undefined;
+    const customDataForPrisma =
+      parsedCustom === undefined
+        ? undefined
+        : parsedCustom === null
+          ? Prisma.DbNull
+          : (parsedCustom as Prisma.InputJsonValue);
+
+    const updateData: Record<string, unknown> = {
+      order_date: orderDate,
+      status: newStatus,
+      notes: newNotes,
+    };
+    if (customDataForPrisma !== undefined) updateData.custom_data = customDataForPrisma;
 
     let totalSum = 0;
 
     await prisma.$transaction(async (tx) => {
       await tx.iml_orders.update({
         where: { id },
-        data: { order_date: orderDate, status: newStatus, notes: newNotes },
+        data: updateData as Parameters<typeof tx.iml_orders.update>[0]["data"],
       });
 
       if (Array.isArray(items)) {
@@ -127,6 +142,23 @@ export async function PUT(
     console.error("IML orders PUT error:", e);
     return NextResponse.json({ error: "Chyba při ukládání objednávky" }, { status: 500 });
   }
+}
+
+function parseOrderCustomData(val: unknown): Record<string, unknown> | null {
+  if (val == null) return null;
+  if (typeof val === "object" && !Array.isArray(val)) {
+    const obj = val as Record<string, unknown>;
+    const clean: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof k === "string" && /^[a-z0-9_]+$/.test(k)) {
+        if (v === null || v === undefined || v === "") continue;
+        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") clean[k] = v;
+        else if (v instanceof Date) clean[k] = v.toISOString().slice(0, 10);
+      }
+    }
+    return Object.keys(clean).length > 0 ? clean : null;
+  }
+  return null;
 }
 
 export async function DELETE(

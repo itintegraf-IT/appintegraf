@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { customer_id, order_number, order_date, status = "nová", notes, items } = body;
+    const { customer_id, order_number, order_date, status = "nová", notes, items, custom_data } = body;
 
     if (!customer_id || !order_number || !order_date) {
       return NextResponse.json({ error: "Vyplňte zákazníka, číslo objednávky a datum" }, { status: 400 });
@@ -84,6 +85,7 @@ export async function POST(req: NextRequest) {
           status: String(status).trim() || "nová",
           notes: notes ? String(notes).trim() : null,
           total: null,
+          custom_data: (parseOrderCustomData(custom_data) ?? Prisma.DbNull) as Prisma.InputJsonValue,
         },
       });
 
@@ -129,4 +131,21 @@ export async function POST(req: NextRequest) {
     console.error("IML orders POST error:", e);
     return NextResponse.json({ error: "Chyba při vytváření objednávky" }, { status: 500 });
   }
+}
+
+function parseOrderCustomData(val: unknown): Record<string, unknown> | null {
+  if (val == null) return null;
+  if (typeof val === "object" && !Array.isArray(val)) {
+    const obj = val as Record<string, unknown>;
+    const clean: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof k === "string" && /^[a-z0-9_]+$/.test(k)) {
+        if (v === null || v === undefined || v === "") continue;
+        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") clean[k] = v;
+        else if (v instanceof Date) clean[k] = v.toISOString().slice(0, 10);
+      }
+    }
+    return Object.keys(clean).length > 0 ? clean : null;
+  }
+  return null;
 }

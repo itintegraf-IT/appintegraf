@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { CustomFieldsFormSection } from "../../_components/CustomFieldsFormSection";
 
 type Customer = { id: number; name: string };
 type Product = { id: number; ig_code: string | null; ig_short_name: string | null; client_name: string | null };
@@ -22,6 +23,7 @@ export default function ImlOrderAddPage() {
     notes: "",
   });
   const [items, setItems] = useState<{ product_id: string; product_name: string; quantity: string; unit_price: string }[]>([]);
+  const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
 
   useEffect(() => {
     Promise.all([
@@ -72,6 +74,7 @@ export default function ImlOrderAddPage() {
           ...form,
           customer_id: parseInt(form.customer_id, 10),
           items: orderItems,
+          custom_data: Object.keys(customData).length > 0 ? customData : undefined,
         }),
       });
 
@@ -170,6 +173,14 @@ export default function ImlOrderAddPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
+        </div>
+
+        <div className="mt-6">
+          <CustomFieldsFormSection
+            entity="orders"
+            values={customData}
+            onChange={setCustomData}
+          />
         </div>
 
         <div className="mt-6">

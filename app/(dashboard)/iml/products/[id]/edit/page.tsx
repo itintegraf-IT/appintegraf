@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ProductFilesUpload } from "../../_components/ProductFilesUpload";
+import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
 
 type Customer = { id: number; name: string };
 type Product = Record<string, string | number | boolean | null | undefined>;
@@ -18,6 +19,7 @@ export default function ImlProductEditPage() {
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
   const [form, setForm] = useState<Record<string, string | boolean>>({});
+  const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
   const [hasImage, setHasImage] = useState(false);
   const [hasPdf, setHasPdf] = useState(false);
 
@@ -59,6 +61,14 @@ export default function ImlProductEditPage() {
         });
         setHasImage(!!p.has_image);
         setHasPdf(!!p.has_pdf);
+        if (p.custom_data && typeof p.custom_data === "object") {
+          const cd = p.custom_data as Record<string, unknown>;
+          const init: Record<string, string | number | boolean> = {};
+          for (const [k, v] of Object.entries(cd)) {
+            if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") init[k] = v;
+          }
+          setCustomData(init);
+        }
       }
     }).catch(() => setError("Chyba při načítání"))
       .finally(() => setLoadingData(false));
@@ -80,6 +90,7 @@ export default function ImlProductEditPage() {
           pieces_per_box: form.pieces_per_box ? parseInt(String(form.pieces_per_box), 10) : null,
           pieces_per_pallet: form.pieces_per_pallet ? parseInt(String(form.pieces_per_pallet), 10) : null,
           stock_quantity: form.stock_quantity ? parseInt(String(form.stock_quantity), 10) : null,
+          custom_data: Object.keys(customData).length > 0 ? customData : null,
         }),
       });
 
@@ -408,6 +419,12 @@ export default function ImlProductEditPage() {
           </div>
           </div>
         </div>
+
+        <CustomFieldsFormSection
+          entity="products"
+          values={customData}
+          onChange={setCustomData}
+        />
 
         <div className="flex gap-2">
           <button

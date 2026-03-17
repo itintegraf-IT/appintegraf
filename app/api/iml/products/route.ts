@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -113,8 +114,11 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const customDataForPrisma =
+      data.custom_data === null ? Prisma.DbNull : (data.custom_data as Prisma.InputJsonValue);
+    const createPayload = { ...data, custom_data: customDataForPrisma, last_edited_by: editorName };
     const product = await prisma.iml_products.create({
-      data: { ...data, last_edited_by: editorName },
+      data: createPayload as Parameters<typeof prisma.iml_products.create>[0]["data"],
     });
 
     await logImlAudit({
@@ -165,5 +169,23 @@ function parseProductBody(body: Record<string, unknown>) {
     stock_quantity: int(body.stock_quantity),
     sku: str(body.sku),
     is_active: body.is_active !== false,
+    custom_data: parseCustomData(body.custom_data),
   };
+}
+
+function parseCustomData(val: unknown): Record<string, unknown> | null {
+  if (val == null) return null;
+  if (typeof val === "object" && !Array.isArray(val)) {
+    const obj = val as Record<string, unknown>;
+    const clean: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+      if (typeof k === "string" && /^[a-z0-9_]+$/.test(k)) {
+        if (v === null || v === undefined || v === "") continue;
+        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") clean[k] = v;
+        else if (v instanceof Date) clean[k] = v.toISOString().slice(0, 10);
+      }
+    }
+    return Object.keys(clean).length > 0 ? clean : null;
+  }
+  return null;
 }

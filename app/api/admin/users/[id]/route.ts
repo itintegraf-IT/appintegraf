@@ -71,6 +71,7 @@ export async function GET(
             planovani: "admin",
             kiosk: "admin",
             training: "admin",
+            iml: "admin",
           };
         } else {
           module_access = decoded as Record<string, string>;

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ProductFilesUpload } from "../_components/ProductFilesUpload";
 import { ProductFilesUploadPlaceholder } from "../_components/ProductFilesUploadPlaceholder";
+import { CustomFieldsFormSection } from "../../_components/CustomFieldsFormSection";
 
 type Customer = { id: number; name: string };
 
@@ -43,6 +44,7 @@ export default function ImlProductAddPage() {
     stock_quantity: "",
     sku: "",
   });
+  const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
 
   useEffect(() => {
     fetch("/api/iml/customers")
@@ -67,6 +69,7 @@ export default function ImlProductAddPage() {
           pieces_per_box: form.pieces_per_box ? parseInt(form.pieces_per_box, 10) : null,
           pieces_per_pallet: form.pieces_per_pallet ? parseInt(form.pieces_per_pallet, 10) : null,
           stock_quantity: form.stock_quantity ? parseInt(form.stock_quantity, 10) : null,
+          custom_data: Object.keys(customData).length > 0 ? customData : undefined,
         }),
       });
 
@@ -412,6 +415,12 @@ export default function ImlProductAddPage() {
           </div>
         </div>
         </div>
+
+        <CustomFieldsFormSection
+          entity="products"
+          values={customData}
+          onChange={setCustomData}
+        />
 
         <div className="flex gap-2">
           <button

@@ -13,9 +13,7 @@ Přehled dokumentace modulů a specifikací projektu.
 
 | Dokument | Popis |
 |----------|-------|
-| [MODUL_IML.md](MODUL_IML.md) | Dokumentace modulu IML – funkce, export/import, API |
-| [NAVRH_MODULU_IML.md](NAVRH_MODULU_IML.md) | Návrh modulu IML – databáze, struktura, fáze implementace |
-| [Readme_IML.md](Readme_IML.md) | Původní specifikace NewIML – zákazníci, objednávky, produkty |
+| [MODUL_IML.md](MODUL_IML.md) | Kompletní dokumentace modulu IML – přehled, databáze, API, export/import, vlastní pole, fáze implementace |
 
 ## Migrace
 

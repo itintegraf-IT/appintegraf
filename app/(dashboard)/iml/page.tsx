@@ -3,7 +3,7 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Package, Users, ShoppingCart, FileText, BarChart3, Clock } from "lucide-react";
+import { Package, Users, ShoppingCart, FileText, BarChart3, Clock, Settings } from "lucide-react";
 import { subMonths } from "date-fns";
 
 export default async function ImlPage() {
@@ -89,9 +89,16 @@ export default async function ImlPage() {
           </h1>
           <p className="mt-1 text-gray-600">Zákazníci, produkty a objednávky</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canWrite && (
             <>
+              <Link
+                href="/iml/settings"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              >
+                <Settings className="h-4 w-4" />
+                Vlastní pole
+              </Link>
               <Link
                 href="/iml/customers/add"
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
