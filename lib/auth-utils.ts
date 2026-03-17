@@ -139,6 +139,7 @@ export async function getLayoutAccess(userId: number): Promise<{
   kiosk: boolean;
   training: boolean;
   planovani: boolean;
+  iml: boolean;
 }> {
   const roles = await getUserRoles(userId);
   const admin = roles.some((r) => r.name?.toLowerCase() === "admin");
@@ -154,6 +155,7 @@ export async function getLayoutAccess(userId: number): Promise<{
     kiosk: checkModule("kiosk"),
     training: checkModule("training"),
     planovani: checkModule("planovani"),
+    iml: checkModule("iml"),
   };
 }
 

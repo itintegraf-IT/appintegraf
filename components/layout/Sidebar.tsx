@@ -18,6 +18,7 @@ import {
   CalendarDays,
   PanelLeftClose,
   PanelLeft,
+  Package,
 } from "lucide-react";
 import {
   Tooltip,
@@ -88,6 +89,7 @@ const navItems = [
   { href: "/equipment", icon: Laptop, label: "Majetek", module: "equipment" },
   { href: "/calendar", icon: Calendar, label: "Kalendář", module: "calendar" },
   { href: "/planovani", icon: CalendarDays, label: "Plánování výroby", module: "planovani" },
+  { href: "/iml", icon: Package, label: "IML", module: "iml" },
   { href: "/kiosk", icon: Tv, label: "Kiosk Monitory", module: "kiosk" },
   { href: "/phone-list", icon: Phone, label: "Telefonní seznam", module: null },
   { href: "/training", icon: GraduationCap, label: "IT Školení", module: "training" },

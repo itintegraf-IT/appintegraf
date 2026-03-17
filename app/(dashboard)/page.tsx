@@ -21,13 +21,14 @@ import {
   Clock,
   ChevronRight,
   Bell,
+  Package,
 } from "lucide-react";
 
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
 
-  const [stats, contactsRead, equipmentRead, calendarRead, kioskRead, trainingRead, trainingWrite, contactsWrite, equipmentWrite, kioskWrite, pendingEvents, notifications] =
+  const [stats, contactsRead, equipmentRead, calendarRead, kioskRead, trainingRead, trainingWrite, contactsWrite, equipmentWrite, kioskWrite, imlRead, imlWrite, pendingEvents, notifications] =
     await Promise.all([
       Promise.all([
         prisma.users.count({ where: { is_active: true } }),
@@ -49,6 +50,8 @@ export default async function DashboardPage() {
       hasModuleAccess(userId, "contacts", "write"),
       hasModuleAccess(userId, "equipment", "write"),
       hasModuleAccess(userId, "kiosk", "write"),
+      hasModuleAccess(userId, "iml", "read"),
+      hasModuleAccess(userId, "iml", "write"),
       (async () => {
         if (userId === 0) return [];
         const canReadCalendar = await hasModuleAccess(userId, "calendar", "read");
@@ -104,12 +107,14 @@ export default async function DashboardPage() {
     { href: "/public/phone-list", icon: Phone, label: "Veřejný telefonní seznam", desc: "Bez přihlášení", show: true },
     { href: "/public/equipment-request", icon: ClipboardList, label: "Požadavek na techniku", desc: "Veřejný formulář", show: true },
     { href: "/kiosk", icon: Tv, label: "Kiosk Monitory", desc: "Správa prezentací pro monitory", show: kioskRead },
+    { href: "/iml", icon: Package, label: "IML", desc: "Zákazníci, produkty a objednávky", show: imlRead },
     { href: "/training", icon: GraduationCap, label: "IT Bezpečnostní školení", desc: "Testy a vzdělávání zaměstnanců", show: trainingRead },
   ];
 
   const quickActions = [
     { href: "/contacts/add", icon: UserPlus, label: "Přidat kontakt", show: contactsWrite },
     { href: "/equipment/add", icon: Laptop, label: "Přidat vybavení", show: equipmentWrite },
+    { href: "/iml/customers/add", icon: Package, label: "Nový zákazník IML", show: imlWrite },
     { href: "/kiosk/create", icon: PlusCircle, label: "Nová prezentace", show: kioskWrite },
     { href: "/calendar/add", icon: CalendarPlus, label: "Nová událost", show: calendarRead },
     { href: "/training/create-test", icon: FileText, label: "Nový test", show: trainingWrite },

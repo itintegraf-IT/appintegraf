@@ -1,0 +1,169 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { prisma } from "@/lib/db";
+import { hasModuleAccess } from "@/lib/auth-utils";
+import { logImlAudit } from "@/lib/iml-audit";
+
+const productListSelect = {
+  id: true,
+  customer_id: true,
+  ig_code: true,
+  ig_short_name: true,
+  client_code: true,
+  client_name: true,
+  requester: true,
+  label_shape_code: true,
+  product_format: true,
+  die_cut_tool_code: true,
+  assembly_code: true,
+  positions_on_sheet: true,
+  pieces_per_box: true,
+  pieces_per_pallet: true,
+  foil_type: true,
+  color_coverage: true,
+  print_note: true,
+  has_print_sample: true,
+  ean_code: true,
+  production_notes: true,
+  approval_status: true,
+  realization_log: true,
+  internal_note: true,
+  last_edited_by: true,
+  item_status: true,
+  print_data_version: true,
+  stock_quantity: true,
+  sku: true,
+  is_active: true,
+  created_at: true,
+  updated_at: true,
+  iml_customers: { select: { id: true, name: true } },
+} as const;
+
+export async function GET(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
+  }
+
+  const userId = parseInt(session.user.id, 10);
+  if (!(await hasModuleAccess(userId, "iml", "read"))) {
+    return NextResponse.json({ error: "Nemáte oprávnění k modulu IML" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const search = searchParams.get("search")?.trim() ?? "";
+  const customerId = searchParams.get("customer_id");
+  const status = searchParams.get("status");
+
+  const where: Record<string, unknown> = {};
+  if (search) {
+    where.OR = [
+      { ig_code: { contains: search } },
+      { ig_short_name: { contains: search } },
+      { client_code: { contains: search } },
+      { client_name: { contains: search } },
+      { sku: { contains: search } },
+    ];
+  }
+  if (customerId) {
+    where.customer_id = parseInt(customerId, 10);
+  }
+  if (status) {
+    where.item_status = status;
+  }
+
+  const products = await prisma.iml_products.findMany({
+    where,
+    orderBy: { id: "desc" },
+    take: 200,
+    select: {
+      ...productListSelect,
+      iml_customers: { select: { id: true, name: true } },
+    },
+  });
+
+  return NextResponse.json({ products });
+}
+
+export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
+  }
+
+  const userId = parseInt(session.user.id, 10);
+  if (!(await hasModuleAccess(userId, "iml", "write"))) {
+    return NextResponse.json({ error: "Nemáte oprávnění k úpravám IML" }, { status: 403 });
+  }
+
+  const user = await prisma.users.findUnique({
+    where: { id: userId },
+    select: { first_name: true, last_name: true },
+  });
+  const editorName = user ? `${user.first_name} ${user.last_name}` : `user_${userId}`;
+
+  try {
+    const body = await req.json();
+    const data = parseProductBody(body);
+
+    if (data.sku) {
+      const existing = await prisma.iml_products.findFirst({ where: { sku: data.sku } });
+      if (existing) {
+        return NextResponse.json({ error: "Produkt s tímto SKU již existuje" }, { status: 400 });
+      }
+    }
+
+    const product = await prisma.iml_products.create({
+      data: { ...data, last_edited_by: editorName },
+    });
+
+    await logImlAudit({
+      userId,
+      action: "create",
+      tableName: "iml_products",
+      recordId: product.id,
+      newValues: { ig_code: product.ig_code, client_name: product.client_name },
+    });
+
+    return NextResponse.json({ success: true, id: product.id });
+  } catch (e) {
+    console.error("IML products POST error:", e);
+    return NextResponse.json({ error: "Chyba při vytváření produktu" }, { status: 500 });
+  }
+}
+
+function parseProductBody(body: Record<string, unknown>) {
+  const str = (v: unknown) => (v != null && v !== "" ? String(v).trim() : null);
+  const int = (v: unknown) => (v != null && v !== "" ? parseInt(String(v), 10) : null);
+  const num = (v: unknown) => (v != null && v !== "" ? parseFloat(String(v)) : null);
+
+  return {
+    customer_id: body.customer_id != null ? int(body.customer_id) : null,
+    ig_code: str(body.ig_code),
+    ig_short_name: str(body.ig_short_name),
+    client_code: str(body.client_code),
+    client_name: str(body.client_name),
+    requester: str(body.requester),
+    label_shape_code: str(body.label_shape_code),
+    product_format: str(body.product_format),
+    die_cut_tool_code: str(body.die_cut_tool_code),
+    assembly_code: str(body.assembly_code),
+    positions_on_sheet: int(body.positions_on_sheet),
+    pieces_per_box: int(body.pieces_per_box),
+    pieces_per_pallet: int(body.pieces_per_pallet),
+    foil_type: str(body.foil_type),
+    color_coverage: str(body.color_coverage),
+    print_note: str(body.print_note),
+    has_print_sample: !!body.has_print_sample,
+    ean_code: str(body.ean_code),
+    production_notes: str(body.production_notes),
+    approval_status: str(body.approval_status),
+    realization_log: str(body.realization_log),
+    internal_note: str(body.internal_note),
+    item_status: str(body.item_status),
+    print_data_version: str(body.print_data_version),
+    stock_quantity: int(body.stock_quantity),
+    sku: str(body.sku),
+    is_active: body.is_active !== false,
+  };
+}
