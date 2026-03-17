@@ -10,10 +10,13 @@ import {
   Wrench,
   LogOut,
   Menu,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 import { useState } from "react";
 import { ThemeToggle } from "./ThemeToggle";
+import { useSidebar } from "./SidebarContext";
 
 type HeaderProps = {
   user: {
@@ -27,6 +30,7 @@ type HeaderProps = {
 
 export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { collapsed, toggleCollapsed } = useSidebar();
 
   const initials = user.name
     ? user.name
@@ -41,10 +45,10 @@ export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
     <header
       className="sticky top-0 z-40 flex h-14 items-center border-b px-4"
       style={{
-        background: "color-mix(in oklab, var(--surface) 88%, transparent)",
+        background: "color-mix(in oklab, var(--surface) 92%, transparent)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
-        borderColor: "color-mix(in oklab, var(--border) 70%, transparent)",
+        borderColor: "var(--border)",
       }}
     >
       <div className="flex w-full items-center justify-between">
@@ -52,15 +56,29 @@ export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
           <button
             type="button"
             onClick={onMenuClick}
-            className="lg:hidden rounded-lg p-2 hover:bg-[var(--accent)]"
+            className="lg:hidden rounded-lg p-2 transition-colors hover:bg-[var(--accent)]"
             style={{ color: "var(--foreground)" }}
             aria-label="Menu"
           >
             <Menu className="h-5 w-5" />
           </button>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className="hidden lg:flex rounded-lg p-2 transition-colors hover:bg-[var(--accent)]"
+            style={{ color: "var(--foreground)" }}
+            aria-label={collapsed ? "Rozbalit menu" : "Sbalit na ikony"}
+            title={collapsed ? "Rozbalit menu" : "Sbalit na ikony"}
+          >
+            {collapsed ? (
+              <PanelLeft className="h-5 w-5" />
+            ) : (
+              <PanelLeftClose className="h-5 w-5" />
+            )}
+          </button>
           <Link
             href="/"
-            className="flex items-center gap-2 font-bold"
+            className="flex items-center gap-2 font-bold transition-colors hover:opacity-90"
             style={{ color: "var(--primary)" }}
           >
             <LayoutDashboard className="h-6 w-6" />

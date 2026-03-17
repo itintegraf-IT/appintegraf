@@ -1,6 +1,6 @@
 # Kalendář – dvoufázové schvalování (2. fáze)
 
-**Implementováno březen 2026.**
+**Implementováno březen 2026.** Viz též hlavní dokumentace `docs/MODUL_KALENDAR.md`.
 
 ## Cíl
 

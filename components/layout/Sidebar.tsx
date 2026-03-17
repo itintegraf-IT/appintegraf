@@ -16,7 +16,16 @@ import {
   Settings,
   LogOut,
   CalendarDays,
+  PanelLeftClose,
+  PanelLeft,
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useSidebar } from "./SidebarContext";
 
 type SidebarProps = {
   user: { name?: string | null };
@@ -25,6 +34,53 @@ type SidebarProps = {
   mobileOpen?: boolean;
   onClose?: () => void;
 };
+
+function NavLink({
+  href,
+  icon: Icon,
+  label,
+  isActive,
+  onClick,
+  collapsed,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  isActive: boolean;
+  onClick?: () => void;
+  collapsed: boolean;
+}) {
+  const linkContent = (
+    <Link
+      href={href}
+      onClick={onClick}
+      className={`flex items-center gap-3 rounded-lg border-l-[3px] px-3 py-2 text-sm transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] ${
+        collapsed ? "justify-center px-2" : ""
+      }`}
+      style={{
+        background: isActive ? "var(--sidebar-accent)" : "transparent",
+        color: isActive ? "var(--sidebar-accent-foreground)" : "var(--sidebar-foreground)",
+        borderLeftColor: isActive ? "var(--sidebar-primary)" : "transparent",
+      }}
+    >
+      <Icon className="h-5 w-5 shrink-0" />
+      {!collapsed && <span>{label}</span>}
+    </Link>
+  );
+
+  if (collapsed) {
+    return (
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>
+          {label}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return linkContent;
+}
 
 const navItems = [
   { href: "/", icon: LayoutDashboard, label: "Dashboard", module: null },
@@ -39,6 +95,8 @@ const navItems = [
 
 export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { collapsed, toggleCollapsed } = useSidebar();
+  const isCollapsed = collapsed && !mobileOpen;
 
   const initials = user.name
     ? user.name
@@ -59,15 +117,49 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
         />
       )}
       <aside
-        className={`fixed left-0 top-14 z-50 h-[calc(100vh-3.5rem)] w-56 flex-col border-r transition-transform duration-200 lg:flex ${
+        className={`fixed left-0 top-14 z-50 h-[calc(100vh-3.5rem)] flex-col border-r transition-all duration-200 lg:flex ${
           mobileOpen ? "flex translate-x-0" : "hidden -translate-x-full lg:translate-x-0"
-        }`}
+        } ${isCollapsed ? "w-16" : "w-56"}`}
         style={{
           background: "var(--sidebar)",
           borderColor: "var(--sidebar-border)",
         }}
       >
+      <div className="flex flex-col h-full">
+      <div
+        className={`flex items-center border-b shrink-0 ${isCollapsed ? "justify-center px-2 py-2" : "justify-between px-3 py-2"}`}
+        style={{ borderColor: "var(--sidebar-border)" }}
+      >
+        {!isCollapsed && (
+          <span className="text-sm font-medium" style={{ color: "var(--sidebar-foreground)" }}>
+            Menu
+          </span>
+        )}
+        <TooltipProvider>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={toggleCollapsed}
+                className="rounded-lg p-2 hover:bg-[var(--sidebar-accent)] transition-colors"
+                style={{ color: "var(--sidebar-foreground)" }}
+                aria-label={isCollapsed ? "Rozbalit menu" : "Sbalit menu"}
+              >
+                {isCollapsed ? (
+                  <PanelLeft className="h-5 w-5" />
+                ) : (
+                  <PanelLeftClose className="h-5 w-5" />
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              {isCollapsed ? "Rozbalit menu" : "Sbalit na ikony"}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
       <nav className="flex-1 overflow-y-auto py-4">
+        <TooltipProvider>
         <ul className="space-y-0.5 px-2">
           {navItems.map((item) => {
             if (item.module && !moduleAccess[item.module]) return null;
@@ -75,21 +167,16 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
               item.href === "/"
                 ? pathname === "/"
                 : pathname.startsWith(item.href);
-            const Icon = item.icon;
             return (
               <li key={item.href}>
-                <Link
+                <NavLink
                   href={item.href}
+                  icon={item.icon}
+                  label={item.label}
+                  isActive={!!isActive}
                   onClick={onClose}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
-                  style={{
-                    background: isActive ? "var(--sidebar-accent)" : "transparent",
-                    color: isActive ? "var(--sidebar-accent-foreground)" : "var(--sidebar-foreground)",
-                  }}
-                >
-                  <Icon className="h-5 w-5 shrink-0" />
-                  {item.label}
-                </Link>
+                  collapsed={isCollapsed}
+                />
               </li>
             );
           })}
@@ -98,89 +185,99 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
             <>
               <li className="my-2 border-t" style={{ borderColor: "var(--sidebar-border)" }} />
               <li>
-                <Link
+                <NavLink
                   href="/admin"
+                  icon={Wrench}
+                  label="Administrace"
+                  isActive={pathname.startsWith("/admin")}
                   onClick={onClose}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
-                  style={{
-                    background: pathname.startsWith("/admin") ? "var(--sidebar-accent)" : "transparent",
-                    color: pathname.startsWith("/admin") ? "var(--sidebar-accent-foreground)" : "var(--sidebar-foreground)",
-                  }}
-                >
-                  <Wrench className="h-5 w-5" />
-                  Administrace
-                </Link>
+                  collapsed={isCollapsed}
+                />
               </li>
               <li>
-                <Link
+                <NavLink
                   href="/admin/reports"
+                  icon={BarChart3}
+                  label="Reporty"
+                  isActive={pathname === "/admin/reports"}
                   onClick={onClose}
-                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
-                  style={{
-                    background: pathname === "/admin/reports" ? "var(--sidebar-accent)" : "transparent",
-                    color: pathname === "/admin/reports" ? "var(--sidebar-accent-foreground)" : "var(--sidebar-foreground)",
-                  }}
-                >
-                  <BarChart3 className="h-5 w-5" />
-                  Reporty
-                </Link>
+                  collapsed={isCollapsed}
+                />
               </li>
             </>
           )}
 
           <li className="my-2 border-t" style={{ borderColor: "var(--sidebar-border)" }} />
           <li>
-            <Link
+            <NavLink
               href="/profile"
+              icon={User}
+              label="Profil"
+              isActive={false}
               onClick={onClose}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-[var(--sidebar-accent)]"
-              style={{ color: "var(--sidebar-foreground)" }}
-            >
-              <User className="h-5 w-5" />
-              Profil
-            </Link>
+              collapsed={isCollapsed}
+            />
           </li>
           <li>
-            <Link
+            <NavLink
               href="/settings"
+              icon={Settings}
+              label="Nastavení"
+              isActive={false}
               onClick={onClose}
-              className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm hover:bg-[var(--sidebar-accent)]"
-              style={{ color: "var(--sidebar-foreground)" }}
-            >
-              <Settings className="h-5 w-5" />
-              Nastavení
-            </Link>
+              collapsed={isCollapsed}
+            />
           </li>
         </ul>
+        </TooltipProvider>
       </nav>
 
       <div
-        className="flex items-center gap-3 border-t p-3"
+        className={`flex items-center border-t p-3 ${isCollapsed ? "flex-col gap-2 justify-center" : "gap-3"}`}
         style={{ borderColor: "var(--sidebar-border)" }}
       >
-        <div
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium"
-          style={{ background: "var(--sidebar-primary)", color: "var(--sidebar-primary-foreground)" }}
-        >
-          {initials}
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium" style={{ color: "var(--sidebar-foreground)" }}>
-            {user.name}
-          </p>
-          <p className="truncate text-xs" style={{ color: "var(--muted-foreground)" }}>
-            Odhlásit
-          </p>
-        </div>
-        <Link
-          href="/api/auth/signout"
-          onClick={onClose}
-          className="rounded-lg p-2 hover:bg-[var(--sidebar-accent)]"
-          style={{ color: "var(--sidebar-foreground)" }}
-          title="Odhlásit se"
-        >
-          <LogOut className="h-5 w-5" />
-        </Link>
+        <TooltipProvider>
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-sm font-medium cursor-default"
+                style={{ background: "var(--sidebar-primary)", color: "var(--sidebar-primary-foreground)" }}
+              >
+                {initials}
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              {user.name}
+            </TooltipContent>
+          </Tooltip>
+          {!isCollapsed && (
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium" style={{ color: "var(--sidebar-foreground)" }}>
+                {user.name}
+              </p>
+              <p className="truncate text-xs" style={{ color: "var(--muted-foreground)" }}>
+                Odhlásit
+              </p>
+            </div>
+          )}
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <Link
+                href="/api/auth/signout"
+                onClick={onClose}
+                className={`rounded-lg p-2 hover:bg-[var(--sidebar-accent)] ${isCollapsed ? "block" : ""}`}
+                style={{ color: "var(--sidebar-foreground)" }}
+                title="Odhlásit se"
+              >
+                <LogOut className="h-5 w-5" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              Odhlásit se
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
       </div>
     </aside>
     </>

@@ -204,7 +204,7 @@ export default async function DashboardPage() {
               key={stat.label}
               className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-red-100 text-red-600">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg icon-card-accent">
                 <Icon className="h-6 w-6" />
               </div>
               <div>
@@ -230,7 +230,7 @@ export default async function DashboardPage() {
                   href={mod.href}
                   className="flex gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition-colors hover:border-red-200 hover:bg-red-50/50"
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg icon-card-accent">
                     <Icon className="h-6 w-6" />
                   </div>
                   <div className="min-w-0 flex-1">

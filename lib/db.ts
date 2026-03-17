@@ -4,7 +4,7 @@ import mariadb from "mariadb";
 
 const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
 
-function parseDatabaseUrl(url: string): mariadb.PoolConfig {
+function parseDatabaseUrl(url: string): mariadb.PoolConfig | string {
   try {
     const u = new URL(url.replace(/^mysql:\/\//, "http://"));
     const database = u.pathname?.replace(/^\//, "").split("?")[0] || undefined;
@@ -20,13 +20,8 @@ function parseDatabaseUrl(url: string): mariadb.PoolConfig {
       allowPublicKeyRetrieval: true, // MySQL 8+ caching_sha2_password
     };
   } catch {
-    return {
-      uri: url,
-      connectionLimit: 5,
-      connectTimeout: 15000,
-      acquireTimeout: 20000,
-      allowPublicKeyRetrieval: true,
-    };
+    // PrismaMariaDb přijímá i connection string přímo
+    return url;
   }
 }
 

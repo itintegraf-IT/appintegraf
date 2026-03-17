@@ -63,7 +63,11 @@ function getEventSliceForDay(
 
 export function WeekCalendarGrid({ events, from, to, userId = 0 }: Props) {
   const router = useRouter();
-  const weekStart = useMemo(() => getWeekStart(new Date(from)), [from]);
+  const weekStart = useMemo(() => {
+    const d = new Date(from);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [from]);
   const today = useMemo(() => new Date().toDateString(), []);
   const [modal, setModal] = useState<{
     start: Date;

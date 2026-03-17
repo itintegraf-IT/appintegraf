@@ -1,15 +1,19 @@
 # Modul Kalendář – dokumentace
 
-Modul kalendáře slouží ke správě událostí a termínů v aplikaci INTEGRAF. Nabízí týdenní zobrazení s mřížkou dnů × hodin, filtry a export do formátu iCalendar (.ics).
+Modul kalendáře slouží ke správě událostí a termínů v aplikaci INTEGRAF. Nabízí týdenní i měsíční zobrazení, dvoufázové schvalování (zástup → vedoucí oddělení), drag & drop přesun událostí a export do formátu iCalendar (.ics).
 
 ## Přehled funkcí
 
 - **Týdenní zobrazení** – mřížka s dny v týdnu (po–ne) a hodinovými sloty (0–23)
-- **Řádek „Celý den“** – pro celodenní události
-- **Navigace** – předchozí/další týden, posun o den, návrat na aktuální týden
+- **Měsíční zobrazení** – přehled celého měsíce v mřížce 6 týdnů
+- **Řádek „Celý den“** – pro celodenní události (týdenní pohled)
+- **Navigace** – předchozí/další týden nebo měsíc, posun o den (týden), návrat na aktuální období
 - **Filtry** – Globální kalendář (všechny události) / Osobní kalendář (jen moje)
-- **CRUD událostí** – vytvoření, zobrazení detailu, úprava
-- **Vytvoření kliknutím** – kliknutí do mřížky (buňka dne × hodiny nebo řádek „Celý den“) otevře modal s předvyplněným datem a časem
+- **CRUD událostí** – vytvoření, zobrazení detailu, úprava, **mazání**
+- **Vytvoření kliknutím** – kliknutí do mřížky otevře modal s předvyplněným datem a časem
+- **Drag & drop** – přesun vlastních událostí přetažením; u dovolené/osobní reset schválení
+- **Dvoufázové schvalování** – zástup schválí → vedoucí oddělení schválí (definitivní)
+- **Notifikace** – na dashboardu i v headeru (zvoneček); události ke schválení na dashboardu
 - **Export .ics** – stažení kalendáře pro import do Outlook, Google Calendar atd.
 
 ---
@@ -22,17 +26,26 @@ app/(dashboard)/calendar/
 ├── add/page.tsx          # Přidání nové události
 ├── [id]/page.tsx         # Detail události
 ├── [id]/edit/page.tsx    # Úprava události
-├── CalendarNav.tsx       # Navigace mezi týdny (client)
-├── CalendarTabs.tsx       # Záložky filtrů Globální/Osobní (client)
+├── CalendarNav.tsx       # Navigace mezi týdny/měsíci (client)
+├── CalendarTabs.tsx      # Záložky filtrů Globální/Osobní (client)
+├── CalendarViewToggle.tsx # Přepínač Týden/Měsíc (client)
 ├── WeekCalendarGrid.tsx  # Týdenní mřížka dnů × hodin (client)
-├── CreateEventModal.tsx   # Modal pro vytvoření události po kliknutí do mřížky (client)
+├── MonthCalendarGrid.tsx # Měsíční mřížka (client)
+├── CreateEventModal.tsx  # Modal pro vytvoření události (client)
+├── ApproveRejectButtons.tsx # Tlačítka Schválit/Zamítnout (client)
+├── DeleteEventButton.tsx # Tlačítko Smazat s potvrzením (client)
+├── ConfirmMoveModal.tsx  # Potvrzení přesunu události (client)
 └── lib/
     ├── week-utils.ts     # Pomocné funkce pro práci s týdny
+    ├── month-utils.ts    # Pomocné funkce pro měsíční zobrazení
     └── event-types.ts    # Typy událostí (Dovolená, Osobní, …)
 
 app/api/calendar/
 ├── route.ts              # GET (seznam), POST (vytvoření)
-├── [id]/route.ts         # GET (detail), PUT (úprava)
+├── [id]/route.ts         # GET (detail), PUT (úprava), DELETE (mazání)
+├── [id]/approve/route.ts # POST – schválení/zamítnutí (zástup nebo vedoucí)
+├── [id]/move/route.ts    # PATCH – přesunutí události
+├── deputies/route.ts     # GET – seznam možných zástupců
 └── export/route.ts       # GET – export .ics
 ```
 
@@ -42,36 +55,55 @@ app/api/calendar/
 
 ### CalendarNav
 
-Navigace v kalendáři:
+Navigace v kalendáři (závisí na zobrazení):
 
+**Týdenní pohled:**
 - **«** – předchozí týden
 - **<** – o den zpět
 - **>** – o den vpřed
 - **»** – další týden
 - **Nyní** – návrat na aktuální týden
 
-Používá URL parametry `from` a `to` (YYYY-MM-DD) pro rozsah zobrazeného týdne.
+**Měsíční pohled:**
+- **<** – předchozí měsíc
+- **>** – další měsíc
+- **Nyní** – aktuální měsíc
+
+### CalendarViewToggle
+
+Přepínač zobrazení:
+- **Týden** – týdenní mřížka s hodinami
+- **Měsíc** – měsíční přehled (6 týdnů)
+
+URL parametr `view` (`week` | `month`), pro měsíc též `month` (YYYY-MM).
 
 ### CalendarTabs
 
 Přepínání mezi pohledy:
-
 - **Globální kalendář** – všechny události
-- **Osobní kalendář** – jen události vytvořené přihlášeným uživatelem (`created_by`)
+- **Osobní kalendář** – události uživatele, události kde je zástupem, události čekající na schválení vedoucím
 
-Používá URL parametr `scope` (`all` | `mine`).
+URL parametr `scope` (`all` | `mine`).
 
 ### WeekCalendarGrid
 
 Týdenní mřížka:
-
 - **Hlavička** – sloupce pro jednotlivé dny (po 16. 3., út 17. 3., …)
-- **Řádek „Celý den“** – pro události s délkou ≥ 24 h nebo začínající v 00:00
+- **Řádek „Celý den“** – pro celodenní události
 - **Hodinové řádky** – 0–23
-- **Události** – umístěné podle času začátku a délky
-- **Zvýraznění dnešního dne** – světle žluté pozadí
-- **Události** – barevné bloky s odkazem na detail; vícedenní události se zobrazují ve všech dnech, které pokrývají
-- **Kliknutí do mřížky** – buňka (den × hodina) nebo řádek „Celý den“ otevře modal pro vytvoření události s předvyplněným datem a časem
+- **Události** – barevné bloky s odkazem na detail; vícedenní události ve všech dnech
+- **Štítky stavu** – Čeká na schválení (žlutý), Čeká na vedoucího (modrý), Schváleno (červený)
+- **Drag & drop** – tvůrce může přetahovat své události na nové datum/čas
+- **Kliknutí** – buňka otevře modal pro novou událost, událost vede na detail
+
+### MonthCalendarGrid
+
+Měsíční mřížka:
+- **6 týdnů** (pondělí–neděle)
+- **Dny mimo měsíc** – šedé pozadí
+- **Dnešní den** – červené zvýraznění
+- **Události** – max. 3 na den, odkaz na detail; indikátory schválení
+- **Kliknutí na den** – modal pro novou celodenní událost
 
 ---
 
@@ -83,6 +115,9 @@ Týdenní mřížka:
 | POST | `/api/calendar` | Vytvoření události |
 | GET | `/api/calendar/[id]` | Detail události |
 | PUT | `/api/calendar/[id]` | Úprava události |
+| DELETE | `/api/calendar/[id]` | Smazání události (jen tvůrce). Notifikace schvalovatelům. |
+| POST | `/api/calendar/[id]/approve` | Schválení/zamítnutí. Body: `{ action: "approve"|"reject", comment?: string }` |
+| PATCH | `/api/calendar/[id]/move` | Přesunutí události. Body: `{ start_date, end_date, all_day? }` |
 | GET | `/api/calendar/export` | Export .ics. Parametr: `scope=all` | `mine` (admin může `all`) |
 | GET | `/api/calendar/deputies` | Seznam možných zástupců (z hlavního + sekundárních oddělení) |
 
@@ -123,22 +158,21 @@ Týdenní mřížka:
 | is_public | Boolean? | Veřejná událost |
 | color | String? | Barva (#hex) |
 | location | String? | Místo |
-| requires_approval | Boolean? | *(zatím nepoužito)* |
-| approval_status | String? | *(zatím nepoužito)* |
+| requires_approval | Boolean? | true, pokud je deputy_id |
+| approval_status | String? | pending, deputy_approved, approved, rejected |
 
-### Zástup (deputy_id) – schvalovací workflow
+### Dvoufázové schvalování (deputy_id)
 
-U typů **Dovolená** a **Osobní** je pole **Zástup** povinné. Zástupem může být pouze uživatel ze stejného hlavního oddělení nebo ze stejných sekundárních oddělení jako tvůrce události.
+U typů **Dovolená** a **Osobní** je pole **Zástup** povinné. Workflow:
 
-- API endpoint: `GET /api/calendar/deputies` – vrací seznam možných zástupců
-- Validace na API: pro `dovolena` a `osobni` je `deputy_id` povinné a musí být z povoleného seznamu
+1. **pending** – zástup dostane notifikaci, schválí nebo zamítne
+2. **deputy_approved** – zástup schválil; vedoucí oddělení žadatele dostane notifikaci
+3. **approved** – vedoucí schválil (definitivní); nebo zástup schválil a oddělení nemá vedoucího
+4. **rejected** – zamítnuto zástupem nebo vedoucím
 
-**Při uložení události s zástupem:**
-1. Nastaví se `requires_approval=true`, `approval_status=pending`
-2. Vytvoří se záznam v `calendar_approvals` (approver_id = deputy_id)
-3. Zástup obdrží **notifikaci** v aplikaci (ikona zvonku v headeru)
-4. Událost se zobrazí zástupovi v kalendáři s indikátorem **„Čeká na schválení“**
-5. V záložce „Osobní kalendář“ zástup vidí i události, u kterých je zástupem
+- API: `GET /api/calendar/deputies` – seznam možných zástupců
+- API: `POST /api/calendar/[id]/approve` – schválení/zamítnutí (zástup nebo vedoucí)
+- **Dashboard** – sekce „Události ke schválení“ a „Notifikace“ (nepřečtené)
 
 ### Typy událostí (event_type)
 
@@ -173,38 +207,57 @@ Modely v DB existují, ale zatím nejsou v UI využívány (např. pro budoucí 
 
 ### Provedené změny
 
-1. **Přechod z měsíčního na týdenní zobrazení**
-   - Místo tabulky seznamu událostí je nyní mřížka dnů × hodin
-   - Týden = pondělí–neděle (český standard)
+1. **Týdenní zobrazení** – mřížka dnů × hodin, řádek „Celý den“, týden = po–ne
 
-2. **Přidání CalendarNav**
-   - Navigace « < > » a tlačítko „Nyní“
-   - Používá `getWeekStart`, `getWeekEnd`, `getPrevWeek`, `getNextWeek` z `lib/week-utils.ts`
+2. **Dvoufázové schvalování** – zástup → vedoucí oddělení; stavy `pending`, `deputy_approved`, `approved`, `rejected`
 
-3. **Přidání CalendarTabs**
-   - Globální kalendář / Osobní kalendář
-   - URL parametr `scope`
+3. **Tlačítka Schválit/Zamítnout** – na detailu události pro zástupce a vedoucího; modal pro důvod zamítnutí
 
-4. **Přidání WeekCalendarGrid**
-   - Mřížka s řádkem „Celý den“ a hodinovými sloty 0–23
-   - Události s absolutním pozicováním podle času
-   - Rozpoznání celodenních událostí (start 00:00, délka ≥ 24 h)
+4. **Mazání událostí** – tlačítko Smazat (jen tvůrce), notifikace schvalovatelům při smazání schválené události
 
-5. **Vytvoření události kliknutím do mřížky**
-   - CreateEventModal – modal s formulářem pro novou událost
-   - Kliknutí na buňku (den × hodina) předvyplní začátek a konec (+1 h)
-   - Kliknutí na řádek „Celý den“ předvyplní celodenní událost (00:00–23:59)
-   - Kliknutí na existující událost vede na detail (stopPropagation)
+5. **Drag & drop** – přesun vlastních událostí v týdenním pohledu; reset schválení u dovolené/osobní
 
-6. **Přidání lib/week-utils.ts**
-   - `getWeekStart()`, `getWeekEnd()`
-   - `getPrevWeek()`, `getNextWeek()`, `getCurrentWeek()`
-   - `formatWeekRange()`
+6. **Měsíční zobrazení** – přepínač Týden/Měsíc, MonthCalendarGrid, `lib/month-utils.ts`
+
+7. **Dashboard** – sekce Události ke schválení, Notifikace (nepřečtené)
+
+8. **Přidání lib/week-utils.ts, lib/month-utils.ts**
+   - `getWeekStart()`, `getWeekEnd()`, `getPrevWeek()`, `getNextWeek()`, `getCurrentWeek()`
+   - `getMonthGridStart()`, `getMonthGridEnd()`, `getPrevMonth()`, `getNextMonth()`, `formatMonth()`
 
 ### URL parametry stránky
 
-- `from` – začátek týdne (YYYY-MM-DD)
-- `to` – konec týdne (YYYY-MM-DD)
+- `view` – `week` (výchozí) | `month`
+- `from` – začátek období (YYYY-MM-DD)
+- `to` – konec období (YYYY-MM-DD)
+- `month` – pro měsíční pohled (YYYY-MM)
 - `scope` – `all` (výchozí) | `mine`
 
-Příklad: `/calendar?from=2026-03-16&to=2026-03-22&scope=mine`
+Příklady:
+- `/calendar?view=week&from=2026-03-16&to=2026-03-22&scope=mine`
+- `/calendar?view=month&month=2026-03&scope=all`
+
+---
+
+## Mazání událostí
+
+- Tlačítko **Smazat** na detailu události (jen pro tvůrce)
+- Potvrzovací modal
+- Při smazání schválené události: notifikace všem schvalovatelům (z `calendar_approvals` se statusem approved)
+
+---
+
+## Přesun událostí (drag & drop)
+
+- **Týdenní pohled** – tvůrce může přetahovat své události
+- **Řádek „Celý den“** – přetažení na den (zachová délku u vícedenních)
+- **Časová mřížka** – přetažení na buňku (zachová délku)
+- **Potvrzení** – modal s novým datem/časem
+- **Dovolená/Osobní** – po přesunu reset schválení na `pending`, notifikace zástupovi
+
+---
+
+## Dashboard
+
+- **Události ke schválení** – události čekající na schválení (jako zástup nebo vedoucí)
+- **Notifikace** – nepřečtené notifikace (aktivní, čekající na vyřízení)

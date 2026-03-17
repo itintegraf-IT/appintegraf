@@ -8,7 +8,7 @@ import { CalendarTabs } from "./CalendarTabs";
 import { CalendarViewToggle } from "./CalendarViewToggle";
 import { WeekCalendarGrid } from "./WeekCalendarGrid";
 import { MonthCalendarGrid } from "./MonthCalendarGrid";
-import { getCurrentWeek } from "./lib/week-utils";
+import { getCurrentWeek, getWeekStart, getWeekEnd } from "./lib/week-utils";
 import { getMonthGridStart, getMonthGridEnd } from "./lib/month-utils";
 
 export default async function CalendarPage({
@@ -42,9 +42,18 @@ export default async function CalendarPage({
     from = gridStart.toISOString().slice(0, 10);
     to = gridEnd.toISOString().slice(0, 10);
   } else {
-    const { from: defaultFrom, to: defaultTo } = getCurrentWeek();
-    from = params.from ?? defaultFrom.toISOString().slice(0, 10);
-    to = params.to ?? defaultTo.toISOString().slice(0, 10);
+    if (params.from) {
+      const weekStart = getWeekStart(new Date(params.from));
+      const weekEnd = getWeekEnd(weekStart);
+      from = weekStart.toISOString().slice(0, 10);
+      to = weekEnd.toISOString().slice(0, 10);
+    } else {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const todayEnd = new Date(today);
+      todayEnd.setDate(todayEnd.getDate() + 6);
+      from = today.toISOString().slice(0, 10);
+      to = todayEnd.toISOString().slice(0, 10);
+    }
   }
 
   const fromDate = new Date(from);

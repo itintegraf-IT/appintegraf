@@ -35,6 +35,26 @@ export async function getPlanovaniRole(userId: number): Promise<PlanovaniRole> {
 }
 
 /**
+ * Vrátí seznam uživatelských jmen uživatelů s rolí DTP nebo MTZ v modulu plánování.
+ * Používá se pro filtr "DTP + MTZ aktivita" v audit/today.
+ */
+export async function getPlanovaniDtpMtzUsernames(): Promise<string[]> {
+  const { prisma } = await import("@/lib/db");
+  const users = await prisma.users.findMany({
+    where: { is_active: true },
+    select: { id: true, username: true },
+  });
+  const usernames: string[] = [];
+  for (const u of users) {
+    const role = await getPlanovaniRole(u.id);
+    if (role === "DTP" || role === "MTZ") {
+      usernames.push(u.username);
+    }
+  }
+  return usernames;
+}
+
+/**
  * Kontrola, zda má uživatel přístup k modulu plánování (alespoň VIEWER).
  */
 export async function hasPlanovaniAccess(userId: number): Promise<boolean> {

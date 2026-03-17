@@ -47,32 +47,48 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const block = await prisma.planovani_blocks.create({
-      data: {
-        orderNumber: String(body.orderNumber),
-        machine: body.machine,
-        startTime: new Date(body.startTime),
-        endTime: new Date(body.endTime),
-        type: body.type ?? "ZAKAZKA",
-        description: body.description ?? null,
-        locked: body.locked ?? false,
-        deadlineExpedice: body.deadlineExpedice ? new Date(body.deadlineExpedice) : null,
-        dataStatusId: body.dataStatusId ?? null,
-        dataStatusLabel: body.dataStatusLabel ?? null,
-        dataRequiredDate: body.dataRequiredDate ? new Date(body.dataRequiredDate) : null,
-        dataOk: body.dataOk ?? false,
-        materialStatusId: body.materialStatusId ?? null,
-        materialStatusLabel: body.materialStatusLabel ?? null,
-        materialRequiredDate: body.materialRequiredDate ? new Date(body.materialRequiredDate) : null,
-        materialOk: body.materialOk ?? false,
-        barvyStatusId: body.barvyStatusId ?? null,
-        barvyStatusLabel: body.barvyStatusLabel ?? null,
-        lakStatusId: body.lakStatusId ?? null,
-        lakStatusLabel: body.lakStatusLabel ?? null,
-        specifikace: body.specifikace ?? null,
-        recurrenceType: body.recurrenceType ?? "NONE",
-        recurrenceParentId: body.recurrenceParentId ?? null,
-      },
+    const username = (session.user as { username?: string }).username ?? session.user.name ?? session.user.email ?? "uživatel";
+
+    const block = await prisma.$transaction(async (tx) => {
+      const newBlock = await tx.planovani_blocks.create({
+        data: {
+          orderNumber: String(body.orderNumber),
+          machine: body.machine,
+          startTime: new Date(body.startTime),
+          endTime: new Date(body.endTime),
+          type: body.type ?? "ZAKAZKA",
+          description: body.description ?? null,
+          locked: body.locked ?? false,
+          deadlineExpedice: body.deadlineExpedice ? new Date(body.deadlineExpedice) : null,
+          dataStatusId: body.dataStatusId ?? null,
+          dataStatusLabel: body.dataStatusLabel ?? null,
+          dataRequiredDate: body.dataRequiredDate ? new Date(body.dataRequiredDate) : null,
+          dataOk: body.dataOk ?? false,
+          materialStatusId: body.materialStatusId ?? null,
+          materialStatusLabel: body.materialStatusLabel ?? null,
+          materialRequiredDate: body.materialRequiredDate ? new Date(body.materialRequiredDate) : null,
+          materialOk: body.materialOk ?? false,
+          barvyStatusId: body.barvyStatusId ?? null,
+          barvyStatusLabel: body.barvyStatusLabel ?? null,
+          lakStatusId: body.lakStatusId ?? null,
+          lakStatusLabel: body.lakStatusLabel ?? null,
+          specifikace: body.specifikace ?? null,
+          recurrenceType: body.recurrenceType ?? "NONE",
+          recurrenceParentId: body.recurrenceParentId ?? null,
+        },
+      });
+
+      await tx.planovani_audit_log.create({
+        data: {
+          blockId: newBlock.id,
+          orderNumber: newBlock.orderNumber,
+          userId: parseInt(session.user.id, 10),
+          username,
+          action: "CREATE",
+        },
+      });
+
+      return newBlock;
     });
 
     const serialized = {

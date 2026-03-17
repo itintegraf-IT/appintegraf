@@ -77,9 +77,21 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
     Object.keys(allowed).forEach((k) => allowed[k] === undefined && delete allowed[k]);
 
-    const block = await prisma.planovani_blocks.update({
-      where: { id },
-      data: {
+    const AUDITED_FIELDS = [
+      "dataStatusLabel", "dataRequiredDate", "dataOk",
+      "materialStatusLabel", "materialRequiredDate", "materialOk",
+      "deadlineExpedice",
+    ] as const;
+    type AuditedField = (typeof AUDITED_FIELDS)[number];
+
+    const username = (session.user as { username?: string }).username ?? session.user.name ?? session.user.email ?? "uživatel";
+
+    const block = await prisma.$transaction(async (tx) => {
+      const oldBlock = await tx.planovani_blocks.findUnique({ where: { id } });
+
+      const updated = await tx.planovani_blocks.update({
+        where: { id },
+        data: {
         ...(allowed.orderNumber !== undefined && { orderNumber: String(allowed.orderNumber) }),
         ...(allowed.machine !== undefined && { machine: allowed.machine as string }),
         ...(allowed.startTime !== undefined && { startTime: new Date(allowed.startTime as string) }),
@@ -109,6 +121,28 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
         ...(allowed.specifikace !== undefined && { specifikace: allowed.specifikace as string }),
         ...(allowed.recurrenceType !== undefined && { recurrenceType: allowed.recurrenceType as string }),
       },
+    });
+
+      if (oldBlock) {
+        const changes = AUDITED_FIELDS
+          .filter((field) => String(oldBlock[field] ?? "") !== String(updated[field] ?? ""))
+          .map((field) => ({
+            blockId: id,
+            orderNumber: oldBlock.orderNumber,
+            userId: parseInt(session.user.id, 10),
+            username,
+            action: "UPDATE",
+            field,
+            oldValue: String(oldBlock[field] ?? ""),
+            newValue: String(updated[field] ?? ""),
+          }));
+
+        if (changes.length > 0) {
+          await tx.planovani_audit_log.createMany({ data: changes });
+        }
+      }
+
+      return updated;
     });
 
     return NextResponse.json({
@@ -141,8 +175,24 @@ export async function DELETE(_: NextRequest, { params }: RouteContext) {
   const id = parseInt(rawId, 10);
   if (isNaN(id)) return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
 
+  const username = (session.user as { username?: string }).username ?? session.user.name ?? session.user.email ?? "uživatel";
+
   try {
-    await prisma.planovani_blocks.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      const blockToDelete = await tx.planovani_blocks.findUnique({ where: { id }, select: { orderNumber: true } });
+
+      await tx.planovani_audit_log.create({
+        data: {
+          blockId: id,
+          orderNumber: blockToDelete?.orderNumber ?? null,
+          userId: parseInt(session.user.id, 10),
+          username,
+          action: "DELETE",
+        },
+      });
+
+      await tx.planovani_blocks.delete({ where: { id } });
+    });
     return NextResponse.json({ success: true });
   } catch (error: unknown) {
     if (isPrismaNotFound(error)) return NextResponse.json({ error: "Blok nenalezen" }, { status: 404 });

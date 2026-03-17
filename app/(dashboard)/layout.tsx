@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/layout/DashboardShell";
+import { DashboardMain } from "@/components/layout/DashboardMain";
+import { SidebarProvider } from "@/components/layout/SidebarContext";
 import { getLayoutAccess } from "@/lib/auth-utils";
 
 export default async function DashboardLayout({
@@ -27,15 +29,15 @@ export default async function DashboardLayout({
   };
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      <DashboardShell
-        user={session.user}
-        isAdmin={admin}
-        moduleAccess={moduleAccess}
-      />
-      <main className="lg:pl-56 pt-14 print:pt-0 print:pl-0">
-        <div className="p-4 sm:p-6 lg:p-8 print:p-2">{children}</div>
-      </main>
-    </div>
+    <SidebarProvider>
+      <div className="min-h-screen" style={{ background: "var(--background)" }}>
+        <DashboardShell
+          user={session.user}
+          isAdmin={admin}
+          moduleAccess={moduleAccess}
+        />
+        <DashboardMain>{children}</DashboardMain>
+      </div>
+    </SidebarProvider>
   );
 }

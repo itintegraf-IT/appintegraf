@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Calendar } from "lucide-react";
-import { getPrevWeek, getNextWeek, getCurrentWeek, formatWeekRange } from "./lib/week-utils";
+import { formatWeekRange } from "./lib/week-utils";
 import { getPrevMonth, getNextMonth, getCurrentMonth, formatMonth } from "./lib/month-utils";
 
 type Props = {
@@ -95,35 +95,25 @@ export function CalendarNav({ view, from, to, month }: Props) {
     });
   };
 
-  const goPrevWeek = () => {
-    const { from: prevFrom, to: prevTo } = getPrevWeek(fromDate);
-    updateWeekUrl(prevFrom, prevTo);
+  const shiftByDays = (days: number) => {
+    const newFrom = new Date(fromDate);
+    newFrom.setDate(newFrom.getDate() + days);
+    const newTo = new Date(toDate);
+    newTo.setDate(newTo.getDate() + days);
+    updateWeekUrl(newFrom, newTo);
   };
 
-  const goNextWeek = () => {
-    const { from: nextFrom, to: nextTo } = getNextWeek(fromDate);
-    updateWeekUrl(nextFrom, nextTo);
-  };
-
-  const goPrevDay = () => {
-    const prev = new Date(fromDate);
-    prev.setDate(prev.getDate() - 1);
-    const prevEnd = new Date(prev);
-    prevEnd.setDate(prevEnd.getDate() + 6);
-    updateWeekUrl(prev, prevEnd);
-  };
-
-  const goNextDay = () => {
-    const next = new Date(fromDate);
-    next.setDate(next.getDate() + 1);
-    const nextEnd = new Date(next);
-    nextEnd.setDate(nextEnd.getDate() + 6);
-    updateWeekUrl(next, nextEnd);
-  };
+  const goPrevWeek = () => shiftByDays(-7);
+  const goNextWeek = () => shiftByDays(7);
+  const goPrevDay = () => shiftByDays(-7);
+  const goNextDay = () => shiftByDays(7);
 
   const goCurrent = () => {
-    const { from: currFrom, to: currTo } = getCurrentWeek();
-    updateWeekUrl(currFrom, currTo);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(today);
+    todayEnd.setDate(todayEnd.getDate() + 6);
+    updateWeekUrl(today, todayEnd);
   };
 
   const weekLabel = formatWeekRange(fromDate, toDate);
@@ -143,7 +133,7 @@ export function CalendarNav({ view, from, to, month }: Props) {
           type="button"
           onClick={goPrevDay}
           className="rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
-          title="O den zpět"
+          title="Předchozí týden"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
@@ -154,7 +144,7 @@ export function CalendarNav({ view, from, to, month }: Props) {
           type="button"
           onClick={goNextDay}
           className="rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
-          title="O den vpřed"
+          title="Další týden"
         >
           <ChevronRight className="h-5 w-5" />
         </button>

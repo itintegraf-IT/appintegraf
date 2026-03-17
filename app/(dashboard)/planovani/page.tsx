@@ -38,7 +38,7 @@ export default async function PlanovaniPage() {
 
   const currentUser = {
     id: userId,
-    username: session.user.name ?? session.user.email ?? "uživatel",
+    username: (session.user as { username?: string }).username ?? session.user.name ?? session.user.email ?? "uživatel",
     role,
   };
 

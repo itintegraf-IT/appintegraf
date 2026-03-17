@@ -789,3 +789,20 @@ model planovani_company_days {
 
   @@map("planovani_company_days")
 }
+
+model planovani_audit_log {
+  id          Int      @id @default(autoincrement())
+  blockId     Int
+  orderNumber String?  @db.VarChar(100)
+  userId      Int
+  username    String   @db.VarChar(100)
+  action      String   @db.VarChar(20)
+  field       String?  @db.VarChar(100)
+  oldValue    String?  @db.Text
+  newValue    String?  @db.Text
+  createdAt   DateTime @default(now()) @db.DateTime(0)
+
+  @@index([blockId, createdAt])
+  @@index([createdAt])
+  @@map("planovani_audit_log")
+}
