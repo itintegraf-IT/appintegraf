@@ -45,10 +45,11 @@ export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
     <header
       className="sticky top-0 z-40 flex h-14 items-center border-b px-4"
       style={{
-        background: "color-mix(in oklab, var(--surface) 92%, transparent)",
+        background: "color-mix(in oklab, var(--surface) 95%, transparent)",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         borderColor: "var(--border)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
       }}
     >
       <div className="flex w-full items-center justify-between">

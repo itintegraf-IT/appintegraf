@@ -11,7 +11,6 @@ import { Switch }    from "@/components/ui/switch";
 import { Badge }     from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ThemeToggle } from "@/components/layout/ThemeToggle";
 
 // ─── Typy ─────────────────────────────────────────────────────────────────────
 type CodebookOption = {
@@ -1619,10 +1618,6 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     : [];
   const nearestOutOfRange = outOfRangeBlocks[0] ?? null;
 
-  function handleLogout() {
-    window.location.href = "/api/auth/signout";
-  }
-
   function handleScrollToNow() {
     const y = dateToY(new Date(), viewStart, slotHeight);
     scrollRef.current?.scrollTo({ top: Math.max(0, y - 200), behavior: "smooth" });
@@ -2398,17 +2393,6 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
               )}
             </div>
           )}
-          <ThemeToggle />
-          <button
-            onClick={handleLogout}
-            style={{
-              padding: "3px 10px", fontSize: 11, borderRadius: 6,
-              background: "transparent", border: "1px solid var(--border)",
-              color: "var(--text-muted)", cursor: "pointer", transition: "all 120ms ease-out",
-            }}
-          >
-            Odhlásit
-          </button>
         </div>
       </header>
 

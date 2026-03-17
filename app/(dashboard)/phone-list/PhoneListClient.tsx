@@ -114,7 +114,7 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
           <button
             type="button"
             onClick={handlePrint}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50 print:hidden"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 font-medium text-gray-700 shadow-card transition-all hover:bg-gray-50 hover:shadow-md print:hidden"
           >
             <Printer className="h-4 w-4" />
             Tisk
@@ -123,13 +123,13 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-4 print:hidden">
-        <div className="flex rounded-lg border border-gray-200 p-1">
+        <div className="flex rounded-xl border border-gray-200 bg-white/90 p-1 shadow-card backdrop-blur-sm">
           <button
             type="button"
             onClick={() => handleTabChange("contacts")}
-            className={`flex items-center gap-2 rounded px-4 py-2 text-sm ${
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
               tab === "contacts"
-                ? "bg-red-600 text-white"
+                ? "bg-red-600 text-white shadow-md"
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
@@ -139,9 +139,9 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
           <button
             type="button"
             onClick={() => handleTabChange("departments")}
-            className={`flex items-center gap-2 rounded px-4 py-2 text-sm ${
+            className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all ${
               tab === "departments"
-                ? "bg-red-600 text-white"
+                ? "bg-red-600 text-white shadow-md"
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
@@ -158,24 +158,24 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Hledat..."
-              className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3"
+              className="w-full rounded-lg border border-gray-200 bg-white py-2 pl-9 pr-3 shadow-sm transition-all focus:border-red-500 focus:ring-2 focus:ring-red-500/20"
             />
           </div>
           <button
             type="submit"
-            className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700"
+            className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white shadow-md transition-all hover:bg-red-700 hover:shadow-lg"
           >
             Hledat
           </button>
         </form>
 
-        <div className="flex rounded-lg border border-gray-200 p-1">
+        <div className="flex rounded-xl border border-gray-200 bg-white/90 p-1 shadow-card backdrop-blur-sm">
           <button
             type="button"
             onClick={() => setViewMode("cards")}
-            className={`rounded px-3 py-1 text-sm ${
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
               viewMode === "cards"
-                ? "bg-red-600 text-white"
+                ? "bg-red-600 text-white shadow-sm"
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
@@ -184,9 +184,9 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
           <button
             type="button"
             onClick={() => setViewMode("table")}
-            className={`rounded px-3 py-1 text-sm ${
+            className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
               viewMode === "table"
-                ? "bg-red-600 text-white"
+                ? "bg-red-600 text-white shadow-sm"
                 : "text-gray-600 hover:bg-gray-100"
             }`}
           >
@@ -195,7 +195,7 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm print:border-0 print:shadow-none">
+      <div className="rounded-xl border border-gray-200 bg-white shadow-elevated print:border-0 print:shadow-none">
         {loading ? (
           <div className="p-12 text-center text-gray-500">Načítání…</div>
         ) : tab === "departments" ? (
@@ -209,7 +209,7 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
                 departments.map((d) => (
                   <div
                     key={d.id}
-                    className="rounded-lg border border-gray-200 p-4 print:break-inside-avoid"
+                    className="rounded-xl border border-gray-200 bg-white p-4 shadow-card transition-all hover:shadow-card-hover hover:border-gray-300 print:break-inside-avoid"
                   >
                     <h3 className="font-semibold text-red-600">{d.name}</h3>
                     <div className="mt-3 space-y-1 text-sm">
@@ -317,14 +317,14 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
             ) : (
               contactsByDepartment.map(([deptName, deptContacts]) => (
                 <div key={deptName} className="mb-8 print:break-inside-avoid">
-                  <h2 className="mb-4 border-b border-red-200 pb-2 text-lg font-semibold text-red-600">
+                  <h2 className="mb-4 border-b border-red-200 border-l-4 border-l-red-500 pl-3 pb-2 text-lg font-semibold text-red-600">
                     {deptName}
                   </h2>
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {deptContacts.map((c) => (
                       <div
                         key={c.id}
-                        className="rounded-lg border border-gray-200 p-4 print:break-inside-avoid"
+                        className="rounded-xl border border-gray-200 bg-white p-4 shadow-card transition-all hover:shadow-card-hover hover:border-gray-300 print:break-inside-avoid"
                       >
                         <h3 className="font-semibold text-gray-900">
                           {c.first_name} {c.last_name}

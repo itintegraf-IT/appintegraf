@@ -22,7 +22,8 @@ body {
 }
 
 body {
-  background-color: var(--background);
+  background: linear-gradient(165deg, var(--background) 0%, color-mix(in oklab, var(--background) 98%, oklch(0.92 0.04 25)) 100%);
+  background-attachment: fixed;
   color: var(--foreground);
 }
 
@@ -30,6 +31,11 @@ body {
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, box-shadow;
   transition-duration: 200ms;
   transition-timing-function: ease-out;
+}
+
+.dark body {
+  background: var(--background) !important;
+  background-attachment: fixed;
 }
 
 @theme inline {
@@ -65,33 +71,33 @@ body {
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(0.985 0.003 247.86);
-  --foreground: oklch(0.2 0.015 248.39);
+  --background: oklch(0.97 0.008 248);
+  --foreground: oklch(0.22 0.02 248);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.015 248.39);
-  --primary: oklch(0.55 0.2 262);
+  --card-foreground: oklch(0.22 0.02 248);
+  --primary: oklch(0.52 0.2 25);
   --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.95 0.01 250);
-  --secondary-foreground: oklch(0.28 0.015 250);
-  --muted: oklch(0.94 0.01 250);
-  --muted-foreground: oklch(0.5 0.02 250);
-  --accent: oklch(0.92 0.03 252);
-  --accent-foreground: oklch(0.3 0.02 250);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(0.86 0.01 252);
-  --input: oklch(0.86 0.01 252);
-  --ring: oklch(0.62 0.2 262);
-  --sidebar: oklch(0.97 0.006 247.9);
-  --sidebar-foreground: oklch(0.2 0.015 248.39);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --secondary: oklch(0.94 0.04 25);
+  --secondary-foreground: oklch(0.35 0.08 25);
+  --muted: oklch(0.93 0.02 250);
+  --muted-foreground: oklch(0.48 0.03 250);
+  --accent: oklch(0.92 0.05 25);
+  --accent-foreground: oklch(0.35 0.08 25);
+  --destructive: oklch(0.65 0.2 25);
+  --border: oklch(0.88 0.02 250);
+  --input: oklch(0.88 0.02 250);
+  --ring: oklch(0.55 0.2 25);
+  --sidebar: oklch(0.97 0.012 248);
+  --sidebar-foreground: oklch(0.25 0.02 248);
+  --sidebar-primary: oklch(0.52 0.2 25);
   --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.92 0.03 252);
-  --sidebar-accent-foreground: oklch(0.3 0.02 250);
-  --sidebar-border: oklch(0.86 0.01 252);
-  --surface: oklch(0.97 0.006 247.9);
-  --surface-2: oklch(0.94 0.008 248);
-  --surface-3: oklch(0.9 0.01 249);
-  --text-muted: oklch(0.48 0.02 250);
+  --sidebar-accent: oklch(0.92 0.06 25);
+  --sidebar-accent-foreground: oklch(0.35 0.08 25);
+  --sidebar-border: oklch(0.9 0.02 250);
+  --surface: oklch(0.98 0.006 248);
+  --surface-2: oklch(0.95 0.01 248);
+  --surface-3: oklch(0.92 0.03 248);
+  --text-muted: oklch(0.48 0.03 250);
   --bg: var(--background);
   --text: var(--foreground);
   --danger: oklch(0.62 0.23 25);
@@ -99,9 +105,14 @@ body {
   --warning: oklch(0.78 0.16 85);
   --brand: oklch(0.9 0.19 102);
   --brand-contrast: oklch(0.2 0.015 248.39);
-  --icon-accent-bg: oklch(0.94 0.06 25);
-  --icon-accent-fg: oklch(0.5 0.18 25);
+  --icon-accent-bg: oklch(0.94 0.08 25);
+  --icon-accent-fg: oklch(0.48 0.2 25);
   --timeline-bg: oklch(0.97 0.005 260);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 2px 6px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
+  --shadow-md-primary: 0 4px 14px -2px rgba(185,28,28,0.25);
+  --sidebar-shadow: 2px 0 12px rgba(0,0,0,0.06);
 }
 
 .dark {
@@ -143,6 +154,11 @@ body {
   --icon-accent-bg: oklch(0.3 0.1 25);
   --icon-accent-fg: oklch(0.82 0.14 25);
   --timeline-bg: oklch(0.11 0.008 260);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.2);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.25);
+  --shadow-lg: 0 10px 25px rgba(0,0,0,0.3);
+  --shadow-md-primary: 0 4px 14px -2px rgba(251,191,36,0.35);
+  --sidebar-shadow: 2px 0 16px rgba(0,0,0,0.2);
 }
 
 /* Ikony na kartách – pastel červeň s dobrým kontrastem */
@@ -173,6 +189,7 @@ body {
 .hover\:bg-red-50:hover { background-color: var(--accent) !important; }
 .hover\:text-red-600:hover { color: var(--primary) !important; }
 .border-red-600 { border-color: var(--primary) !important; }
+.border-red-500 { border-color: var(--ring) !important; }
 .border-red-200 { border-color: color-mix(in oklab, var(--primary) 35%, var(--border)) !important; }
 .hover\:border-red-200:hover { border-color: color-mix(in oklab, var(--primary) 40%, var(--border)) !important; }
 .ring-red-500 { --tw-ring-color: var(--ring) !important; }
@@ -195,3 +212,10 @@ body {
 .bg-green-50 { background-color: color-mix(in oklab, var(--success) 15%, transparent) !important; }
 .text-green-800 { color: var(--success) !important; }
 .bg-amber-50 { background-color: color-mix(in oklab, var(--warning) 15%, transparent) !important; }
+
+/* Moderní stíny a efekty */
+.shadow-card { box-shadow: var(--shadow-sm) !important; }
+.shadow-card-hover:hover { box-shadow: var(--shadow-md) !important; }
+.transition-shadow { transition: box-shadow 0.2s ease; }
+.shadow-elevated { box-shadow: var(--shadow-md) !important; }
+.shadow-elevated-lg { box-shadow: var(--shadow-lg) !important; }

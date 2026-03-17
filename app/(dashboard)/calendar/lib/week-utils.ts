@@ -3,6 +3,20 @@
  * Týden = pondělí – neděle (český standard).
  */
 
+/** Formátuje datum jako YYYY-MM-DD v lokální časové zóně (toISOString používá UTC a může posunout den). */
+export function formatDateLocal(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** Parsuje řetězec YYYY-MM-DD jako lokální datum (ne UTC). */
+export function parseDateLocal(str: string): Date {
+  const [y, m, d] = str.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
 export function getWeekStart(date: Date): Date {
   const d = new Date(date);
   const day = d.getDay();

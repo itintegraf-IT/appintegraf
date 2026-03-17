@@ -127,7 +127,7 @@ export default async function DashboardPage() {
 
       {/* Notifikace */}
       {notifications.length > 0 && (
-        <div className="mb-8 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="mb-8 rounded-xl border border-gray-200 bg-white p-6 shadow-elevated">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
             <Bell className="h-5 w-5 text-gray-600" />
             Notifikace ({notifications.length})
@@ -202,7 +202,7 @@ export default async function DashboardPage() {
           return (
             <div
               key={stat.label}
-              className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+              className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-card transition-all hover:shadow-card-hover"
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-lg icon-card-accent">
                 <Icon className="h-6 w-6" />
@@ -260,7 +260,7 @@ export default async function DashboardPage() {
                 <Link
                   key={action.href}
                   href={action.href}
-                  className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600"
+                  className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 shadow-card transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-600 hover:shadow-md"
                 >
                   <Icon className="h-4 w-4" />
                   {action.label}

@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Calendar } from "lucide-react";
-import { formatWeekRange } from "./lib/week-utils";
+import { formatWeekRange, formatDateLocal, parseDateLocal } from "./lib/week-utils";
 import { getPrevMonth, getNextMonth, getCurrentMonth, formatMonth } from "./lib/month-utils";
 
 type Props = {
@@ -84,14 +84,14 @@ export function CalendarNav({ view, from, to, month }: Props) {
     );
   }
 
-  const fromDate = new Date(from);
-  const toDate = new Date(to);
+  const fromDate = parseDateLocal(from);
+  const toDate = parseDateLocal(to);
 
   const updateWeekUrl = (newFrom: Date, newTo: Date) => {
     updateUrl({
       view: "week",
-      from: newFrom.toISOString().slice(0, 10),
-      to: newTo.toISOString().slice(0, 10),
+      from: formatDateLocal(newFrom),
+      to: formatDateLocal(newTo),
     });
   };
 
@@ -105,8 +105,8 @@ export function CalendarNav({ view, from, to, month }: Props) {
 
   const goPrevWeek = () => shiftByDays(-7);
   const goNextWeek = () => shiftByDays(7);
-  const goPrevDay = () => shiftByDays(-7);
-  const goNextDay = () => shiftByDays(7);
+  const goPrevDay = () => shiftByDays(-1);
+  const goNextDay = () => shiftByDays(1);
 
   const goCurrent = () => {
     const now = new Date();
@@ -133,7 +133,7 @@ export function CalendarNav({ view, from, to, month }: Props) {
           type="button"
           onClick={goPrevDay}
           className="rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
-          title="Předchozí týden"
+          title="Předchozí den"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
@@ -144,7 +144,7 @@ export function CalendarNav({ view, from, to, month }: Props) {
           type="button"
           onClick={goNextDay}
           className="rounded-lg border border-gray-300 p-2 text-gray-700 hover:bg-gray-50"
-          title="Další týden"
+          title="Další den"
         >
           <ChevronRight className="h-5 w-5" />
         </button>

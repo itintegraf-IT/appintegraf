@@ -9,7 +9,8 @@ import {
   formatMonth,
 } from "./lib/month-utils";
 import { CreateEventModal } from "./CreateEventModal";
-import { WEEKDAY_NAMES_MONDAY } from "./lib/week-utils";
+import { WEEKDAY_NAMES_MONDAY, formatDateLocal } from "./lib/week-utils";
+import type { Holiday } from "./lib/holidays";
 
 type CalendarEvent = {
   id: number;
@@ -29,11 +30,12 @@ type CalendarEvent = {
 
 type Props = {
   events: CalendarEvent[];
+  holidays?: Holiday[];
   month: string;
   userId?: number;
 };
 
-export function MonthCalendarGrid({ events, month, userId = 0 }: Props) {
+export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: Props) {
   const monthDate = useMemo(() => new Date(month + "-01"), [month]);
   const today = useMemo(() => new Date().toDateString(), []);
 
@@ -77,6 +79,9 @@ export function MonthCalendarGrid({ events, month, userId = 0 }: Props) {
     });
   };
 
+  const holidaysForDay = (day: Date) =>
+    holidays.filter((h) => h.date === formatDateLocal(day));
+
   const handleDayClick = (day: Date) => {
     const start = new Date(day);
     start.setHours(0, 0, 0, 0);
@@ -113,8 +118,10 @@ export function MonthCalendarGrid({ events, month, userId = 0 }: Props) {
             <div key={wi} className="grid min-h-[100px] grid-cols-7">
               {week.map((day) => {
                 const dayEvents = eventsForDay(day);
+                const dayHolidays = holidaysForDay(day);
                 const isToday = day.toDateString() === today;
                 const inMonth = isCurrentMonth(day);
+                const isHoliday = dayHolidays.length > 0;
 
                 return (
                   <div
@@ -122,7 +129,7 @@ export function MonthCalendarGrid({ events, month, userId = 0 }: Props) {
                     onClick={() => handleDayClick(day)}
                     className={`cursor-pointer border-r border-b border-gray-200 p-1 transition-colors last:border-r-0 hover:bg-green-50/50 ${
                       !inMonth ? "bg-gray-50/50" : ""
-                    } ${isToday ? "bg-amber-50" : ""}`}
+                    } ${isToday ? "bg-amber-50" : ""} ${isHoliday && inMonth ? "bg-slate-50/70" : ""}`}
                   >
                     <span
                       className={`inline-flex h-6 w-6 items-center justify-center rounded text-sm ${
@@ -135,6 +142,15 @@ export function MonthCalendarGrid({ events, month, userId = 0 }: Props) {
                     >
                       {day.getDate()}
                     </span>
+                    {dayHolidays.map((h) => (
+                      <div
+                        key={h.date + h.name}
+                        className="mt-0.5 truncate rounded bg-slate-100 px-1 py-0.5 text-[9px] font-medium text-slate-600"
+                        title={h.name}
+                      >
+                        {h.name}
+                      </div>
+                    ))}
                     <div className="mt-1 space-y-0.5">
                       {dayEvents.slice(0, 3).map((e) => {
                         const pendingApproval =

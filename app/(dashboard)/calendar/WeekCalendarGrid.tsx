@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { getWeekStart } from "./lib/week-utils";
+import { parseDateLocal, formatDateLocal } from "./lib/week-utils";
+import type { Holiday } from "./lib/holidays";
 import { isAllDayEvent, requiresDeputy } from "./lib/event-types";
 import { CreateEventModal } from "./CreateEventModal";
 import { ConfirmMoveModal } from "./ConfirmMoveModal";
@@ -26,6 +27,7 @@ type CalendarEvent = {
 
 type Props = {
   events: CalendarEvent[];
+  holidays?: Holiday[];
   from: string;
   to: string;
   userId?: number;
@@ -61,10 +63,10 @@ function getEventSliceForDay(
   return { top, height };
 }
 
-export function WeekCalendarGrid({ events, from, to, userId = 0 }: Props) {
+export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }: Props) {
   const router = useRouter();
   const weekStart = useMemo(() => {
-    const d = new Date(from);
+    const d = parseDateLocal(from);
     d.setHours(0, 0, 0, 0);
     return d;
   }, [from]);
@@ -190,6 +192,9 @@ export function WeekCalendarGrid({ events, from, to, userId = 0 }: Props) {
     );
   }, [events]);
 
+  const holidaysForDay = (day: Date) =>
+    holidays.filter((h) => h.date === formatDateLocal(day));
+
   const totalHeight = 24 * ROW_HEIGHT;
 
   return (
@@ -202,19 +207,29 @@ export function WeekCalendarGrid({ events, from, to, userId = 0 }: Props) {
             Celý den
           </div>
           <div className="flex flex-1">
-            {days.map((d) => (
-              <div
-                key={d.toISOString()}
-                className={`flex-1 border-r border-gray-200 px-2 py-2 text-center text-sm font-medium last:border-r-0 ${
-                  d.toDateString() === today
-                    ? "bg-amber-50 text-amber-900"
-                    : "bg-gray-50 text-gray-700"
-                }`}
-              >
-                {d.toLocaleDateString("cs-CZ", { weekday: "short" })} {d.getDate()}.{" "}
-                {d.getMonth() + 1}.
-              </div>
-            ))}
+            {days.map((d) => {
+              const dayHolidays = holidaysForDay(d);
+              const isHoliday = dayHolidays.length > 0;
+              return (
+                <div
+                  key={d.toISOString()}
+                  className={`flex-1 border-r border-gray-200 px-2 py-2 text-center text-sm font-medium last:border-r-0 ${
+                    d.toDateString() === today
+                      ? "bg-amber-50 text-amber-900"
+                      : isHoliday
+                        ? "bg-slate-100 text-slate-700"
+                        : "bg-gray-50 text-gray-700"
+                  }`}
+                  title={dayHolidays.map((h) => h.name).join(", ")}
+                >
+                  {d.toLocaleDateString("cs-CZ", { weekday: "short" })} {d.getDate()}.{" "}
+                  {d.getMonth() + 1}.
+                  {isHoliday && (
+                    <span className="ml-0.5 text-[10px] text-slate-500">•</span>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -232,6 +247,15 @@ export function WeekCalendarGrid({ events, from, to, userId = 0 }: Props) {
                   d.toDateString() === today ? "bg-amber-50/50" : ""
                 }`}
               >
+                {holidaysForDay(d).map((h) => (
+                  <div
+                    key={h.date + h.name}
+                    className="mb-1 truncate rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                    title={h.name}
+                  >
+                    {h.name}
+                  </div>
+                ))}
                 {allDayEvents
                   .filter((e) => {
                     const start = new Date(e.start_date);

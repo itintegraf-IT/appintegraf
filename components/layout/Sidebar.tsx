@@ -123,6 +123,7 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
         style={{
           background: "var(--sidebar)",
           borderColor: "var(--sidebar-border)",
+          boxShadow: "var(--sidebar-shadow)",
         }}
       >
       <div className="flex flex-col h-full">

@@ -8,8 +8,9 @@ import { CalendarTabs } from "./CalendarTabs";
 import { CalendarViewToggle } from "./CalendarViewToggle";
 import { WeekCalendarGrid } from "./WeekCalendarGrid";
 import { MonthCalendarGrid } from "./MonthCalendarGrid";
-import { getCurrentWeek, getWeekStart, getWeekEnd } from "./lib/week-utils";
+import { getCurrentWeek, getWeekStart, getWeekEnd, formatDateLocal, parseDateLocal } from "./lib/week-utils";
 import { getMonthGridStart, getMonthGridEnd } from "./lib/month-utils";
+import { getHolidaysForRange } from "./lib/holidays";
 
 export default async function CalendarPage({
   searchParams,
@@ -39,20 +40,24 @@ export default async function CalendarPage({
     const monthDate = new Date(month + "-01");
     const gridStart = getMonthGridStart(monthDate);
     const gridEnd = getMonthGridEnd(monthDate);
-    from = gridStart.toISOString().slice(0, 10);
-    to = gridEnd.toISOString().slice(0, 10);
+    from = formatDateLocal(gridStart);
+    to = formatDateLocal(gridEnd);
   } else {
-    if (params.from) {
-      const weekStart = getWeekStart(new Date(params.from));
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+    if (params.from && params.to && dateRe.test(params.from) && dateRe.test(params.to)) {
+      from = params.from;
+      to = params.to;
+    } else if (params.from && dateRe.test(params.from)) {
+      const weekStart = getWeekStart(parseDateLocal(params.from));
       const weekEnd = getWeekEnd(weekStart);
-      from = weekStart.toISOString().slice(0, 10);
-      to = weekEnd.toISOString().slice(0, 10);
+      from = formatDateLocal(weekStart);
+      to = formatDateLocal(weekEnd);
     } else {
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       const todayEnd = new Date(today);
       todayEnd.setDate(todayEnd.getDate() + 6);
-      from = today.toISOString().slice(0, 10);
-      to = todayEnd.toISOString().slice(0, 10);
+      from = formatDateLocal(today);
+      to = formatDateLocal(todayEnd);
     }
   }
 
@@ -107,6 +112,8 @@ export default async function CalendarPage({
     end_date: e.end_date,
   }));
 
+  const holidays = getHolidaysForRange(from, to);
+
   return (
     <>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -143,9 +150,9 @@ export default async function CalendarPage({
       <CalendarNav view={view} from={from} to={to} month={month} />
 
       {view === "month" && month ? (
-        <MonthCalendarGrid events={eventsForGrid} month={month} userId={userId} />
+        <MonthCalendarGrid events={eventsForGrid} holidays={holidays} month={month} userId={userId} />
       ) : (
-        <WeekCalendarGrid events={eventsForGrid} from={from} to={to} userId={userId} />
+        <WeekCalendarGrid events={eventsForGrid} holidays={holidays} from={from} to={to} userId={userId} />
       )}
     </>
   );

@@ -1,0 +1,103 @@
+Identifikace produktu
+
+•             Kód produktu (IG)
+
+•             Název zkrácený (IG)
+
+•             Kód produktu (klient)
+
+•             Název originální (klient)
+
+•             Náhled (jpg)
+
+•             Zadavatel
+
+ 
+
+Výseky a montáže
+
+•             Kódové označení tvaru etikety
+
+•             Rozměr/formát produktu
+
+•             Kód výsekového nástroje
+
+•             Kód montáže
+
+•             Počet pozic na Tiskovém Archu
+
+•             Počet kusů v krabici
+
+•             Počet KS/krabic na paletě
+
+ 
+
+Materiály a tisk
+
+•             Název/druh fólie (potiskovaného materiálu)
+
+•             Barevnost + procentuální pokrytí
+
+•             Poznámka k tisku (např. typ barvy: Led/UV)
+
+•             Tisková data (PDF)
+
+•             Vzor min tisku/nátisk: máme / nemáme
+
+•             EAN kód
+
+•             Výrobní poznámky / doporučení
+
+ 
+
+Schvalování a historie
+
+•             Stav schválení (např. máme / nemáme / řeší grafik / chyba atd.)
+
+•             LOG s četností a datem realizací
+
+•             Volná poznámka
+
+ 
+
+ 
+
+Datum založení záznamu
+
+• Datum poslední aktualizace
+
+• Kdo naposledy editoval
+
+• Stav položky (aktivní / archivní / testovací / zablokovaná atd.)
+
+• Verze tiskových dat (např. v1, v2…)
+
+• Skladová zásoba – SHV (pozn.: zatím k diskusi = s velkým otazníkem)
+
+ 
+
+Sekce: Klient
+
+• Název zákazníka
+
+• Kontaktní osoba
+
+• E-mail
+
+• Procentuální možnost expedovat pod-/nadnáklad
+
+• Poznámka
+
+• Fakturační adresa
+• Doručovací adresa
+• Individuální požadavky (např. zákaz podnákladu, specifický způsob balení)
+
+
+ 
+
+ 
+
+•             Statistiky a historie
+• Historie objednávek / poslední datum výroby
+• Celkové množství vyrobených kusů
+• Průměrná objednávka (za posledních 6–12 měsíců)
