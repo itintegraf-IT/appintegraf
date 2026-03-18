@@ -70,12 +70,9 @@ export async function PUT(req: NextRequest) {
       if (!password_current) {
         return NextResponse.json({ error: "Zadejte současné heslo pro změnu" }, { status: 400 });
       }
-      let valid = false;
-      if (user.password_hash) {
-        valid = await bcrypt.compare(password_current, user.password_hash);
-      } else if (user.password_custom && password_current === user.password_custom) {
-        valid = true;
-      }
+      const valid =
+        user.password_hash &&
+        (await bcrypt.compare(password_current, user.password_hash));
       if (!valid) {
         return NextResponse.json({ error: "Současné heslo není správné" }, { status: 400 });
       }

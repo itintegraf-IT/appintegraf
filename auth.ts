@@ -30,17 +30,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        let isValid = false;
-
-        // Primárně ověření přes password_hash (bcrypt)
-        if (user.password_hash && user.password_hash.length > 0) {
-          isValid = await bcrypt.compare(password, user.password_hash);
-        }
-        // Legacy fallback: plaintext password_custom (PHP kompatibilita)
-        else if (user.password_custom && password === user.password_custom) {
-          isValid = true;
-          // TODO: Upgrade na hash při prvním přihlášení
-        }
+        const isValid =
+          user.password_hash &&
+          user.password_hash.length > 0 &&
+          (await bcrypt.compare(password, user.password_hash));
 
         if (!isValid) {
           return null;

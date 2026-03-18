@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import * as XLSX from "xlsx";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -64,14 +65,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Mapování musí obsahovat alespoň pole ig_code, client_name nebo ig_short_name" }, { status: 400 });
     }
 
-    const text = await file.text();
-    const lines = text.split(/\r?\n/).filter((l) => l.trim());
-    if (lines.length < 2) {
-      return NextResponse.json({ error: "CSV je prázdné nebo nemá data" }, { status: 400 });
+    let dataRows: string[][];
+    const ext = file.name.toLowerCase();
+    if (ext.endsWith(".xlsx") || ext.endsWith(".xls")) {
+      const buf = Buffer.from(await file.arrayBuffer());
+      const wb = XLSX.read(buf, { type: "buffer" });
+      const firstSheet = wb.SheetNames[0];
+      const ws = wb.Sheets[firstSheet];
+      const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" });
+      dataRows = (data as string[][]).slice(1).filter((r) => r.some((c) => c != null && String(c).trim()));
+    } else {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim());
+      if (lines.length < 2) {
+        return NextResponse.json({ error: "CSV je prázdné nebo nemá data" }, { status: 400 });
+      }
+      const delimiter = lines[0].includes(";") ? ";" : ",";
+      dataRows = lines.slice(1).map((l) => parseCsvLine(l, delimiter));
     }
 
-    const delimiter = lines[0].includes(";") ? ";" : ",";
-    const dataRows = lines.slice(1).map((l) => parseCsvLine(l, delimiter));
+    if (dataRows.length === 0) {
+      return NextResponse.json({ error: "Soubor nemá žádná data k importu" }, { status: 400 });
+    }
 
     const customers = await prisma.iml_customers.findMany({ select: { id: true, name: true } });
     const customerByName = new Map(customers.map((c) => [c.name.toLowerCase(), c.id]));

@@ -324,7 +324,7 @@ export function AdminUserForm({ user }: { user?: User }) {
             type="password"
             value={form.password_custom}
             onChange={(e) => setForm({ ...form, password_custom: e.target.value })}
-            placeholder={isEdit ? "" : "heslo123 (výchozí)"}
+            placeholder={isEdit ? "Min 6 znaků" : "heslo123 (výchozí), min 6 znaků"}
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
           />
         </div>

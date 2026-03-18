@@ -3,7 +3,7 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Package, Users, ShoppingCart, FileText, BarChart3, Clock, Settings } from "lucide-react";
+import { Package, Users, ShoppingCart, FileText, BarChart3, Clock, Settings, Upload } from "lucide-react";
 import { subMonths } from "date-fns";
 
 export default async function ImlPage() {
@@ -77,6 +77,7 @@ export default async function ImlPage() {
     { href: "/iml/customers", icon: Users, value: customersCount, label: "Zákazníci" },
     { href: "/iml/products", icon: Package, value: productsCount, label: "Produkty" },
     { href: "/iml/orders", icon: ShoppingCart, value: ordersCount, label: "Objednávky" },
+    { href: "/iml/imports", icon: Upload, value: "3", label: "Importy" },
   ];
 
   return (
@@ -98,6 +99,13 @@ export default async function ImlPage() {
               >
                 <Settings className="h-4 w-4" />
                 Vlastní pole
+              </Link>
+              <Link
+                href="/iml/imports"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              >
+                <Upload className="h-4 w-4" />
+                Importy
               </Link>
               <Link
                 href="/iml/customers/add"
@@ -125,7 +133,7 @@ export default async function ImlPage() {
         </div>
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
           return (

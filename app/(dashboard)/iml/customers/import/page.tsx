@@ -1,78 +1,164 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
-import { ArrowLeft, Upload, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Upload, FileSpreadsheet, GripVertical } from "lucide-react";
+import * as XLSX from "xlsx";
+
+const TARGET_FIELDS = [
+  { key: "name", label: "Název zákazníka", required: true },
+  { key: "email", label: "E-mail", required: false },
+  { key: "phone", label: "Telefon", required: false },
+  { key: "contact_person", label: "Kontaktní osoba", required: false },
+  { key: "city", label: "Město", required: false },
+  { key: "postal_code", label: "PSČ", required: false },
+  { key: "country", label: "Země", required: false },
+  { key: "billing_address", label: "Fakturační adresa", required: false },
+  { key: "shipping_address", label: "Doručovací adresa", required: false },
+  { key: "individual_requirements", label: "Individuální požadavky", required: false },
+  { key: "customer_note", label: "Poznámka ke klientovi", required: false },
+  { key: "allow_under_over_delivery_percent", label: "Povolená odchylka pod-/nadnáklad (%)", required: false },
+] as const;
+
+type Mapping = Record<string, number>;
+
+function parseCsv(text: string): string[][] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length === 0) return [];
+  const delimiter = lines[0].includes(";") ? ";" : ",";
+  const result: string[][] = [];
+  for (const line of lines) {
+    const parts: string[] = [];
+    let cur = "";
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') inQ = !inQ;
+      else if (!inQ && c === delimiter) {
+        parts.push(cur.trim());
+        cur = "";
+      } else cur += c;
+    }
+    parts.push(cur.trim());
+    result.push(parts);
+  }
+  return result;
+}
 
 export default function ImlCustomersImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string[][]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
-  const [mapping, setMapping] = useState<Record<string, number>>({
-    name: 0,
-    email: 1,
-    phone: -1,
-    contact_person: -1,
-    city: -1,
-    postal_code: -1,
-    country: -1,
-    billing_address: -1,
-    shipping_address: -1,
-    individual_requirements: -1,
-    customer_note: -1,
-    allow_under_over_delivery_percent: -1,
-  });
+  const [rows, setRows] = useState<string[][]>([]);
+  const [mapping, setMapping] = useState<Mapping>({});
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<{ imported: number; errors: string[] } | null>(null);
   const [error, setError] = useState("");
+  const [dragOver, setDragOver] = useState<string | null>(null);
+  const [draggedCol, setDraggedCol] = useState<number | null>(null);
 
-  const parseCsv = (text: string): string[][] => {
-    const lines = text.split(/\r?\n/).filter((l) => l.trim());
-    const delimiter = lines[0]?.includes(";") ? ";" : ",";
-    return lines.map((l) => {
-      const parts: string[] = [];
-      let cur = "";
-      let inQ = false;
-      for (let i = 0; i < l.length; i++) {
-        const c = l[i];
-        if (c === '"') inQ = !inQ;
-        else if (!inQ && c === delimiter) {
-          parts.push(cur.trim());
-          cur = "";
-        } else cur += c;
-      }
-      parts.push(cur.trim());
-      return parts;
-    });
-  };
+  const parseFile = useCallback((f: File) => {
+    const ext = f.name.toLowerCase();
+    if (ext.endsWith(".xlsx") || ext.endsWith(".xls")) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const wb = XLSX.read(data, { type: "array" });
+          const firstSheet = wb.SheetNames[0];
+          const ws = wb.Sheets[firstSheet];
+          const arr = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" });
+          const matrix = arr as string[][];
+          if (matrix.length > 0) {
+            setHeaders(matrix[0].map((h, i) => (h ? String(h) : `Sloupec ${i + 1}`)));
+            setRows(matrix.slice(1, 21));
+          } else {
+            setHeaders([]);
+            setRows([]);
+          }
+        } catch (err) {
+          setError("Nepodařilo se načíst Excel soubor");
+        }
+      };
+      reader.readAsArrayBuffer(f);
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = String(reader.result);
+        const matrix = parseCsv(text);
+        if (matrix.length > 0) {
+          setHeaders(matrix[0].map((h, i) => (h ? String(h) : `Sloupec ${i + 1}`)));
+          setRows(matrix.slice(1, 21));
+        } else {
+          setHeaders([]);
+          setRows([]);
+        }
+      };
+      reader.readAsText(f, "UTF-8");
+    }
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     setFile(f ?? null);
     setResult(null);
     setError("");
-    if (!f) {
-      setPreview([]);
+    setMapping({});
+    if (f) parseFile(f);
+    else {
       setHeaders([]);
-      return;
+      setRows([]);
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const text = String(reader.result);
-      const rows = parseCsv(text);
-      setHeaders(rows[0] ?? []);
-      setPreview(rows.slice(1, 6));
-    };
-    reader.readAsText(f, "UTF-8");
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(null);
+    const f = e.dataTransfer.files?.[0];
+    if (f && (f.name.toLowerCase().endsWith(".csv") || f.name.toLowerCase().endsWith(".xlsx") || f.name.toLowerCase().endsWith(".xls"))) {
+      setFile(f);
+      setResult(null);
+      setError("");
+      setMapping({});
+      parseFile(f);
+    } else {
+      setError("Podporované formáty: CSV, Excel (.xlsx, .xls)");
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver("zone");
+  };
+
+  const handleDragLeave = () => setDragOver(null);
+
+  const onDropTarget = (fieldKey: string) => {
+    setDragOver(null);
+    if (draggedCol !== null) {
+      setMapping((m) => ({ ...m, [fieldKey]: draggedCol }));
+      setDraggedCol(null);
+    }
+  };
+
+  const onDragStartCol = (colIndex: number) => setDraggedCol(colIndex);
+  const onDragEndCol = () => setDraggedCol(null);
+
+  const removeMapping = (fieldKey: string) => {
+    setMapping((m) => {
+      const next = { ...m };
+      delete next[fieldKey];
+      return next;
+    });
+  };
+
+  const canImport = () => {
+    return file && typeof mapping.name === "number" && mapping.name >= 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      setError("Vyberte soubor");
-      return;
-    }
+    if (!file || !canImport()) return;
     setLoading(true);
     setError("");
     setResult(null);
@@ -80,15 +166,14 @@ export default function ImlCustomersImportPage() {
       const formData = new FormData();
       formData.append("file", file);
       formData.append("mapping", JSON.stringify(mapping));
-      const res = await fetch("/api/iml/customers/import", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch("/api/iml/customers/import", { method: "POST", body: formData });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Chyba při importu");
       setResult({ imported: data.imported, errors: data.errors ?? [] });
       setFile(null);
-      setPreview([]);
+      setHeaders([]);
+      setRows([]);
+      setMapping({});
       fileInputRef.current!.value = "";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chyba při importu");
@@ -97,30 +182,17 @@ export default function ImlCustomersImportPage() {
     }
   };
 
-  const fields = [
-    "name",
-    "email",
-    "phone",
-    "contact_person",
-    "city",
-    "postal_code",
-    "country",
-    "billing_address",
-    "shipping_address",
-    "individual_requirements",
-    "customer_note",
-    "allow_under_over_delivery_percent",
-  ];
-
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Import zákazníků IML z CSV</h1>
-          <p className="mt-1 text-gray-600">Nahrajte CSV soubor a namapujte sloupce</p>
+          <h1 className="text-2xl font-bold text-gray-900">Import zákazníků z CSV/Excel</h1>
+          <p className="mt-1 text-gray-600">
+            Nahrajte soubor, zobrazte náhled a přetáhněte sloupce na cílová pole
+          </p>
         </div>
         <Link
-          href="/iml/customers"
+          href="/iml/imports"
           className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -128,15 +200,12 @@ export default function ImlCustomersImportPage() {
         </Link>
       </div>
 
-      <form
-        onSubmit={handleSubmit}
-        className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
-      >
+      <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
-          <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
         {result && (
-          <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">
+          <div className="rounded-lg bg-green-50 p-3 text-sm text-green-800">
             Importováno: {result.imported} zákazníků.
             {result.errors.length > 0 && (
               <div className="mt-2 text-amber-700">
@@ -147,70 +216,165 @@ export default function ImlCustomersImportPage() {
           </div>
         )}
 
-        <div className="mb-4">
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            <FileSpreadsheet className="mr-1 inline h-4 w-4" /> CSV soubor
-          </label>
+        <div
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          className={`rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
+            dragOver === "zone"
+              ? "border-red-400 bg-red-50"
+              : "border-gray-300 bg-gray-50 hover:border-gray-400"
+          }`}
+        >
+          <FileSpreadsheet className="mx-auto mb-2 h-10 w-10 text-gray-500" />
+          <p className="mb-2 text-sm font-medium text-gray-700">
+            Přetáhněte soubor sem nebo klikněte pro výběr
+          </p>
+          <p className="mb-4 text-xs text-gray-500">CSV, Excel (.xlsx, .xls)</p>
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv"
+            accept=".csv,.xlsx,.xls"
             onChange={handleFileChange}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 file:mr-2 file:rounded file:border-0 file:bg-red-50 file:px-3 file:py-1 file:text-red-600"
+            className="hidden"
           />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            Vybrat soubor
+          </button>
+          {file && (
+            <p className="mt-2 text-sm text-gray-600">
+              <strong>{file.name}</strong>
+            </p>
+          )}
         </div>
 
         {headers.length > 0 && (
-          <div className="mb-4 overflow-x-auto">
-            <p className="mb-2 text-sm font-medium text-gray-700">
-              Mapování sloupců (povinné: name)
-            </p>
-            <table className="min-w-full text-sm">
-              <thead>
-                <tr className="border-b">
-                  <th className="px-2 py-1 text-left">Pole</th>
-                  <th className="px-2 py-1 text-left">Sloupec CSV</th>
-                </tr>
-              </thead>
-              <tbody>
-                {fields.map((field) => (
-                  <tr key={field} className="border-b">
-                    <td className="px-2 py-1">{field}</td>
-                    <td className="px-2 py-1">
-                      <select
-                        value={mapping[field] ?? -1}
-                        onChange={(e) =>
-                          setMapping((m) => ({ ...m, [field]: parseInt(e.target.value, 10) }))
-                        }
-                        className="rounded border border-gray-300 px-2 py-1"
+          <>
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-semibold text-gray-700">
+                Mapování sloupců – přetáhněte sloupec ze zdroje na cílové pole
+              </h3>
+              <div className="grid gap-6 lg:grid-cols-2">
+                <div>
+                  <p className="mb-2 text-xs font-medium text-gray-500">Sloupce v souboru</p>
+                  <div className="flex flex-wrap gap-2">
+                    {headers.map((h, i) => (
+                      <div
+                        key={i}
+                        draggable
+                        onDragStart={() => onDragStartCol(i)}
+                        onDragEnd={onDragEndCol}
+                        className={`flex cursor-grab items-center gap-1 rounded-lg border px-3 py-2 text-sm ${
+                          draggedCol === i
+                            ? "border-red-400 bg-red-50 opacity-80"
+                            : "border-gray-300 bg-white hover:border-gray-400"
+                        }`}
                       >
-                        <option value={-1}>—</option>
-                        {headers.map((h, i) => (
-                          <option key={i} value={i}>
-                            {i}: {h}
-                          </option>
+                        <GripVertical className="h-4 w-4 text-gray-400" />
+                        <span className="font-medium">{h}</span>
+                        <span className="text-gray-400">({i})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-xs font-medium text-gray-500">Cílová pole</p>
+                  <div className="space-y-2">
+                    {TARGET_FIELDS.map((f) => (
+                      <div
+                        key={f.key}
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDragOver(f.key);
+                        }}
+                        onDragLeave={() => setDragOver(null)}
+                        onDrop={() => onDropTarget(f.key)}
+                        className={`flex items-center justify-between rounded-lg border-2 px-3 py-2 ${
+                          dragOver === f.key
+                            ? "border-red-400 bg-red-50"
+                            : mapping[f.key] != null
+                              ? "border-green-300 bg-green-50/50"
+                              : "border-dashed border-gray-300 bg-gray-50"
+                        }`}
+                      >
+                        <span className="text-sm">
+                          {f.label}
+                          {f.required && <span className="text-red-500"> *</span>}
+                        </span>
+                        {mapping[f.key] != null ? (
+                          <span className="flex items-center gap-1">
+                            <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-800">
+                              {headers[mapping[f.key]]} ({mapping[f.key]})
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => removeMapping(f.key)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">Přetáhněte sloupec</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-semibold text-gray-700">Náhled dat</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      {headers.map((h, i) => (
+                        <th key={i} className="px-3 py-2 text-left font-medium text-gray-700">
+                          {h}
+                          {Object.entries(mapping).some(([, v]) => v === i) && (
+                            <span className="ml-1 text-green-600">✓</span>
+                          )}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((row, ri) => (
+                      <tr key={ri} className="border-b border-gray-100">
+                        {headers.map((_, ci) => (
+                          <td key={ci} className="max-w-[200px] truncate px-3 py-2">
+                            {row[ci] ?? ""}
+                          </td>
                         ))}
-                      </select>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <p className="mt-2 text-xs text-gray-500">Náhled: {preview.length} řádků</p>
-          </div>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                Zobrazeno prvních {rows.length} řádků
+              </p>
+            </div>
+          </>
         )}
 
         <div className="flex gap-2">
           <button
             type="submit"
-            disabled={loading || !file}
+            disabled={loading || !canImport()}
             className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
           >
             <Upload className="h-4 w-4" />
             {loading ? "Importuji…" : "Importovat"}
           </button>
           <Link
-            href="/iml/customers"
+            href="/iml/imports"
             className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
           >
             Zrušit
