@@ -85,7 +85,7 @@ export async function GET(
       };
     });
 
-    const hotKrab = 0;
+    const hotKrab = jobConfig?.hot_krab ?? 0;
     const pocetRoli = rows.reduce((s, r) => s + r.ks, 0);
     const celkem = pocetRoli + hotKrab * ksVKr;
 

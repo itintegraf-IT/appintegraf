@@ -39,6 +39,8 @@ export default function KontrolaClient({ job }: Props) {
   const [tiskNaJehle, setTiskNaJehle] = useState(true);
   const [turbo, setTurbo] = useState(false);
   const [korekce, setKorekce] = useState(0);
+  const [opravitMode, setOpravitMode] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const fix = FIX_SETTINGS[job];
   const pocCislic = fix?.pocCislic ?? 6;
@@ -119,6 +121,13 @@ export default function KontrolaClient({ job }: Props) {
     setState({ ...state, rows });
   };
 
+  const updateRow = (idx: number, field: "cisloOd" | "cisloDo" | "ks", value: string | number) => {
+    if (!state) return;
+    const rows = [...state.rows];
+    rows[idx] = { ...rows[idx], [field]: value };
+    setState({ ...state, rows });
+  };
+
   const handleOK = async () => {
     if (!state) return;
     if (balil === "Vyber jmeno...") {
@@ -147,6 +156,14 @@ export default function KontrolaClient({ job }: Props) {
         const d = await res.json();
         throw new Error(d.error ?? "Chyba");
       }
+      const data = await res.json();
+      if (data.protocolPdf) {
+        const blob = new Blob(
+          [Uint8Array.from(atob(data.protocolPdf), (c) => c.charCodeAt(0))],
+          { type: "application/pdf" }
+        );
+        window.open(URL.createObjectURL(blob), "_blank");
+      }
       await loadState();
     } catch (e) {
       alert(e instanceof Error ? e.message : "Chyba");
@@ -156,6 +173,142 @@ export default function KontrolaClient({ job }: Props) {
   const updateCisloZakazky = (v: string) => {
     if (!state) return;
     setState({ ...state, cisloZakazky: v.slice(0, 7) });
+  };
+
+  const handleExportTxt = () => {
+    window.open(`/api/vyroba/control/${job}/export-txt`, "_blank");
+  };
+
+  const handleProtokol = async () => {
+    if (!state) return;
+    try {
+      const res = await fetch(`/api/vyroba/protocol/${job}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "both",
+          balil,
+          cKrabNaPalete: state.cKrabNaPalete,
+          cisloKrabice: state.hotKrab + 1,
+          hotKrab: state.hotKrab,
+          rows: state.rows,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Chyba");
+      const blob = await res.blob();
+      window.open(URL.createObjectURL(blob), "_blank");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Chyba protokolu");
+    }
+  };
+
+  const handleSestava = async () => {
+    if (!state || !isIGT) return;
+    try {
+      const boxes = [
+        {
+          cisloKrabice: String(state.hotKrab + 1).padStart(6, "0"),
+          cisloPalety: String(state.paleta).padStart(2, "0"),
+          serie: state.rows[0]?.serie ?? "",
+          rows: state.rows,
+        },
+      ];
+      const res = await fetch(`/api/vyroba/protocol/${job}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "igt-inkjety",
+          cisloZakazky: state.cisloZakazky,
+          cisloPalety: state.paleta,
+          boxes,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Chyba");
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `inkjety_${state.cisloZakazky}.txt`;
+      a.click();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Chyba sestavy");
+    }
+  };
+
+  const handlePaleta = async () => {
+    if (!state || !isIGT) return;
+    try {
+      const boxes = [
+        {
+          cisloKrabice: String(state.hotKrab + 1).padStart(6, "0"),
+          cisloPalety: String(state.paleta).padStart(2, "0"),
+          rows: state.rows,
+        },
+      ];
+      const res = await fetch(`/api/vyroba/protocol/${job}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "igt-paleta",
+          cisloZakazky: state.cisloZakazky,
+          cisloPalety: state.paleta,
+          boxes,
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Chyba");
+      const blob = await res.blob();
+      window.open(URL.createObjectURL(blob), "_blank");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Chyba palety");
+    }
+  };
+
+  const handleImportTxt = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".txt";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setImporting(true);
+      try {
+        const content = await file.text();
+        const res = await fetch(`/api/vyroba/control/${job}/import-txt`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error ?? "Chyba");
+        await loadState();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Chyba při importu");
+      } finally {
+        setImporting(false);
+      }
+    };
+    input.click();
+  };
+
+  const handleOpravit = async () => {
+    if (!state) return;
+    try {
+      const res = await fetch(`/api/vyroba/control/${job}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "opravit",
+          rows: state.rows.map((r) => ({
+            cisloOd: r.cisloOd,
+            cisloDo: r.cisloDo,
+            ks: r.ks,
+          })),
+        }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Chyba");
+      setOpravitMode(false);
+      await loadState();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Chyba");
+    }
   };
 
   if (loading) {
@@ -259,35 +412,72 @@ export default function KontrolaClient({ job }: Props) {
                   {isIGT && (
                     <td className="p-2 font-mono">{row.predcisli ?? ""}</td>
                   )}
-                  <td className="p-2 font-mono">{row.cisloOd}</td>
                   <td className="p-2 font-mono">
-                    <span
-                      className={
-                        korekceOutOfRange && row.checked ? "text-red-600" : ""
-                      }
-                    >
-                      {row.cisloDo}
-                    </span>
+                    {opravitMode ? (
+                      <input
+                        type="text"
+                        value={row.cisloOd}
+                        onChange={(e) => updateRow(idx, "cisloOd", e.target.value)}
+                        className="w-24 rounded border border-gray-300 px-1 py-0.5 text-sm"
+                      />
+                    ) : (
+                      row.cisloOd
+                    )}
+                  </td>
+                  <td className="p-2 font-mono">
+                    {opravitMode ? (
+                      <input
+                        type="text"
+                        value={row.cisloDo}
+                        onChange={(e) => updateRow(idx, "cisloDo", e.target.value)}
+                        className={`w-24 rounded border border-gray-300 px-1 py-0.5 text-sm ${korekceOutOfRange && row.checked ? "border-red-500" : ""}`}
+                      />
+                    ) : (
+                      <span
+                        className={
+                          korekceOutOfRange && row.checked ? "text-red-600" : ""
+                        }
+                      >
+                        {row.cisloDo}
+                      </span>
+                    )}
                   </td>
                   <td className="p-2">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => plusMinus(-1)}
-                        className="rounded bg-red-100 p-1 text-red-700 hover:bg-red-200"
-                        title="Korekce -1"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => plusMinus(1)}
-                        className="rounded bg-blue-100 p-1 text-blue-700 hover:bg-blue-200"
-                        title="Korekce +1"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
+                    {!opravitMode && (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => plusMinus(-1)}
+                          className="rounded bg-red-100 p-1 text-red-700 hover:bg-red-200"
+                          title="Korekce -1"
+                        >
+                          <Minus className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => plusMinus(1)}
+                          className="rounded bg-blue-100 p-1 text-blue-700 hover:bg-blue-200"
+                          title="Korekce +1"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
                   </td>
-                  <td className="p-2 font-mono">{row.ks} ks</td>
+                  <td className="p-2 font-mono">
+                    {opravitMode ? (
+                      <input
+                        type="number"
+                        min={0}
+                        max={state.ksVKr}
+                        value={row.ks}
+                        onChange={(e) =>
+                          updateRow(idx, "ks", parseInt(e.target.value, 10) || 0)
+                        }
+                        className="w-14 rounded border border-gray-300 px-1 py-0.5 text-sm"
+                      />
+                    ) : (
+                      `${row.ks} ks`
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -336,17 +526,53 @@ export default function KontrolaClient({ job }: Props) {
 
         <div className="mb-6 flex flex-wrap items-center gap-4">
           <button
-            onClick={() => window.open("#", "_blank")}
+            onClick={handleExportTxt}
             className="rounded bg-white/20 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/30"
+            title="Stáhnout stav jako TXT pro ruční opravu"
           >
-            Open
+            Export TXT
           </button>
           <button
-            onClick={() => {}}
-            className="rounded bg-white/20 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/30"
+            onClick={handleImportTxt}
+            disabled={importing}
+            className="rounded bg-white/20 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/30 disabled:opacity-50"
+            title="Načíst stav z TXT souboru (přepíše DB)"
           >
-            Jet
+            {importing ? "Importuji…" : "Import TXT"}
           </button>
+          {opravitMode ? (
+            <>
+              <button
+                onClick={handleOpravit}
+                className="rounded bg-amber-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-amber-600"
+              >
+                Uložit opravu
+              </button>
+              <button
+                onClick={() => setOpravitMode(false)}
+                className="rounded bg-white/20 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/30"
+              >
+                Zrušit
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setOpravitMode(true)}
+              className="rounded bg-white/20 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/30"
+              title="Ruční oprava čísel v gridu"
+            >
+              Opravit
+            </button>
+          )}
+          {!isIGT && (
+            <button
+              onClick={handleProtokol}
+              className="rounded bg-white/20 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/30"
+              title="Tisk protokolu (balný list + štítek) pro aktuální stav"
+            >
+              Protokol
+            </button>
+          )}
           <div className="flex items-center gap-2">
             <select
               value={balil}
@@ -370,18 +596,24 @@ export default function KontrolaClient({ job }: Props) {
             />
             Tisk na jehle
           </label>
-          <button
-            onClick={() => {}}
-            className="rounded bg-white/20 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/30"
-          >
-            Sestava
-          </button>
-          <button
-            onClick={() => {}}
-            className="rounded bg-white/20 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/30"
-          >
-            Paleta
-          </button>
+          {isIGT && (
+            <>
+              <button
+                onClick={handleSestava}
+                className="rounded bg-white/20 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/30"
+                title="TXT pro jehličkovou tiskárnu (inkjety)"
+              >
+                Sestava
+              </button>
+              <button
+                onClick={handlePaleta}
+                className="rounded bg-white/20 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/30"
+                title="Paletový list PDF"
+              >
+                Paleta
+              </button>
+            </>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center justify-center gap-2">

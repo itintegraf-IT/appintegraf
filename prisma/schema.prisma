@@ -965,6 +965,7 @@ model vyroba_job_config {
   predcisli      Json?    @db.Json
   paleta         Json?    @db.Json
   cislo_zakazky  String?  @db.VarChar(20)
+  hot_krab       Int      @default(0) @db.Int
   updated_at     DateTime @updatedAt @db.DateTime(0)
 
   @@map("vyroba_job_config")
