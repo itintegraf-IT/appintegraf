@@ -19,8 +19,7 @@ export default async function VyrobaNastaveniPage() {
     }),
     prisma.vyroba_job_config.findMany(),
     prisma.vyroba_employees.findMany({
-      where: { is_active: true },
-      orderBy: { sort_order: "asc" },
+      orderBy: [{ sort_order: "asc" }, { name: "asc" }],
     }),
   ]);
 

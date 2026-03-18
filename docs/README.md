@@ -15,6 +15,15 @@ Přehled dokumentace modulů a specifikací projektu.
 |----------|-------|
 | [MODUL_IML.md](MODUL_IML.md) | Kompletní dokumentace modulu IML – přehled, databáze, API, export/import, vlastní pole, fáze implementace |
 
+## Modul Výroba
+
+| Dokument | Popis |
+|----------|-------|
+| [NAVRH_MODUL_VYROBA.md](NAVRH_MODUL_VYROBA.md) | Návrh a plán implementace – architektura, datový model, fáze 1–6, **stav implementace (všechny fáze hotové)** |
+| [DOKUMENTACE_KOMPLETNI_vyrobaceniny.md](DOKUMENTACE_KOMPLETNI_vyrobaceniny.md) | Kompletní dokumentace IG52 – výpočty, formáty, migrace do Next.js |
+| [MANUAL_VYROBA.md](MANUAL_VYROBA.md) | **Uživatelský manuál** – přehled obrazovek, tok práce, řešení problémů |
+| [VYROBA_TISK.md](VYROBA_TISK.md) | **Řešení tisku** – PDF, TXT, možnosti nasazení |
+
 ## Migrace
 
 | Dokument | Popis |

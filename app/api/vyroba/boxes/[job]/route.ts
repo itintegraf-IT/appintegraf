@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { hasModuleAccess } from "@/lib/auth-utils";
+import { hasModuleAccess, getUsersWithModuleAccess } from "@/lib/auth-utils";
 import { FIX_SETTINGS, JOB_TYPES } from "@/lib/vyroba/config/fix-settings";
 import {
   initialRowsForJob,
@@ -33,11 +33,11 @@ export async function GET(
   }
 
   try {
-    const [addressSetting, jobConfig, boxStates, employees] = await Promise.all([
+    const [addressSetting, jobConfig, boxStates, vyrobaUsers] = await Promise.all([
       prisma.vyroba_settings.findUnique({ where: { setting_key: "ADRESA" } }),
       prisma.vyroba_job_config.findUnique({ where: { job } }),
       prisma.vyroba_box_state.findMany({ where: { job }, orderBy: { production: "asc" } }),
-      prisma.vyroba_employees.findMany({ where: { is_active: true }, orderBy: { sort_order: "asc" } }),
+      getUsersWithModuleAccess("vyroba", "read"),
     ]);
 
     const address = addressSetting?.setting_val ?? "";
@@ -104,7 +104,7 @@ export async function GET(
       cKrabNaPalete: 0,
       paleta: 1,
       cisloZakazky,
-      employees: employees.map((e) => e.name),
+      employees: vyrobaUsers.map((u) => u.name),
       stepBase,
     });
   } catch (error) {

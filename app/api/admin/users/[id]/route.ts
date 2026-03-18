@@ -69,6 +69,7 @@ export async function GET(
             equipment: "admin",
             calendar: "admin",
             planovani: "admin",
+            vyroba: "admin",
             kiosk: "admin",
             training: "admin",
             iml: "admin",

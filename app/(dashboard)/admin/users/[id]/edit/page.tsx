@@ -64,8 +64,10 @@ export default async function AdminUserEditPage({
             equipment: "admin",
             calendar: "admin",
             planovani: "admin",
+            vyroba: "admin",
             kiosk: "admin",
             training: "admin",
+            iml: "admin",
           };
         } else {
           module_access = decoded as Record<string, string>;

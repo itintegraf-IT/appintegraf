@@ -1,9 +1,25 @@
 # Návrh řešení a plán implementace – Modul Výroba
 
 **Pracovní název:** Výroba  
-**Verze dokumentu:** 1.0  
+**Verze dokumentu:** 1.1  
 **Datum:** 18. 3. 2025  
+**Poslední aktualizace:** 18. 3. 2025  
 **Zdroje:** DOKUMENTACE_KOMPLETNI_vyrobaceniny.md, IG.exe_extracted
+
+---
+
+## Stav implementace (k 18. 3. 2025)
+
+**Hotové fáze:** 1, 2, 3, 4, 5, 6
+
+| Fáze | Stav | Popis |
+|------|------|-------|
+| 1 | ✅ | Infrastruktura – Prisma, API, layout, stránky |
+| 2 | ✅ | Generování – všech 6 typů JOB (CreateVnitro, POP, NEXGO, DPB_AVJ, IGT_Sazka) |
+| 3 | ✅ | Kontrola + výhoz – grid, DB, TXT export/import, opravy |
+| 4 | ✅ | Protokoly – balný list, štítek, paleta IGT, inkjety TXT |
+| 5 | ✅ | Zaměstnanci – CRUD API, nastavení ADRESA/JOB |
+| 6 | ✅ | Testování, dokumentace, tisk |
 
 ---
 
@@ -33,10 +49,10 @@ Modul **Výroba** migruje funkcionalitu desktopové aplikace IG52 (Python/wxPyth
 │                        FRONTEND (React / Next.js)                        │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  /vyroba                    │  Hlavní dashboard – výběr JOB             │
+│  /vyroba/[job]              │  Parametry výroby (serie, ks, …)         │
 │  /vyroba/generovani/[job]   │  Generování dat (Create*)                 │
-│  /vyroba/kontrola/[job]     │  Kontrola balení (ButtonOK)                │
-│  /vyroba/nastaveni          │  Konfigurace JOB, ADRESA, zaměstnanci     │
-│  /vyroba/protokoly          │  Tisk/náhled protokolů                    │
+│  /vyroba/kontrola/[job]     │  Kontrola balení, výhoz, protokoly       │
+│  /vyroba/nastaveni          │  Konfigurace ADRESA, JOB, zaměstnanci     │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -46,11 +62,14 @@ Modul **Výroba** migruje funkcionalitu desktopové aplikace IG52 (Python/wxPyth
 │  /api/vyroba/jobs              │  Seznam JOB typů                       │
 │  /api/vyroba/jobs/[job]/config │  GET/PUT konfigurace JOB               │
 │  /api/vyroba/address            │  GET/PUT ADRESA                        │
-│  /api/vyroba/employees          │  Zaměstnanci (CRUD)                    │
+│  /api/vyroba/employees          │  GET/POST – zaměstnanci               │
+│  /api/vyroba/employees/[id]     │  PATCH/DELETE – úprava, deaktivace     │
 │  /api/vyroba/generate/[job]     │  POST – generování dat                │
-│  /api/vyroba/control/[job]      │  POST – výhoz / kontrola               │
+│  /api/vyroba/control/[job]      │  POST – výhoz, opravit                  │
+│  /api/vyroba/control/[job]/export-txt  │  GET – export stavu jako TXT   │
+│  /api/vyroba/control/[job]/import-txt  │  POST – import TXT do DB        │
 │  /api/vyroba/boxes/[job]        │  GET – rozpracované krabice            │
-│  /api/vyroba/protocol/[job]     │  POST – generování PDF                │
+│  /api/vyroba/protocol/[job]     │  POST – generování PDF/TXT             │
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -245,69 +264,69 @@ Výstupy budou ukládány do konfigurovatelné cesty (env `VYROBA_OUTPUT_PATH` n
 
 ## 7. Plán implementace
 
-### Fáze 1: Základní infrastruktura (1–2 týdny)
+### Fáze 1: Základní infrastruktura (1–2 týdny) ✅
 
-| # | Úkol | Výstup |
-|---|------|--------|
-| 1.1 | Prisma migrace – nové tabulky | `vyroba_*` modely |
-| 1.2 | Přidat `vyroba` do `getLayoutAccess` a Sidebar | Navigace v aplikaci |
-| 1.3 | Seed / inicializace FixSettings, default ADRESA | Konfigurace |
-| 1.4 | API: `GET/PUT /api/vyroba/address` | Základní API |
-| 1.5 | API: `GET/PUT /api/vyroba/jobs/[job]/config` | Konfigurace JOB |
-| 1.6 | Stránka `/vyroba` – dashboard s výběrem JOB | UI základ |
+| # | Úkol | Výstup | Stav |
+|---|------|--------|------|
+| 1.1 | Prisma migrace – nové tabulky | `vyroba_*` modely | ✅ |
+| 1.2 | Přidat `vyroba` do `getLayoutAccess` a Sidebar | Navigace v aplikaci | ✅ |
+| 1.3 | Seed / inicializace FixSettings, default ADRESA | Konfigurace | ✅ |
+| 1.4 | API: `GET/PUT /api/vyroba/address` | Základní API | ✅ |
+| 1.5 | API: `GET/PUT /api/vyroba/jobs/[job]/config` | Konfigurace JOB | ✅ |
+| 1.6 | Stránka `/vyroba` – dashboard s výběrem JOB | UI základ | ✅ |
 
-### Fáze 2: Generování (2–3 týdny)
+### Fáze 2: Generování (2–3 týdny) ✅
 
-| # | Úkol | Výstup |
-|---|------|--------|
-| 2.1 | `lib/vyroba/utils/deleni3.ts` | Pomocná funkce |
-| 2.2 | `lib/vyroba/generators/createVnitro.ts` | CD_Vnitro |
-| 2.3 | `lib/vyroba/generators/createValidator.ts` | CD_Validator |
-| 2.4 | `lib/vyroba/generators/createPOP.ts` | CD_POP |
-| 2.5 | `lib/vyroba/generators/createNEXGO.ts` | CD_POP_NEXGO |
-| 2.6 | `lib/vyroba/generators/createDPB_AVJ.ts` | DPB_AVJ |
-| 2.7 | `lib/vyroba/generators/createIGT_Sazka.ts` | IGT_Sazka |
-| 2.8 | API `POST /api/vyroba/generate/[job]` | Endpoint generování |
-| 2.9 | UI `/vyroba/generovani/[job]` | Formulář + spuštění |
+| # | Úkol | Výstup | Stav |
+|---|------|--------|------|
+| 2.1 | `lib/vyroba/utils/deleni3.ts` | Pomocná funkce | ✅ |
+| 2.2 | `lib/vyroba/generators/createVnitro.ts` | CD_Vnitro | ✅ |
+| 2.3 | `lib/vyroba/generators/createValidator.ts` | CD_Validator | ✅ |
+| 2.4 | `lib/vyroba/generators/createPOP.ts` | CD_POP | ✅ |
+| 2.5 | `lib/vyroba/generators/createNEXGO.ts` | CD_POP_NEXGO | ✅ |
+| 2.6 | `lib/vyroba/generators/createDPB_AVJ.ts` | DPB_AVJ | ✅ |
+| 2.7 | `lib/vyroba/generators/createIGT_Sazka.ts` | IGT_Sazka | ✅ |
+| 2.8 | API `POST /api/vyroba/generate/[job]` | Endpoint generování | ✅ |
+| 2.9 | UI `/vyroba/generovani/[job]` | Formulář + spuštění | ✅ |
 
-### Fáze 3: Kontrola a výhoz (2–3 týdny)
+### Fáze 3: Kontrola a výhoz (2–3 týdny) ✅
 
-| # | Úkol | Výstup |
-|---|------|--------|
-| 3.1 | `lib/vyroba/control/rozprcaneKrabice.ts` | Načtení stavu |
-| 3.2 | `lib/vyroba/control/buttonOK.ts` – CD_Vnitro, CD_Validator, CD_POP, DPB_AVJ | Logika výhozu |
-| 3.3 | `lib/vyroba/control/buttonOKNEXGO.ts` | CD_POP_NEXGO |
-| 3.4 | `lib/vyroba/control/buttonOKIGT.ts` | IGT_Sazka |
-| 3.5 | API `POST /api/vyroba/control/[job]` | Endpoint výhozu |
-| 3.6 | API `GET /api/vyroba/boxes/[job]` | Stav krabic |
-| 3.7 | UI `/vyroba/kontrola/[job]` | Kontrolní obrazovka (pólové číslo, OK, <, <<, >, >>) |
+| # | Úkol | Výstup | Stav |
+|---|------|--------|------|
+| 3.1 | Načtení stavu z DB + TXT | `lib/vyroba/control/calculations.ts`, `txt-io.ts` | ✅ |
+| 3.2 | Logika výhozu – CD_Vnitro, CD_Validator, CD_POP, DPB_AVJ | ButtonOK v control API | ✅ |
+| 3.3 | Logika výhozu CD_POP_NEXGO | Stejný endpoint | ✅ |
+| 3.4 | Logika výhozu IGT_Sazka | Stejný endpoint | ✅ |
+| 3.5 | API `POST /api/vyroba/control/[job]` | Endpoint výhozu, opravit | ✅ |
+| 3.6 | API `GET /api/vyroba/boxes/[job]` | Stav krabic | ✅ |
+| 3.7 | UI `/vyroba/kontrola/[job]` | Kontrolní obrazovka (pólové číslo, OK, <, <<, >, >>) | ✅ |
 
-### Fáze 4: Protokoly a sestavy (1–2 týdny)
+### Fáze 4: Protokoly a sestavy (1–2 týdny) ✅
 
-| # | Úkol | Výstup |
-|---|------|--------|
-| 4.1 | `lib/vyroba/protocol/pdf-baleni-list.ts` | Balný list PDF (pdf-lib) |
-| 4.2 | `lib/vyroba/protocol/pdf-stitek.ts` | Štítek PDF |
-| 4.3 | `lib/vyroba/protocol/igt-paleta.ts` | Paletový list IGT |
-| 4.4 | `lib/vyroba/protocol/igt-inkjety.ts` | TXT pro jehličkovou tiskárnu |
-| 4.5 | API `POST /api/vyroba/protocol/[job]` | Generování PDF |
-| 4.6 | UI tisk/náhled protokolů | Integrace do kontroly |
+| # | Úkol | Výstup | Stav |
+|---|------|--------|------|
+| 4.1 | `lib/vyroba/protocol/pdf-baleni-list.ts` | Balný list PDF (pdf-lib) | ✅ |
+| 4.2 | `lib/vyroba/protocol/pdf-stitek.ts` | Štítek PDF | ✅ |
+| 4.3 | `lib/vyroba/protocol/igt-paleta.ts` | Paletový list IGT | ✅ |
+| 4.4 | `lib/vyroba/protocol/igt-inkjety.ts` | TXT pro jehličkovou tiskárnu | ✅ |
+| 4.5 | API `POST /api/vyroba/protocol/[job]` | Generování PDF | ✅ |
+| 4.6 | UI tisk/náhled protokolů | Integrace do kontroly | ✅ |
 
-### Fáze 5: Zaměstnanci a nastavení (1 týden)
+### Fáze 5: Zaměstnanci a nastavení (1 týden) ✅
 
-| # | Úkol | Výstup |
-|---|------|--------|
-| 5.1 | CRUD `vyroba_employees` | API + UI |
-| 5.2 | Stránka `/vyroba/nastaveni` | Konfigurace ADRESA, JOB, zaměstnanci |
-| 5.3 | Migrace z VarSettings.dat (volitelně) | Import existujících dat |
+| # | Úkol | Výstup | Stav |
+|---|------|--------|------|
+| 5.1 | CRUD `vyroba_employees` | API + UI | ✅ |
+| 5.2 | Stránka `/vyroba/nastaveni` | Konfigurace ADRESA, JOB, zaměstnanci | ✅ |
+| 5.3 | Migrace z VarSettings.dat (volitelně) | Import existujících dat | ⏸️ |
 
-### Fáze 6: Ostré nasazení a testování (1–2 týdny)
+### Fáze 6: Ostré nasazení a testování (1–2 týdny) ✅
 
-| # | Úkol | Výstup |
-|---|------|--------|
-| 6.1 | E2E testy kritických flow | Automatizované testy |
-| 6.2 | Dokumentace pro uživatele | Manuál |
-| 6.3 | Řešení tisku (Cloud Print / lokální služba) | Tisková integrace |
+| # | Úkol | Výstup | Stav |
+|---|------|--------|------|
+| 6.1 | E2E testy kritických flow | Unit testy (Vitest), E2E (Playwright) | ✅ |
+| 6.2 | Dokumentace pro uživatele | MANUAL_VYROBA.md | ✅ |
+| 6.3 | Řešení tisku | VYROBA_TISK.md – možnosti, doporučení | ✅ |
 
 ---
 
@@ -362,6 +381,83 @@ Původní IG52 používá `win32print` a EPSON FX-890. Možnosti pro Next.js:
 | Fáze 5 – Nastavení | 1 týden |
 | Fáze 6 – Testování | 1–2 týdny |
 | **Celkem** | **8–13 týdnů** |
+
+---
+
+## 11. Implementované komponenty (detailní popis)
+
+### 11.1 Fáze 1 – Infrastruktura
+
+| Komponenta | Cesta / popis |
+|------------|---------------|
+| Prisma modely | `vyroba_settings`, `vyroba_job_config`, `vyroba_employees`, `vyroba_box_state`, `vyroba_audit` |
+| Layout | Modul „Výroba“ v Sidebar, přístup dle `getLayoutAccess` |
+| API ADRESA | `GET/PUT /api/vyroba/address` |
+| API JOB | `GET /api/vyroba/jobs`, `GET/PUT /api/vyroba/jobs/[job]/config` |
+| Stránky | `/vyroba` (dashboard), `/vyroba/nastaveni` |
+
+### 11.2 Fáze 2 – Generování
+
+| Komponenta | Soubor | Popis |
+|------------|--------|-------|
+| createVnitro | `lib/vyroba/generators/createVnitro.ts` | CD_Vnitro – zaváděcí 6× NEPRODEJNE, hlavní část, koncová 4× |
+| createValidator | `lib/vyroba/generators/createValidator.ts` | CD_Validator |
+| createPOP | `lib/vyroba/generators/createPOP.ts` | CD_POP – variabilní PocetCnaRoli |
+| createNEXGO | `lib/vyroba/generators/createNEXGO.ts` | CD_POP_NEXGO – fixní 160 ks/roli |
+| createDPB_AVJ | `lib/vyroba/generators/createDPB_AVJ.ts` | DPB_AVJ – skip, modulo, 14 zaváděcích |
+| createIGT_Sazka | `lib/vyroba/generators/createIGT_Sazka.ts` | IGT_Sazka – PredcisliL |
+
+- **API:** `POST /api/vyroba/generate/[job]`
+- **UI:** `/vyroba/generovani/[job]` – formulář s parametry, spuštění generování
+
+### 11.3 Fáze 3 – Kontrola a výhoz
+
+| Komponenta | Popis |
+|------------|-------|
+| Tok | `/vyroba` → Parametry výroby → `/vyroba/[job]` → TISK → generovani, REZANI → kontrola |
+| Kontrolní obrazovka | `/vyroba/kontrola/[job]` – světle modré okno, grid (checkbox, Série, Od–Do, +/−, ks) |
+| Navigace | «« « ‹ OK › » »› »», Turbo režim |
+| Zdroj dat | `vyroba_box_state`, `hot_krab` v `vyroba_job_config` |
+| TXT export | `GET /api/vyroba/control/[job]/export-txt` – stáhnout aktuální stav |
+| TXT import | `POST /api/vyroba/control/[job]/import-txt` – nahrát TXT a aktualizovat DB |
+| Opravit | Režim úprav v gridu, akce `opravit` v control API |
+| Výhoz | Akce `vyhoz` – zápis do DB, při plné krabici (CD) automatické generování protokolu |
+
+- **Logika:** `lib/vyroba/control/calculations.ts`, `lib/vyroba/control/txt-io.ts`
+
+### 11.4 Fáze 4 – Protokoly a sestavy
+
+| Komponenta | Soubor | Popis |
+|------------|--------|-------|
+| Balný list | `lib/vyroba/protocol/pdf-baleni-list.ts` | PDF A4, tabulka Poř. č., Serie, Od č., Do č. |
+| Štítek | `lib/vyroba/protocol/pdf-stitek.ts` | PDF štítek pro krabici |
+| Paleta IGT | `lib/vyroba/protocol/igt-paleta.ts` | Paletový list IGT |
+| Inkjety | `lib/vyroba/protocol/igt-inkjety.ts` | TXT pro jehličkovou tiskárnu EPSON FX |
+
+- **API:** `POST /api/vyroba/protocol/[job]` – typy: `both`, `balny-list`, `stitek` (CD), `igt-paleta`, `igt-inkjety` (IGT)
+- **UI:** Tlačítko „Protokol“ (CD), „Sestava“ a „Paleta“ (IGT) v kontrole; automatické otevření PDF po výhozu při plné krabici (CD)
+- **Závislosti:** pdf-lib, @pdf-lib/fontkit, dejavu-fonts-ttf
+
+### 11.5 Fáze 5 – Zaměstnanci a nastavení
+
+| Komponenta | Popis |
+|------------|-------|
+| API zaměstnanci | `GET/POST /api/vyroba/employees`, `PATCH/DELETE /api/vyroba/employees/[id]` |
+| CRUD operace | Přidání, úprava jména, deaktivace (soft delete), reaktivace |
+| Stránka nastavení | `/vyroba/nastaveni` – ADRESA, odkazy na JOB parametry, tabulka zaměstnanců |
+
+**Poznámka:** Migrace z VarSettings.dat (5.3) je volitelná a zatím není implementována.
+
+### 11.6 Fáze 6 – Testování a dokumentace
+
+| Komponenta | Popis |
+|------------|-------|
+| Unit testy | Vitest – `lib/vyroba/utils/deleni3.test.ts`, `pocet-vyhozu.test.ts`, `control/calculations.test.ts`, `txt-io.test.ts` |
+| E2E testy | Playwright – `e2e/vyroba.spec.ts` (smoke testy stránek) |
+| Uživatelský manuál | `docs/MANUAL_VYROBA.md` |
+| Tisk | `docs/VYROBA_TISK.md` – možnosti tisku, formáty |
+
+**Příkazy:** `npm run test` (unit), `npm run test:e2e` (E2E)
 
 ---
 

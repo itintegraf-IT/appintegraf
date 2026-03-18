@@ -536,4 +536,22 @@ Z analýzy IG.pyc (co_names, co_consts):
 
 ---
 
+## 12. Stav migrace do Next.js (APPIntegraf-NEXT)
+
+**Aktualizace:** 18. 3. 2025
+
+Migrace modulu Výroba do Next.js je implementována v projektu APPIntegraf-NEXT. Podrobnosti viz `docs/NAVRH_MODUL_VYROBA.md`.
+
+| Oblast | Stav | Poznámka |
+|--------|------|----------|
+| Generování (Create*) | ✅ | Všech 6 typů JOB |
+| Kontrola / výhoz | ✅ | DB + TXT export/import |
+| Protokoly (BL, ST, paleta, inkjety) | ✅ | pdf-lib, DejaVu fonty |
+| Zaměstnanci | ✅ | CRUD API + UI |
+| Nastavení ADRESA, JOB | ✅ | |
+| Tisk na jehličkovou tiskárnu | ⏸️ | TXT výstup připraven, tisk přes externí nástroj |
+| Migrace VarSettings.dat | ⏸️ | Volitelně |
+
+---
+
 *Dokumentace vytvořena reverzní analýzou Python zdrojového kódu z IG.exe (PyInstaller). Sekce výstupů doplněna analýzou složky Vystupy.*

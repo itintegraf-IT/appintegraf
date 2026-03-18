@@ -167,6 +167,62 @@ export async function getUsersWithModuleAdmin(module: string): Promise<number[]>
 }
 
 /**
+ * Vrátí seznam uživatelů, kteří mají přístup k danému modulu.
+ * Použito pro výběr baliče v modulu Výroba.
+ */
+export async function getUsersWithModuleAccess(
+  module: string,
+  access: ModuleAccess = "read"
+): Promise<{ id: number; name: string }[]> {
+  const userRolesData = await prisma.user_roles.findMany({
+    where: { users: { is_active: true } },
+    include: { roles: true, users: { select: { id: true, first_name: true, last_name: true } } },
+  });
+
+  const usersWithFallbackRole = await prisma.users.findMany({
+    where: {
+      is_active: true,
+      role_id: { not: null },
+      user_roles: { none: {} },
+    },
+    include: { roles: true },
+  });
+
+  const hasAccess = (roles: { name: string | null; module_access: string | null }[]) =>
+    roles.some((r) => r.name?.toLowerCase() === "admin") ||
+    hasModuleAccessFromRoles(roles, module, access);
+
+  const result: { id: number; name: string }[] = [];
+  const seen = new Set<number>();
+
+  for (const ur of userRolesData) {
+    const roles = [{ name: ur.roles.name, module_access: ur.module_access }];
+    if (hasAccess(roles) && !seen.has(ur.users.id)) {
+      seen.add(ur.users.id);
+      result.push({
+        id: ur.users.id,
+        name: `${ur.users.first_name} ${ur.users.last_name}`.trim() || ur.users.id.toString(),
+      });
+    }
+  }
+
+  for (const u of usersWithFallbackRole) {
+    if (!u.roles || seen.has(u.id)) continue;
+    const roles = [{ name: u.roles.name, module_access: u.roles.permissions as string | null }];
+    if (hasAccess(roles)) {
+      seen.add(u.id);
+      result.push({
+        id: u.id,
+        name: `${u.first_name} ${u.last_name}`.trim() || u.id.toString(),
+      });
+    }
+  }
+
+  result.sort((a, b) => a.name.localeCompare(b.name));
+  return result;
+}
+
+/**
  * Načte admin status a přístup ke všem modulům v jednom DB dotazu.
  * Použít v layoutu místo 6 samostatných volání.
  */
