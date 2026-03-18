@@ -1,7 +1,25 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   LayoutDashboard,
   Users,
@@ -20,6 +38,7 @@ import {
   PanelLeft,
   Package,
   Factory,
+  GripVertical,
 } from "lucide-react";
 import {
   Tooltip,
@@ -29,13 +48,101 @@ import {
 } from "@/components/ui/tooltip";
 import { useSidebar } from "./SidebarContext";
 
+const STORAGE_KEY_PREFIX = "sidebar-menu-order";
+
 type SidebarProps = {
-  user: { name?: string | null };
+  user: { name?: string | null; id?: string };
   isAdmin: boolean;
   moduleAccess: Record<string, boolean>;
   mobileOpen?: boolean;
   onClose?: () => void;
 };
+
+type NavItem = {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  module: string | null;
+};
+
+function SortableNavItem({
+  item,
+  isActive,
+  onClick,
+  collapsed,
+}: {
+  item: NavItem;
+  isActive: boolean;
+  onClick?: () => void;
+  collapsed: boolean;
+}) {
+  const Icon = item.icon;
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.href });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const linkContent = (
+    <div
+      ref={setNodeRef}
+      style={{
+        ...style,
+        borderLeftColor: isActive ? "var(--sidebar-primary)" : "transparent",
+        background: isActive ? "var(--sidebar-accent)" : "transparent",
+      }}
+      className={`flex items-center gap-1 rounded-lg border-l-[3px] text-sm transition-colors px-2 py-2 ${
+        isDragging ? "opacity-50" : ""
+      }`}
+    >
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="touch-none cursor-grab active:cursor-grabbing rounded p-0.5 hover:bg-[var(--sidebar-accent)] shrink-0"
+        style={{ color: "var(--sidebar-foreground)" }}
+        aria-label="Přesunout položku"
+        onClick={(e) => e.preventDefault()}
+      >
+        <GripVertical className="h-4 w-4" />
+      </button>
+      <Link
+        href={item.href}
+        onClick={onClick}
+        className={`flex flex-1 items-center gap-3 min-w-0 py-0.5 rounded-r-lg hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] ${
+          collapsed ? "justify-center" : ""
+        }`}
+        style={{
+          color: isActive ? "var(--sidebar-accent-foreground)" : "var(--sidebar-foreground)",
+        }}
+      >
+        <Icon className="h-5 w-5 shrink-0" />
+        {!collapsed && <span className="truncate">{item.label}</span>}
+      </Link>
+    </div>
+  );
+
+  if (collapsed) {
+    return (
+      <Tooltip delayDuration={0}>
+        <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+        <TooltipContent side="right" sideOffset={8}>
+          {item.label}
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return linkContent;
+}
 
 function NavLink({
   href,
@@ -84,7 +191,7 @@ function NavLink({
   return linkContent;
 }
 
-const navItems = [
+const navItems: NavItem[] = [
   { href: "/", icon: LayoutDashboard, label: "Dashboard", module: null },
   { href: "/contacts", icon: Users, label: "Kontakty", module: "contacts" },
   { href: "/equipment", icon: Laptop, label: "Majetek", module: "equipment" },
@@ -97,10 +204,71 @@ const navItems = [
   { href: "/training", icon: GraduationCap, label: "IT Školení", module: "training" },
 ];
 
+function getStoredOrder(userId: string | undefined): string[] {
+  if (typeof window === "undefined" || !userId) return [];
+  try {
+    const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}-${userId}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveOrder(userId: string | undefined, order: string[]) {
+  if (typeof window === "undefined" || !userId) return;
+  try {
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}-${userId}`, JSON.stringify(order));
+  } catch {
+    // ignore
+  }
+}
+
 export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { collapsed, toggleCollapsed } = useSidebar();
   const isCollapsed = collapsed && !mobileOpen;
+  const userId = user?.id;
+
+  const visibleItems = navItems.filter((item) => !item.module || moduleAccess[item.module]);
+  const visibleHrefs = visibleItems.map((i) => i.href).join(",");
+
+  const [orderedItems, setOrderedItems] = useState<NavItem[]>(() => visibleItems);
+
+  useEffect(() => {
+    const items = navItems.filter((item) => !item.module || moduleAccess[item.module]);
+    const stored = getStoredOrder(userId);
+    const orderMap = new Map(stored.map((href, i) => [href, i]));
+    const next = [...items].sort((a, b) => {
+      const ai = orderMap.has(a.href) ? orderMap.get(a.href)! : 999;
+      const bi = orderMap.has(b.href) ? orderMap.get(b.href)! : 999;
+      return ai - bi;
+    });
+    setOrderedItems(next);
+  }, [userId, visibleHrefs]);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      setOrderedItems((prev) => {
+        const ids = prev.map((i) => i.href);
+        const oldIndex = ids.indexOf(active.id as string);
+        const newIndex = ids.indexOf(over.id as string);
+        if (oldIndex === -1 || newIndex === -1) return prev;
+        const next = arrayMove(prev, oldIndex, newIndex);
+        saveOrder(userId, next.map((i) => i.href));
+        return next;
+      });
+    },
+    [userId]
+  );
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
 
   const initials = user.name
     ? user.name
@@ -166,25 +334,33 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
       <nav className="flex-1 overflow-y-auto py-4">
         <TooltipProvider>
         <ul className="space-y-0.5 px-2">
-          {navItems.map((item) => {
-            if (item.module && !moduleAccess[item.module]) return null;
-            const isActive =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
-            return (
-              <li key={item.href}>
-                <NavLink
-                  href={item.href}
-                  icon={item.icon}
-                  label={item.label}
-                  isActive={!!isActive}
-                  onClick={onClose}
-                  collapsed={isCollapsed}
-                />
-              </li>
-            );
-          })}
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext
+              items={orderedItems.map((i) => i.href)}
+              strategy={verticalListSortingStrategy}
+            >
+              {orderedItems.map((item) => {
+                const isActive =
+                  item.href === "/"
+                    ? pathname === "/"
+                    : pathname.startsWith(item.href);
+                return (
+                  <li key={item.href}>
+                    <SortableNavItem
+                      item={item}
+                      isActive={!!isActive}
+                      onClick={onClose}
+                      collapsed={isCollapsed}
+                    />
+                  </li>
+                );
+              })}
+            </SortableContext>
+          </DndContext>
 
           {isAdmin && (
             <>
