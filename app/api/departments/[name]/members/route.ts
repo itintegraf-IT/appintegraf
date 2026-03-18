@@ -18,7 +18,7 @@ export async function GET(
   }
 
   const dept = await prisma.departments.findFirst({
-    where: { name: { equals: name, mode: "insensitive" }, is_active: true },
+    where: { name, is_active: true },
   });
 
   if (!dept) {

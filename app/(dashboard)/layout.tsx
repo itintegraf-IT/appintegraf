@@ -17,7 +17,7 @@ export default async function DashboardLayout({
   }
 
   const userId = parseInt(session.user.id, 10);
-  const { admin, contacts, equipment, calendar, kiosk, training, planovani, iml } = await getLayoutAccess(userId);
+  const { admin, contacts, equipment, calendar, kiosk, training, planovani, iml, vyroba } = await getLayoutAccess(userId);
 
   const moduleAccess = {
     contacts,
@@ -27,6 +27,7 @@ export default async function DashboardLayout({
     training,
     planovani,
     iml,
+    vyroba,
   };
 
   return (

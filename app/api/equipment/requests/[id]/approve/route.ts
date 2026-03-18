@@ -5,7 +5,7 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 
 async function isInDepartment(userId: number, departmentName: string): Promise<boolean> {
   const dept = await prisma.departments.findFirst({
-    where: { name: { equals: departmentName, mode: "insensitive" }, is_active: true },
+    where: { name: departmentName, is_active: true },
   });
   if (!dept) return false;
   const inMain = await prisma.users.findFirst({
