@@ -128,6 +128,45 @@ export async function isAdmin(userId: number): Promise<boolean> {
 }
 
 /**
+ * Vrátí ID uživatelů, kteří mají admin oprávnění pro daný modul (např. "equipment" = Majetek).
+ * Použito pro notifikace při nových požadavcích.
+ */
+export async function getUsersWithModuleAdmin(module: string): Promise<number[]> {
+  const userRolesData = await prisma.user_roles.findMany({
+    where: { users: { is_active: true } },
+    include: { roles: true, users: { select: { id: true } } },
+  });
+
+  const usersWithFallbackRole = await prisma.users.findMany({
+    where: {
+      is_active: true,
+      role_id: { not: null },
+      user_roles: { none: {} },
+    },
+    include: { roles: true },
+  });
+
+  const hasAdminInRoles = (roles: { name: string | null; module_access: string | null }[]) =>
+    roles.some((r) => r.name?.toLowerCase() === "admin") ||
+    hasModuleAccessFromRoles(roles, module, "admin");
+
+  const adminIds = new Set<number>();
+
+  for (const ur of userRolesData) {
+    const roles = [{ name: ur.roles.name, module_access: ur.module_access }];
+    if (hasAdminInRoles(roles)) adminIds.add(ur.users.id);
+  }
+
+  for (const u of usersWithFallbackRole) {
+    if (!u.roles) continue;
+    const roles = [{ name: u.roles.name, module_access: u.roles.permissions as string | null }];
+    if (hasAdminInRoles(roles)) adminIds.add(u.id);
+  }
+
+  return [...adminIds];
+}
+
+/**
  * Načte admin status a přístup ke všem modulům v jednom DB dotazu.
  * Použít v layoutu místo 6 samostatných volání.
  */

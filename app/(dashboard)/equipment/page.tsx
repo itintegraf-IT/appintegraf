@@ -1,19 +1,22 @@
 import { auth } from "@/auth";
-import { isAdmin } from "@/lib/auth-utils";
+import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { Laptop, Plus, Eye } from "lucide-react";
+import { Laptop, Plus, Eye, ClipboardList } from "lucide-react";
+import { EquipmentRequestsTab } from "./EquipmentRequestsTab";
 
 export default async function EquipmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ scope?: string }>;
+  searchParams: Promise<{ scope?: string; tab?: string }>;
 }) {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
   const admin = await isAdmin(userId);
+  const equipmentRead = await hasModuleAccess(userId, "equipment", "read");
   const params = await searchParams;
   const scope = params.scope ?? "mine";
+  const tab = params.tab ?? "equipment";
 
   let equipment: Array<{
     id: number;
@@ -56,10 +59,38 @@ export default async function EquipmentPage({
             <Laptop className="h-7 w-7 text-red-600" />
             Majetek
           </h1>
-          <p className="mt-1 text-gray-600">Evidence vybavení</p>
+          <p className="mt-1 text-gray-600">
+            {tab === "requests" ? "Požadavky na techniku" : "Evidence vybavení"}
+          </p>
         </div>
-        <div className="flex gap-2">
-          {admin && (
+        <div className="flex flex-wrap items-center gap-2">
+          {equipmentRead && (
+            <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-1">
+              <Link
+                href={tab === "requests" ? "/equipment" : "/equipment?tab=requests"}
+                className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                  tab === "requests"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                <ClipboardList className="h-4 w-4" />
+                Požadavky
+              </Link>
+              <Link
+                href={tab === "equipment" ? "/equipment" : "/equipment"}
+                className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                  tab === "equipment"
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                <Laptop className="h-4 w-4" />
+                Vybavení
+              </Link>
+            </div>
+          )}
+          {admin && tab === "equipment" && (
             <>
               <Link
                 href={scope === "all" ? "/equipment" : "/equipment?scope=all"}
@@ -79,6 +110,9 @@ export default async function EquipmentPage({
         </div>
       </div>
 
+      {tab === "requests" ? (
+        <EquipmentRequestsTab />
+      ) : (
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -125,6 +159,7 @@ export default async function EquipmentPage({
           </table>
         </div>
       </div>
+      )}
     </>
   );
 }

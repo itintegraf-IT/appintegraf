@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getUsersWithModuleAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
@@ -44,6 +45,21 @@ export async function POST(req: NextRequest) {
         status: "nov_",
       },
     });
+
+    const requesterName = String(requester_name).trim();
+    const equipmentType = String(equipment_type).trim();
+    const adminUserIds = await getUsersWithModuleAdmin("equipment");
+    if (adminUserIds.length > 0) {
+      await prisma.notifications.createMany({
+        data: adminUserIds.map((userId) => ({
+          user_id: userId,
+          title: "Nový požadavek na techniku",
+          message: `${requesterName} odeslal/a požadavek na ${equipmentType} (č. #${request.id}).`,
+          type: "equipment_request",
+          link: "/equipment",
+        })),
+      });
+    }
 
     return NextResponse.json({
       success: true,

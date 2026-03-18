@@ -231,24 +231,31 @@ model equipment_items {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model equipment_requests {
-  id              Int                          @id @default(autoincrement())
-  requester_name  String                       @db.VarChar(100)
-  requester_email String                       @db.VarChar(100)
-  requester_phone String?                      @db.VarChar(20)
-  department      String?                      @db.VarChar(100)
-  position        String?                      @db.VarChar(100)
-  equipment_type  String                       @db.VarChar(100)
-  description     String                       @db.Text
-  priority        equipment_requests_priority? @default(st_edn_)
-  status          equipment_requests_status?   @default(nov_)
-  admin_response  String?                      @db.Text
-  it_response     String?                      @db.Text
-  processed_by    Int?
-  processed_at    DateTime?                    @db.Timestamp(0)
-  created_at      DateTime                     @default(now()) @db.Timestamp(0)
-  updated_at      DateTime                     @default(now()) @db.Timestamp(0)
-  users           users?                       @relation(fields: [processed_by], references: [id], onUpdate: NoAction, map: "equipment_requests_ibfk_1")
+  id                     Int                          @id @default(autoincrement())
+  requester_name         String                       @db.VarChar(100)
+  requester_email        String                       @db.VarChar(100)
+  requester_phone        String?                      @db.VarChar(20)
+  department             String?                      @db.VarChar(100)
+  position               String?                      @db.VarChar(100)
+  equipment_type         String                       @db.VarChar(100)
+  description            String                       @db.Text
+  priority               equipment_requests_priority? @default(st_edn_)
+  status                 equipment_requests_status?   @default(nov_)
+  admin_response         String?                      @db.Text
+  it_response            String?                      @db.Text
+  it_response_by         Int?
+  it_response_at         DateTime?                    @db.Timestamp(0)
+  approval_requested_to Int?
+  approval_requested_at  DateTime?                    @db.Timestamp(0)
+  processed_by           Int?
+  processed_at          DateTime?                    @db.Timestamp(0)
+  created_at             DateTime                     @default(now()) @db.Timestamp(0)
+  updated_at             DateTime                     @default(now()) @db.Timestamp(0)
+  users                  users?                       @relation("equipment_requests_processed", fields: [processed_by], references: [id], onUpdate: NoAction, map: "equipment_requests_ibfk_1")
+  users_it               users?                       @relation("equipment_requests_it", fields: [it_response_by], references: [id], onUpdate: NoAction)
+  users_approval         users?                       @relation("equipment_requests_approval", fields: [approval_requested_to], references: [id], onUpdate: NoAction)
 
+  @@index([approval_requested_to], map: "idx_approval_requested_to")
   @@index([created_at], map: "idx_created")
   @@index([priority], map: "idx_priority")
   @@index([status], map: "idx_status")
@@ -642,7 +649,9 @@ model users {
   departments                                                    departments[]
   equipment_assignments_equipment_assignments_user_idTousers     equipment_assignments[]       @relation("equipment_assignments_user_idTousers")
   equipment_assignments_equipment_assignments_assigned_byTousers equipment_assignments[]       @relation("equipment_assignments_assigned_byTousers")
-  equipment_requests                                             equipment_requests[]
+  equipment_requests                                             equipment_requests[]             @relation("equipment_requests_processed")
+  equipment_requests_approval                                    equipment_requests[]             @relation("equipment_requests_approval")
+  equipment_requests_it                                          equipment_requests[]             @relation("equipment_requests_it")
   equipment_transfers_equipment_transfers_from_user_idTousers    equipment_transfers[]         @relation("equipment_transfers_from_user_idTousers")
   equipment_transfers_equipment_transfers_to_user_idTousers      equipment_transfers[]         @relation("equipment_transfers_to_user_idTousers")
   equipment_transfers_equipment_transfers_transferred_byTousers  equipment_transfers[]         @relation("equipment_transfers_transferred_byTousers")
@@ -713,11 +722,12 @@ enum equipment_requests_priority {
 }
 
 enum equipment_requests_status {
-  nov_      @map("nový")
-  schv_leno @map("schváleno")
-  zam_tnuto @map("zamítnuto")
-  odlo_eno  @map("odloženo")
-  vy__zeno  @map("vyřízeno")
+  nov_            @map("nový")
+  cek_na_schv_len_ @map("čeká na schválení")
+  schv_leno       @map("schváleno")
+  zam_tnuto       @map("zamítnuto")
+  odlo_eno        @map("odloženo")
+  vy__zeno        @map("vyřízeno")
 }
 
 enum questions_correct_answer {
