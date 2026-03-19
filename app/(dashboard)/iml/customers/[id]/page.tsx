@@ -43,14 +43,17 @@ export default async function ImlCustomerDetailPage({
         include: { iml_order_items: { select: { quantity: true } } },
       });
 
-      const lastOrder = orders.length > 0
-        ? orders.reduce((a, b) => (a.order_date > b.order_date ? a : b))
+      type OrderRow = { order_date: Date; iml_order_items: Array<{ quantity: number }>; total?: unknown };
+      const ordersTyped = orders as OrderRow[];
+
+      const lastOrder = ordersTyped.length > 0
+        ? ordersTyped.reduce((a, b) => (a.order_date > b.order_date ? a : b))
         : null;
-      const totalQuantity = orders.reduce(
+      const totalQuantity = ordersTyped.reduce(
         (sum, o) => sum + o.iml_order_items.reduce((s, i) => s + i.quantity, 0),
         0
       );
-      const ordersLast12Months = orders.filter((o) => new Date(o.order_date) >= twelveMonthsAgo);
+      const ordersLast12Months = ordersTyped.filter((o) => new Date(o.order_date) >= twelveMonthsAgo);
       const avgOrderTotal =
         ordersLast12Months.length > 0
           ? ordersLast12Months.reduce((s, o) => s + (o.total ? Number(o.total) : 0), 0) /
