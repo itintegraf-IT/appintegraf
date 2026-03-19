@@ -21,6 +21,9 @@ export default async function AdminRolesPage() {
     },
   });
 
+  type RoleRow = { id: number; name: string; description: string | null; is_active: boolean | null; _count: { user_roles: number } };
+  const rolesList = roles as RoleRow[];
+
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -52,7 +55,7 @@ export default async function AdminRolesPage() {
               </tr>
             </thead>
             <tbody>
-              {roles.map((r) => (
+              {rolesList.map((r) => (
                 <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">{r.description ?? "-"}</td>
