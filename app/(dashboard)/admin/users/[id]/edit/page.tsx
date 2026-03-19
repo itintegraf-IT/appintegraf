@@ -88,7 +88,9 @@ export default async function AdminUserEditPage({
     if (dept) department_id = dept.id;
   }
 
-  const secondary_department_ids = (row.user_secondary_departments ?? []).map((sd) => sd.department_id);
+  const secondary_department_ids = (
+    (row.user_secondary_departments ?? []) as Array<{ department_id: number }>
+  ).map((sd) => sd.department_id);
 
   const { user_roles: _ur, user_secondary_departments: _usd, ...rest } = row;
   const user = {
