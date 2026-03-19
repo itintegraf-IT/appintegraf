@@ -45,7 +45,7 @@ export default async function CalendarPage({
           ? "list_all"
           : "week";
   const searchQuery = params.q?.trim() || "";
-  const showList = searchQuery && params.display !== "calendar";
+  const showList = !!(searchQuery && params.display !== "calendar");
   const isListView = view === "list_mine" || view === "list_all";
 
   const now = new Date();

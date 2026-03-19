@@ -6,9 +6,12 @@ Modul kalendáře slouží ke správě událostí a termínů v aplikaci INTEGRA
 
 - **Týdenní zobrazení** – mřížka s dny v týdnu (po–ne) a hodinovými sloty (0–23)
 - **Měsíční zobrazení** – přehled celého měsíce v mřížce 6 týdnů
+- **Seznam osobní / Seznam globální** – řádkové zobrazení událostí na 14 dní dopředu s listováním
 - **Řádek „Celý den“** – pro celodenní události (týdenní pohled)
 - **Navigace** – předchozí/další týden nebo měsíc, posun o den (týden), návrat na aktuální období
 - **Filtry** – Globální kalendář (všechny události) / Osobní kalendář (jen moje)
+- **Vyhledávání** – fulltext v názvu, popisu, místě; vyhledávání podle lidí (tvůrce, zástup, účastníci)
+- **České státní svátky** – zobrazení v mřížce (týdenní i měsíční pohled)
 - **CRUD událostí** – vytvoření, zobrazení detailu, úprava, **mazání**
 - **Vytvoření kliknutím** – kliknutí do mřížky otevře modal s předvyplněným datem a časem
 - **Drag & drop** – přesun vlastních událostí přetažením; u dovolené/osobní reset schválení
@@ -28,7 +31,10 @@ app/(dashboard)/calendar/
 ├── [id]/edit/page.tsx    # Úprava události
 ├── CalendarNav.tsx       # Navigace mezi týdny/měsíci (client)
 ├── CalendarTabs.tsx      # Záložky filtrů Globální/Osobní (client)
-├── CalendarViewToggle.tsx # Přepínač Týden/Měsíc (client)
+├── CalendarViewToggle.tsx # Přepínač Týden/Měsíc/Seznam osobní/Seznam globální (client)
+├── CalendarSearch.tsx    # Vyhledávací pole a přepínač Seznam/Kalendář (client)
+├── CalendarSearchResults.tsx # Řádkové zobrazení výsledků vyhledávání (client)
+├── CalendarListView.tsx  # Řádkové zobrazení událostí 14 dní s listováním (client)
 ├── WeekCalendarGrid.tsx  # Týdenní mřížka dnů × hodin (client)
 ├── MonthCalendarGrid.tsx # Měsíční mřížka (client)
 ├── CreateEventModal.tsx  # Modal pro vytvoření události (client)
@@ -38,7 +44,8 @@ app/(dashboard)/calendar/
 └── lib/
     ├── week-utils.ts     # Pomocné funkce pro práci s týdny
     ├── month-utils.ts    # Pomocné funkce pro měsíční zobrazení
-    └── event-types.ts    # Typy událostí (Dovolená, Osobní, …)
+    ├── event-types.ts    # Typy událostí (Dovolená, Osobní, …)
+    └── holidays.ts       # České státní svátky (pevné + Velikonoce)
 
 app/api/calendar/
 ├── route.ts              # GET (seznam), POST (vytvoření)
@@ -58,10 +65,10 @@ app/api/calendar/
 Navigace v kalendáři (závisí na zobrazení):
 
 **Týdenní pohled:**
-- **«** – předchozí týden
-- **<** – o den zpět
-- **>** – o den vpřed
-- **»** – další týden
+- **«** – předchozí týden (−7 dní)
+- **<** – o den zpět (−1 den)
+- **>** – o den vpřed (+1 den)
+- **»** – další týden (+7 dní)
 - **Nyní** – návrat na aktuální týden
 
 **Měsíční pohled:**
@@ -74,16 +81,48 @@ Navigace v kalendáři (závisí na zobrazení):
 Přepínač zobrazení:
 - **Týden** – týdenní mřížka s hodinami
 - **Měsíc** – měsíční přehled (6 týdnů)
+- **Seznam osobní** – řádkové zobrazení událostí z osobního kalendáře (14 dní dopředu)
+- **Seznam globální** – řádkové zobrazení všech událostí (14 dní dopředu)
 
-URL parametr `view` (`week` | `month`), pro měsíc též `month` (YYYY-MM).
+URL parametr `view` (`week` | `month` | `list_mine` | `list_all`). Pro měsíc též `month` (YYYY-MM). Pro seznamy `list_from` a `list_to` (YYYY-MM-DD).
 
 ### CalendarTabs
 
-Přepínání mezi pohledy:
+Přepínání mezi pohledy (zobrazuje se jen u Týden/Měsíc, u seznamů je scope daný pohledem):
 - **Globální kalendář** – všechny události
 - **Osobní kalendář** – události uživatele, události kde je zástupem, události čekající na schválení vedoucím
 
 URL parametr `scope` (`all` | `mine`).
+
+### CalendarSearch
+
+Vyhledávací pole:
+- **Fulltext** – název, popis, místo
+- **Lidé** – tvůrce, zástup, účastníci (podle jména)
+- Při vyhledávání: přepínač **Seznam** / **Kalendář** pro zobrazení výsledků
+
+URL parametr `q` (vyhledávací řetězec), `display` (`calendar` = zobrazit v mřížce).
+
+### CalendarSearchResults
+
+Řádkové zobrazení výsledků vyhledávání:
+- Tabulka: Datum, Čas, Název, Lidé, Místo
+- Odkaz na detail události
+- Tlačítko **Zobrazit v kalendáři** – přepne na mřížku s filtrem
+
+### CalendarListView
+
+Řádkové zobrazení událostí (Seznam osobní / Seznam globální):
+- Tabulka: Datum, Čas, Název, Lidé, Místo
+- **14 dní dopředu** od zvoleného data
+- **Listování** – tlačítka „Předchozí 14 dní“ a „Další 14 dní“
+- Odkaz na detail události
+
+### České státní svátky (lib/holidays.ts)
+
+- **Pevné svátky:** Nový rok, Svátek práce, Den vítězství, Cyril a Metoděj, Jan Hus, Den české státnosti, 28. říjen, 17. listopad, Štědrý den, 1. a 2. svátek vánoční
+- **Pohyblivé:** Velký pátek, Velikonoční pondělí (výpočet dle gregoriánského algoritmu)
+- Zobrazení v týdenní i měsíční mřížce (šedé štítky), zvýraznění sloupců dnů se svátky
 
 ### WeekCalendarGrid
 
@@ -190,7 +229,8 @@ Definice v `lib/event-types.ts`, výchozí typ: `jine`.
 
 ### calendar_approvals | calendar_event_participants
 
-Modely v DB existují, ale zatím nejsou v UI využívány (např. pro budoucí workflow schvalování).
+- **calendar_approvals** – workflow schvalování (zástup, vedoucí)
+- **calendar_event_participants** – účastníci události; využíváno při vyhledávání podle lidí a v řádkovém zobrazení (Seznam, výsledky vyhledávání)
 
 ---
 
@@ -224,18 +264,31 @@ Modely v DB existují, ale zatím nejsou v UI využívány (např. pro budoucí 
 8. **Přidání lib/week-utils.ts, lib/month-utils.ts**
    - `getWeekStart()`, `getWeekEnd()`, `getPrevWeek()`, `getNextWeek()`, `getCurrentWeek()`
    - `getMonthGridStart()`, `getMonthGridEnd()`, `getPrevMonth()`, `getNextMonth()`, `formatMonth()`
+   - `formatDateLocal()`, `parseDateLocal()` – formátování dat v lokální časové zóně
+
+9. **České státní svátky** – `lib/holidays.ts`, zobrazení v mřížce (týdenní i měsíční)
+
+10. **Vyhledávání** – fulltext (název, popis, místo) a podle lidí (tvůrce, zástup, účastníci); řádkové zobrazení výsledků s přepínačem na kalendář
+
+11. **Seznam osobní / Seznam globální** – řádkové zobrazení událostí na 14 dní dopředu s listováním (Předchozí/Další 14 dní)
 
 ### URL parametry stránky
 
-- `view` – `week` (výchozí) | `month`
-- `from` – začátek období (YYYY-MM-DD)
-- `to` – konec období (YYYY-MM-DD)
+- `view` – `week` (výchozí) | `month` | `list_mine` | `list_all`
+- `from` – začátek období (YYYY-MM-DD), pro týdenní pohled
+- `to` – konec období (YYYY-MM-DD), pro týdenní pohled
 - `month` – pro měsíční pohled (YYYY-MM)
+- `list_from` – začátek období pro seznam (YYYY-MM-DD)
+- `list_to` – konec období pro seznam (YYYY-MM-DD), vždy 14 dní od list_from
 - `scope` – `all` (výchozí) | `mine`
+- `q` – vyhledávací řetězec (fulltext + lidé)
+- `display` – `calendar` = při vyhledávání zobrazit mřížku místo seznamu výsledků
 
 Příklady:
 - `/calendar?view=week&from=2026-03-16&to=2026-03-22&scope=mine`
 - `/calendar?view=month&month=2026-03&scope=all`
+- `/calendar?view=list_mine&list_from=2026-03-16&list_to=2026-03-29`
+- `/calendar?q=Jan&display=calendar`
 
 ---
 
