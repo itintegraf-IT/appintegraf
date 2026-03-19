@@ -47,7 +47,8 @@ export default async function EquipmentPage({
       },
       orderBy: { assigned_at: "desc" },
     });
-    equipment = assignments.map((a) => a.equipment_items);
+    type AssignmentRow = { equipment_items: (typeof equipment)[number] };
+    equipment = (assignments as AssignmentRow[]).map((a) => a.equipment_items);
   }
 
   const formatDate = (d: Date | null) =>
