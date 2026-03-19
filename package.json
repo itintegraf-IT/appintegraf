@@ -2,6 +2,9 @@
   "name": "appintegraf-next",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0 <21"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
