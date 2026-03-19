@@ -71,6 +71,11 @@ export default async function ImlCustomerDetailPage({
 
   if (!customer) notFound();
 
+  type ProductRow = { id: number; ig_code: string | null; client_name: string | null; ig_short_name: string | null };
+  type OrderRow = { id: number; order_number: string; order_date: Date; status: string | null; total: unknown };
+  const products = customer.iml_products as ProductRow[];
+  const orders = customer.iml_orders as OrderRow[];
+
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -181,11 +186,11 @@ export default async function ImlCustomerDetailPage({
         </div>
       </div>
 
-      {customer.iml_products.length > 0 && (
+      {products.length > 0 && (
         <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
             <Package className="h-5 w-5 text-gray-600" />
-            Produkty ({customer.iml_products.length})
+            Produkty ({products.length})
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -197,7 +202,7 @@ export default async function ImlCustomerDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {customer.iml_products.map((p) => (
+                {products.map((p) => (
                   <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-mono text-sm">{p.ig_code ?? "-"}</td>
                     <td className="px-4 py-3">{p.client_name ?? p.ig_short_name ?? "-"}</td>
@@ -214,11 +219,11 @@ export default async function ImlCustomerDetailPage({
         </div>
       )}
 
-      {customer.iml_orders.length > 0 && (
+      {orders.length > 0 && (
         <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
             <ShoppingCart className="h-5 w-5 text-gray-600" />
-            Objednávky ({customer.iml_orders.length})
+            Objednávky ({orders.length})
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -232,7 +237,7 @@ export default async function ImlCustomerDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {customer.iml_orders.map((o) => (
+                {orders.map((o) => (
                   <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-mono text-sm">{o.order_number}</td>
                     <td className="px-4 py-3">{new Date(o.order_date).toLocaleDateString("cs-CZ")}</td>
