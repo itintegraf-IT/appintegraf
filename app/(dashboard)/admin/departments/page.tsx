@@ -21,6 +21,8 @@ export default async function AdminDepartmentsPage() {
     },
   });
 
+  type Dept = (typeof departments)[number];
+
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -63,7 +65,7 @@ export default async function AdminDepartmentsPage() {
               </tr>
             </thead>
             <tbody>
-              {departments.map((d) => (
+              {departments.map((d: Dept) => (
                 <tr key={d.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium">{d.name}</td>
                   <td className="px-4 py-3">{d.code ?? "-"}</td>
