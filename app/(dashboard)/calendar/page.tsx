@@ -113,12 +113,11 @@ export default async function CalendarPage({
   const buildScopeWhere = async (useScope?: "mine" | "all") => {
     const s = useScope ?? scope;
     if (s !== "mine") return {};
-    const managerDeptIds = await prisma.departments
-      .findMany({
-        where: { manager_id: userId },
-        select: { id: true },
-      })
-      .then((r: Array<{ id: number }>) => r.map((d) => d.id));
+    const deptRows = await prisma.departments.findMany({
+      where: { manager_id: userId },
+      select: { id: true },
+    });
+    const managerDeptIds = (deptRows as Array<{ id: number }>).map((d) => d.id);
 
     const orConditions: Array<Record<string, unknown>> = [
       { created_by: userId },
@@ -138,17 +137,16 @@ export default async function CalendarPage({
 
   const buildSearchWhere = async () => {
     if (!searchQuery) return null;
-    const matchingUserIds = await prisma.users
-      .findMany({
-        where: {
-          OR: [
-            { first_name: { contains: searchQuery } },
-            { last_name: { contains: searchQuery } },
-          ],
-        },
-        select: { id: true },
-      })
-      .then((r: Array<{ id: number }>) => r.map((u) => u.id));
+    const userRows = await prisma.users.findMany({
+      where: {
+        OR: [
+          { first_name: { contains: searchQuery } },
+          { last_name: { contains: searchQuery } },
+        ],
+      },
+      select: { id: true },
+    });
+    const matchingUserIds = (userRows as Array<{ id: number }>).map((u) => u.id);
 
     const searchConditions: Array<Record<string, unknown>> = [
       { title: { contains: searchQuery } },

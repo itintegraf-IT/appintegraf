@@ -56,9 +56,11 @@ export default async function DashboardPage() {
         if (userId === 0) return [];
         const canReadCalendar = await hasModuleAccess(userId, "calendar", "read");
         if (!canReadCalendar) return [];
-        const managerDeptIds = await prisma.departments
-          .findMany({ where: { manager_id: userId }, select: { id: true } })
-          .then((r: Array<{ id: number }>) => r.map((d) => d.id));
+        const deptRows = await prisma.departments.findMany({
+          where: { manager_id: userId },
+          select: { id: true },
+        });
+        const managerDeptIds = (deptRows as Array<{ id: number }>).map((d) => d.id);
         const events = await prisma.calendar_events.findMany({
           where: {
             OR: [
