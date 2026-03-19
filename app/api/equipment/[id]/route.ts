@@ -97,3 +97,33 @@ export async function PUT(
     return NextResponse.json({ error: "Chyba při ukládání vybavení" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
+  }
+
+  const userId = parseInt(session.user.id, 10);
+  if (!(await isAdmin(userId))) {
+    return NextResponse.json({ error: "Nemáte oprávnění mazat vybavení" }, { status: 403 });
+  }
+
+  const id = parseInt((await params).id, 10);
+  if (isNaN(id)) {
+    return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
+  }
+
+  try {
+    await prisma.equipment_items.delete({
+      where: { id },
+    });
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error("Equipment DELETE error:", e);
+    return NextResponse.json({ error: "Chyba při mazání vybavení" }, { status: 500 });
+  }
+}

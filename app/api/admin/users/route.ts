@@ -45,10 +45,41 @@ export async function GET(req: NextRequest) {
       role_id: true,
       created_at: true,
       roles: { select: { name: true } },
+      user_roles: { select: { module_access: true } },
     },
   });
 
-  return NextResponse.json({ users });
+  const usersWithModules = users.map((u) => {
+    const ur = u.user_roles?.[0];
+    let module_access: Record<string, string> = {};
+    if (ur?.module_access) {
+      try {
+        const decoded = JSON.parse(ur.module_access);
+        if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+          if (decoded.all === true) {
+            module_access = {
+              contacts: "admin",
+              equipment: "admin",
+              calendar: "admin",
+              planovani: "admin",
+              vyroba: "admin",
+              kiosk: "admin",
+              training: "admin",
+              iml: "admin",
+            };
+          } else {
+            module_access = decoded as Record<string, string>;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+    const { user_roles: _, ...rest } = u;
+    return { ...rest, module_access };
+  });
+
+  return NextResponse.json({ users: usersWithModules });
 }
 
 export async function POST(req: NextRequest) {

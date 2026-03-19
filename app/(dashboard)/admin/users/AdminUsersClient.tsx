@@ -2,7 +2,41 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Eye, Pencil } from "lucide-react";
+import {
+  Search,
+  Eye,
+  Pencil,
+  Users,
+  Laptop,
+  Calendar,
+  CalendarDays,
+  Factory,
+  Package,
+  Tv,
+  GraduationCap,
+} from "lucide-react";
+
+const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  contacts: Users,
+  equipment: Laptop,
+  calendar: Calendar,
+  planovani: CalendarDays,
+  vyroba: Factory,
+  iml: Package,
+  kiosk: Tv,
+  training: GraduationCap,
+};
+
+const MODULE_LABELS: Record<string, string> = {
+  contacts: "Kontakty",
+  equipment: "Majetek",
+  calendar: "Kalendář",
+  planovani: "Plánování výroby",
+  vyroba: "Výroba",
+  iml: "IML",
+  kiosk: "Kiosk Monitory",
+  training: "IT Školení",
+};
 
 type User = {
   id: number;
@@ -16,6 +50,7 @@ type User = {
   is_active: boolean | null;
   role_id: number | null;
   roles: { name: string } | null;
+  module_access?: Record<string, string>;
 };
 
 export function AdminUsersClient() {
@@ -74,6 +109,7 @@ export function AdminUsersClient() {
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">E-mail</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Oddělení</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Role</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Moduly</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
               <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Akce</th>
             </tr>
@@ -81,13 +117,13 @@ export function AdminUsersClient() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   Načítání…
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   Žádní uživatelé
                 </td>
               </tr>
@@ -103,6 +139,31 @@ export function AdminUsersClient() {
                   <td className="px-4 py-3">{u.email}</td>
                   <td className="px-4 py-3">{u.department_name ?? "-"}</td>
                   <td className="px-4 py-3">{u.roles?.name ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    <div
+                      className="flex flex-wrap gap-1"
+                      title={Object.keys(u.module_access ?? {})
+                        .map((k) => MODULE_LABELS[k] ?? k)
+                        .join(", ") || "—"}
+                    >
+                      {Object.entries(u.module_access ?? {}).map(([key]) => {
+                        const Icon = MODULE_ICONS[key];
+                        if (!Icon) return null;
+                        return (
+                          <span
+                            key={key}
+                            className="inline-flex rounded bg-gray-100 p-1 text-gray-600"
+                            title={MODULE_LABELS[key] ?? key}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </span>
+                        );
+                      })}
+                      {(!u.module_access || Object.keys(u.module_access).length === 0) && (
+                        <span className="text-gray-400 text-xs">—</span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`rounded px-2 py-0.5 text-sm ${

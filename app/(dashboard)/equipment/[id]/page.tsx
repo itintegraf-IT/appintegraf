@@ -2,8 +2,9 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { isAdmin } from "@/lib/auth-utils";
+import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { ArrowLeft } from "lucide-react";
+import { EquipmentAssignClient } from "./EquipmentAssignClient";
 
 export default async function EquipmentViewPage({
   params,
@@ -16,13 +17,37 @@ export default async function EquipmentViewPage({
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
   const admin = await isAdmin(userId);
+  const equipmentWrite = await hasModuleAccess(userId, "equipment", "write");
 
   const item = await prisma.equipment_items.findUnique({
     where: { id },
-    include: { equipment_categories: true },
+    include: {
+      equipment_categories: true,
+      equipment_assignments: {
+        where: { returned_at: null },
+        take: 1,
+        include: {
+          users_equipment_assignments_user_idTousers: {
+            select: { first_name: true, last_name: true },
+          },
+        },
+      },
+    },
   });
 
   if (!item) notFound();
+
+  const activeAssignment = item.equipment_assignments[0];
+  const assignedTo = activeAssignment?.users_equipment_assignments_user_idTousers
+    ? {
+        first_name: activeAssignment.users_equipment_assignments_user_idTousers.first_name,
+        last_name: activeAssignment.users_equipment_assignments_user_idTousers.last_name,
+      }
+    : null;
+  const isAssignedToMe = activeAssignment?.user_id === userId;
+  const canAssign = (admin || equipmentWrite) && item.status !== "vy_azeno";
+  const canReturn =
+    (admin || equipmentWrite || isAssignedToMe) && !!activeAssignment;
 
   return (
     <>
@@ -92,6 +117,15 @@ export default async function EquipmentViewPage({
           )}
         </div>
       </div>
+
+      <EquipmentAssignClient
+        equipmentId={item.id}
+        status={item.status}
+        canAssign={canAssign && !activeAssignment}
+        canReturn={canReturn}
+        assignedTo={assignedTo}
+        assignedAt={activeAssignment?.assigned_at ? activeAssignment.assigned_at.toISOString() : null}
+      />
     </>
   );
 }

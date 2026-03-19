@@ -2,8 +2,9 @@ import { auth } from "@/auth";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { Laptop, Plus, Eye, ClipboardList } from "lucide-react";
+import { Laptop, Plus, ClipboardList } from "lucide-react";
 import { EquipmentRequestsTab } from "./EquipmentRequestsTab";
+import { EquipmentTableActions } from "./EquipmentTableActions";
 
 export default async function EquipmentPage({
   searchParams,
@@ -14,6 +15,7 @@ export default async function EquipmentPage({
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
   const admin = await isAdmin(userId);
   const equipmentRead = await hasModuleAccess(userId, "equipment", "read");
+  const equipmentWrite = await hasModuleAccess(userId, "equipment", "write");
   const params = await searchParams;
   const scope = params.scope ?? "mine";
   const tab = params.tab ?? "equipment";
@@ -147,10 +149,13 @@ export default async function EquipmentPage({
                       <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">{e.status ?? "-"}</span>
                     </td>
                     <td className="px-4 py-3">{formatDate(e.purchase_date)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <Link href={`/equipment/${e.id}`} className="rounded p-2 text-gray-600 hover:bg-gray-100">
-                        <Eye className="inline h-4 w-4" />
-                      </Link>
+                    <td className="px-4 py-3">
+                      <EquipmentTableActions
+                        equipmentId={e.id}
+                        canEdit={admin}
+                        canAssign={(admin || equipmentWrite) && scope === "all"}
+                        canDelete={admin}
+                      />
                     </td>
                   </tr>
                 ))
