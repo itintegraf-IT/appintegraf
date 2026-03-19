@@ -58,7 +58,7 @@ export default async function DashboardPage() {
         if (!canReadCalendar) return [];
         const managerDeptIds = await prisma.departments
           .findMany({ where: { manager_id: userId }, select: { id: true } })
-          .then((r) => r.map((d) => d.id));
+          .then((r: Array<{ id: number }>) => r.map((d) => d.id));
         const events = await prisma.calendar_events.findMany({
           where: {
             OR: [

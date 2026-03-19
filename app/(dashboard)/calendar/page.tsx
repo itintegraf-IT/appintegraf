@@ -118,7 +118,7 @@ export default async function CalendarPage({
         where: { manager_id: userId },
         select: { id: true },
       })
-      .then((r) => r.map((d) => d.id));
+      .then((r: Array<{ id: number }>) => r.map((d) => d.id));
 
     const orConditions: Array<Record<string, unknown>> = [
       { created_by: userId },
@@ -148,7 +148,7 @@ export default async function CalendarPage({
         },
         select: { id: true },
       })
-      .then((r) => r.map((u) => u.id));
+      .then((r: Array<{ id: number }>) => r.map((u) => u.id));
 
     const searchConditions: Array<Record<string, unknown>> = [
       { title: { contains: searchQuery } },
