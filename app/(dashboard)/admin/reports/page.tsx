@@ -21,6 +21,8 @@ export default async function ReportsPage() {
     orderBy: { module: "asc" },
   });
 
+  const moduleNames: string[] = (modules as Array<{ module: string }>).map((m) => m.module);
+
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -37,7 +39,7 @@ export default async function ReportsPage() {
         </Link>
       </div>
 
-      <AuditLogClient modules={modules.map((m: { module: string }) => m.module)} />
+      <AuditLogClient modules={moduleNames} />
     </>
   );
 }
