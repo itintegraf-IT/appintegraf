@@ -206,7 +206,23 @@ export default async function CalendarPage({
     include: showList || isListView ? listInclude : baseInclude,
   });
 
-  const eventsForGrid = events.map((e) => ({
+  type GridEvent = {
+    id: number;
+    title: string;
+    description: string | null;
+    start_date: Date;
+    end_date: Date;
+    event_type: string | null;
+    color: string | null;
+    location: string | null;
+    deputy_id: number | null;
+    approval_status: string | null;
+    created_by: number;
+    users: { first_name: string; last_name: string } | null;
+    users_deputy: { first_name: string; last_name: string } | null;
+    [key: string]: unknown;
+  };
+  const eventsForGrid = (events as GridEvent[]).map((e) => ({
     ...e,
     start_date: e.start_date,
     end_date: e.end_date,
