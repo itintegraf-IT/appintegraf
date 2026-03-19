@@ -21,8 +21,6 @@ export default async function ReportsPage() {
     orderBy: { module: "asc" },
   });
 
-  type ModuleRow = (typeof modules)[number];
-
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -39,7 +37,7 @@ export default async function ReportsPage() {
         </Link>
       </div>
 
-      <AuditLogClient modules={modules.map((m: ModuleRow) => m.module)} />
+      <AuditLogClient modules={modules.map((m: { module: string }) => m.module)} />
     </>
   );
 }
