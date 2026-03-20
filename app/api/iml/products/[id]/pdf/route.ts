@@ -85,6 +85,7 @@ export async function POST(
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
+    console.log(`IML PDF upload: product ${id}, size ${buffer.length} bytes`);
 
     await prisma.iml_products.update({
       where: { id },
@@ -101,7 +102,15 @@ export async function POST(
 
     return NextResponse.json({ success: true });
   } catch (e) {
-    console.error("IML product PDF upload error:", e);
+    const err = e as Error & { code?: string; cause?: unknown };
+    console.error(
+      "IML product PDF upload error:",
+      err.message,
+      "code:",
+      err.code ?? (err as { meta?: { code?: string } }).meta?.code,
+      "cause:",
+      err.cause
+    );
     return NextResponse.json({ error: "Chyba při nahrávání PDF" }, { status: 500 });
   }
 }
