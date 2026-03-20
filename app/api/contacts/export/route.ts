@@ -45,8 +45,9 @@ export async function GET(req: NextRequest) {
   });
 
   const header = "username;email;first_name;last_name;phone;landline;landline2;position;department_name";
+  type ContactRow = (typeof contacts)[number];
   const rows = contacts.map(
-    (c) =>
+    (c: ContactRow) =>
       [
         escapeCsv(c.username),
         escapeCsv(c.email),
