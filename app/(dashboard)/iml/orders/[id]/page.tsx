@@ -44,6 +44,17 @@ export default async function ImlOrderDetailPage({
   const customData = (order.custom_data as Record<string, unknown> | null) ?? {};
   const hasCustomData = Object.keys(customData).length > 0;
 
+  type CustomFieldRow = { id: number; field_key: string; label: string };
+  type OrderItemRow = {
+    id: number;
+    quantity: number;
+    unit_price: number | null;
+    subtotal: number | null;
+    iml_products: { id: number; ig_code: string | null; ig_short_name: string | null; client_name: string | null };
+  };
+  const fieldsTyped = customFields as CustomFieldRow[];
+  const itemsTyped = order.iml_order_items as OrderItemRow[];
+
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -105,7 +116,7 @@ export default async function ImlOrderDetailPage({
         <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 text-sm font-semibold text-gray-700">Vlastní pole</h3>
           <div className="grid gap-4 sm:grid-cols-2">
-            {customFields.map((f) => {
+            {fieldsTyped.map((f) => {
               const val = customData[f.field_key];
               if (val === undefined || val === null || val === "") return null;
               return (
@@ -141,7 +152,7 @@ export default async function ImlOrderDetailPage({
                   </td>
                 </tr>
               ) : (
-                order.iml_order_items.map((it) => (
+                itemsTyped.map((it) => (
                   <tr key={it.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <Link href={`/iml/products/${it.iml_products.id}`} className="font-medium text-red-600 hover:text-red-700">

@@ -39,6 +39,9 @@ export default async function ImlProductDetailPage({
   const customData = (product.custom_data as Record<string, unknown> | null) ?? {};
   const hasCustomData = Object.keys(customData).length > 0;
 
+  type CustomFieldRow = { id: number; field_key: string; label: string };
+  const customFieldsTyped = customFields as CustomFieldRow[];
+
   const fmt = (v: unknown) => (v != null && v !== "" ? String(v) : "-");
   const fmtNum = (v: unknown) => (v != null ? String(v) : "-");
 
@@ -178,7 +181,7 @@ export default async function ImlProductDetailPage({
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h3 className="mb-4 text-sm font-semibold text-gray-700">Vlastní pole</h3>
             <div className="grid gap-4 sm:grid-cols-2">
-              {customFields.map((f) => {
+              {customFieldsTyped.map((f) => {
                 const val = customData[f.field_key];
                 if (val === undefined || val === null || val === "") return null;
                 return (

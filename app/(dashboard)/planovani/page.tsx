@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { getPlanovaniRole } from "@/lib/planovani-auth";
 import { hasPlanovaniAccess } from "@/lib/planovani-auth";
 import PlannerPage from "./_components/PlannerPage";
+import type { Block, CompanyDay } from "./_components/TimelineGrid";
 
 export default async function PlanovaniPage() {
   const session = await auth();
@@ -18,7 +19,8 @@ export default async function PlanovaniPage() {
     getPlanovaniRole(userId),
   ]);
 
-  const serialized = blocks.map((b) => ({
+  type BlockRow = { startTime: Date; endTime: Date; deadlineExpedice?: Date | null; dataRequiredDate?: Date | null; materialRequiredDate?: Date | null; createdAt: Date; updatedAt: Date } & Record<string, unknown>;
+  const serialized = blocks.map((b: BlockRow) => ({
     ...b,
     startTime: b.startTime.toISOString(),
     endTime: b.endTime.toISOString(),
@@ -29,7 +31,8 @@ export default async function PlanovaniPage() {
     updatedAt: b.updatedAt.toISOString(),
   }));
 
-  const serializedCompanyDays = companyDays.map((d) => ({
+  type CompanyDayRow = { startDate: Date; endDate: Date; createdAt: Date } & Record<string, unknown>;
+  const serializedCompanyDays = companyDays.map((d: CompanyDayRow) => ({
     ...d,
     startDate: d.startDate.toISOString(),
     endDate: d.endDate.toISOString(),
@@ -44,8 +47,8 @@ export default async function PlanovaniPage() {
 
   return (
     <PlannerPage
-      initialBlocks={serialized}
-      initialCompanyDays={serializedCompanyDays}
+      initialBlocks={serialized as Block[]}
+      initialCompanyDays={serializedCompanyDays as CompanyDay[]}
       currentUser={currentUser}
     />
   );

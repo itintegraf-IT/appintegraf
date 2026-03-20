@@ -20,7 +20,7 @@ export default async function EquipmentPage({
   const scope = params.scope ?? "mine";
   const tab = params.tab ?? "equipment";
 
-  let equipment: Array<{
+  type EquipmentRow = {
     id: number;
     name: string;
     brand: string | null;
@@ -29,7 +29,8 @@ export default async function EquipmentPage({
     status: string | null;
     purchase_date: Date | null;
     equipment_categories?: { name: string };
-  }> = [];
+  };
+  let equipment: EquipmentRow[] = [];
 
   if (admin && scope === "all") {
     equipment = await prisma.equipment_items.findMany({
@@ -138,7 +139,7 @@ export default async function EquipmentPage({
                   </td>
                 </tr>
               ) : (
-                equipment.map((e) => (
+                (equipment as EquipmentRow[]).map((e) => (
                   <tr key={e.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{e.name}</td>
                     <td className="px-4 py-3">

@@ -9,6 +9,9 @@ export default async function KioskPage() {
     take: 50,
   });
 
+  type PresentationRow = { id: number; name: string; description: string | null; created_at: Date };
+  const presentationsTyped = presentations as PresentationRow[];
+
   return (
     <>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -41,14 +44,14 @@ export default async function KioskPage() {
               </tr>
             </thead>
             <tbody>
-              {presentations.length === 0 ? (
+              {presentationsTyped.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
                     Žádné prezentace
                   </td>
                 </tr>
               ) : (
-                presentations.map((p) => (
+                presentationsTyped.map((p) => (
                   <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{p.name}</td>
                     <td className="px-4 py-3 text-gray-600">{p.description ?? "-"}</td>

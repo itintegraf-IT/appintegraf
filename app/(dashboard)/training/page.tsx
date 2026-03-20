@@ -16,6 +16,11 @@ export default async function TrainingPage() {
     }),
   ]);
 
+  type TestRow = { id: number; name: string; description: string | null; time_limit: number | null; pass_percentage: number | null };
+  type MaterialRow = { id: number; title: string; source: string | null };
+  const testsTyped = tests as TestRow[];
+  const materialsTyped = materials as MaterialRow[];
+
   return (
     <>
       <TrainingSuccessBanner />
@@ -45,7 +50,7 @@ export default async function TrainingPage() {
             </h2>
           </div>
           <div className="divide-y divide-gray-100">
-            {tests.length === 0 ? (
+            {testsTyped.length === 0 ? (
               <div className="px-4 py-8 text-center text-gray-500">Žádné testy</div>
             ) : (
               tests.map((t) => (
@@ -80,10 +85,10 @@ export default async function TrainingPage() {
             </h2>
           </div>
           <div className="divide-y divide-gray-100">
-            {materials.length === 0 ? (
+            {materialsTyped.length === 0 ? (
               <div className="px-4 py-8 text-center text-gray-500">Žádné materiály</div>
             ) : (
-              materials.map((m) => (
+              materialsTyped.map((m) => (
                 <div key={m.id} className="px-4 py-3 hover:bg-gray-50">
                   <div className="flex items-start justify-between gap-2">
                     <div>

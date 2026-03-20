@@ -94,6 +94,11 @@ export default async function DashboardPage() {
       })(),
     ]);
 
+  type NotificationRow = { id: number; title: string; message: string | null; link: string | null; read_at: Date | null; created_at: Date };
+  type PendingEventRow = { id: number; title: string; start_date: Date; approval_status: string | null; users: { first_name: string; last_name: string } | null };
+  const notificationsTyped = notifications as NotificationRow[];
+  const pendingEventsTyped = pendingEvents as PendingEventRow[];
+
   const statCards = [
     { icon: Users, value: stats.users, label: "Uživatelé" },
     { icon: Building2, value: stats.departments, label: "Oddělení" },
@@ -133,11 +138,11 @@ export default async function DashboardPage() {
       </div>
 
       {/* Notifikace */}
-      {notifications.length > 0 && (
+      {notificationsTyped.length > 0 && (
         <div className="mb-8 rounded-xl border border-gray-200 bg-white p-6 shadow-elevated">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
             <Bell className="h-5 w-5 text-gray-600" />
-            Notifikace ({notifications.length})
+            Notifikace ({notificationsTyped.length})
           </h2>
           <div className="space-y-2">
             {notifications.map((n) => (
@@ -156,14 +161,14 @@ export default async function DashboardPage() {
       )}
 
       {/* Události ke schválení */}
-      {calendarRead && pendingEvents.length > 0 && (
+      {calendarRead && pendingEventsTyped.length > 0 && (
         <div className="mb-8 rounded-xl border-2 border-amber-200 bg-amber-50/50 p-6">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-amber-900">
             <Clock className="h-5 w-5 text-amber-600" />
-            Události ke schválení ({pendingEvents.length})
+            Události ke schválení ({pendingEventsTyped.length})
           </h2>
           <div className="space-y-3">
-            {pendingEvents.map((e) => {
+            {pendingEventsTyped.map((e) => {
               const creatorName = e.users
                 ? `${e.users.first_name} ${e.users.last_name}`
                 : "–";

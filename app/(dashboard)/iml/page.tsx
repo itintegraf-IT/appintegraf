@@ -64,14 +64,23 @@ export default async function ImlPage() {
     }),
   ]);
 
-  const customerIds = topCustomersByOrders.map((o) => o.customer_id);
+  type OrderStatusRow = { status: string | null; _count: { id: number } };
+  type TopCustomerRow = { customer_id: number; _count: { id: number } };
+  type ProductStatusRow = { item_status: string | null; _count: { id: number } };
+  type RecentOrderRow = { id: number; order_number: string; order_date: Date; status: string | null; iml_customers?: { name: string } | null };
+  const ordersByStatusTyped = ordersByStatus as OrderStatusRow[];
+  const topCustomersTyped = topCustomersByOrders as TopCustomerRow[];
+  const productsByStatusTyped = productsByStatus as ProductStatusRow[];
+  const recentOrdersTyped = recentOrders as RecentOrderRow[];
+  const customerIds = topCustomersTyped.map((o) => o.customer_id);
   const customerNames = customerIds.length
     ? await prisma.iml_customers.findMany({
         where: { id: { in: customerIds } },
         select: { id: true, name: true },
       })
     : [];
-  const customerMap = new Map(customerNames.map((c) => [c.id, c.name]));
+  type CustomerRow = { id: number; name: string };
+  const customerMap = new Map((customerNames as CustomerRow[]).map((c) => [c.id, c.name]));
 
   const cards = [
     { href: "/iml/customers", icon: Users, value: customersCount, label: "Zákazníci" },
@@ -199,13 +208,13 @@ export default async function ImlPage() {
             Objednávky podle stavu
           </h3>
           <div className="space-y-2">
-            {ordersByStatus.map((s) => (
+            {ordersByStatusTyped.map((s) => (
               <div key={s.status} className="flex justify-between text-sm">
                 <span className="text-gray-600">{s.status || "(prázdné)"}</span>
                 <span className="font-medium">{s._count.id}</span>
               </div>
             ))}
-            {ordersByStatus.length === 0 && (
+            {ordersByStatusTyped.length === 0 && (
               <p className="text-sm text-gray-500">Žádné objednávky</p>
             )}
           </div>
@@ -217,7 +226,7 @@ export default async function ImlPage() {
             Top zákazníci (počet objednávek)
           </h3>
           <div className="space-y-2">
-            {topCustomersByOrders.map((o) => (
+            {topCustomersTyped.map((o) => (
               <div key={o.customer_id} className="flex justify-between text-sm">
                 <span className="text-gray-600 truncate max-w-[180px]">
                   {customerMap.get(o.customer_id) ?? `#${o.customer_id}`}
@@ -225,7 +234,7 @@ export default async function ImlPage() {
                 <span className="font-medium">{o._count.id}</span>
               </div>
             ))}
-            {topCustomersByOrders.length === 0 && (
+            {topCustomersTyped.length === 0 && (
               <p className="text-sm text-gray-500">Žádná data</p>
             )}
           </div>
@@ -238,14 +247,14 @@ export default async function ImlPage() {
         </div>
       </div>
 
-      {productsByStatus.length > 0 && (
+      {productsByStatusTyped.length > 0 && (
         <div className="mb-8 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-gray-700">
             <Package className="h-4 w-4" />
             Produkty podle stavu
           </h3>
           <div className="flex flex-wrap gap-4">
-            {productsByStatus.map((s) => (
+            {productsByStatusTyped.map((s) => (
               <div key={s.item_status ?? "null"} className="flex items-center gap-2">
                 <span className="rounded bg-gray-100 px-2 py-0.5 text-sm text-gray-700">
                   {s.item_status || "(neuvedeno)"}
@@ -257,7 +266,7 @@ export default async function ImlPage() {
         </div>
       )}
 
-      {recentOrders.length > 0 && (
+      {recentOrdersTyped.length > 0 && (
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
             <FileText className="h-5 w-5 text-gray-600" />
@@ -275,7 +284,7 @@ export default async function ImlPage() {
                 </tr>
               </thead>
               <tbody>
-                {recentOrders.map((o) => (
+                {recentOrdersTyped.map((o) => (
                   <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-mono text-sm">{o.order_number}</td>
                     <td className="px-4 py-3">{o.iml_customers?.name ?? "-"}</td>
