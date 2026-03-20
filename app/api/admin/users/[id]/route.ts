@@ -94,7 +94,9 @@ export async function GET(
     if (dept) department_id = dept.id;
   }
 
-  const secondary_department_ids = (user.user_secondary_departments ?? []).map((sd) => sd.department_id);
+  const secondary_department_ids = (
+    (user.user_secondary_departments ?? []) as Array<{ department_id: number }>
+  ).map((sd) => sd.department_id);
 
   const { user_roles: _, user_secondary_departments: __, ...rest } = user;
   return NextResponse.json({
