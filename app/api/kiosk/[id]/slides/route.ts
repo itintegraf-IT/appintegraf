@@ -38,12 +38,11 @@ export async function POST(
   const uploadDir = path.join(process.cwd(), "public", "uploads", "kiosk");
   await mkdir(uploadDir, { recursive: true });
 
-  const maxOrder = await prisma.slides
-    .aggregate({
-      where: { presentation_id: id },
-      _max: { sort_order: true },
-    })
-    .then((r) => (r._max.sort_order ?? -1) + 1);
+  const agg = await prisma.slides.aggregate({
+    where: { presentation_id: id },
+    _max: { sort_order: true },
+  });
+  const maxOrder = (agg._max.sort_order ?? -1) + 1;
 
   let sortOrder = maxOrder;
   const created: { id: number }[] = [];
