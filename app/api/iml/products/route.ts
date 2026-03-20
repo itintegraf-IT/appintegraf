@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -114,8 +113,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const customDataForPrisma =
-      data.custom_data === null ? Prisma.DbNull : (data.custom_data as Prisma.InputJsonValue);
+    const customDataForPrisma = data.custom_data;
     const createPayload = { ...data, custom_data: customDataForPrisma, last_edited_by: editorName };
     const product = await prisma.iml_products.create({
       data: createPayload as Parameters<typeof prisma.iml_products.create>[0]["data"],

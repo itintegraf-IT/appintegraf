@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -85,7 +84,9 @@ export async function POST(req: NextRequest) {
           status: String(status).trim() || "nová",
           notes: notes ? String(notes).trim() : null,
           total: null,
-          custom_data: (parseOrderCustomData(custom_data) ?? Prisma.DbNull) as Prisma.InputJsonValue,
+          custom_data: (parseOrderCustomData(custom_data) ?? null) as Parameters<
+            typeof prisma.iml_orders.create
+          >[0]["data"]["custom_data"],
         },
       });
 

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -84,8 +83,7 @@ export async function PUT(
       }
     }
 
-    const customDataForPrisma =
-      data.custom_data === null ? Prisma.DbNull : (data.custom_data as Prisma.InputJsonValue);
+    const customDataForPrisma = data.custom_data;
     const updatePayload = { ...data, custom_data: customDataForPrisma, last_edited_by: editorName };
     await prisma.iml_products.update({
       where: { id },

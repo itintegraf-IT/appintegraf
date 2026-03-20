@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -73,12 +72,7 @@ export async function PUT(
     const newStatus = status != null ? String(status).trim() : existing.status;
     const newNotes = notes != null ? (notes ? String(notes).trim() : null) : existing.notes;
     const parsedCustom = custom_data !== undefined ? parseOrderCustomData(custom_data) : undefined;
-    const customDataForPrisma =
-      parsedCustom === undefined
-        ? undefined
-        : parsedCustom === null
-          ? Prisma.DbNull
-          : (parsedCustom as Prisma.InputJsonValue);
+    const customDataForPrisma = parsedCustom === undefined ? undefined : parsedCustom;
 
     const updateData: Record<string, unknown> = {
       order_date: orderDate,
