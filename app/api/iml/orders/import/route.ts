@@ -103,13 +103,13 @@ export async function POST(req: NextRequest) {
       select: { id: true, ig_code: true, sku: true, client_name: true },
     });
     type ProductRow = (typeof products)[number];
-    const productByIgCode = new Map(
+    const productByIgCode = new Map<string, number>(
       products.filter((p: ProductRow) => p.ig_code).map((p: ProductRow) => [p.ig_code!.toLowerCase().trim(), p.id])
     );
-    const productBySku = new Map(
+    const productBySku = new Map<string, number>(
       products.filter((p: ProductRow) => p.sku).map((p: ProductRow) => [p.sku!.toLowerCase().trim(), p.id])
     );
-    const productByClientName = new Map(
+    const productByClientName = new Map<string, number>(
       products.filter((p: ProductRow) => p.client_name).map((p: ProductRow) => [p.client_name!.toLowerCase().trim(), p.id])
     );
 
