@@ -2,8 +2,9 @@ import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
-import type { vyroba_job_config } from "@prisma/client";
 import VyrobaNastaveniClient from "./VyrobaNastaveniClient";
+
+type JobConfigRow = Awaited<ReturnType<typeof prisma.vyroba_job_config.findMany>>[number];
 
 export default async function VyrobaNastaveniPage() {
   const session = await auth();
@@ -26,7 +27,7 @@ export default async function VyrobaNastaveniPage() {
 
   const address = addressSetting?.setting_val ?? process.env.VYROBA_OUTPUT_PATH ?? "";
   const configMap = Object.fromEntries(
-    jobConfigs.map((c: vyroba_job_config) => [c.job, c])
+    jobConfigs.map((c: JobConfigRow) => [c.job, c])
   );
 
   return (
