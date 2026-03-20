@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
       orderBy: { startTime: "asc" },
     });
 
-    const serialized = blocks.map((b) => ({
+    type BlockRow = (typeof blocks)[number];
+    const serialized = blocks.map((b: BlockRow) => ({
       ...b,
       startTime: b.startTime.toISOString(),
       endTime: b.endTime.toISOString(),

@@ -104,7 +104,7 @@ export async function GET(
       cKrabNaPalete: 0,
       paleta: 1,
       cisloZakazky,
-      employees: vyrobaUsers.map((u) => u.name),
+      employees: (vyrobaUsers as Array<{ name: string }>).map((u) => u.name),
       stepBase,
     });
   } catch (error) {

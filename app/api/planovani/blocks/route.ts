@@ -11,7 +11,8 @@ export async function GET() {
     const blocks = await prisma.planovani_blocks.findMany({
       orderBy: { startTime: "asc" },
     });
-    const serialized = blocks.map((b) => ({
+    type BlockRow = (typeof blocks)[number];
+    const serialized = blocks.map((b: BlockRow) => ({
       ...b,
       startTime: b.startTime.toISOString(),
       endTime: b.endTime.toISOString(),

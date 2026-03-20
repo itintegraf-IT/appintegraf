@@ -26,7 +26,8 @@ export async function GET() {
       },
       orderBy: { createdAt: "desc" },
     });
-    const serialized = logs.map((log) => ({
+    type LogRow = (typeof logs)[number];
+    const serialized = logs.map((log: LogRow) => ({
       ...log,
       createdAt: log.createdAt.toISOString(),
     }));

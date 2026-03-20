@@ -24,7 +24,8 @@ export async function GET(_: NextRequest, { params }: RouteContext) {
       orderBy: { createdAt: "desc" },
       take: 10,
     });
-    const serialized = logs.map((log) => ({
+    type LogRow = (typeof logs)[number];
+    const serialized = logs.map((log: LogRow) => ({
       ...log,
       createdAt: log.createdAt.toISOString(),
     }));

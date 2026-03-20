@@ -34,7 +34,8 @@ export async function GET(req: NextRequest) {
     orderBy: { assigned_at: "desc" },
   });
 
-  const equipment = items.map((a) => ({
+  type AssignmentRow = (typeof items)[number];
+  const equipment = items.map((a: AssignmentRow) => ({
     ...a.equipment_items,
     assignment_id: a.id,
   }));

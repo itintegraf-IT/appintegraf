@@ -96,19 +96,21 @@ export async function POST(req: NextRequest) {
     const dataRows = rows.slice(1).filter((r) => r.some((c) => c && String(c).trim()));
 
     const customers = await prisma.iml_customers.findMany({ select: { id: true, name: true } });
-    const customerByName = new Map(customers.map((c) => [c.name.toLowerCase().trim(), c.id]));
+    type CustomerRow = (typeof customers)[number];
+    const customerByName = new Map(customers.map((c: CustomerRow) => [c.name.toLowerCase().trim(), c.id]));
 
     const products = await prisma.iml_products.findMany({
       select: { id: true, ig_code: true, sku: true, client_name: true },
     });
+    type ProductRow = (typeof products)[number];
     const productByIgCode = new Map(
-      products.filter((p) => p.ig_code).map((p) => [p.ig_code!.toLowerCase().trim(), p.id])
+      products.filter((p: ProductRow) => p.ig_code).map((p: ProductRow) => [p.ig_code!.toLowerCase().trim(), p.id])
     );
     const productBySku = new Map(
-      products.filter((p) => p.sku).map((p) => [p.sku!.toLowerCase().trim(), p.id])
+      products.filter((p: ProductRow) => p.sku).map((p: ProductRow) => [p.sku!.toLowerCase().trim(), p.id])
     );
     const productByClientName = new Map(
-      products.filter((p) => p.client_name).map((p) => [p.client_name!.toLowerCase().trim(), p.id])
+      products.filter((p: ProductRow) => p.client_name).map((p: ProductRow) => [p.client_name!.toLowerCase().trim(), p.id])
     );
 
     const findProduct = (ident: string): number | null => {

@@ -36,7 +36,9 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  const rows = orders.map((o) => ({
+  type OrderRow = (typeof orders)[number];
+  type OrderItemRow = OrderRow["iml_order_items"][number];
+  const rows = orders.map((o: OrderRow) => ({
     id: o.id,
     order_number: o.order_number ?? "",
     customer_name: o.iml_customers?.name ?? "",
@@ -46,7 +48,7 @@ export async function GET(req: NextRequest) {
     notes: o.notes ?? "",
     items_count: o.iml_order_items.length,
     items_summary: o.iml_order_items
-      .map((i) => `${i.iml_products?.ig_code ?? i.iml_products?.client_name ?? "?"}: ${i.quantity}`)
+      .map((i: OrderItemRow) => `${i.iml_products?.ig_code ?? i.iml_products?.client_name ?? "?"}: ${i.quantity}`)
       .join("; "),
     created_at: o.created_at ? new Date(o.created_at).toISOString().slice(0, 10) : "",
     updated_at: o.updated_at ? new Date(o.updated_at).toISOString().slice(0, 10) : "",

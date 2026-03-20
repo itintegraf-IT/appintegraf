@@ -35,7 +35,8 @@ export async function GET(req: NextRequest) {
     orderBy: { name: "asc" },
   });
 
-  const rows = customers.map((c) => ({
+  type CustomerRow = (typeof customers)[number];
+  const rows = customers.map((c: CustomerRow) => ({
     id: c.id,
     name: c.name ?? "",
     email: c.email ?? "",

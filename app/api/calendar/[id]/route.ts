@@ -175,7 +175,8 @@ export async function DELETE(
     ? `${event.users.first_name} ${event.users.last_name}`
     : "Uživatel";
 
-  const approverIds = [...new Set(event.calendar_approvals.map((a) => a.approver_id))].filter(
+  type ApprovalRow = (typeof event.calendar_approvals)[number];
+  const approverIds = [...new Set(event.calendar_approvals.map((a: ApprovalRow) => a.approver_id))].filter(
     (aid) => aid !== userId
   );
 

@@ -49,7 +49,8 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  const usersWithModules = users.map((u) => {
+  type UserRow = (typeof users)[number];
+  const usersWithModules = users.map((u: UserRow) => {
     const ur = u.user_roles?.[0];
     let module_access: Record<string, string> = {};
     if (ur?.module_access) {

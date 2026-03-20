@@ -11,7 +11,8 @@ export async function GET() {
     const days = await prisma.planovani_company_days.findMany({
       orderBy: { startDate: "asc" },
     });
-    const serialized = days.map((d) => ({
+    type DayRow = (typeof days)[number];
+    const serialized = days.map((d: DayRow) => ({
       ...d,
       startDate: d.startDate.toISOString(),
       endDate: d.endDate.toISOString(),

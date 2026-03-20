@@ -41,7 +41,8 @@ export async function GET(req: NextRequest) {
     include: { iml_customers: { select: { name: true } } },
   });
 
-  const rows = products.map((p) => ({
+  type ProductRow = (typeof products)[number];
+  const rows = products.map((p: ProductRow) => ({
     id: p.id,
     ig_code: p.ig_code ?? "",
     ig_short_name: p.ig_short_name ?? "",

@@ -14,7 +14,8 @@ export async function GET() {
     distinct: ["department_name"],
   });
 
-  const names = [...new Set(departments.map((d) => d.department_name).filter(Boolean))] as string[];
+  type DeptRow = (typeof departments)[number];
+  const names = [...new Set(departments.map((d: DeptRow) => d.department_name).filter(Boolean))] as string[];
   names.sort();
 
   return NextResponse.json(names);
