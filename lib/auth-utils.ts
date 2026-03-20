@@ -12,7 +12,8 @@ async function getUserRoles(userId: number) {
   });
 
   if (userRoles.length > 0) {
-    return userRoles.map((ur) => ({
+    type UserRoleRow = (typeof userRoles)[number];
+    return userRoles.map((ur: UserRoleRow) => ({
       name: ur.roles.name,
       module_access: ur.module_access,
     }));
@@ -124,7 +125,8 @@ export async function hasModuleAccess(
  */
 export async function isAdmin(userId: number): Promise<boolean> {
   const roles = await getUserRoles(userId);
-  return roles.some((r) => r.name?.toLowerCase() === "admin");
+  type RoleItem = (typeof roles)[number];
+  return roles.some((r: RoleItem) => r.name?.toLowerCase() === "admin");
 }
 
 /**
@@ -147,7 +149,7 @@ export async function getUsersWithModuleAdmin(module: string): Promise<number[]>
   });
 
   const hasAdminInRoles = (roles: { name: string | null; module_access: string | null }[]) =>
-    roles.some((r) => r.name?.toLowerCase() === "admin") ||
+    roles.some((r: { name: string | null }) => r.name?.toLowerCase() === "admin") ||
     hasModuleAccessFromRoles(roles, module, "admin");
 
   const adminIds = new Set<number>();
@@ -189,7 +191,7 @@ export async function getUsersWithModuleAccess(
   });
 
   const hasAccess = (roles: { name: string | null; module_access: string | null }[]) =>
-    roles.some((r) => r.name?.toLowerCase() === "admin") ||
+    roles.some((r: { name: string | null }) => r.name?.toLowerCase() === "admin") ||
     hasModuleAccessFromRoles(roles, module, access);
 
   const result: { id: number; name: string }[] = [];
@@ -238,7 +240,8 @@ export async function getLayoutAccess(userId: number): Promise<{
   vyroba: boolean;
 }> {
   const roles = await getUserRoles(userId);
-  const admin = roles.some((r) => r.name?.toLowerCase() === "admin");
+  type RoleItem = (typeof roles)[number];
+  const admin = roles.some((r: RoleItem) => r.name?.toLowerCase() === "admin");
 
   const checkModule = (module: string) =>
     admin || hasModuleAccessFromRoles(roles, module, "read");

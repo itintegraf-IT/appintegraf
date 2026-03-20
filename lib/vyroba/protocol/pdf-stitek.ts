@@ -2,7 +2,7 @@
  * Štítek PDF – podle Protokoly.py (ST), více štítků na A4
  */
 import { PDFPage, PDFFont, rgb } from "pdf-lib";
-import { StitekInput } from "./types";
+import { StitekInput, type ProtocolRow } from "./types";
 import { JOB_LABELS } from "../config/fix-settings";
 
 const mm = (x: number) => x * 2.83465;
@@ -90,7 +90,7 @@ export async function createStitekPdf(
 
   if (showVypisS && rows.length > 0) {
     const vypisS = rows
-      .map((r) => `${r.ks}/${r.serie}/${r.cisloOd}`)
+      .map((r: ProtocolRow) => `${r.ks}/${r.serie}/${r.cisloOd}`)
       .join("   ");
     page.drawRectangle({
       x: baseX,

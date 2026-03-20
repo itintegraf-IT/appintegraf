@@ -52,7 +52,7 @@ function sanitizeForAudit(obj: Record<string, unknown>): Record<string, unknown>
   const out: Record<string, unknown> = {};
   const skipKeys = ["image_data", "pdf_data", "password"];
   for (const [k, v] of Object.entries(obj)) {
-    if (skipKeys.some((s) => k.toLowerCase().includes(s))) continue;
+    if (skipKeys.some((s: string) => k.toLowerCase().includes(s))) continue;
     if (v instanceof Buffer || v instanceof Uint8Array) continue;
     out[k] = v;
   }

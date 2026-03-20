@@ -17,7 +17,7 @@ export interface PlanovaniSession {
 
 function hasItem(items: string[], ...keys: string[]): boolean {
   const set = new Set(items);
-  return keys.some((k) => set.has(k.toLowerCase()));
+  return keys.some((k: string) => set.has(k.toLowerCase()));
 }
 
 /**

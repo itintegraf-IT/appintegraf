@@ -23,7 +23,7 @@ const CD_JOBS = [
 ];
 
 export function isCdJob(job: string): boolean {
-  return CD_JOBS.some((j) => job.includes(j));
+  return CD_JOBS.some((j: string) => job.includes(j));
 }
 
 export function isIgtJob(job: string): boolean {

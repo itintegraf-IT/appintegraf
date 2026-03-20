@@ -2,7 +2,7 @@
  * Balný list PDF – podle Protokoly.py Ulozeni_PDF (BL)
  */
 import { PDFPage, PDFFont, rgb } from "pdf-lib";
-import { BalnyListInput } from "./types";
+import { BalnyListInput, type ProtocolRow } from "./types";
 import { JOB_LABELS } from "../config/fix-settings";
 
 const mm = (x: number) => x * 2.83465;
@@ -87,7 +87,7 @@ export async function createBalnyListPdf(
   y += mm(25);
 
   const reversed = [...rows].reverse();
-  const withPoradi = reversed.map((r, i) => ({
+  const withPoradi = reversed.map((r: ProtocolRow, i: number) => ({
     ...r,
     poradi: String(i + 1).padStart(2, "0"),
   }));

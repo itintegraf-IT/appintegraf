@@ -31,7 +31,7 @@ export function parseTxtLine(
   const trimmed = line.trim();
   if (!trimmed || trimmed.split("|").length < 4) return null;
 
-  const parts = trimmed.split("|").map((p) => p.trim());
+  const parts = trimmed.split("|").map((p: string) => p.trim());
   const remaining = parseInt(parts[0], 10) || 0;
   const ks = Math.max(0, ksVKr - remaining);
   const serie = parts[1] ?? "";
@@ -82,7 +82,7 @@ export function exportToTxt(
   ksVKr: number,
   isIGT: boolean
 ): string {
-  return rows.map((r) => formatTxtRow(r, ksVKr, isIGT)).join("");
+  return rows.map((r: TxtRow) => formatTxtRow(r, ksVKr, isIGT)).join("");
 }
 
 /**
@@ -95,7 +95,7 @@ export function importFromTxt(
   ksVKr: number = 20,
   prod: number = 6
 ): TxtRow[] {
-  const lines = content.split("\n").filter((l) => l.includes("|"));
+  const lines = content.split("\n").filter((l: string) => l.includes("|"));
   const rows: TxtRow[] = [];
   const perProd = Math.max(1, Math.floor(lines.length / prod));
   for (let k = 0; k < prod; k++) {
@@ -170,7 +170,7 @@ export async function readTxtFiles(
     const filePath = path.join(dir, `${k}.txt`);
     try {
       const content = await fs.readFile(filePath, "utf-8");
-      const lines = content.split("\n").filter((l) => l.includes("|"));
+      const lines = content.split("\n").filter((l: string) => l.includes("|"));
       const lastLine = lines[lines.length - 1];
       if (lastLine) {
         const parsed = parseTxtLine(lastLine, isIGT, 20);
