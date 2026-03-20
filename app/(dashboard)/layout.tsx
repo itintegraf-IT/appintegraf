@@ -5,6 +5,9 @@ import { DashboardMain } from "@/components/layout/DashboardMain";
 import { SidebarProvider } from "@/components/layout/SidebarContext";
 import { getLayoutAccess } from "@/lib/auth-utils";
 
+/** Dashboard vyžaduje DB a auth – vždy renderovat za běhu, ne při buildu */
+export const dynamic = "force-dynamic";
+
 export default async function DashboardLayout({
   children,
 }: {
