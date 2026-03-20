@@ -3,20 +3,9 @@ import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
-const isDev = process.env.NODE_ENV === "development";
-const canonicalUrl = isDev
-  ? ""
-  : (process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "");
-const useSecureCookies = !isDev && canonicalUrl.startsWith("https:");
-
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
   secret: process.env.AUTH_SECRET,
-  ...(useSecureCookies && {
-    cookies: {
-      useSecureCookies: true,
-    },
-  }),
   providers: [
     Credentials({
       credentials: {

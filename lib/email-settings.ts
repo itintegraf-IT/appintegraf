@@ -72,10 +72,10 @@ export async function getEmailSettingsSafe(): Promise<
   Omit<EmailSettings, "password"> & { passwordSet: boolean }
 > {
   const settings = await getEmailSettings();
+  const { password, ...rest } = settings;
   return {
-    ...settings,
-    password: "",
-    passwordSet: settings.password.length > 0,
+    ...rest,
+    passwordSet: password.length > 0,
   };
 }
 
