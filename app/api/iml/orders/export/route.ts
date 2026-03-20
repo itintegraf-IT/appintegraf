@@ -68,7 +68,8 @@ export async function GET(req: NextRequest) {
   }
 
   const header = "id;order_number;customer_name;order_date;status;total;notes;items_count;items_summary;created_at;updated_at";
-  const csvRows = rows.map((r) =>
+  type CsvRow = (typeof rows)[number];
+  const csvRows = rows.map((r: CsvRow) =>
     [
       r.id,
       escapeCsv(r.order_number),

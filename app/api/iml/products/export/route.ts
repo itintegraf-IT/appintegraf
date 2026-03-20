@@ -83,7 +83,8 @@ export async function GET(req: NextRequest) {
   }
 
   const header = "id;ig_code;ig_short_name;client_code;client_name;sku;customer_name;requester;label_shape_code;product_format;die_cut_tool_code;assembly_code;positions_on_sheet;pieces_per_box;pieces_per_pallet;foil_type;color_coverage;ean_code;item_status;approval_status;has_print_sample;is_active;created_at;updated_at";
-  const csvRows = rows.map((r) =>
+  type CsvRow = (typeof rows)[number];
+  const csvRows = rows.map((r: CsvRow) =>
     [
       r.id,
       escapeCsv(r.ig_code),
