@@ -235,6 +235,8 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
   const visibleHrefs = visibleItems.map((i) => i.href).join(",");
 
   const [orderedItems, setOrderedItems] = useState<NavItem[]>(() => visibleItems);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     const items = navItems.filter((item) => !item.module || moduleAccess[item.module]);
@@ -334,33 +336,54 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
       <nav className="flex-1 overflow-y-auto py-4">
         <TooltipProvider>
         <ul className="space-y-0.5 px-2">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={orderedItems.map((i) => i.href)}
-              strategy={verticalListSortingStrategy}
+          {mounted ? (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
             >
-              {orderedItems.map((item) => {
-                const isActive =
-                  item.href === "/"
-                    ? pathname === "/"
-                    : pathname.startsWith(item.href);
-                return (
-                  <li key={item.href}>
-                    <SortableNavItem
-                      item={item}
-                      isActive={!!isActive}
-                      onClick={onClose}
-                      collapsed={isCollapsed}
-                    />
-                  </li>
-                );
-              })}
-            </SortableContext>
-          </DndContext>
+              <SortableContext
+                items={orderedItems.map((i) => i.href)}
+                strategy={verticalListSortingStrategy}
+              >
+                {orderedItems.map((item) => {
+                  const isActive =
+                    item.href === "/"
+                      ? pathname === "/"
+                      : pathname.startsWith(item.href);
+                  return (
+                    <li key={item.href}>
+                      <SortableNavItem
+                        item={item}
+                        isActive={!!isActive}
+                        onClick={onClose}
+                        collapsed={isCollapsed}
+                      />
+                    </li>
+                  );
+                })}
+              </SortableContext>
+            </DndContext>
+          ) : (
+            orderedItems.map((item) => {
+              const isActive =
+                item.href === "/"
+                  ? pathname === "/"
+                  : pathname.startsWith(item.href);
+              return (
+                <li key={item.href}>
+                  <NavLink
+                    href={item.href}
+                    icon={item.icon}
+                    label={item.label}
+                    isActive={!!isActive}
+                    onClick={onClose}
+                    collapsed={isCollapsed}
+                  />
+                </li>
+              );
+            })
+          )}
 
           {isAdmin && (
             <>

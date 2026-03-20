@@ -15,8 +15,8 @@ function parseDatabaseUrl(url: string): mariadb.PoolConfig | string {
       password: u.password || undefined,
       database,
       connectionLimit: 5,
-      connectTimeout: 15000,
-      acquireTimeout: 20000,
+      connectTimeout: 30000,
+      acquireTimeout: 60000, // 60s – pro zápis velkých BLOB (PDF)
       allowPublicKeyRetrieval: true, // MySQL 8+ caching_sha2_password
     };
   } catch {
@@ -26,10 +26,7 @@ function parseDatabaseUrl(url: string): mariadb.PoolConfig | string {
 }
 
 function createPrismaClient() {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    throw new Error("DATABASE_URL is not set");
-  }
+  const url = process.env.DATABASE_URL ?? "mysql://localhost:3306/appintegraf";
   const poolConfig = parseDatabaseUrl(url);
   const adapter = new PrismaMariaDb(poolConfig);
   return new PrismaClient({
