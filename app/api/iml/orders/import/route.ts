@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/db";
+import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 
@@ -190,7 +190,7 @@ export async function POST(req: NextRequest) {
       }
 
       let totalSum = 0;
-      const order = await prisma.$transaction(async (tx) => {
+      const order = await prisma.$transaction(async (tx: PrismaTransactionClient) => {
         const o = await tx.iml_orders.create({
           data: {
             customer_id: customerId,

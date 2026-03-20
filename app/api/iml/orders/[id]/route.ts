@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/db";
+import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 
@@ -83,8 +83,7 @@ export async function PUT(
 
     let totalSum = 0;
 
-    type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-    await prisma.$transaction(async (tx: Tx) => {
+    await prisma.$transaction(async (tx: PrismaTransactionClient) => {
       await tx.iml_orders.update({
         where: { id },
         data: updateData as Parameters<typeof tx.iml_orders.update>[0]["data"],

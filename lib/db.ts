@@ -41,3 +41,8 @@ function createPrismaClient() {
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+
+/** Typ pro transakční klienta v prisma.$transaction(async (tx) => ...) */
+export type PrismaTransactionClient = Parameters<
+  Parameters<typeof prisma.$transaction>[0]
+>[0];

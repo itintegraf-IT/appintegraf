@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/db";
+import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { getPlanovaniRole } from "@/lib/planovani-auth";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -86,7 +86,8 @@ export async function PUT(request: NextRequest, { params }: RouteContext) {
 
     const username = (session.user as { username?: string }).username ?? session.user.name ?? session.user.email ?? "uživatel";
 
-    const block = await prisma.$transaction(async (tx) => {
+    type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+    const block = await prisma.$transaction(async (tx: Tx) => {
       const oldBlock = await tx.planovani_blocks.findUnique({ where: { id } });
 
       const updated = await tx.planovani_blocks.update({
@@ -178,7 +179,7 @@ export async function DELETE(_: NextRequest, { params }: RouteContext) {
   const username = (session.user as { username?: string }).username ?? session.user.name ?? session.user.email ?? "uživatel";
 
   try {
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: PrismaTransactionClient) => {
       const blockToDelete = await tx.planovani_blocks.findUnique({ where: { id }, select: { orderNumber: true } });
 
       await tx.planovani_audit_log.create({

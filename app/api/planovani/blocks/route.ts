@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/db";
+import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { getPlanovaniRole } from "@/lib/planovani-auth";
 
 export async function GET() {
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     const username = (session.user as { username?: string }).username ?? session.user.name ?? session.user.email ?? "uživatel";
 
-    const block = await prisma.$transaction(async (tx) => {
+    const block = await prisma.$transaction(async (tx: PrismaTransactionClient) => {
       const newBlock = await tx.planovani_blocks.create({
         data: {
           orderNumber: String(body.orderNumber),
