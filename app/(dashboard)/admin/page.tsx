@@ -12,6 +12,7 @@ import {
   GraduationCap,
   BarChart3,
   UserCog,
+  Mail,
 } from "lucide-react";
 
 export default async function AdminPage() {
@@ -70,6 +71,13 @@ export default async function AdminPage() {
           className="rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
         >
           Role
+        </Link>
+        <Link
+          href="/admin/settings/email"
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+        >
+          <Mail className="h-4 w-4" />
+          Nastavení e-mailu
         </Link>
       </div>
 

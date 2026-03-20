@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { sendCalendarApprovalEmail } from "@/lib/email";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -142,15 +143,30 @@ export async function POST(req: NextRequest) {
           status: "pending",
         },
       });
+      const notifMessage = `${creatorName} vytvořil/a událost „${String(title).trim()}“ (${eventType === "dovolena" ? "Dovolená" : "Osobní"}), která vyžaduje vaše schválení.`;
       await prisma.notifications.create({
         data: {
           user_id: deputyIdNum,
           title: "Událost čeká na schválení",
-          message: `${creatorName} vytvořil/a událost „${String(title).trim()}“ (${eventType === "dovolena" ? "Dovolená" : "Osobní"}), která vyžaduje vaše schválení.`,
+          message: notifMessage,
           type: "calendar_approval",
           link: `/calendar/${event.id}`,
         },
       });
+      const deputy = await prisma.users.findUnique({
+        where: { id: deputyIdNum },
+        select: { email: true, first_name: true, last_name: true },
+      });
+      if (deputy?.email) {
+        await sendCalendarApprovalEmail({
+          toEmail: deputy.email,
+          toName: `${deputy.first_name} ${deputy.last_name}`.trim() || "Schvalovateli",
+          subject: "Událost čeká na schválení – INTEGRAF",
+          message: notifMessage,
+          eventTitle: String(title).trim(),
+          eventId: event.id,
+        });
+      }
     }
 
     return NextResponse.json({ success: true, id: event.id });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { sendCalendarApprovalEmail } from "@/lib/email";
 
 /**
  * POST /api/calendar/[id]/approve
@@ -135,6 +136,20 @@ export async function POST(
             },
           }),
         ]);
+        const manager = await prisma.users.findUnique({
+          where: { id: managerId },
+          select: { email: true, first_name: true, last_name: true },
+        });
+        if (manager?.email) {
+          await sendCalendarApprovalEmail({
+            toEmail: manager.email,
+            toName: `${manager.first_name} ${manager.last_name}`.trim() || "Vedoucí",
+            subject: "Událost čeká na schválení – INTEGRAF",
+            message: `${deputyName} schválil/a událost „${event.title}“ od ${creatorName}. Událost čeká na vaše schválení.`,
+            eventTitle: event.title,
+            eventId: id,
+          });
+        }
       } else {
         // Žádný vedoucí → rovnou approved
         const deputyName = event.users_deputy
