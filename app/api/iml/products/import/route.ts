@@ -90,7 +90,9 @@ export async function POST(req: NextRequest) {
 
     const customers = await prisma.iml_customers.findMany({ select: { id: true, name: true } });
     type CustomerRow = (typeof customers)[number];
-    const customerByName = new Map(customers.map((c: CustomerRow) => [c.name.toLowerCase(), c.id]));
+    const customerByName = new Map<string, number>(
+      customers.map((c: CustomerRow) => [c.name.toLowerCase(), c.id])
+    );
 
     let imported = 0;
     const errors: string[] = [];
