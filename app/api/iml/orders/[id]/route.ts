@@ -83,7 +83,8 @@ export async function PUT(
 
     let totalSum = 0;
 
-    await prisma.$transaction(async (tx) => {
+    type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+    await prisma.$transaction(async (tx: Tx) => {
       await tx.iml_orders.update({
         where: { id },
         data: updateData as Parameters<typeof tx.iml_orders.update>[0]["data"],

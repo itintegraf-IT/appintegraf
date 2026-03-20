@@ -75,7 +75,8 @@ export async function POST(req: NextRequest) {
     const orderItems = Array.isArray(items) ? items : [];
     let totalSum = 0;
 
-    const order = await prisma.$transaction(async (tx) => {
+    type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+    const order = await prisma.$transaction(async (tx: Tx) => {
       const ord = await tx.iml_orders.create({
         data: {
           customer_id: customerId,
