@@ -2,6 +2,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { Tv, Plus, Eye, Pencil } from "lucide-react";
 
+export const dynamic = "force-dynamic";
+
 export default async function KioskPage() {
   const presentations = await prisma.presentations.findMany({
     where: { is_active: true },
