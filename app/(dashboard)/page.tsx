@@ -145,7 +145,7 @@ export default async function DashboardPage() {
             Notifikace ({notificationsTyped.length})
           </h2>
           <div className="space-y-2">
-            {notifications.map((n) => (
+            {notificationsTyped.map((n) => (
               <NotificationLink
                 key={n.id}
                 id={n.id}

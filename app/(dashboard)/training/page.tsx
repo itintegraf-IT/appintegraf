@@ -53,7 +53,7 @@ export default async function TrainingPage() {
             {testsTyped.length === 0 ? (
               <div className="px-4 py-8 text-center text-gray-500">Žádné testy</div>
             ) : (
-              tests.map((t) => (
+              testsTyped.map((t) => (
                 <div key={t.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
                   <div>
                     <p className="font-medium text-gray-900">{t.name}</p>

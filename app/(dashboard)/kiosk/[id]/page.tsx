@@ -18,6 +18,9 @@ export default async function KioskViewPage({
 
   if (!presentation) notFound();
 
+  type SlideRow = { id: number; file_type: string; file_path: string; title: string | null; filename: string };
+  const slidesTyped = presentation.slides as SlideRow[];
+
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -47,16 +50,16 @@ export default async function KioskViewPage({
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <p className="text-gray-600">{presentation.description ?? "-"}</p>
           <p className="mt-4 text-sm text-gray-500">
-            Snímků: {presentation.slides.length} | Přechod: {presentation.transition_effect ?? "fade"}{" "}
+            Snímků: {slidesTyped.length} | Přechod: {presentation.transition_effect ?? "fade"}{" "}
             | Délka: {presentation.display_duration}s
           </p>
         </div>
 
-        {presentation.slides.length > 0 ? (
+        {slidesTyped.length > 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">Snímky</h2>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-              {presentation.slides.map((slide, idx) => (
+              {slidesTyped.map((slide, idx) => (
                 <div
                   key={slide.id}
                   className="overflow-hidden rounded-lg border border-gray-200 bg-gray-50"
