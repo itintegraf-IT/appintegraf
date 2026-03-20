@@ -119,7 +119,8 @@ export async function POST(
       const formatCislo = (val: number) =>
         deleni3(String(val).padStart(6, "0"));
 
-      let currentRows = rows.map((r) => ({
+      type RowType = (typeof rows)[number];
+      let currentRows = rows.map((r: RowType) => ({
         ...r,
         cisloOd: r.cisloOd,
         cisloDo: r.cisloDo,
@@ -131,7 +132,7 @@ export async function POST(
       const cKrabNaPalete = String(body.cKrabNaPalete ?? "").trim() || "  ";
 
       for (let i = 0; i < cyklus; i++) {
-        const rowsBeforeIter = currentRows.map((r) => ({ ...r }));
+        const rowsBeforeIter = currentRows.map((r: RowType) => ({ ...r }));
 
         for (let k = 0; k < prod; k++) {
           const row = currentRows[k];
@@ -189,7 +190,7 @@ export async function POST(
           rowsForProtocol.length > 0
         ) {
           try {
-            const protocolRows = rowsForProtocol.map((r) => ({
+            const protocolRows = rowsForProtocol.map((r: RowType) => ({
               serie: r.serie ?? "",
               cisloOd: r.cisloOd ?? "",
               cisloDo: r.cisloDo ?? "",

@@ -65,8 +65,9 @@ export async function GET(
       pocCislic
     );
 
+    type BoxStateRow = (typeof boxStates)[number];
     const rows = Array.from({ length: prod }, (_, k) => {
-      const state = boxStates.find((s) => s.production === k + 1);
+      const state = boxStates.find((s: BoxStateRow) => s.production === k + 1);
       const def = defaultRows[k];
       const od = state?.cislo_role
         ? formatCislo(parseInt(state.cislo_role, 10), pocCislic)

@@ -44,8 +44,9 @@ export async function GET(
     const prod = jobConfig?.prod ?? 6;
     const pocCislic = 6;
 
+    type BoxStateRow = (typeof boxStates)[number];
     const rows = Array.from({ length: prod }, (_, k) => {
-      const s = boxStates.find((x) => x.production === k + 1);
+      const s = boxStates.find((x: BoxStateRow) => x.production === k + 1);
       const od = s?.cislo_role
         ? formatCislo(parseInt(s.cislo_role, 10), pocCislic)
         : "0";

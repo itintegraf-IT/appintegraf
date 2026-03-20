@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       transition_effect = String(formData.get("transition_effect") ?? "fade").trim() || "fade";
       transition_time = parseInt(String(formData.get("transition_time") ?? "5"), 10) || 5;
       display_duration = parseInt(String(formData.get("display_duration") ?? "10"), 10) || 10;
-      files = (formData.getAll("files") as File[]).filter((f) => f instanceof File && f.size > 0);
+      files = (formData.getAll("files") as File[]).filter((f: File) => f instanceof File && f.size > 0);
     } else {
       const body = await req.json();
       name = String(body.name ?? "").trim();

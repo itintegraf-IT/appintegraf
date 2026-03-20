@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       const firstSheet = wb.SheetNames[0];
       const ws = wb.Sheets[firstSheet];
       const data = XLSX.utils.sheet_to_json<string[]>(ws, { header: 1, defval: "" });
-      dataRows = (data as string[][]).slice(1).filter((r) => r.some((c) => c != null && String(c).trim()));
+      dataRows = (data as string[][]).slice(1).filter((r: string[]) => r.some((c: unknown) => c != null && String(c).trim()));
     } else {
       const text = await file.text();
       const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "CSV je prázdné nebo nemá data" }, { status: 400 });
       }
       const delimiter = lines[0].includes(";") ? ";" : ",";
-      dataRows = lines.slice(1).map((l) => parseCsvLine(l, delimiter));
+      dataRows = lines.slice(1).map((l: string) => parseCsvLine(l, delimiter));
     }
 
     if (dataRows.length === 0) {

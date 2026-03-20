@@ -32,10 +32,10 @@ function parseCsvLine(line: string, delimiter: string): string[] {
 }
 
 function parseCsv(text: string): string[][] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const lines = text.split(/\r?\n/).filter((l: string) => l.trim());
   if (lines.length === 0) return [];
   const delimiter = lines[0].includes(";") ? ";" : ",";
-  return lines.map((l) => parseCsvLine(l, delimiter));
+  return lines.map((l: string) => parseCsvLine(l, delimiter));
 }
 
 export async function POST(req: NextRequest) {
@@ -93,7 +93,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Soubor je prázdný nebo nemá data" }, { status: 400 });
     }
 
-    const dataRows = rows.slice(1).filter((r) => r.some((c) => c && String(c).trim()));
+    type RowType = string[];
+    const dataRows = rows.slice(1).filter((r: RowType) => r.some((c: string) => c && String(c).trim()));
 
     const customers = await prisma.iml_customers.findMany({ select: { id: true, name: true } });
     type CustomerRow = (typeof customers)[number];

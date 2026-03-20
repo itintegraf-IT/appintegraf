@@ -53,7 +53,7 @@ export async function POST(
       const cisloKrabice = String(body.cisloKrabice ?? body.hotKrab ?? 0);
       const rows = (body.rows as ProtocolRow[]) ?? [];
 
-      const protocolRows = rows.map((r) => ({
+      const protocolRows = rows.map((r: ProtocolRow) => ({
         serie: r.serie ?? "",
         cisloOd: r.cisloOd ?? "",
         cisloDo: r.cisloDo ?? "",
@@ -108,21 +108,22 @@ export async function POST(
     if (isIgtJob(job)) {
       const cisloZakazky = (body.cisloZakazky as string) ?? "";
       const cisloPalety = String(body.cisloPalety ?? 1);
-      const boxes = (body.boxes as Array<{
+      type BoxItem = {
         cisloKrabice: string;
         cisloPalety: string;
         serie: string;
         rows: ProtocolRow[];
-      }>) ?? [];
+      };
+      const boxes = (body.boxes as BoxItem[]) ?? [];
 
       if (type === "igt-paleta") {
         const paletaInput = {
           cisloZakazky,
           cisloPalety,
-          boxes: boxes.map((b) => ({
+          boxes: boxes.map((b: BoxItem) => ({
             cisloKrabice: b.cisloKrabice,
             cisloPalety: b.cisloPalety,
-            rows: (b.rows ?? []).map((r) => ({
+            rows: (b.rows ?? []).map((r: ProtocolRow) => ({
               serie: r.serie ?? "",
               cisloOd: r.cisloOd ?? "",
               cisloDo: r.cisloDo ?? "",
@@ -141,11 +142,11 @@ export async function POST(
 
       if (type === "igt-inkjety") {
         const inkjetyInput = {
-          boxes: boxes.map((b) => ({
+          boxes: boxes.map((b: BoxItem) => ({
             cisloKrabice: b.cisloKrabice,
             cisloPalety: b.cisloPalety,
             serie: b.serie ?? "",
-            rows: (b.rows ?? []).map((r) => ({
+            rows: (b.rows ?? []).map((r: ProtocolRow) => ({
               serie: r.serie ?? "",
               cisloOd: r.cisloOd ?? "",
               cisloDo: r.cisloDo ?? "",

@@ -56,13 +56,13 @@ export async function POST(req: NextRequest) {
     }
 
     const text = await file.text();
-    const lines = text.split(/\r?\n/).filter((l) => l.trim());
+    const lines = text.split(/\r?\n/).filter((l: string) => l.trim());
     if (lines.length < 2) {
       return NextResponse.json({ error: "CSV je prázdné nebo nemá data" }, { status: 400 });
     }
 
     const delimiter = lines[0].includes(";") ? ";" : ",";
-    const dataRows = lines.slice(1).map((l) => parseCsvLine(l, delimiter));
+    const dataRows = lines.slice(1).map((l: string) => parseCsvLine(l, delimiter));
 
     let imported = 0;
     const errors: string[] = [];
