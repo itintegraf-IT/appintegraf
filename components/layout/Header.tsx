@@ -56,7 +56,7 @@ export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={state === "pinned" ? expandToFull : onMenuClick}
+            onClick={state === "pinned" ? expandToFull : (onMenuClick ?? (() => {}))}
             className="lg:hidden rounded-lg p-2 transition-colors hover:bg-[var(--accent)]"
             style={{ color: "var(--foreground)" }}
             aria-label={state === "pinned" ? "Rozbalit menu" : "Menu"}
