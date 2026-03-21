@@ -227,8 +227,9 @@ function saveOrder(userId: string | undefined, order: string[]) {
 
 export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
-  const { collapsed, toggleCollapsed } = useSidebar();
+  const { state, collapsed, pinned, toggleCollapsed } = useSidebar();
   const isCollapsed = collapsed && !mobileOpen;
+  const isPinned = pinned && !mobileOpen;
   const userId = user?.id;
 
   const visibleItems = navItems.filter((item) => !item.module || moduleAccess[item.module]);
@@ -291,9 +292,9 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
         />
       )}
       <aside
-        className={`fixed left-0 top-14 z-50 h-[calc(100vh-3.5rem)] flex-col border-r transition-all duration-200 lg:flex ${
-          mobileOpen ? "flex translate-x-0" : "hidden -translate-x-full lg:translate-x-0"
-        } ${isCollapsed ? "w-16" : "w-56"}`}
+        className={`fixed left-0 top-14 z-50 h-[calc(100vh-3.5rem)] flex-col border-r transition-all duration-200 ${
+          isPinned ? "hidden" : mobileOpen ? "flex translate-x-0 lg:flex" : "hidden -translate-x-full lg:translate-x-0 lg:flex"
+        } ${!isPinned && (isCollapsed ? "w-16" : "w-56")}`}
         style={{
           background: "var(--sidebar)",
           borderColor: "var(--sidebar-border)",
@@ -318,17 +319,19 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
                 onClick={toggleCollapsed}
                 className="rounded-lg p-2 hover:bg-[var(--sidebar-accent)] transition-colors"
                 style={{ color: "var(--sidebar-foreground)" }}
-                aria-label={isCollapsed ? "Rozbalit menu" : "Sbalit menu"}
+                aria-label={state === "expanded" ? "Sbalit na ikony" : state === "rail" ? "Sbalit úplně" : "Rozbalit menu"}
               >
-                {isCollapsed ? (
-                  <PanelLeft className="h-5 w-5" />
-                ) : (
+                {state === "expanded" ? (
                   <PanelLeftClose className="h-5 w-5" />
+                ) : state === "rail" ? (
+                  <PanelLeftClose className="h-5 w-5" />
+                ) : (
+                  <PanelLeft className="h-5 w-5" />
                 )}
               </button>
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={8}>
-              {isCollapsed ? "Rozbalit menu" : "Sbalit na ikony"}
+              {state === "expanded" ? "Sbalit na ikony" : state === "rail" ? "Sbalit úplně" : "Rozbalit menu"}
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -437,7 +440,7 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
       </nav>
 
       <div
-        className={`flex items-center border-t p-3 ${isCollapsed ? "flex-col gap-2 justify-center" : "gap-3"}`}
+        className={`flex items-center border-t p-3 ${isCollapsed ? "flex-col gap-2 justify-center px-2" : "gap-3"}`}
         style={{ borderColor: "var(--sidebar-border)" }}
       >
         <TooltipProvider>

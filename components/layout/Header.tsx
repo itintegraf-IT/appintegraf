@@ -30,7 +30,7 @@ type HeaderProps = {
 
 export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { collapsed, toggleCollapsed } = useSidebar();
+  const { state, toggleCollapsed, expandToFull } = useSidebar();
 
   const initials = user.name
     ? user.name
@@ -56,25 +56,31 @@ export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={onMenuClick}
+            onClick={state === "pinned" ? expandToFull : onMenuClick}
             className="lg:hidden rounded-lg p-2 transition-colors hover:bg-[var(--accent)]"
             style={{ color: "var(--foreground)" }}
-            aria-label="Menu"
+            aria-label={state === "pinned" ? "Rozbalit menu" : "Menu"}
           >
-            <Menu className="h-5 w-5" />
+            {state === "pinned" ? (
+              <LayoutDashboard className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </button>
           <button
             type="button"
-            onClick={toggleCollapsed}
+            onClick={state === "pinned" ? expandToFull : toggleCollapsed}
             className="hidden lg:flex rounded-lg p-2 transition-colors hover:bg-[var(--accent)]"
             style={{ color: "var(--foreground)" }}
-            aria-label={collapsed ? "Rozbalit menu" : "Sbalit na ikony"}
-            title={collapsed ? "Rozbalit menu" : "Sbalit na ikony"}
+            aria-label={state === "expanded" ? "Sbalit na ikony" : state === "rail" ? "Sbalit úplně" : "Rozbalit menu"}
+            title={state === "expanded" ? "Sbalit na ikony" : state === "rail" ? "Sbalit úplně" : "Rozbalit menu"}
           >
-            {collapsed ? (
-              <PanelLeft className="h-5 w-5" />
-            ) : (
+            {state === "pinned" ? (
+              <LayoutDashboard className="h-5 w-5" />
+            ) : state === "expanded" ? (
               <PanelLeftClose className="h-5 w-5" />
+            ) : (
+              <PanelLeft className="h-5 w-5" />
             )}
           </button>
           <Link
