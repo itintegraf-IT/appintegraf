@@ -7,9 +7,26 @@ import { ArrowLeft } from "lucide-react";
 import {
   EQUIPMENT_ITEM_STATUS,
   isEquipmentItemStatus,
+  type EquipmentItemStatus,
 } from "@/lib/equipment-status";
 
 type Category = { id: number; name: string; code: string };
+
+type EquipmentFormState = {
+  name: string;
+  brand: string;
+  model: string;
+  serial_number: string;
+  description: string;
+  category_id: string;
+  purchase_date: string;
+  purchase_price: string;
+  supplier: string;
+  invoice_number: string;
+  status: EquipmentItemStatus;
+  location: string;
+  notes: string;
+};
 type Equipment = {
   id: number;
   name: string;
@@ -35,7 +52,7 @@ export default function EditEquipmentPage() {
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<EquipmentFormState>({
     name: "",
     brand: "",
     model: "",
@@ -173,7 +190,15 @@ export default function EditEquipmentPage() {
             <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
             <select
               value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value })}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm({
+                  ...form,
+                  status: isEquipmentItemStatus(v)
+                    ? v
+                    : EQUIPMENT_ITEM_STATUS.SKLADEM,
+                });
+              }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             >
               <option value={EQUIPMENT_ITEM_STATUS.SKLADEM}>Skladem</option>
