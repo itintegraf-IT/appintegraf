@@ -38,7 +38,7 @@ export async function GET(
   const contentType = getImageContentType(product.image_data);
   const body = Buffer.isBuffer(product.image_data) ? product.image_data : Buffer.from(product.image_data);
 
-  return new NextResponse(body, {
+  return new NextResponse(new Uint8Array(body), {
     headers: {
       "Content-Type": contentType,
       "Cache-Control": "private, max-age=3600",

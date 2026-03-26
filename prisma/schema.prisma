@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "mysql"
+  url      = env("DATABASE_URL")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -746,46 +747,54 @@ enum equipment_items_status {
 
 // ─── Modul Plánování výroby (PlanovaniVyroby) ─────────────────────────────────
 model planovani_blocks {
-  id                    Int       @id @default(autoincrement())
-  orderNumber           String    @db.VarChar(100)
-  machine               String    @db.VarChar(20)
-  startTime             DateTime  @db.DateTime(0)
-  endTime               DateTime  @db.DateTime(0)
-  type                  String    @default("ZAKAZKA") @db.VarChar(20)
-  description           String?   @db.Text
-  locked                Boolean   @default(false)
-  deadlineExpedice      DateTime? @db.DateTime(0)
-  dataStatusId          Int?
-  dataStatusLabel       String?   @db.VarChar(100)
-  dataRequiredDate      DateTime? @db.DateTime(0)
-  dataOk                Boolean   @default(false)
-  materialStatusId     Int?
-  materialStatusLabel   String?   @db.VarChar(100)
-  materialRequiredDate  DateTime? @db.DateTime(0)
-  materialOk            Boolean   @default(false)
-  barvyStatusId         Int?
-  barvyStatusLabel      String?   @db.VarChar(100)
-  lakStatusId           Int?
-  lakStatusLabel        String?   @db.VarChar(100)
-  specifikace           String?   @db.Text
-  recurrenceType        String    @default("NONE") @db.VarChar(20)
-  recurrenceParentId    Int?
-  createdAt             DateTime  @default(now()) @db.DateTime(0)
-  updatedAt             DateTime  @updatedAt @db.DateTime(0)
-  recurrenceParent      planovani_blocks?  @relation("RecurrenceChildren", fields: [recurrenceParentId], references: [id])
-  recurrenceChildren   planovani_blocks[] @relation("RecurrenceChildren")
+  id                         Int       @id @default(autoincrement())
+  orderNumber                String    @db.VarChar(100)
+  machine                    String    @db.VarChar(20)
+  startTime                  DateTime  @db.DateTime(0)
+  endTime                    DateTime  @db.DateTime(0)
+  type                       String    @default("ZAKAZKA") @db.VarChar(20)
+  blockVariant               String    @default("STANDARD") @db.VarChar(32)
+  description                String?   @db.Text
+  locked                     Boolean   @default(false)
+  deadlineExpedice           DateTime? @db.DateTime(0)
+  dataStatusId               Int?
+  dataStatusLabel            String?   @db.VarChar(100)
+  dataRequiredDate           DateTime? @db.DateTime(0)
+  dataOk                     Boolean   @default(false)
+  materialStatusId           Int?
+  materialStatusLabel        String?   @db.VarChar(100)
+  materialRequiredDate       DateTime? @db.DateTime(0)
+  materialOk                 Boolean   @default(false)
+  barvyStatusId              Int?
+  barvyStatusLabel           String?   @db.VarChar(100)
+  lakStatusId                Int?
+  lakStatusLabel             String?   @db.VarChar(100)
+  specifikace                String?   @db.Text
+  materialNote               String?   @db.Text
+  materialNoteByUsername     String?   @db.VarChar(100)
+  recurrenceType             String    @default("NONE") @db.VarChar(20)
+  recurrenceParentId         Int?
+  printCompletedAt           DateTime? @db.DateTime(0)
+  printCompletedByUserId     Int?
+  printCompletedByUsername   String?   @db.VarChar(100)
+  createdAt                  DateTime  @default(now()) @db.DateTime(0)
+  updatedAt                  DateTime  @updatedAt @db.DateTime(0)
+  recurrenceParent           planovani_blocks?  @relation("RecurrenceChildren", fields: [recurrenceParentId], references: [id])
+  recurrenceChildren         planovani_blocks[] @relation("RecurrenceChildren")
 
+  @@index([recurrenceParentId])
   @@map("planovani_blocks")
 }
 
 model planovani_codebook_options {
-  id        Int     @id @default(autoincrement())
-  category  String  @db.VarChar(20)
-  label     String  @db.VarChar(200)
-  sortOrder Int     @default(0)
-  isActive  Boolean @default(true)
-  shortCode String? @db.VarChar(20)
-  isWarning Boolean @default(false)
+  id         Int     @id @default(autoincrement())
+  category   String  @db.VarChar(20)
+  label      String  @db.VarChar(200)
+  sortOrder  Int     @default(0)
+  isActive   Boolean @default(true)
+  shortCode  String? @db.VarChar(20)
+  isWarning  Boolean @default(false)
+  badgeColor String? @db.VarChar(32)
 
   @@map("planovani_codebook_options")
 }
@@ -795,9 +804,38 @@ model planovani_company_days {
   startDate DateTime @db.DateTime(0)
   endDate   DateTime @db.DateTime(0)
   label     String   @db.VarChar(200)
+  machine   String?  @db.VarChar(20)
   createdAt DateTime @default(now()) @db.DateTime(0)
 
   @@map("planovani_company_days")
+}
+
+model planovani_machine_work_hours {
+  id        Int     @id @default(autoincrement())
+  machine   String  @db.VarChar(20)
+  dayOfWeek Int
+  startHour Int
+  endHour   Int
+  isActive  Boolean @default(true)
+
+  @@unique([machine, dayOfWeek])
+  @@index([machine])
+  @@map("planovani_machine_work_hours")
+}
+
+model planovani_machine_schedule_exceptions {
+  id        Int      @id @default(autoincrement())
+  machine   String   @db.VarChar(20)
+  date      DateTime @db.DateTime(0)
+  startHour Int
+  endHour   Int
+  isActive  Boolean  @default(true)
+  label     String?  @db.VarChar(200)
+  createdAt DateTime @default(now()) @db.DateTime(0)
+
+  @@unique([machine, date])
+  @@index([date])
+  @@map("planovani_machine_schedule_exceptions")
 }
 
 model planovani_audit_log {

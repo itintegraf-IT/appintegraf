@@ -20,10 +20,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
+        // Stejná sémantika jako kontakty / phone-list: aktivní = true nebo NULL (legacy řádky)
         const user = await prisma.users.findFirst({
           where: {
             username: username.trim(),
-            is_active: true,
+            OR: [{ is_active: true }, { is_active: null }],
           },
         });
 

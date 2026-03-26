@@ -2,10 +2,10 @@
 /**
  * Migrace dat z igvyroba (PlanovaniVyroby) do appintegraf.
  *
- * Spuštění z appintegraf-next: node migrations/planovani-igvyroba/migrate.mjs
- * Nebo: npm run migrate:planovani
+ * Spuštění: npm run migrate:planovani  |  npm run migrate:idvyroba
  *
- * Konfigurace: upravte migrations/planovani-igvyroba/config.mjs
+ * Konfigurace: .env → SOURCE_DATABASE_URL (nebo IDVYROBA_DATABASE_URL) + DATABASE_URL,
+ * případně úprava migrations/planovani-igvyroba/config.mjs (výchozí zdroj: igvyroba).
  */
 import mariadb from "mariadb";
 import config from "./config.mjs";
@@ -33,7 +33,7 @@ async function run() {
   const { source: src, target: tgt } = config;
 
   console.log("╔══════════════════════════════════════════════════════════╗");
-  console.log("║  Migrace: igvyroba → appintegraf (Plánování výroby)      ║");
+  console.log("║  Migrace: igvyroba → appintegraf (Plánování výroby)       ║");
   console.log("╚══════════════════════════════════════════════════════════╝");
   console.log("");
   console.log("📤 Zdroj:  ", src.database, "@", src.host + ":" + src.port);
@@ -49,14 +49,14 @@ async function run() {
       connectTimeout: 15000,
       allowPublicKeyRetrieval: true,
     });
-    console.log("   ✓ Připojeno ke zdroji (igvyroba)");
+    console.log("   ✓ Připojeno ke zdroji (" + src.database + ")");
 
     targetConn = await mariadb.createConnection({
       ...tgt,
       connectTimeout: 15000,
       allowPublicKeyRetrieval: true,
     });
-    console.log("   ✓ Připojeno k cíli (appintegraf)");
+    console.log("   ✓ Připojeno k cíli (" + tgt.database + ")");
     console.log("");
 
     const blockTable = await tryTable(sourceConn, SOURCE_TABLES.block);
@@ -64,7 +64,7 @@ async function run() {
     const companyTable = await tryTable(sourceConn, SOURCE_TABLES.company);
 
     if (!blockTable || !codebookTable || !companyTable) {
-      console.error("❌ Některé tabulky nebyly nalezeny v igvyroba:");
+      console.error("❌ Některé tabulky nebyly nalezeny ve zdrojové databázi:");
       if (!blockTable) console.error("   - Block / block");
       if (!codebookTable) console.error("   - CodebookOption / codebookoption");
       if (!companyTable) console.error("   - CompanyDay / companyday");

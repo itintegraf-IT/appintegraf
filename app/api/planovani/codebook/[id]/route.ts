@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getPlanovaniRole } from "@/lib/planovani-auth";
+import { parseBadgeColor } from "@/lib/badgeColors";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -16,6 +17,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
   try {
     const body = await request.json();
+    let badgeColorUpdate: { badgeColor: string | null } | undefined;
+    if (body.badgeColor !== undefined) {
+      const parsed = parseBadgeColor(body.badgeColor);
+      if ("error" in parsed) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      badgeColorUpdate = { badgeColor: parsed.color };
+    }
     const updated = await prisma.planovani_codebook_options.update({
       where: { id: numId },
       data: {
@@ -24,6 +33,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         ...(body.isActive !== undefined && { isActive: Boolean(body.isActive) }),
         ...(body.shortCode !== undefined && { shortCode: body.shortCode }),
         ...(body.sortOrder !== undefined && { sortOrder: Number(body.sortOrder) }),
+        ...badgeColorUpdate,
       },
     });
     return NextResponse.json(updated);

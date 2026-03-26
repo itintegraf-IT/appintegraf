@@ -44,4 +44,4 @@ Migrace původní PHP aplikace INTEGRAF na Next.js s App Router. Oprávnění po
 ## Databáze
 
 - Databáze `appintegraf` – introspected z existující PHP aplikace
-- Migrace dat: `npm run migrate:planovani` – přenos z igvyroba do appintegraf
+- Migrace dat plánování: `npm run migrate:idvyroba` / `migrate:planovani` – z `igvyroba` do `appintegraf`, viz `migrations/planovani-igvyroba/README.md` a `SOURCE_DATABASE_URL` v `.env`

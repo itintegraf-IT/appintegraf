@@ -92,7 +92,8 @@ export async function hasModuleAccess(
       if (perm === true) return true;
       if (typeof perm === "string") {
         const p = perm.toLowerCase();
-        if (access === "read" && ["read", "write", "admin"].includes(p)) return true;
+        const planovaniTiskar = module === "planovani" && p === "tiskar";
+        if (access === "read" && (["read", "write", "admin"].includes(p) || planovaniTiskar)) return true;
         if (access === "write" && ["write", "admin"].includes(p)) return true;
         if (access === "admin" && p === "admin") return true;
       }
@@ -282,7 +283,8 @@ function hasModuleAccessFromRoles(
       if (perm === true) return true;
       if (typeof perm === "string") {
         const p = perm.toLowerCase();
-        if (access === "read" && ["read", "write", "admin"].includes(p)) return true;
+        const planovaniTiskar = module === "planovani" && p === "tiskar";
+        if (access === "read" && (["read", "write", "admin"].includes(p) || planovaniTiskar)) return true;
         if (access === "write" && ["write", "admin"].includes(p)) return true;
         if (access === "admin" && p === "admin") return true;
       }

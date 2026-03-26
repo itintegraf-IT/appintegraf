@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getPlanovaniRole } from "@/lib/planovani-auth";
 
+const VALID_MACHINES = ["XL_105", "XL_106"] as const;
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -34,9 +36,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { startDate, endDate, label } = await req.json();
+  const { startDate, endDate, label, machine } = await req.json();
   if (!startDate || !endDate || !label) {
     return NextResponse.json({ error: "Chybí povinná pole" }, { status: 400 });
+  }
+  if (machine != null && !VALID_MACHINES.includes(machine)) {
+    return NextResponse.json({ error: "Neplatná hodnota stroje" }, { status: 400 });
   }
 
   try {
@@ -45,6 +50,7 @@ export async function POST(req: Request) {
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         label,
+        machine: machine ?? null,
       },
     });
     return NextResponse.json({

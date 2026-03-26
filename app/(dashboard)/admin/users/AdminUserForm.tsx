@@ -16,12 +16,14 @@ const AVAILABLE_MODULES = [
   { key: "iml", label: "IML", icon: Package },
 ] as const;
 
-/** Mapování UI úrovní na hodnoty v DB (auth-utils: read/write/admin) */
+/** Mapování UI úrovní na hodnoty v DB (auth-utils: read/write/admin); u plánování navíc tiskař */
 const PERMISSION_LEVELS = [
   { value: "read", label: "Viewer" },
   { value: "write", label: "Editor" },
   { value: "admin", label: "Admin" },
 ] as const;
+
+const PLANOVA_EXTRA_LEVELS = [{ value: "tiskar", label: "Tiskař" }] as const;
 
 type Role = { id: number; name: string };
 type Department = { id: number; name: string; code?: string | null };
@@ -108,24 +110,42 @@ export function AdminUserForm({ user }: { user?: User }) {
 
   const setModuleVisible = (moduleKey: string, visible: boolean) => {
     setForm((prev) => {
-      const next = { ...prev.module_access };
+      const next: ModuleAccessMap = { ...prev.module_access };
       if (visible) {
         next[moduleKey] = "read"; // výchozí Viewer
       } else {
         delete next[moduleKey];
+        if (moduleKey === "planovani") delete next.planovani_machine;
       }
       return { ...prev, module_access: next };
     });
   };
 
   const setModulePermission = (moduleKey: string, level: string) => {
-    setForm((prev) => ({
-      ...prev,
-      module_access: {
-        ...prev.module_access,
-        [moduleKey]: level,
-      },
-    }));
+    setForm((prev) => {
+      if (moduleKey === "planovani" && level === "tiskar") {
+        return {
+          ...prev,
+          module_access: {
+            ...prev.module_access,
+            planovani: "tiskar",
+            planovani_machine: prev.module_access.planovani_machine ?? "XL_105",
+          },
+        };
+      }
+      if (moduleKey === "planovani" && level !== "tiskar") {
+        const next: ModuleAccessMap = { ...prev.module_access, planovani: level };
+        delete next.planovani_machine;
+        return { ...prev, module_access: next };
+      }
+      return {
+        ...prev,
+        module_access: {
+          ...prev.module_access,
+          [moduleKey]: level,
+        },
+      };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -409,7 +429,32 @@ export function AdminUserForm({ user }: { user?: User }) {
                       {opt.label}
                     </option>
                   ))}
+                  {mod.key === "planovani" &&
+                    PLANOVA_EXTRA_LEVELS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
                 </select>
+                {mod.key === "planovani" && level === "tiskar" && (
+                  <select
+                    value={form.module_access.planovani_machine ?? "XL_105"}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        module_access: {
+                          ...prev.module_access,
+                          planovani_machine: e.target.value,
+                        },
+                      }))
+                    }
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                    title="Stroj pro zobrazení v náhledu tiskaře"
+                  >
+                    <option value="XL_105">Stroj XL 105</option>
+                    <option value="XL_106">Stroj XL 106</option>
+                  </select>
+                )}
               </div>
             );
           })}

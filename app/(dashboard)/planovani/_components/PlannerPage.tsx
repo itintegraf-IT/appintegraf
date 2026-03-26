@@ -1,8 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { signOut } from "next-auth/react";
 import TimelineGrid, { dateToY, type Block, type CompanyDay } from "./TimelineGrid";
-import { snapGroupDelta } from "@/lib/workingTime";
+import { BLOCK_VARIANTS, normalizeBlockVariant, type BlockVariant } from "@/lib/blockVariants";
+import { snapGroupDelta, snapToNextValidStart } from "@/lib/workingTime";
+import type { MachineWorkHours } from "@/lib/machineWorkHours";
+import type { MachineScheduleException } from "@/lib/machineScheduleException";
 import { Input }     from "@/components/ui/input";
 import { Textarea }  from "@/components/ui/textarea";
 import { Label }     from "@/components/ui/label";
@@ -11,10 +15,23 @@ import { Switch }    from "@/components/ui/switch";
 import { Badge }     from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import DatePickerField from "./DatePickerField";
-import JobBuilderForm, { type QueueItemPayload } from "./JobBuilderForm";
+import { Lock, Unlock, ClipboardList, Pin, Wrench, CalendarDays } from "lucide-react";
+import ThemeToggle from "./ThemeToggle";
 
 // ─── Typy ─────────────────────────────────────────────────────────────────────
+type AuditLogEntry = {
+  id: number;
+  blockId: number;
+  orderNumber: string | null;
+  userId: number;
+  username: string;
+  action: string;
+  field: string | null;
+  oldValue: string | null;
+  newValue: string | null;
+  createdAt: string;
+};
+
 type CodebookOption = {
   id: number;
   category: string;
@@ -23,12 +40,14 @@ type CodebookOption = {
   isActive: boolean;
   shortCode: string | null;
   isWarning: boolean;
+  badgeColor: string | null;
 };
 
 type QueueItem = {
   id: number;
   orderNumber: string;
   type: string;
+  blockVariant: BlockVariant;
   durationHours: number;
   description: string;
   dataStatusId: number | null;
@@ -58,21 +77,7 @@ type Toast = { id: number; message: string; type: "success" | "error" | "info" }
 
 type HistoryEntry = { undo: () => Promise<void>; redo: () => Promise<void> };
 
-type AuditLogEntry = {
-  id: number;
-  blockId: number;
-  orderNumber: string | null;
-  userId: number;
-  username: string;
-  action: string;
-  field: string | null;
-  oldValue: string | null;
-  newValue: string | null;
-  createdAt: string;
-};
-
-// ─── Push chain helper ────────────────────────────────────────────────────────
-const CHAIN_GAP_MS = 30 * 60 * 1000; // 30 min = stále "navazující"
+type OverlapResult = "resolved" | "blocked_by_lock" | "failed";
 
 // ─── Konstanty ────────────────────────────────────────────────────────────────
 const TYPE_LABELS: Record<string, string> = {
@@ -82,10 +87,17 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_BUILDER_CONFIG = {
-  ZAKAZKA:   { emoji: "📋", label: "Zakázka",        color: "#1a6bcc" },
-  REZERVACE: { emoji: "📌", label: "Rezervace",       color: "#7c3aed" },
-  UDRZBA:    { emoji: "🔧", label: "Údržba / Oprava", color: "#c0392b" },
+  ZAKAZKA:   { icon: ClipboardList, label: "Zakázka",        color: "#1a6bcc" },
+  REZERVACE: { icon: Pin,           label: "Rezervace",       color: "#7c3aed" },
+  UDRZBA:    { icon: Wrench,        label: "Údržba / Oprava", color: "#c0392b" },
 } as const;
+
+const VARIANT_CONFIG: Record<BlockVariant, { label: string; color: string }> = {
+  STANDARD:         { label: "Klasická",         color: "#3b82f6" },
+  BEZ_TECHNOLOGIE:  { label: "Bez technologie",  color: "#059669" },
+  BEZ_SACKU:        { label: "Bez sáčku",        color: "#e36414" },
+  POZASTAVENO:      { label: "Pozastaveno",       color: "#d00000" },
+};
 
 // ─── ZoomSlider ───────────────────────────────────────────────────────────────
 function ZoomSlider({ value, onChange, min = 3, max = 26 }: {
@@ -218,6 +230,148 @@ function formatDuration(hours: number): string {
 // NOTE etapa 8: pro role bez přístupu k builderu stačí nevyrenderovat handle + aside
 // — timeline s flex-1 se automaticky roztáhne na celou šířku
 
+// ─── DatePickerField ──────────────────────────────────────────────────────────
+const MONTH_NAMES_CS = ["Leden","Únor","Březen","Duben","Květen","Červen","Červenec","Srpen","Září","Říjen","Listopad","Prosinec"];
+const DAY_NAMES_CS   = ["Po","Út","St","Čt","Pá","So","Ne"];
+const navBtnStyle: React.CSSProperties = {
+  width: 28, height: 28, borderRadius: 8, border: "none",
+  background: "var(--surface-2)", color: "var(--text-muted)",
+  display: "flex", alignItems: "center", justifyContent: "center",
+  cursor: "pointer", transition: "background 100ms ease-out",
+};
+
+function DatePickerField({
+  value,
+  onChange,
+  placeholder = "Vyberte datum…",
+  asButton = false,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  asButton?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  const today = new Date();
+  const selected = value ? new Date(value + "T00:00:00") : undefined;
+  const [viewYear,  setViewYear]  = useState(() => selected?.getFullYear()  ?? today.getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => selected?.getMonth()     ?? today.getMonth());
+
+  function toStr(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }
+  function prevMonth() {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
+    else setViewMonth(m => m - 1);
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
+    else setViewMonth(m => m + 1);
+  }
+
+  // Grid Po=0 … Ne=6
+  const firstDow = (new Date(viewYear, viewMonth, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const cells: (number | null)[] = [
+    ...Array(firstDow).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const displayLabel = selected
+    ? selected.toLocaleDateString("cs-CZ", { day: "numeric", month: "numeric" })
+    : placeholder;
+
+  const CELL = 36;
+  const GAP  = 3;
+
+  const triggerBtn = (onClick?: () => void) => (
+    <button onClick={onClick} style={asButton ? {
+      height: 32, borderRadius: 6,
+      border: "1px solid var(--border)", background: "transparent",
+      color: "var(--text)", fontSize: 11, padding: "0 10px",
+      display: "flex", alignItems: "center", gap: 5,
+      cursor: "pointer", outline: "none", whiteSpace: "nowrap",
+      transition: "background 120ms ease-out",
+    } as React.CSSProperties : {
+      height: 32, width: "100%", borderRadius: 6,
+      border: "1px solid var(--border)", background: "var(--surface-2)",
+      color: selected ? "var(--text)" : "var(--text-muted)",
+      fontSize: 12, padding: "0 10px",
+      display: "flex", alignItems: "center", gap: 6,
+      cursor: "pointer", outline: "none", boxSizing: "border-box",
+      transition: "border-color 120ms ease-out",
+    } as React.CSSProperties}>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ opacity: asButton ? 0.6 : 0.4, flexShrink: 0 }}>
+        <rect x="3" y="4" width="18" height="18" rx="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      <span>{displayLabel}</span>
+    </button>
+  );
+
+  if (!mounted) return triggerBtn();
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        {triggerBtn()}
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-auto p-0 border-0" style={{ background: "var(--surface)", borderRadius: 14, boxShadow: "0 8px 32px rgba(0,0,0,0.35)" }}>
+        <div style={{ width: 7 * CELL + 6 * GAP + 32, padding: "16px 16px 12px", fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif" }}>
+
+          {/* Hlavička */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <button onClick={prevMonth} style={navBtnStyle}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--text)", letterSpacing: "-0.01em" }}>
+              {MONTH_NAMES_CS[viewMonth]} {viewYear}
+            </span>
+            <button onClick={nextMonth} style={navBtnStyle}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+          </div>
+
+          {/* Zkratky dnů */}
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL}px)`, gap: GAP, marginBottom: 4 }}>
+            {DAY_NAMES_CS.map(d => (
+              <div key={d} style={{ textAlign: "center", fontSize: 11, fontWeight: 500, color: "var(--text-muted)", paddingBottom: 4 }}>{d}</div>
+            ))}
+          </div>
+
+          {/* Dny */}
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL}px)`, gap: GAP }}>
+            {cells.map((day, i) => {
+              if (!day) return <div key={i} style={{ width: CELL, height: CELL }} />;
+              const isSelected = !!selected && selected.getDate() === day && selected.getMonth() === viewMonth && selected.getFullYear() === viewYear;
+              const isToday    = today.getDate() === day && today.getMonth() === viewMonth && today.getFullYear() === viewYear;
+              return (
+                <button key={i}
+                  onClick={() => { onChange(toStr(new Date(viewYear, viewMonth, day))); setOpen(false); }}
+                  style={{
+                    width: CELL, height: CELL, borderRadius: "50%",
+                    background: isSelected ? "#3b82f6" : isToday && !isSelected ? "rgba(59,130,246,0.15)" : "transparent",
+                    color: isSelected ? "#fff" : isToday ? "#3b82f6" : "var(--text)",
+                    border: isToday ? "1.5px solid #3b82f6" : "1.5px solid transparent",
+                    fontSize: 13, fontWeight: isSelected || isToday ? 700 : 400,
+                    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                    transition: "background 100ms ease-out",
+                  }}
+                >
+                  {day}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 // ─── BlockEdit ────────────────────────────────────────────────────────────────
 function BlockEdit({
   block,
@@ -229,6 +383,10 @@ function BlockEdit({
   canEdit = true,
   canEditData = true,
   canEditMat = true,
+  dataOpts: dataOptsProp,
+  materialOpts: materialOptsProp,
+  barvyOpts: barvyOptsProp,
+  lakOpts: lakOptsProp,
 }: {
   block: Block;
   onClose: () => void;
@@ -239,9 +397,14 @@ function BlockEdit({
   canEdit?: boolean;
   canEditData?: boolean;
   canEditMat?: boolean;
+  dataOpts?: CodebookOption[];
+  materialOpts?: CodebookOption[];
+  barvyOpts?: CodebookOption[];
+  lakOpts?: CodebookOption[];
 }) {
   const [orderNumber, setOrderNumber] = useState(block.orderNumber);
   const [type, setType]               = useState(block.type);
+  const [blockVariant, setBlockVariant] = useState<BlockVariant>(normalizeBlockVariant(block.blockVariant, block.type));
   const [description, setDescription] = useState(block.description ?? "");
   const [locked, setLocked]           = useState(block.locked);
   const [saving, setSaving]           = useState(false);
@@ -269,6 +432,7 @@ function BlockEdit({
     block.materialRequiredDate ? new Date(block.materialRequiredDate).toISOString().slice(0, 10) : ""
   );
   const [materialOk, setMaterialOk]             = useState(block.materialOk);
+  const [materialNote, setMaterialNote]         = useState(block.materialNote ?? "");
   // BARVY
   const [barvyStatusId, setBarvyStatusId] = useState<string>(block.barvyStatusId?.toString() ?? "");
 
@@ -298,25 +462,32 @@ function BlockEdit({
       .map((b) => b.id);
   }
 
-  // Číselníky
-  const [dataOpts, setDataOpts]         = useState<CodebookOption[]>([]);
-  const [materialOpts, setMaterialOpts] = useState<CodebookOption[]>([]);
-  const [barvyOpts, setBarvyOpts]       = useState<CodebookOption[]>([]);
-  const [lakOpts, setLakOpts]           = useState<CodebookOption[]>([]);
+  // Číselníky — preferujeme props z PlannerPage (single source of truth), fallback na vlastní fetch
+  const [dataOptsLocal, setDataOptsLocal]         = useState<CodebookOption[]>([]);
+  const [materialOptsLocal, setMaterialOptsLocal] = useState<CodebookOption[]>([]);
+  const [barvyOptsLocal, setBarvyOptsLocal]       = useState<CodebookOption[]>([]);
+  const [lakOptsLocal, setLakOptsLocal]           = useState<CodebookOption[]>([]);
+
+  const dataOpts     = dataOptsProp     ?? dataOptsLocal;
+  const materialOpts = materialOptsProp ?? materialOptsLocal;
+  const barvyOpts    = barvyOptsProp    ?? barvyOptsLocal;
+  const lakOpts      = lakOptsProp      ?? lakOptsLocal;
 
   useEffect(() => {
+    if (dataOptsProp) return; // props dodány — přeskočíme vlastní fetch
     Promise.all([
       fetch("/api/planovani/codebook?category=DATA").then((r) => r.json()),
       fetch("/api/planovani/codebook?category=MATERIAL").then((r) => r.json()),
       fetch("/api/planovani/codebook?category=BARVY").then((r) => r.json()),
       fetch("/api/planovani/codebook?category=LAK").then((r) => r.json()),
     ]).then(([d, m, b, l]) => {
-      setDataOpts(d);
-      setMaterialOpts(m);
-      setBarvyOpts(b);
-      setLakOpts(l);
+      setDataOptsLocal(d);
+      setMaterialOptsLocal(m);
+      setBarvyOptsLocal(b);
+      setLakOptsLocal(l);
     });
-  }, []);
+  }, [dataOptsProp]);
+
 
   function resolveLabel(opts: CodebookOption[], id: string): string | null {
     return opts.find((o) => o.id.toString() === id)?.label ?? null;
@@ -336,6 +507,7 @@ function BlockEdit({
     return {
       orderNumber: orderNumber.trim(),
       type,
+      blockVariant: type === "ZAKAZKA" ? blockVariant : "STANDARD",
       description: description.trim() || null,
       locked,
       deadlineExpedice: deadlineExpedice || null,
@@ -347,6 +519,7 @@ function BlockEdit({
       materialStatusLabel: materialStatusId ? resolveLabel(materialOpts, materialStatusId) : null,
       materialRequiredDate: materialRequiredDate || null,
       materialOk,
+      materialNote: materialNote.trim() || null,
       barvyStatusId: barvyStatusId ? parseInt(barvyStatusId) : null,
       barvyStatusLabel: barvyStatusId ? resolveLabel(barvyOpts, barvyStatusId) : null,
       lakStatusId: lakStatusId ? parseInt(lakStatusId) : null,
@@ -450,7 +623,7 @@ function BlockEdit({
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onClose} className="h-7 px-3 text-xs text-slate-400">
-          ← Zpět
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="15 18 9 12 15 6"/></svg> Zpět
         </Button>
       </div>
 
@@ -471,13 +644,32 @@ function BlockEdit({
           <SectionLabel>Typ záznamu</SectionLabel>
           <div style={{ display: "flex", gap: 6 }}>
             {(Object.entries(TYPE_BUILDER_CONFIG) as [string, typeof TYPE_BUILDER_CONFIG[keyof typeof TYPE_BUILDER_CONFIG]][]).map(([key, cfg]) => (
-              <button key={key} type="button" onClick={() => setType(key)} style={{ flex: 1, padding: "7px 4px", borderRadius: 7, border: type === key ? `1px solid ${cfg.color}` : "1px solid var(--border)", background: type === key ? `${cfg.color}22` : "var(--surface-2)", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-                <span style={{ fontSize: 14 }}>{cfg.emoji}</span>
+              <button key={key} type="button" onClick={() => { setType(key); if (key !== "ZAKAZKA") setBlockVariant("STANDARD"); }} style={{ flex: 1, padding: "7px 4px", borderRadius: 7, border: type === key ? `1px solid ${cfg.color}` : "1px solid var(--border)", background: type === key ? `${cfg.color}22` : "var(--surface-2)", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
+                <cfg.icon size={14} strokeWidth={1.5} color={type === key ? cfg.color : "var(--text-muted)"} />
                 <span style={{ fontSize: 9, fontWeight: 600, color: type === key ? cfg.color : "var(--text-muted)", textAlign: "center" }}>{cfg.label}</span>
               </button>
             ))}
           </div>
         </div>
+
+        {/* Varianta zakázky — jen pro ZAKAZKA */}
+        {type === "ZAKAZKA" && (
+          <div style={{ marginTop: 8 }}>
+            <SectionLabel>Stav zakázky</SectionLabel>
+            <div style={{ display: "flex", gap: 5 }}>
+              {(BLOCK_VARIANTS as readonly BlockVariant[]).map((v) => {
+                const cfg = VARIANT_CONFIG[v];
+                const isActive = blockVariant === v;
+                return (
+                  <button key={v} type="button" onClick={() => setBlockVariant(v)} style={{ flex: 1, padding: "6px 4px", borderRadius: 7, border: isActive ? `1px solid ${cfg.color}` : "1px solid var(--border)", background: isActive ? `${cfg.color}22` : "var(--surface-2)", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, transition: "all 0.12s" }}>
+                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: isActive ? cfg.color : "var(--border)" }} />
+                    <span style={{ fontSize: 8, fontWeight: 600, color: isActive ? cfg.color : "var(--text-muted)", textAlign: "center", lineHeight: 1.2 }}>{cfg.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Číslo zakázky + Popis — side by side */}
         <div style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -617,6 +809,12 @@ function BlockEdit({
               <SectionLabel>Specifikace</SectionLabel>
               <Textarea value={specifikace} onChange={(e) => setSpecifikace(e.target.value)} rows={2} placeholder="Speciální požadavky…" className="text-xs resize-none" />
             </div>
+
+            {/* POZNÁMKA MTZ */}
+            <div style={{ marginTop: 8, opacity: !canEditMat ? 0.45 : 1, pointerEvents: !canEditMat ? "none" : "auto" }}>
+              <SectionLabel>Poznámka materiál (MTZ)</SectionLabel>
+              <Textarea value={materialNote} onChange={(e) => setMaterialNote(e.target.value)} rows={2} placeholder="Materiál skladem od…" className="text-xs resize-none" />
+            </div>
           </div>
         )}
 
@@ -624,7 +822,7 @@ function BlockEdit({
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
           <Switch checked={locked} onCheckedChange={setLocked} />
           <Label style={{ fontSize: 11, color: locked ? "var(--brand)" : "var(--text-muted)", cursor: "pointer" }}>
-            🔒 Zamčený blok
+            <Lock size={11} strokeWidth={1.5} style={{ display: "inline-block", verticalAlign: "middle", marginRight: 4 }} />Zamčený blok
           </Label>
         </div>
 
@@ -703,11 +901,12 @@ function BlockEdit({
                   opacity: saving ? 0.7 : 1,
                   boxShadow: "0 2px 8px color-mix(in oklab, var(--brand) 28%, transparent)",
                   transition: "filter 120ms ease-out, transform 120ms ease-out, box-shadow 120ms ease-out",
+                  display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
                 }}
                 onMouseEnter={(e) => { if (!saving) (e.currentTarget as HTMLButtonElement).style.filter = "brightness(0.96)"; }}
                 onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = "none"; }}
               >
-                {saving ? "Ukládám…" : "Uložit změny →"}
+                {saving ? "Ukládám…" : <><span>Uložit změny</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg></>}
               </button>
               <Button type="button" variant="ghost" onClick={onClose} disabled={saving} className="text-slate-400 text-xs">
                 Zrušit
@@ -735,7 +934,7 @@ function BlockEdit({
 
         {/* Barva náhledu */}
         <div style={{ marginTop: 12, borderRadius: 6, padding: "8px 10px", background: `${typeCfg?.color ?? "#334155"}14`, borderLeft: `3px solid ${typeCfg?.color ?? "var(--text-muted)"}`, fontSize: 11, color: typeCfg?.color ?? "var(--text-muted)" }}>
-          {typeCfg?.emoji} {typeCfg?.label}
+          {typeCfg && <typeCfg.icon size={11} strokeWidth={1.5} style={{ display: "inline-block", verticalAlign: "middle", marginRight: 4 }} />}{typeCfg?.label}
         </div>
       </div>
     </div>
@@ -743,29 +942,6 @@ function BlockEdit({
 }
 
 // ─── BlockDetail ──────────────────────────────────────────────────────────────
-const FIELD_LABELS: Record<string, string> = {
-  dataStatusLabel: "DATA stav",
-  dataRequiredDate: "DATA datum",
-  dataOk: "DATA OK",
-  materialStatusLabel: "Materiál stav",
-  materialRequiredDate: "Materiál datum",
-  materialOk: "Materiál OK",
-  deadlineExpedice: "Expedice termín",
-};
-
-function fmtAuditVal(val: string | null, field: string | null) {
-  if (!val || val === "null") return "—";
-  if (field === "dataOk" || field === "materialOk") return val === "true" ? "✓ OK" : "✗ Ne";
-  if (val.match(/^\d{4}-\d{2}-\d{2}T/)) {
-    try {
-      return new Date(val).toLocaleDateString("cs-CZ");
-    } catch {
-      return val;
-    }
-  }
-  return val;
-}
-
 function BlockDetail({
   block,
   onClose,
@@ -781,7 +957,7 @@ function BlockDetail({
 
   useEffect(() => {
     fetch(`/api/planovani/blocks/${block.id}/audit`)
-      .then((r) => (r.ok ? r.json() : []))
+      .then((r) => r.ok ? r.json() : [])
       .then((data: AuditLogEntry[]) => setBlockHistory(data))
       .catch(() => setBlockHistory([]));
   }, [block.id]);
@@ -816,7 +992,7 @@ function BlockDetail({
           </div>
         </div>
         <Button variant="ghost" size="sm" onClick={onClose} className="h-7 px-3 text-xs text-slate-400">
-          ← Zpět
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="15 18 9 12 15 6"/></svg> Zpět
         </Button>
       </div>
 
@@ -830,13 +1006,13 @@ function BlockDetail({
               variant="secondary"
               style={{ fontSize: 10, background: `${typeCfg?.color ?? "var(--text-muted)"}22`, color: typeCfg?.color ?? "var(--text-muted)", border: `1px solid ${typeCfg?.color ?? "var(--text-muted)"}44` }}
             >
-              {typeCfg?.emoji} {TYPE_LABELS[block.type] ?? block.type}
+              {typeCfg && <typeCfg.icon size={10} strokeWidth={1.5} style={{ display: "inline-block", verticalAlign: "middle", marginRight: 3 }} />}{TYPE_LABELS[block.type] ?? block.type}
             </Badge>
           </div>
           <Row label="Začátek" value={formatDateTime(block.startTime)} />
           <Row label="Konec"   value={formatDateTime(block.endTime)} />
           <Row label="Délka"   value={durationHuman(block.startTime, block.endTime)} />
-          {block.locked && <Row label="Stav" value="🔒 Zamčeno" />}
+          {block.locked && <Row label="Stav" value="Zamčeno" />}
         </div>
 
         {block.description && (
@@ -875,40 +1051,48 @@ function BlockDetail({
             </div>
           </>
         )}
-
-        {/* Historie změn */}
-        {blockHistory.length > 0 && (
-          <div style={{ margin: "0 16px 12px", borderRadius: 8, border: "1px solid var(--border)", overflow: "hidden" }}>
-            <div style={{ padding: "5px 10px", background: "var(--surface-2)", fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-muted)" }}>
-              Historie změn
-            </div>
-            <div style={{ display: "flex", flexDirection: "column" }}>
-              {blockHistory.map((log, i) => (
-                <div key={log.id} style={{ padding: "5px 10px", borderTop: i > 0 ? "1px solid var(--border)" : undefined, display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  <div style={{ fontSize: 9, color: "var(--text-muted)", whiteSpace: "nowrap", paddingTop: 1, minWidth: 70 }}>
-                    {new Date(log.createdAt).toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit" })}{" "}
-                    {new Date(log.createdAt).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}
-                  </div>
-                  <div style={{ fontSize: 10, color: "var(--text-muted)", flex: 1 }}>
-                    <span style={{ color: "var(--text)", fontWeight: 600 }}>{log.username}</span>
-                    {log.action === "UPDATE" && log.field && (
-                      <span>
-                        {" "}
-                        · {FIELD_LABELS[log.field] ?? log.field}:{" "}
-                        <span style={{ color: "var(--text)" }}>
-                          {fmtAuditVal(log.oldValue, log.field)} → {fmtAuditVal(log.newValue, log.field)}
-                        </span>
-                      </span>
-                    )}
-                    {log.action === "CREATE" && <span style={{ color: "#22c55e" }}> · Přidána</span>}
-                    {log.action === "DELETE" && <span style={{ color: "#ef4444" }}> · Smazána</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Tisk dokončen */}
+      {block.printCompletedAt && (
+        <div style={{ margin: "0 16px 12px", borderRadius: 8, border: "1px solid rgba(34,197,94,0.3)", overflow: "hidden", background: "rgba(34,197,94,0.06)" }}>
+          <div style={{ padding: "7px 12px", display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontSize: 11, color: "#22c55e", fontWeight: 700 }}>✓ Tisk dokončen</span>
+            <span style={{ fontSize: 10, color: "var(--text-muted)", flex: 1 }}>
+              {new Date(block.printCompletedAt).toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+              {" "}
+              {new Date(block.printCompletedAt).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}
+              {block.printCompletedByUsername && ` — ${block.printCompletedByUsername}`}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Historie změn */}
+      {blockHistory.length > 0 && (
+        <div style={{ margin: "0 16px 12px", borderRadius: 8, border: "1px solid var(--border)", overflow: "hidden" }}>
+          <div style={{ padding: "5px 10px", background: "var(--surface-2)", fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+            Historie změn
+          </div>
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {blockHistory.map((log, i) => (
+              <div key={log.id} style={{ padding: "5px 10px", borderTop: i > 0 ? "1px solid var(--border)" : undefined, display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <div style={{ fontSize: 9, color: "var(--text-muted)", whiteSpace: "nowrap", paddingTop: 1, minWidth: 70 }}>
+                  {new Date(log.createdAt).toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit" })} {new Date(log.createdAt).toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" })}
+                </div>
+                <div style={{ fontSize: 10, color: "var(--text-muted)", flex: 1 }}>
+                  <span style={{ color: "var(--text)", fontWeight: 600 }}>{log.username}</span>
+                  {log.action === "UPDATE" && log.field && (
+                    <span> · {FIELD_LABELS[log.field] ?? log.field}: <span style={{ color: "var(--text)" }}>{fmtAuditVal(log.oldValue, log.field)} → {fmtAuditVal(log.newValue, log.field)}</span></span>
+                  )}
+                  {log.action === "CREATE" && <span style={{ color: "#22c55e" }}> · Přidána</span>}
+                  {log.action === "DELETE" && <span style={{ color: "#ef4444" }}> · Smazána</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Smazat */}
       <div className="px-4 py-3 border-t border-slate-800">
@@ -972,15 +1156,26 @@ function DeadlineRow({ label, value, ok, date }: { label: string; value: string;
 }
 
 // ─── InfoPanel ────────────────────────────────────────────────────────────────
-function InfoPanel({
-  logs,
-  onClose,
-  onJumpToBlock,
-}: {
-  logs: AuditLogEntry[];
-  onClose: () => void;
-  onJumpToBlock: (orderNumber: string) => void;
-}) {
+const FIELD_LABELS: Record<string, string> = {
+  dataStatusLabel: "DATA stav",
+  dataRequiredDate: "DATA datum",
+  dataOk: "DATA OK",
+  materialStatusLabel: "Materiál stav",
+  materialRequiredDate: "Materiál datum",
+  materialOk: "Materiál OK",
+  deadlineExpedice: "Expedice termín",
+};
+
+function fmtAuditVal(val: string | null, field: string | null) {
+  if (!val || val === "null") return "—";
+  if (field === "dataOk" || field === "materialOk") return val === "true" ? "✓ OK" : "✗ Ne";
+  if (val.includes("T") && val.includes("Z")) {
+    try { return new Date(val).toLocaleDateString("cs-CZ"); } catch { return val; }
+  }
+  return val;
+}
+
+function InfoPanel({ logs, onClose, onJumpToBlock }: { logs: AuditLogEntry[]; onClose: () => void; onJumpToBlock: (orderNumber: string) => void }) {
   function fmtDatetime(iso: string) {
     const d = new Date(iso);
     const today = new Date();
@@ -988,32 +1183,18 @@ function InfoPanel({
     const time = d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
     return isToday ? time : d.toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit" }) + " " + time;
   }
+  function fmtVal(val: string | null, field: string | null) {
+    return fmtAuditVal(val, field);
+  }
 
   return (
     <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--surface)", borderLeft: "1px solid var(--border)" }}>
-      <div
-        style={{
-          padding: "10px 16px",
-          background: "linear-gradient(135deg, color-mix(in oklab, var(--surface-2) 95%, transparent) 0%, var(--surface) 100%)",
-          borderBottom: "1px solid var(--border)",
-          flexShrink: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
+      <div style={{ padding: "10px 16px", background: "linear-gradient(135deg, color-mix(in oklab, var(--surface-2) 95%, transparent) 0%, var(--surface) 100%)", borderBottom: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-muted)" }}>
-            Posledních 3 dny
-          </div>
+          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-muted)" }}>Posledních 3 dny</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginTop: 2 }}>DTP + MTZ aktivita</div>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose} className="h-7 px-3 text-xs text-slate-400">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-            <polyline points="15 18 9 12 15 6" />
-          </svg>{" "}
-          Zpět
-        </Button>
+        <Button variant="ghost" size="sm" onClick={onClose} className="h-7 px-3 text-xs text-slate-400"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="15 18 9 12 15 6"/></svg> Zpět</Button>
       </div>
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "12px 16px" }}>
         {logs.length === 0 ? (
@@ -1023,10 +1204,7 @@ function InfoPanel({
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {logs.map((log) => (
-              <div
-                key={log.id}
-                style={{ padding: "8px 10px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--border)" }}
-              >
+              <div key={log.id} style={{ padding: "8px 10px", borderRadius: 8, background: "var(--surface-2)", border: "1px solid var(--border)" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
                   <span style={{ fontSize: 11, fontWeight: 600, color: "var(--text)" }}>{log.username}</span>
                   <span style={{ fontSize: 10, color: "var(--text-muted)" }}>{fmtDatetime(log.createdAt)}</span>
@@ -1034,22 +1212,8 @@ function InfoPanel({
                 <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
                   {log.orderNumber ? (
                     <button
-                      onClick={() => {
-                        onClose();
-                        onJumpToBlock(log.orderNumber!);
-                      }}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        padding: 0,
-                        color: "#3b82f6",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontSize: 11,
-                        textDecoration: "underline",
-                        textDecorationStyle: "dotted",
-                        textUnderlineOffset: 2,
-                      }}
+                      onClick={() => { onClose(); onJumpToBlock(log.orderNumber!); }}
+                      style={{ background: "none", border: "none", padding: 0, color: "#3b82f6", fontWeight: 600, cursor: "pointer", fontSize: 11, textDecoration: "underline", textDecorationStyle: "dotted", textUnderlineOffset: 2 }}
                     >
                       {log.orderNumber}
                     </button>
@@ -1057,16 +1221,13 @@ function InfoPanel({
                     <span>#{log.blockId}</span>
                   )}
                   {log.action === "UPDATE" && log.field && (
-                    <span>
-                      {" "}
-                      · {FIELD_LABELS[log.field] ?? log.field}:{" "}
-                      <span style={{ color: "var(--text)" }}>
-                        {fmtAuditVal(log.oldValue, log.field)} → {fmtAuditVal(log.newValue, log.field)}
-                      </span>
-                    </span>
+                    <span> · {FIELD_LABELS[log.field] ?? log.field}: <span style={{ color: "var(--text)" }}>{fmtVal(log.oldValue, log.field)} → {fmtVal(log.newValue, log.field)}</span></span>
                   )}
                   {log.action === "CREATE" && <span style={{ color: "#22c55e" }}> · Přidána</span>}
                   {log.action === "DELETE" && <span style={{ color: "#ef4444" }}> · Smazána</span>}
+                  {log.action === "PRINT_COMPLETE" && <span style={{ color: "#22c55e" }}> · ✓ Tisk dokončen</span>}
+                  {log.action === "PRINT_UNDO" && <span style={{ color: "#f59e0b" }}> · Vráceno hotovo</span>}
+                  {log.action === "PRINT_RESET" && <span style={{ color: "#64748b" }}> · Reset potvrzení (přeplánováno)</span>}
                 </div>
               </div>
             ))}
@@ -1078,36 +1239,116 @@ function InfoPanel({
 }
 
 // ─── ShutdownManager ──────────────────────────────────────────────────────────
+type EditState = { label: string; startDate: string; endDate: string; startHour: number; endHour: number; machine: "both" | "XL_105" | "XL_106" };
+
+function machineBadgeStyle(m?: string | null): React.CSSProperties {
+  return {
+    flexShrink: 0, fontSize: 9, fontWeight: 700, letterSpacing: "0.06em", borderRadius: 4, padding: "1px 5px",
+    background: !m ? "rgba(139,92,246,0.2)" : m === "XL_105" ? "rgba(59,130,246,0.2)" : "rgba(34,197,94,0.2)",
+    color: !m ? "#c4b5fd" : m === "XL_105" ? "#93c5fd" : "#86efac",
+    border: `1px solid ${!m ? "rgba(139,92,246,0.3)" : m === "XL_105" ? "rgba(59,130,246,0.3)" : "rgba(34,197,94,0.3)"}`,
+  };
+}
+
+function MachinePicker({ value, onChange }: { value: "both" | "XL_105" | "XL_106"; onChange: (v: "both" | "XL_105" | "XL_106") => void }) {
+  return (
+    <div style={{ display: "flex", gap: 4 }}>
+      {(["both", "XL_105", "XL_106"] as const).map((opt) => {
+        const lbl = opt === "both" ? "Oba stroje" : opt === "XL_105" ? "XL 105" : "XL 106";
+        const active = value === opt;
+        return (
+          <button key={opt} type="button" onClick={() => onChange(opt)} style={{
+            flex: 1, height: 28, borderRadius: 6, fontSize: 11, fontWeight: active ? 700 : 500,
+            border: active ? "1px solid rgba(139,92,246,0.5)" : "1px solid var(--border)",
+            background: active ? "rgba(139,92,246,0.15)" : "var(--surface-2)",
+            color: active ? "#c4b5fd" : "var(--text-muted)",
+            cursor: "pointer", transition: "all 0.12s ease-out",
+          }}>{lbl}</button>
+        );
+      })}
+    </div>
+  );
+}
+
 function ShutdownManager({
   companyDays,
   onAdd,
+  onUpdate,
   onDelete,
   onClose,
 }: {
   companyDays: CompanyDay[];
-  onAdd: (startDate: string, endDate: string, label: string) => Promise<void>;
+  onAdd: (startDate: string, endDate: string, label: string, machine: string | null) => Promise<void>;
+  onUpdate: (id: number, startDate: string, endDate: string, label: string, machine: string | null) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onClose: () => void;
 }) {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate]     = useState("");
+  const [startHour, setStartHour] = useState(0);
+  const [endHour, setEndHour]     = useState(23);
   const [label, setLabel]         = useState("");
+  const [machine, setMachine]     = useState<"both" | "XL_105" | "XL_106">("both");
   const [saving, setSaving]       = useState(false);
   const [deleting, setDeleting]   = useState<number | null>(null);
   const [error, setError]         = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+
+  const hourSelectStyle: React.CSSProperties = {
+    height: 32, borderRadius: 6, border: "1px solid var(--border)",
+    background: "var(--surface-2)", color: "var(--text)", fontSize: 11,
+    padding: "0 6px", cursor: "pointer", width: "100%",
+  };
+
+  function startEdit(cd: CompanyDay) {
+    const s = new Date(cd.startDate);
+    const e = new Date(cd.endDate);
+    setEditingId(cd.id);
+    setEditState({
+      label: cd.label,
+      startDate: cd.startDate.slice(0, 10),
+      endDate: cd.endDate.slice(0, 10),
+      startHour: s.getHours(),
+      endHour: e.getHours(),
+      machine: !cd.machine ? "both" : cd.machine === "XL_105" ? "XL_105" : "XL_106",
+    });
+  }
+
+  function cancelEdit() { setEditingId(null); setEditState(null); }
 
   async function handleAdd() {
     if (!startDate || !endDate || !label.trim()) { setError("Vyplňte všechna pole."); return; }
-    if (endDate < startDate) { setError("Konec musí být po začátku."); return; }
+    const startISO = `${startDate}T${String(startHour).padStart(2, "0")}:00:00`;
+    const endISO   = `${endDate}T${String(endHour).padStart(2, "0")}:59:59`;
+    if (endISO < startISO) { setError("Konec musí být po začátku."); return; }
     setSaving(true); setError(null);
     try {
-      await onAdd(startDate, endDate, label.trim());
-      setStartDate(""); setEndDate(""); setLabel("");
+      await onAdd(startISO, endISO, label.trim(), machine === "both" ? null : machine);
+      setStartDate(""); setEndDate(""); setLabel(""); setStartHour(0); setEndHour(23); setMachine("both");
     } catch (error) {
       console.error("Company day save failed", error);
       setError("Chyba při ukládání.");
     }
     finally { setSaving(false); }
+  }
+
+  async function handleSaveEdit(id: number) {
+    if (!editState) return;
+    if (!editState.startDate || !editState.endDate || !editState.label.trim()) { setError("Vyplňte všechna pole."); return; }
+    const startISO = `${editState.startDate}T${String(editState.startHour).padStart(2, "0")}:00:00`;
+    const endISO   = `${editState.endDate}T${String(editState.endHour).padStart(2, "0")}:59:59`;
+    if (endISO < startISO) { setError("Konec musí být po začátku."); return; }
+    setEditSaving(true); setError(null);
+    try {
+      await onUpdate(id, startISO, endISO, editState.label.trim(), editState.machine === "both" ? null : editState.machine);
+      cancelEdit();
+    } catch (err) {
+      console.error("Company day update failed", err);
+      setError("Chyba při ukládání.");
+    }
+    finally { setEditSaving(false); }
   }
 
   async function handleDelete(id: number) {
@@ -1127,7 +1368,7 @@ function ShutdownManager({
           <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-muted)" }}>Firemní dny</div>
           <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", marginTop: 2 }}>Odstávky a svátky</div>
         </div>
-        <Button variant="ghost" size="sm" onClick={onClose} className="h-7 px-3 text-xs text-slate-400">← Zpět</Button>
+        <Button variant="ghost" size="sm" onClick={onClose} className="h-7 px-3 text-xs text-slate-400"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}><polyline points="15 18 9 12 15 6"/></svg> Zpět</Button>
       </div>
 
       <div style={{ flex: 1, minHeight: 0, overflowY: "auto", padding: "16px" }}>
@@ -1142,14 +1383,34 @@ function ShutdownManager({
             <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Název</Label>
             <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Velikonoce, dovolená…" className="h-8 text-xs" />
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <div>
+            <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Stroj</Label>
+            <MachinePicker value={machine} onChange={setMachine} />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto", gap: 6, alignItems: "end" }}>
             <div>
-              <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Od</Label>
+              <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Od (datum)</Label>
               <DatePickerField value={startDate} onChange={setStartDate} placeholder="Od…" />
             </div>
             <div>
-              <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Do</Label>
+              <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Hod.</Label>
+              <select value={startHour} onChange={(e) => setStartHour(Number(e.target.value))} style={hourSelectStyle}>
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Do (datum)</Label>
               <DatePickerField value={endDate} onChange={setEndDate} placeholder="Do…" />
+            </div>
+            <div>
+              <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Hod.</Label>
+              <select value={endHour} onChange={(e) => setEndHour(Number(e.target.value))} style={hourSelectStyle}>
+                {Array.from({ length: 24 }, (_, i) => (
+                  <option key={i} value={i}>{String(i).padStart(2, "0")}:59</option>
+                ))}
+              </select>
             </div>
           </div>
           <Button
@@ -1174,24 +1435,97 @@ function ShutdownManager({
             <div style={{ fontSize: 11, color: "var(--text-muted)", textAlign: "center", padding: "12px 0" }}>Žádné záznamy</div>
           )}
           {companyDays.map((cd) => (
-            <div key={cd.id} style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(139,92,246,0.06)", border: "1px solid rgba(139,92,246,0.15)", borderRadius: 6, padding: "8px 10px" }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 11, fontWeight: 600, color: "#c4b5fd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{cd.label}</div>
-                <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-                  {new Date(cd.startDate).toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit", year: "numeric" })}
-                  {cd.startDate.slice(0, 10) !== cd.endDate.slice(0, 10) && (
-                    <> – {new Date(cd.endDate).toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit", year: "numeric" })}</>
-                  )}
+            <div key={cd.id} style={{ background: editingId === cd.id ? "rgba(139,92,246,0.1)" : "rgba(139,92,246,0.06)", border: `1px solid ${editingId === cd.id ? "rgba(139,92,246,0.35)" : "rgba(139,92,246,0.15)"}`, borderRadius: 8, overflow: "hidden" }}>
+              {/* Řádek s názvem */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "#c4b5fd", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>{cd.label}</div>
+                    <span style={machineBadgeStyle(cd.machine)}>
+                      {!cd.machine ? "OBA" : cd.machine === "XL_105" ? "XL 105" : "XL 106"}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                    {(() => {
+                      const s = new Date(cd.startDate);
+                      const e = new Date(cd.endDate);
+                      const sDate = s.toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit", year: "numeric" });
+                      const eDate = e.toLocaleDateString("cs-CZ", { day: "2-digit", month: "2-digit", year: "numeric" });
+                      const sHour = s.getHours(); const eHour = e.getHours();
+                      const wholeDay = sHour === 0 && eHour === 23;
+                      const sTime = wholeDay ? "" : ` ${String(sHour).padStart(2, "0")}:00`;
+                      const eTime = wholeDay ? "" : ` ${String(eHour).padStart(2, "0")}:59`;
+                      const sameDateStr = cd.startDate.slice(0, 10) === cd.endDate.slice(0, 10);
+                      return sameDateStr ? `${sDate}${sTime}${eTime && sTime !== eTime ? ` – ${eTime.trim()}` : ""}` : `${sDate}${sTime} – ${eDate}${eTime}`;
+                    })()}
+                  </div>
+                </div>
+                {/* Tlačítka */}
+                <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => editingId === cd.id ? cancelEdit() : startEdit(cd)}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: editingId === cd.id ? "#c4b5fd" : "var(--text-muted)", fontSize: 13, padding: "0 4px", lineHeight: 1 }}
+                    title={editingId === cd.id ? "Zrušit editaci" : "Upravit"}
+                  >
+                    {editingId === cd.id ? "✕" : "✎"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(cd.id)}
+                    disabled={deleting === cd.id}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 16, padding: "0 4px", lineHeight: 1 }}
+                    title="Smazat"
+                  >
+                    {deleting === cd.id ? "…" : "×"}
+                  </button>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(cd.id)}
-                disabled={deleting === cd.id}
-                style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 16, padding: "0 4px", lineHeight: 1 }}
-              >
-                {deleting === cd.id ? "…" : "×"}
-              </button>
+
+              {/* Inline editační formulář */}
+              {editingId === cd.id && editState && (
+                <div style={{ borderTop: "1px solid rgba(139,92,246,0.2)", padding: "10px 10px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div>
+                    <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Název</Label>
+                    <Input value={editState.label} onChange={(e) => setEditState((s) => s && ({ ...s, label: e.target.value }))} className="h-8 text-xs" />
+                  </div>
+                  <div>
+                    <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Stroj</Label>
+                    <MachinePicker value={editState.machine} onChange={(v) => setEditState((s) => s && ({ ...s, machine: v }))} />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr auto", gap: 6, alignItems: "end" }}>
+                    <div>
+                      <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Od</Label>
+                      <DatePickerField value={editState.startDate} onChange={(v) => setEditState((s) => s && ({ ...s, startDate: v }))} placeholder="Od…" />
+                    </div>
+                    <div>
+                      <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Hod.</Label>
+                      <select value={editState.startHour} onChange={(e) => setEditState((s) => s && ({ ...s, startHour: Number(e.target.value) }))} style={hourSelectStyle}>
+                        {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, "0")}:00</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Do</Label>
+                      <DatePickerField value={editState.endDate} onChange={(v) => setEditState((s) => s && ({ ...s, endDate: v }))} placeholder="Do…" />
+                    </div>
+                    <div>
+                      <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 4, display: "block" }}>Hod.</Label>
+                      <select value={editState.endHour} onChange={(e) => setEditState((s) => s && ({ ...s, endHour: Number(e.target.value) }))} style={hourSelectStyle}>
+                        {Array.from({ length: 24 }, (_, i) => <option key={i} value={i}>{String(i).padStart(2, "0")}:59</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => handleSaveEdit(cd.id)}
+                    disabled={editSaving || !editState.label.trim() || !editState.startDate || !editState.endDate}
+                    className="w-full text-xs font-semibold border border-purple-400/35 bg-purple-400/[0.06] text-purple-400 hover:bg-purple-400/[0.12] hover:text-purple-400 disabled:text-slate-600 disabled:border-slate-700 disabled:bg-transparent"
+                  >
+                    {editSaving ? "Ukládám…" : "Uložit změny"}
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -1234,7 +1568,9 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
         <div key={t.id} style={{
           display: "flex", alignItems: "center", gap: 10,
           background: "color-mix(in oklab, var(--surface) 92%, transparent)", backdropFilter: "blur(12px)",
-          border: "1px solid var(--border)",
+          borderTop: "1px solid var(--border)",
+          borderRight: "1px solid var(--border)",
+          borderBottom: "1px solid var(--border)",
           borderLeft: `3px solid ${borderColor[t.type]}`,
           borderRadius: 10, padding: "10px 14px",
           boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
@@ -1253,14 +1589,17 @@ function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id
 }
 
 // ─── PlannerPage ──────────────────────────────────────────────────────────────
-export default function PlannerPage({ initialBlocks, initialCompanyDays, currentUser }: { initialBlocks: Block[]; initialCompanyDays: CompanyDay[]; currentUser: { id: number; username: string; role: string } }) {
+export default function PlannerPage({ initialBlocks, initialCompanyDays, initialMachineWorkHours, initialMachineExceptions, currentUser }: { initialBlocks: Block[]; initialCompanyDays: CompanyDay[]; initialMachineWorkHours: MachineWorkHours[]; initialMachineExceptions: MachineScheduleException[]; currentUser: { id: number; username: string; role: string; assignedMachine?: string | null } }) {
   // Role-based permissions
   const canEdit     = ["ADMIN", "PLANOVAT"].includes(currentUser.role);
   const canEditData = canEdit || currentUser.role === "DTP";
   const canEditMat  = canEdit || currentUser.role === "MTZ";
+  const isTiskar    = currentUser.role === "TISKAR";
 
   const [blocks, setBlocks] = useState<Block[]>(initialBlocks);
   const [companyDays, setCompanyDays] = useState<CompanyDay[]>(initialCompanyDays);
+  const [machineWorkHours, setMachineWorkHours] = useState<MachineWorkHours[]>(initialMachineWorkHours);
+  const [machineExceptions, setMachineExceptions] = useState<MachineScheduleException[]>(initialMachineExceptions);
   const [showShutdowns, setShowShutdowns] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [todayAuditLogs, setTodayAuditLogs] = useState<AuditLogEntry[]>([]);
@@ -1285,6 +1624,35 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
   workingTimeLockRef.current = workingTimeLock;
   const MAX_HISTORY = 30;
 
+  // Builder form fields
+  const [orderNumber, setOrderNumber]     = useState("");
+  const [type, setType]                   = useState("ZAKAZKA");
+  const [blockVariant, setBlockVariant]   = useState<BlockVariant>("STANDARD");
+  const [durationHours, setDurationHours] = useState(1);
+  const [description, setDescription]     = useState("");
+  const [bDeadlineExpedice, setBDeadlineExpedice] = useState("");
+  const [bDataStatusId, setBDataStatusId]         = useState<string>("");
+  const [bDataRequiredDate, setBDataRequiredDate] = useState<string>("");
+  const [bMaterialStatusId, setBMaterialStatusId]         = useState<string>("");
+  const [bMaterialRequiredDate, setBMaterialRequiredDate] = useState<string>("");
+  const [bBarvyStatusId, setBBarvyStatusId]       = useState<string>("");
+  const [bLakStatusId, setBLakStatusId]           = useState<string>("");
+  const [bSpecifikace, setBSpecifikace]           = useState("");
+  const [bRecurrenceType, setBRecurrenceType]     = useState("NONE");
+  const [bRecurrenceCount, setBRecurrenceCount]   = useState(2);
+
+  // Číselníky pro builder
+  const [bDataOpts, setBDataOpts]         = useState<CodebookOption[]>([]);
+  const [bMaterialOpts, setBMaterialOpts] = useState<CodebookOption[]>([]);
+  const [bBarvyOpts, setBBarvyOpts]       = useState<CodebookOption[]>([]);
+  const [bLakOpts, setBLakOpts]           = useState<CodebookOption[]>([]);
+
+  // Lookup mapa badgeColor pro TimelineGrid — jen id → barva, fallback null = zachovat per-field výchozí
+  const badgeColorMap: Record<number, string | null> = Object.fromEntries(
+    [...bDataOpts, ...bMaterialOpts, ...bBarvyOpts, ...bLakOpts]
+      .map((o) => [o.id, o.badgeColor])
+  );
+
   // Queue
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const queueIdRef = useRef(0);
@@ -1295,17 +1663,11 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
   const [editingBlock, setEditingBlock]   = useState<Block | null>(null);
   const [copiedBlock, setCopiedBlock] = useState<Block | null>(null);
   const [selectedBlockIds, setSelectedBlockIds] = useState<Set<number>>(new Set());
-  const [lassoHintSeen, setLassoHintSeen] = useState(false);
-  useEffect(() => {
-    if (localStorage.getItem("integraf-lasso-hint-seen") === "true") setLassoHintSeen(true);
-  }, []);
-  const dismissLassoHint = useCallback(() => {
-    setLassoHintSeen(true);
-    localStorage.setItem("integraf-lasso-hint-seen", "true");
-  }, []);
   const [pushSuggestion, setPushSuggestion] = useState<PushSuggestion | null>(null);
   const blocksRef = useRef<Block[]>([]);
   blocksRef.current = blocks;
+  const selectedBlockIdsRef = useRef<Set<number>>(new Set());
+  selectedBlockIdsRef.current = selectedBlockIds;
   const [isCut, setIsCut] = useState(false);
   const [pasteTarget, setPasteTarget] = useState<{ machine: string; time: Date } | null>(null);
   const copiedBlockRef = useRef<Block | null>(null);
@@ -1314,7 +1676,11 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
   copiedBlockRef.current = copiedBlock;
   isCutRef.current = isCut;
   pasteTargetRef.current = pasteTarget;
+  const clipboardGroupRef = useRef<Block[]>([]);
+  const isGroupCutRef = useRef(false);
   const [filterText, setFilterText] = useState("");
+  const [searchMatchIndex, setSearchMatchIndex] = useState(0);
+  const [searchNoMore, setSearchNoMore] = useState(false);
   const [jumpDate, setJumpDate]     = useState("");
   const [reportDate, setReportDate] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -1325,7 +1691,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     const onScroll = () => setHeaderScrolled(el.scrollTop > 20);
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
   const [daysAhead, setDaysAhead] = useState(60);
   const [daysBack, setDaysBack]   = useState(3);
 
@@ -1357,10 +1723,6 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
   const [asideWidth, setAsideWidth] = useState(320);
   const isResizing = useRef(false);
 
-  // Job Builder popout — plovoucí okno na druhý monitor
-  const [builderPopoutOpen, setBuilderPopoutOpen] = useState(false);
-  const builderPopoutRef = useRef<Window | null>(null);
-
   useEffect(() => {
     function onMouseMove(e: MouseEvent) {
       if (!isResizing.current) return;
@@ -1380,61 +1742,25 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     };
   }, []);
 
-  // PostMessage listener — přijímá položky z Job Builderu v popup okně
+  // Načtení číselníků pro builder
   useEffect(() => {
-    function onMessage(e: MessageEvent) {
-      if (e.origin !== window.location.origin) return;
-      if (e.data?.type === "planovani:returnToPanel") {
-        builderPopoutRef.current?.close();
-        builderPopoutRef.current = null;
-        setBuilderPopoutOpen(false);
-      }
-      if (e.data?.type === "planovani:addToQueue" && e.data?.payload) {
-        const p = e.data.payload as QueueItemPayload;
-        setQueue((prev) => [
-          ...prev,
-          {
-            id: ++queueIdRef.current,
-            orderNumber: p.orderNumber,
-            type: p.type,
-            durationHours: p.durationHours,
-            description: p.description,
-            dataStatusId: p.dataStatusId,
-            dataStatusLabel: p.dataStatusLabel,
-            dataRequiredDate: p.dataRequiredDate,
-            materialStatusId: p.materialStatusId,
-            materialStatusLabel: p.materialStatusLabel,
-            materialRequiredDate: p.materialRequiredDate,
-            barvyStatusId: p.barvyStatusId,
-            barvyStatusLabel: p.barvyStatusLabel,
-            lakStatusId: p.lakStatusId,
-            lakStatusLabel: p.lakStatusLabel,
-            specifikace: p.specifikace,
-            deadlineExpedice: p.deadlineExpedice,
-            recurrenceType: p.recurrenceType,
-            recurrenceCount: p.recurrenceCount,
-          },
-        ]);
-        showToast("Přidáno do fronty", "success");
-      }
-    }
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
+    Promise.all([
+      fetch("/api/planovani/codebook?category=DATA").then((r) => r.json()),
+      fetch("/api/planovani/codebook?category=MATERIAL").then((r) => r.json()),
+      fetch("/api/planovani/codebook?category=BARVY").then((r) => r.json()),
+      fetch("/api/planovani/codebook?category=LAK").then((r) => r.json()),
+    ]).then(([d, m, b, l]) => {
+      setBDataOpts(d);
+      setBMaterialOpts(m);
+      setBBarvyOpts(b);
+      setBLakOpts(l);
+    }).catch((error) => {
+      console.error("Codebooks load failed", error);
+      showToast("Nepodařilo se načíst číselníky.", "error");
+    });
   }, []);
 
-  // Detekce zavření popup okna (při focusu hlavního okna)
-  useEffect(() => {
-    function onFocus() {
-      if (builderPopoutRef.current?.closed) {
-        setBuilderPopoutOpen(false);
-        builderPopoutRef.current = null;
-      }
-    }
-    window.addEventListener("focus", onFocus);
-    return () => window.removeEventListener("focus", onFocus);
-  }, []);
-
-  // Načtení DTP+MTZ audit logů (jen pro ADMIN + PLANOVAT)
+  // Načtení dnešních audit logů (jen pro ADMIN + PLANOVAT)
   const fetchTodayAudit = useCallback(() => {
     if (!["ADMIN", "PLANOVAT"].includes(currentUser.role)) return;
     fetch("/api/planovani/audit/today")
@@ -1444,12 +1770,12 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
       })
       .then((data: AuditLogEntry[]) => {
         setTodayAuditLogs(data);
-        const lastSeen = localStorage.getItem("planovani-audit-last-seen");
+        const lastSeen = localStorage.getItem("auditLastSeen");
         const lastSeenTime = lastSeen ? new Date(lastSeen).getTime() : 0;
         const newCount = data.filter((l) => new Date(l.createdAt).getTime() > lastSeenTime).length;
         setAuditNewCount(newCount);
       })
-      .catch(() => { /* zachovat poslední validní data */ });
+      .catch(() => { /* zachovat poslední validní data a count — neměnit stav */ });
   }, [currentUser.role]);
 
   useEffect(() => {
@@ -1458,10 +1784,66 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     return () => clearInterval(interval);
   }, [fetchTodayAudit]);
 
+  // Polling bloků každých 30 s — merge jen printCompleted* pole
+  useEffect(() => {
+    const pollBlocks = async () => {
+      try {
+        const res = await fetch("/api/planovani/blocks");
+        if (!res.ok) return;
+        const fresh: Block[] = await res.json();
+        const mergePrintCompleted = (b: Block): Block => {
+          const f = fresh.find((x) => x.id === b.id);
+          if (!f) return b;
+          return {
+            ...b,
+            printCompletedAt: f.printCompletedAt,
+            printCompletedByUserId: f.printCompletedByUserId,
+            printCompletedByUsername: f.printCompletedByUsername,
+          };
+        };
+        setBlocks((prev) => prev.map(mergePrintCompleted));
+        setSelectedBlock((sel) => sel ? mergePrintCompleted(sel) : null);
+        setEditingBlock((eb) => eb ? mergePrintCompleted(eb) : null);
+      } catch {
+        // tiché selhání — zachovat aktuální stav
+      }
+    };
+    const t = setInterval(pollBlocks, 30_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Potvrzení / vrácení tisku (pro roli TISKAR z BlockCard)
+  async function handlePrintComplete(blockId: number, completed: boolean) {
+    const optimistic = (b: Block): Block =>
+      b.id === blockId
+        ? { ...b, printCompletedAt: completed ? new Date().toISOString() : null, printCompletedByUserId: completed ? currentUser.id : null, printCompletedByUsername: completed ? currentUser.username : null }
+        : b;
+    setBlocks((prev) => prev.map(optimistic));
+    setSelectedBlock((sel) => sel ? optimistic(sel) : null);
+    try {
+      const res = await fetch(`/api/planovani/blocks/${blockId}/complete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completed }),
+      });
+      if (!res.ok) {
+        // revert — znovu načíst
+        const r = await fetch("/api/planovani/blocks");
+        if (r.ok) { const fresh: Block[] = await r.json(); setBlocks(fresh); }
+      } else {
+        const updated: Block = await res.json();
+        setBlocks((prev) => prev.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
+      }
+    } catch (e) {
+      console.error("Print complete failed", e);
+      showToast("Potvrzení tisku se nepodařilo uložit.", "error");
+    }
+  }
+
   function handleOpenInfoPanel() {
     setShowInfoPanel(true);
     fetchTodayAudit();
-    localStorage.setItem("planovani-audit-last-seen", new Date().toISOString());
+    localStorage.setItem("auditLastSeen", new Date().toISOString());
     setAuditNewCount(0);
   }
 
@@ -1472,7 +1854,8 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     if (match) setSelectedBlock(match);
   }
 
-  const viewStart = startOfDay(addDays(new Date(), -daysBack));
+  const effectiveDaysBack = isTiskar ? 1 : daysBack;
+  const viewStart = startOfDay(addDays(new Date(), -effectiveDaysBack));
 
   // "Přejít na" blok mimo rozsah — ref pro čekající scroll po změně daysBack
   const pendingScrollMs = useRef<number | null>(null);
@@ -1496,13 +1879,56 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
   // Bloky mimo rozsah (v minulosti) odpovídající aktuálnímu hledání
   const outOfRangeBlocks = filterText.trim()
     ? blocks
-        .filter(b =>
-          b.orderNumber.toLowerCase().includes(filterText.trim().toLowerCase()) &&
-          new Date(b.startTime) < viewStart
-        )
+        .filter(b => {
+          const q = filterText.trim().toLowerCase();
+          const matches = [b.orderNumber, b.description, b.specifikace].some(f => f?.toLowerCase().includes(q));
+          return matches && new Date(b.startTime) < viewStart;
+        })
         .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime())
     : [];
   const nearestOutOfRange = outOfRangeBlocks[0] ?? null;
+
+  // Všechny bloky odpovídající hledání, seřazené podle startTime
+  const searchMatches = filterText.trim()
+    ? blocks
+        .filter(b => {
+          const q = filterText.trim().toLowerCase();
+          return [b.orderNumber, b.description, b.specifikace].some(f => f?.toLowerCase().includes(q));
+        })
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+    : [];
+
+  function handleSearchEnter() {
+    if (!filterText.trim()) return;
+    if (searchMatches.length === 0) {
+      setSearchNoMore(true);
+      setTimeout(() => setSearchNoMore(false), 2500);
+      return;
+    }
+    const idx = searchMatchIndex % searchMatches.length;
+    const block = searchMatches[idx];
+    const isOutOfRange = new Date(block.startTime) < viewStart;
+    if (isOutOfRange) {
+      handleJumpToOutOfRange(block);
+    } else {
+      const y = dateToY(new Date(block.startTime), viewStart, slotHeight);
+      scrollRef.current?.scrollTo({ top: Math.max(0, y - 200), behavior: "smooth" });
+      setSelectedBlock(block);
+    }
+    const nextIdx = searchMatchIndex + 1;
+    if (nextIdx >= searchMatches.length) {
+      setSearchMatchIndex(0);
+      setSearchNoMore(true);
+      setTimeout(() => setSearchNoMore(false), 2500);
+    } else {
+      setSearchMatchIndex(nextIdx);
+      setSearchNoMore(false);
+    }
+  }
+
+  async function handleLogout() {
+    await signOut({ callbackUrl: "/login" });
+  }
 
   function handleScrollToNow() {
     const y = dateToY(new Date(), viewStart, slotHeight);
@@ -1528,7 +1954,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
   //  1. Překryv dozadu (přesunutý blok narazí na předchozí) → snap dopředu
   //  2. Překryv dopředu → auto-push navazující bloky
   // excludeIds = bloky které mají být při kontrole přeskočeny (přesouvané bloky ve skupině)
-  async function autoResolveOverlap(movedBlock: Block, excludeIds: Set<number> = new Set([movedBlock.id]), prevBlock?: Block) {
+  async function autoResolveOverlap(movedBlock: Block, excludeIds: Set<number> = new Set([movedBlock.id]), prevBlock?: Block, deleteBlockOnConflict = false): Promise<OverlapResult> {
     const duration = new Date(movedBlock.endTime).getTime() - new Date(movedBlock.startTime).getTime();
     const otherBlocks = blocksRef.current.filter(b => !excludeIds.has(b.id));
     const sameMachine = otherBlocks
@@ -1537,8 +1963,27 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
 
     let current = movedBlock;
 
-    // Helper: vrátit blok zpět na původní pozici
-    async function revertMovedBlock() {
+    // Helper: vrátit blok zpět na původní pozici (nebo smazat pokud je nový a deleteBlockOnConflict)
+    async function revertMovedBlock(): Promise<OverlapResult> {
+      if (deleteBlockOnConflict && !prevBlock) {
+        // Nový blok — smazat místo revert
+        let deleteOk = false;
+        try {
+          const delRes = await fetch(`/api/planovani/blocks/${current.id}`, { method: "DELETE" });
+          deleteOk = delRes.ok;
+        } catch {
+          deleteOk = false;
+        }
+        if (!deleteOk) {
+          // DELETE selhalo — blok zůstává v DB; caller odstraní item z fronty (prevence duplicit)
+          showToast("Blok koliduje se zamknutým blokem a nepodařilo se ho smazat — zkontroluj timeline.", "error");
+          return "failed";
+        }
+        setBlocks(prev => prev.filter(b => b.id !== current.id));
+        setSelectedBlock(sel => sel?.id === current.id ? null : sel);
+        showToast("Blok nelze umístit — koliduje se zamknutým blokem.", "error");
+        return "blocked_by_lock";
+      }
       const orig = prevBlock ?? movedBlock;
       try {
         const res = await fetch(`/api/planovani/blocks/${current.id}`, {
@@ -1550,11 +1995,15 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
           const reverted = await res.json() as Block;
           setBlocks(prev => prev.map(b => b.id === reverted.id ? reverted : b));
           setSelectedBlock(sel => sel?.id === reverted.id ? reverted : sel);
+        } else {
+          return "failed";
         }
       } catch (error) {
         console.error("Revert moved block failed", error);
         showToast("Nepodařilo se vrátit blok na původní pozici.", "error");
+        return "failed";
       }
+      return "blocked_by_lock";
     }
 
     // ── Krok 1: Překryv dozadu ────────────────────────────────────────────────
@@ -1573,10 +2022,13 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
         if (res.ok) {
           current = await res.json() as Block;
           setBlocks(prev => prev.map(b => b.id === current.id ? current : b));
+        } else {
+          return "failed";
         }
       } catch (error) {
         console.error("Backward overlap correction failed", error);
         showToast("Nepodařilo se opravit překryv bloku.", "error");
+        return "failed";
       }
     }
 
@@ -1586,15 +2038,15 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     const firstFollowing = sameMachine.find(b =>
       new Date(b.startTime).getTime() >= curStart && new Date(b.startTime).getTime() < curEnd
     );
-    if (!firstFollowing) return;
+    if (!firstFollowing) return "resolved";
 
     const shiftMs = curEnd - new Date(firstFollowing.startTime).getTime();
-    if (shiftMs <= 0) return;
+    if (shiftMs <= 0) return "resolved";
 
     if (firstFollowing.locked) {
-      await revertMovedBlock();
-      setPushSuggestion({ chain: [], shiftMs, blockedByLock: true, lockedBlock: firstFollowing });
-      return;
+      const result = await revertMovedBlock();
+      if (!deleteBlockOnConflict) setPushSuggestion({ chain: [], shiftMs, blockedByLock: true, lockedBlock: firstFollowing });
+      return result;
     }
 
     const chain: Block[] = [firstFollowing];
@@ -1606,7 +2058,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
       const next = sameMachine.find(b =>
         !chain.find(c => c.id === b.id) &&
         new Date(b.startTime).getTime() >= cursorEnd - 60_000 &&
-        new Date(b.startTime).getTime() <= cursorEnd + CHAIN_GAP_MS
+        new Date(b.startTime).getTime() < cursorEnd + shiftMs
       );
       if (!next) break;
       if (next.locked) {
@@ -1623,7 +2075,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
       chain.push(next);
     }
 
-    // Zkontrolovat, zda posunutý chain nepřekryje locked blok mimo chain gap
+    // Zkontrolovat, zda posunutý chain nepřekryje locked blok mimo chain
     if (!blockedByLocked) {
       const lockedOnMachine = sameMachine.filter(b => b.locked && !chain.find(c => c.id === b.id));
       for (const b of chain) {
@@ -1641,19 +2093,21 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     }
 
     if (blockedByLocked) {
-      await revertMovedBlock();
-      setPushSuggestion({ chain, shiftMs, blockedByLock: true, lockedBlock: lockedBlockRef });
-      return;
+      const result = await revertMovedBlock();
+      if (!deleteBlockOnConflict) setPushSuggestion({ chain, shiftMs, blockedByLock: true, lockedBlock: lockedBlockRef });
+      return result;
     }
 
-    if (chain.length === 0) return;
+    if (chain.length === 0) return "resolved";
 
     // Pokud je zamknutý pracovní čas, snapneme push chain přes blokované časy
     let effectiveShiftMs = shiftMs;
     if (workingTimeLockRef.current) {
       const { deltaMs } = snapGroupDelta(
         chain.map(b => ({ machine: b.machine, originalStart: new Date(b.startTime), originalEnd: new Date(b.endTime) })),
-        shiftMs
+        shiftMs,
+        machineWorkHours,
+        machineExceptions
       );
       effectiveShiftMs = deltaMs;
     }
@@ -1667,7 +2121,10 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
             method: "PUT",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ startTime: newStart.toISOString(), endTime: newEnd.toISOString() }),
-          }).then(r => r.json() as Promise<Block>);
+          }).then(r => {
+            if (!r.ok) throw new Error(`Chain push HTTP ${r.status}`);
+            return r.json() as Promise<Block>;
+          });
         })
       );
       setBlocks(prev => prev.map(b => (results as Block[]).find(r => r.id === b.id) ?? b));
@@ -1681,7 +2138,10 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     } catch (error) {
       console.error("Auto-push chain update failed", error);
       showToast("Nepodařilo se automaticky posunout navazující bloky.", "error");
+      return "failed";
     }
+
+    return "resolved";
   }
 
   function handleBlockUpdate(updated: Block, addToHistory = false) {
@@ -1720,28 +2180,38 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
   async function handleMultiBlockUpdate(updates: { id: number; startTime: Date; endTime: Date; machine: string }[]) {
     const originals = new Map(updates.map(u => [u.id, blocksRef.current.find(b => b.id === u.id)]));
     try {
-      const results = await Promise.all(
-        updates.map((u) =>
-          fetch(`/api/planovani/blocks/${u.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ startTime: u.startTime.toISOString(), endTime: u.endTime.toISOString(), machine: u.machine }),
-          }).then((r) => r.json() as Promise<Block>)
-        )
-      );
-      setBlocks((prev) => prev.map((b) => (results as Block[]).find((r) => r.id === b.id) ?? b));
+      const batchRes = await fetch("/api/planovani/blocks/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          updates: updates.map((u) => ({
+            id: u.id,
+            startTime: u.startTime.toISOString(),
+            endTime: u.endTime.toISOString(),
+            machine: u.machine,
+          })),
+        }),
+      });
+      if (!batchRes.ok) {
+        const err = await batchRes.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? "Chyba serveru");
+      }
+      const results: Block[] = await batchRes.json();
+      setBlocks((prev) => prev.map((b) => results.find((r) => r.id === b.id) ?? b));
 
       const prevSnaps = updates.map(u => { const o = originals.get(u.id); return o ? { id: u.id, startTime: o.startTime, endTime: o.endTime, machine: o.machine } : null; }).filter(Boolean) as { id: number; startTime: string; endTime: string; machine: string }[];
       const nextSnaps = updates.map(u => ({ id: u.id, startTime: u.startTime.toISOString(), endTime: u.endTime.toISOString(), machine: u.machine }));
       if (prevSnaps.length > 0) {
         undoStack.current.push({
           undo: async () => {
-            const res = await Promise.all(prevSnaps.map(p => fetch(`/api/planovani/blocks/${p.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ startTime: p.startTime, endTime: p.endTime, machine: p.machine }) }).then(r => r.ok ? r.json() as Promise<Block> : null)));
-            setBlocks(prev => prev.map(b => (res as (Block | null)[]).find(r => r?.id === b.id) ?? b));
+            const r = await fetch("/api/planovani/blocks/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ updates: prevSnaps }) });
+            if (!r.ok) { const err = await r.json().catch(() => ({})) as { error?: string }; throw new Error(err.error ?? "Chyba serveru"); }
+            const res: Block[] = await r.json(); setBlocks(prev => prev.map(b => res.find(x => x.id === b.id) ?? b));
           },
           redo: async () => {
-            const res = await Promise.all(nextSnaps.map(n => fetch(`/api/planovani/blocks/${n.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ startTime: n.startTime, endTime: n.endTime, machine: n.machine }) }).then(r => r.ok ? r.json() as Promise<Block> : null)));
-            setBlocks(prev => prev.map(b => (res as (Block | null)[]).find(r => r?.id === b.id) ?? b));
+            const r = await fetch("/api/planovani/blocks/batch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ updates: nextSnaps }) });
+            if (!r.ok) { const err = await r.json().catch(() => ({})) as { error?: string }; throw new Error(err.error ?? "Chyba serveru"); }
+            const res: Block[] = await r.json(); setBlocks(prev => prev.map(b => res.find(x => x.id === b.id) ?? b));
           },
         });
         if (undoStack.current.length > MAX_HISTORY) undoStack.current.shift();
@@ -1751,7 +2221,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
       }
 
       const excludeIds = new Set(updates.map(u => u.id));
-      for (const moved of results as Block[]) {
+      for (const moved of results) {
         await autoResolveOverlap(moved, excludeIds, originals.get(moved.id));
       }
     } catch (error) {
@@ -1768,12 +2238,80 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     );
   }
 
+  async function deleteSingleBlockWithUndo(block: Block) {
+    const res = await fetch(`/api/planovani/blocks/${block.id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Chyba serveru");
+
+    setBlocks((prev) => prev.filter((b) => b.id !== block.id));
+    setSelectedBlock(null);
+    setEditingBlock(null);
+
+    // Undo jen pro standalone bloky — série mají komplexní parent/child vztahy
+    if (block.recurrenceType !== "NONE" || block.recurrenceParentId !== null) return;
+
+    let restoredId: number | null = null;
+
+    const payload = {
+      orderNumber: block.orderNumber,
+      machine: block.machine,
+      startTime: block.startTime,
+      endTime: block.endTime,
+      type: block.type,
+      blockVariant: block.blockVariant,
+      description: block.description,
+      locked: block.locked,
+      deadlineExpedice: block.deadlineExpedice,
+      dataStatusId: block.dataStatusId,
+      dataStatusLabel: block.dataStatusLabel,
+      dataRequiredDate: block.dataRequiredDate,
+      dataOk: block.dataOk,
+      materialStatusId: block.materialStatusId,
+      materialStatusLabel: block.materialStatusLabel,
+      materialRequiredDate: block.materialRequiredDate,
+      materialOk: block.materialOk,
+      barvyStatusId: block.barvyStatusId,
+      barvyStatusLabel: block.barvyStatusLabel,
+      lakStatusId: block.lakStatusId,
+      lakStatusLabel: block.lakStatusLabel,
+      specifikace: block.specifikace,
+      materialNote: block.materialNote,
+      recurrenceType: "NONE",
+    };
+
+    undoStack.current = undoStack.current.slice(-MAX_HISTORY + 1);
+    undoStack.current.push({
+      undo: async () => {
+        const r = await fetch("/api/planovani/blocks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!r.ok) throw new Error("Chyba serveru");
+        const newBlock: Block = await r.json();
+        restoredId = newBlock.id;
+        handleBlockCreate(newBlock);
+        setSelectedBlock(newBlock);
+      },
+      redo: async () => {
+        if (restoredId === null) throw new Error("Žádný obnovený blok");
+        const r = await fetch(`/api/planovani/blocks/${restoredId}`, { method: "DELETE" });
+        if (!r.ok) throw new Error("Chyba serveru");
+        const rid = restoredId;
+        restoredId = null;
+        setBlocks((prev) => prev.filter((b) => b.id !== rid));
+        setSelectedBlock(null);
+      },
+    });
+    redoStack.current = [];
+    setCanUndo(true);
+    setCanRedo(false);
+  }
+
   async function handleDeleteBlock(id: number) {
+    const block = blocks.find((b) => b.id === id);
+    if (!block) return;
     try {
-      const res = await fetch(`/api/planovani/blocks/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Chyba serveru");
-      setBlocks((prev) => prev.filter((b) => b.id !== id));
-      setSelectedBlock(null);
+      await deleteSingleBlockWithUndo(block);
     } catch (error) {
       console.error("Block delete failed", error);
       showToast("Chyba při mazání bloku.", "error");
@@ -1781,6 +2319,21 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
   }
 
   async function handleDeleteAll(ids: number[]) {
+    // Single delete — s undo podporou
+    if (ids.length === 1) {
+      const block = blocks.find((b) => b.id === ids[0]);
+      if (block) {
+        try {
+          await deleteSingleBlockWithUndo(block);
+        } catch (error) {
+          console.error("Block delete failed", error);
+          showToast("Chyba při mazání bloku.", "error");
+        }
+        return;
+      }
+    }
+
+    // Multi delete (série) — bez undo
     try {
       await Promise.all(ids.map((id) => fetch(`/api/planovani/blocks/${id}`, { method: "DELETE" })));
       setBlocks((prev) => prev.filter((b) => !ids.includes(b.id)));
@@ -1819,21 +2372,76 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     }
   }
 
-  async function handleAddCompanyDay(startDate: string, endDate: string, label: string) {
+  async function handleAddCompanyDay(startDate: string, endDate: string, label: string, machine: string | null) {
     const res = await fetch("/api/planovani/company-days", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ startDate, endDate, label }),
+      body: JSON.stringify({ startDate, endDate, label, machine }),
     });
     if (!res.ok) throw new Error("Chyba serveru");
     const created: CompanyDay = await res.json();
     setCompanyDays((prev) => [...prev, created].sort((a, b) => a.startDate.localeCompare(b.startDate)));
   }
 
+  async function handleUpdateCompanyDay(id: number, startDate: string, endDate: string, label: string, machine: string | null) {
+    const res = await fetch(`/api/planovani/company-days/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ startDate, endDate, label, machine }),
+    });
+    if (!res.ok) throw new Error("Chyba serveru");
+    const updated: CompanyDay = await res.json();
+    setCompanyDays((prev) => prev.map((d) => d.id === id ? updated : d).sort((a, b) => a.startDate.localeCompare(b.startDate)));
+  }
+
   async function handleDeleteCompanyDay(id: number) {
     const res = await fetch(`/api/planovani/company-days/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error("Chyba serveru");
     setCompanyDays((prev) => prev.filter((d) => d.id !== id));
+  }
+
+  function handleAddToQueue() {
+    if (!orderNumber.trim()) return;
+    const findLabel = (opts: CodebookOption[], id: string) =>
+      opts.find((o) => String(o.id) === id)?.label ?? null;
+    setQueue((prev) => [
+      ...prev,
+      {
+        id: ++queueIdRef.current,
+        orderNumber: orderNumber.trim(),
+        type,
+        blockVariant: type === "ZAKAZKA" ? blockVariant : "STANDARD",
+        durationHours,
+        description: description.trim(),
+        dataStatusId: bDataStatusId ? Number(bDataStatusId) : null,
+        dataStatusLabel: findLabel(bDataOpts, bDataStatusId),
+        dataRequiredDate: bDataRequiredDate || null,
+        materialStatusId: bMaterialStatusId ? Number(bMaterialStatusId) : null,
+        materialStatusLabel: findLabel(bMaterialOpts, bMaterialStatusId),
+        materialRequiredDate: bMaterialRequiredDate || null,
+        barvyStatusId: bBarvyStatusId ? Number(bBarvyStatusId) : null,
+        barvyStatusLabel: findLabel(bBarvyOpts, bBarvyStatusId),
+        lakStatusId: bLakStatusId ? Number(bLakStatusId) : null,
+        lakStatusLabel: findLabel(bLakOpts, bLakStatusId),
+        specifikace: bSpecifikace,
+        deadlineExpedice: bDeadlineExpedice,
+        recurrenceType: bRecurrenceType,
+        recurrenceCount: bRecurrenceType !== "NONE" ? bRecurrenceCount : 1,
+      },
+    ]);
+    setOrderNumber("");
+    setDescription("");
+    setBDataStatusId("");
+    setBDataRequiredDate("");
+    setBMaterialStatusId("");
+    setBMaterialRequiredDate("");
+    setBBarvyStatusId("");
+    setBLakStatusId("");
+    setBSpecifikace("");
+    setBDeadlineExpedice("");
+    setBRecurrenceType("NONE");
+    setBRecurrenceCount(2);
+    setBlockVariant("STANDARD");
   }
 
   function addRecurrenceInterval(date: Date, type: string): Date {
@@ -1844,10 +2452,43 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     return d;
   }
 
-  async function handleQueueDrop(itemId: number, machine: string, startTime: Date) {
+  async function handleExceptionUpsert(machine: string, date: Date, startHour: number, endHour: number, isActive: boolean) {
+    try {
+      const res = await fetch("/api/planovani/machine-exceptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Datum posíláme jako YYYY-MM-DD lokálního (CZ) kalendářního dne — bez UTC posunu
+        body: JSON.stringify({ machine, date: `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`, startHour, endHour, isActive }),
+      });
+      if (!res.ok) { showToast("Nepodařilo se uložit výjimku.", "error"); return; }
+      const exc: MachineScheduleException = await res.json();
+      setMachineExceptions((prev) => {
+        const filtered = prev.filter((e) => !(e.machine === exc.machine && e.date.slice(0, 10) === exc.date.slice(0, 10)));
+        return [...filtered, exc];
+      });
+    } catch {
+      showToast("Chyba při ukládání výjimky.", "error");
+    }
+  }
+
+  async function handleExceptionDelete(id: number) {
+    try {
+      const res = await fetch(`/api/planovani/machine-exceptions/${id}`, { method: "DELETE" });
+      if (!res.ok) { showToast("Nepodařilo se smazat výjimku.", "error"); return; }
+      setMachineExceptions((prev) => prev.filter((e) => e.id !== id));
+    } catch {
+      showToast("Chyba při mazání výjimky.", "error");
+    }
+  }
+
+  async function handleQueueDrop(itemId: number, machine: string, rawStartTime: Date) {
     const item = queue.find((q) => q.id === itemId);
     if (!item) return;
     const durationMs = item.durationHours * 60 * 60 * 1000;
+    // Snap na pracovní dobu pokud je zamknutý pracovní čas
+    const startTime = workingTimeLockRef.current
+      ? snapToNextValidStart(machine, rawStartTime, durationMs, machineWorkHours, machineExceptions)
+      : rawStartTime;
     const rType = item.recurrenceType ?? "NONE";
     const rCount = rType !== "NONE" ? Math.max(1, item.recurrenceCount ?? 1) : 1;
 
@@ -1855,6 +2496,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
       orderNumber: item.orderNumber,
       machine,
       type: item.type,
+      blockVariant: item.blockVariant,
       description: item.description || null,
       dataStatusId: item.dataStatusId,
       dataStatusLabel: item.dataStatusLabel,
@@ -1879,9 +2521,27 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...baseBody, startTime: startTime.toISOString(), endTime: firstEnd.toISOString() }),
       });
-      if (!res1.ok) throw new Error("Chyba serveru");
+      if (!res1.ok) {
+        const err = await res1.json().catch(() => ({})) as { error?: string };
+        throw new Error(err.error ?? "Chyba serveru");
+      }
       const parentBlock: Block = await res1.json();
       handleBlockCreate(parentBlock);
+
+      // Vyřešit případný overlap nového bloku s existujícími
+      const overlapResult = await autoResolveOverlap(parentBlock, new Set([parentBlock.id]), undefined, true);
+      if (overlapResult === "blocked_by_lock") {
+        // Blok byl smazán (kolidoval se zamknutým), item zůstane ve frontě
+        setDraggingQueueItem(null);
+        return;
+      }
+      if (overlapResult === "failed") {
+        // POST proběhl, blok existuje v DB/UI, ale overlap resolution selhala
+        setQueue((prev) => prev.filter((q) => q.id !== itemId));
+        setDraggingQueueItem(null);
+        showToast("Blok byl vytvořen, ale nepodařilo se automaticky vyřešit překryv — zkontroluj pozici na timeline.", "info");
+        return;
+      }
 
       // Vytvořit children bloky (pokud opakování > 1)
       if (rType !== "NONE" && rCount > 1) {
@@ -1913,6 +2573,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     } catch (error) {
       console.error("Queue drop block creation failed", error);
       showToast("Chyba při vytváření bloku.", "error");
+      setDraggingQueueItem(null);
     }
   }
 
@@ -1926,7 +2587,10 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     const target = pasteTargetRef.current;
     if (!src || !target) return;
     const durationMs = new Date(src.endTime).getTime() - new Date(src.startTime).getTime();
-    const newStart = target.time;
+    const rawStart = target.time;
+    const newStart = workingTimeLockRef.current
+      ? snapToNextValidStart(target.machine, rawStart, durationMs, machineWorkHours, machineExceptions)
+      : rawStart;
     const newEnd = new Date(newStart.getTime() + durationMs);
     try {
       const res = await fetch("/api/planovani/blocks", {
@@ -1936,6 +2600,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
           orderNumber: src.orderNumber,
           machine: target.machine,
           type: src.type,
+          blockVariant: src.blockVariant,
           startTime: newStart.toISOString(),
           endTime: newEnd.toISOString(),
           description: src.description,
@@ -1972,12 +2637,99 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     }
   }
 
+  async function handleGroupPaste() {
+    const group = clipboardGroupRef.current;
+    const target = pasteTargetRef.current;
+    if (!group.length || !target) return;
+    // Anchor = nejstarší startTime ve skupině
+    const anchorMs = Math.min(...group.map((b) => new Date(b.startTime).getTime()));
+    const pasteMs = target.time.getTime();
+
+    // POST všechny bloky sekvenčně — při prvním selhání se zastaví a žádný lokální stav se nezmění
+    const created: Block[] = [];
+    try {
+      for (const src of group) {
+        const offsetMs = new Date(src.startTime).getTime() - anchorMs;
+        const durationMs = new Date(src.endTime).getTime() - new Date(src.startTime).getTime();
+        const newStart = new Date(pasteMs + offsetMs);
+        const newEnd = new Date(newStart.getTime() + durationMs);
+        const res = await fetch("/api/planovani/blocks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            orderNumber: src.orderNumber, machine: target.machine, type: src.type, blockVariant: src.blockVariant,
+            startTime: newStart.toISOString(), endTime: newEnd.toISOString(),
+            description: src.description, locked: false,
+            deadlineExpedice: src.deadlineExpedice,
+            dataStatusId: src.dataStatusId, dataStatusLabel: src.dataStatusLabel, dataRequiredDate: src.dataRequiredDate, dataOk: src.dataOk,
+            materialStatusId: src.materialStatusId, materialStatusLabel: src.materialStatusLabel, materialRequiredDate: src.materialRequiredDate, materialOk: src.materialOk,
+            barvyStatusId: src.barvyStatusId, barvyStatusLabel: src.barvyStatusLabel,
+            lakStatusId: src.lakStatusId, lakStatusLabel: src.lakStatusLabel,
+            specifikace: src.specifikace,
+          }),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        created.push(await res.json() as Block);
+      }
+    } catch (err) {
+      console.error("Group paste failed", err);
+      // Rollback: smaž bloky, které se stihly vytvořit před selháním
+      if (created.length > 0) {
+        const rollbackResults = await Promise.allSettled(
+          created.map((b) => fetch(`/api/planovani/blocks/${b.id}`, { method: "DELETE" }).then((r) => {
+            if (!r.ok) throw new Error(`Rollback DELETE ${b.id} HTTP ${r.status}`);
+          }))
+        );
+        const rollbackFailed = rollbackResults.filter((r) => r.status === "rejected");
+        if (rollbackFailed.length > 0) {
+          console.error("Group paste rollback partial failure", rollbackFailed);
+          // allSettled zachovává pořadí — blok na indexu i odpovídá rollbackResults[i]
+          const survivingBlocks = created.filter((_, i) => rollbackResults[i].status === "rejected");
+          survivingBlocks.forEach((b) => handleBlockCreate(b));
+          showToast(`Chyba vložení — ${survivingBlocks.length} blok(ů) zůstal(y) v DB. Zkontroluj timeline.`, "error");
+          return;
+        }
+      }
+      showToast("Chyba při vložení skupiny — žádné bloky nebyly přidány.", "error");
+      return;
+    }
+
+    // Všechny POST proběhly úspěšně — přidej do lokálního stavu
+    created.forEach((b) => handleBlockCreate(b));
+
+    if (isGroupCutRef.current) {
+      // DELETE originálů — kontroluj .ok, sb er selhání
+      const deleteResults = await Promise.allSettled(
+        group.map((src) => fetch(`/api/planovani/blocks/${src.id}`, { method: "DELETE" }).then((r) => {
+          if (!r.ok) throw new Error(`DELETE ${src.id} HTTP ${r.status}`);
+        }))
+      );
+      const failedDeletes = deleteResults.filter((r) => r.status === "rejected");
+      if (failedDeletes.length > 0) {
+        console.error("Group cut: some DELETEs failed", failedDeletes);
+        showToast("Bloky byly zkopírovány, ale původní se nepodařilo smazat.", "error");
+      } else {
+        setBlocks((prev) => prev.filter((b) => !group.some((g) => g.id === b.id)));
+        setSelectedBlockIds(new Set());
+        clipboardGroupRef.current = [];
+        isGroupCutRef.current = false;
+      }
+    }
+  }
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement).tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.key === "Escape") {
         setSelectedBlockIds(new Set());
+        return;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedBlockIdsRef.current.size > 0) {
+        e.preventDefault();
+        const ids = [...selectedBlockIdsRef.current];
+        setSelectedBlockIds(new Set());
+        handleDeleteAll(ids);
         return;
       }
       if ((e.key === "Delete" || e.key === "Backspace") && selectedBlock) {
@@ -1990,7 +2742,9 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
         e.preventDefault();
         const entry = undoStack.current.pop();
         if (entry) {
-          void entry.undo().then(() => { redoStack.current.push(entry); setCanUndo(undoStack.current.length > 0); setCanRedo(true); showToast("Vráceno zpět", "info"); });
+          entry.undo()
+            .then(() => { redoStack.current.push(entry); setCanUndo(undoStack.current.length > 0); setCanRedo(true); showToast("Vráceno zpět", "info"); })
+            .catch((err: unknown) => { undoStack.current.push(entry); setCanUndo(true); console.error("Undo failed", err); showToast("Vrácení zpět selhalo.", "error"); });
         }
         return;
       }
@@ -1998,10 +2752,31 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
         e.preventDefault();
         const entry = redoStack.current.pop();
         if (entry) {
-          void entry.redo().then(() => { undoStack.current.push(entry); setCanUndo(true); setCanRedo(redoStack.current.length > 0); showToast("Znovu provedeno", "info"); });
+          entry.redo()
+            .then(() => { undoStack.current.push(entry); setCanUndo(true); setCanRedo(redoStack.current.length > 0); showToast("Znovu provedeno", "info"); })
+            .catch((err: unknown) => { redoStack.current.push(entry); setCanRedo(true); console.error("Redo failed", err); showToast("Znovu provedení selhalo.", "error"); });
         }
         return;
       }
+      // Priorita: skupinové operace, pokud je vybráno více bloků lasem
+      if (e.key === "c" && selectedBlockIdsRef.current.size > 0) {
+        e.preventDefault();
+        clipboardGroupRef.current = blocksRef.current.filter((b) => selectedBlockIdsRef.current.has(b.id));
+        isGroupCutRef.current = false;
+        return;
+      }
+      if (e.key === "x" && selectedBlockIdsRef.current.size > 0) {
+        e.preventDefault();
+        clipboardGroupRef.current = blocksRef.current.filter((b) => selectedBlockIdsRef.current.has(b.id));
+        isGroupCutRef.current = true;
+        return;
+      }
+      if (e.key === "v" && clipboardGroupRef.current.length > 0 && pasteTargetRef.current) {
+        e.preventDefault();
+        void handleGroupPaste();
+        return;
+      }
+      // Fallback: jednoblokové operace
       if (e.key === "c" && selectedBlock) {
         e.preventDefault();
         setCopiedBlock(selectedBlock);
@@ -2021,10 +2796,37 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
     return () => window.removeEventListener("keydown", handler);
   }, [selectedBlock]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const typeConfig = TYPE_BUILDER_CONFIG[type as keyof typeof TYPE_BUILDER_CONFIG];
+
   return (
     <main style={{ height: "100vh", overflow: "hidden", display: "flex", flexDirection: "column" }} className="bg-background text-foreground">
-      {/* ── Header ── */}
-      <header className="flex-shrink-0 px-4 py-2 flex items-center gap-4" style={{
+      {/* ── Header (TISKAR — minimální pruh) ── */}
+      {isTiskar && (
+        <header className="flex-shrink-0 px-4 py-2 flex items-center gap-3" style={{
+          borderBottom: "1px solid var(--border)",
+          background: "var(--surface)",
+        }}>
+          <img src="/logo.png" alt="Integraf" style={{ height: 24, width: "auto", objectFit: "contain", flexShrink: 0 }} />
+          <div style={{ width: 1, height: 16, background: "var(--border)", flexShrink: 0 }} />
+          <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            {currentUser.username}
+            <span style={{ marginLeft: 5, fontSize: 10, background: "var(--surface-2)", borderRadius: 4, padding: "1px 5px", color: "var(--text-muted)" }}>
+              TISKAŘ
+            </span>
+          </span>
+          <div style={{ flex: 1 }} />
+          <Button variant="outline" size="sm" onClick={handleScrollToNow} className="h-8 text-xs theme-transition-fast" style={{ borderColor: "var(--border)", background: "var(--surface-2)", color: "var(--text-muted)" }}>
+            Dnes
+          </Button>
+          <ThemeToggle />
+          <button onClick={handleLogout} style={{ padding: "3px 10px", fontSize: 11, borderRadius: 6, background: "transparent", border: "1px solid var(--border)", color: "var(--text-muted)", cursor: "pointer" }}>
+            Odhlásit
+          </button>
+        </header>
+      )}
+
+      {/* ── Header (ostatní role — plný) ── */}
+      {!isTiskar && <header className="flex-shrink-0 px-4 py-2 flex items-center gap-4" style={{
           borderBottom: `1px solid ${headerScrolled ? "color-mix(in oklab, var(--border) 100%, transparent)" : "color-mix(in oklab, var(--border) 70%, transparent)"}`,
           background: headerScrolled ? "color-mix(in oklab, var(--surface) 95%, transparent)" : "color-mix(in oklab, var(--surface) 72%, transparent)",
           backdropFilter: headerScrolled ? "blur(24px) saturate(180%)" : "blur(8px)",
@@ -2037,14 +2839,40 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
         </div>
 
         <div className="flex items-center gap-2 ml-4 flex-1">
-          <Input
-            type="text"
-            value={filterText}
-            onChange={(e) => setFilterText(e.target.value)}
-            placeholder="Hledat zakázku…"
-            className="h-8 text-xs w-40 theme-transition-fast"
-            style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)" }}
-          />
+          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+            <Input
+              type="text"
+              value={filterText}
+              onChange={(e) => { setFilterText(e.target.value); setSearchMatchIndex(0); setSearchNoMore(false); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { e.preventDefault(); handleSearchEnter(); }
+                if (e.key === "Escape") { setFilterText(""); setSelectedBlock(null); setSearchMatchIndex(0); setSearchNoMore(false); }
+              }}
+              placeholder="Hledat zakázku…"
+              className="h-8 text-xs w-40 theme-transition-fast"
+              style={{ background: "var(--surface-2)", borderColor: "var(--border)", color: "var(--text)", paddingRight: filterText ? 22 : undefined }}
+            />
+            {filterText && (
+              <button
+                onClick={() => { setFilterText(""); setSelectedBlock(null); setSearchMatchIndex(0); setSearchNoMore(false); }}
+                style={{ position: "absolute", right: 6, background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 0, lineHeight: 1, fontSize: 14, display: "flex", alignItems: "center" }}
+                title="Zrušit filtr (Esc)"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          {filterText && (
+            <span style={{ fontSize: 11, whiteSpace: "nowrap", color: searchNoMore ? "#f59e0b" : "var(--text-muted)" }}>
+              {searchNoMore
+                ? "Žádný další výsledek"
+                : searchMatches.length > 0
+                  ? searchMatchIndex === 0
+                    ? `${searchMatches.length} shod — Enter`
+                    : `${searchMatchIndex} / ${searchMatches.length}`
+                  : "Žádná shoda"}
+            </span>
+          )}
           <div style={{ width: 150 }}>
             <DatePickerField
               value={jumpDate}
@@ -2101,31 +2929,19 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
               </button>
             ))}
           </div>
-          {nearestOutOfRange && (
-            <button onClick={() => handleJumpToOutOfRange(nearestOutOfRange)} style={{
-              display: "flex", alignItems: "center", gap: 4,
-              padding: "2px 8px", fontSize: 11, borderRadius: 5,
-              background: "color-mix(in oklab, var(--brand) 8%, transparent)",
-              border: "1px solid color-mix(in oklab, var(--brand) 25%, transparent)",
-              color: "var(--brand)", cursor: "pointer",
-              transition: "all 120ms ease-out", whiteSpace: "nowrap",
-            }}>
-              ↑ {nearestOutOfRange.orderNumber} v minulosti{outOfRangeBlocks.length > 1 ? ` (+${outOfRangeBlocks.length - 1})` : ""} — přejít
-            </button>
-          )}
         </div>
 
         <div className="ml-auto flex items-center gap-3 text-[11px]" style={{ color: "var(--text-muted)" }}>
           {canEdit && (
             <div style={{ display: "flex", gap: 2 }}>
               <button
-                onClick={() => { const entry = undoStack.current.pop(); if (entry) void entry.undo().then(() => { redoStack.current.push(entry); setCanUndo(undoStack.current.length > 0); setCanRedo(true); showToast("Vráceno zpět", "info"); }); }}
+                onClick={() => { const entry = undoStack.current.pop(); if (entry) entry.undo().then(() => { redoStack.current.push(entry); setCanUndo(undoStack.current.length > 0); setCanRedo(true); showToast("Vráceno zpět", "info"); }).catch((err: unknown) => { undoStack.current.push(entry); setCanUndo(true); console.error("Undo failed", err); showToast("Vrácení zpět selhalo.", "error"); }); }}
                 disabled={!canUndo}
                 title="Vrátit zpět (Ctrl+Z)"
                 style={{ padding: "2px 7px", fontSize: 13, borderRadius: 5, background: "transparent", border: `1px solid ${canUndo ? "var(--border)" : "color-mix(in oklab, var(--border) 50%, transparent)"}`, color: canUndo ? "var(--text-muted)" : "color-mix(in oklab, var(--text-muted) 45%, transparent)", cursor: canUndo ? "pointer" : "default", transition: "all 120ms ease-out", lineHeight: 1.4 }}
               >↩</button>
               <button
-                onClick={() => { const entry = redoStack.current.pop(); if (entry) void entry.redo().then(() => { undoStack.current.push(entry); setCanUndo(true); setCanRedo(redoStack.current.length > 0); showToast("Znovu provedeno", "info"); }); }}
+                onClick={() => { const entry = redoStack.current.pop(); if (entry) entry.redo().then(() => { undoStack.current.push(entry); setCanUndo(true); setCanRedo(redoStack.current.length > 0); showToast("Znovu provedeno", "info"); }).catch((err: unknown) => { redoStack.current.push(entry); setCanRedo(true); console.error("Redo failed", err); showToast("Znovu provedení selhalo.", "error"); }); }}
                 disabled={!canRedo}
                 title="Znovu provést (Ctrl+Shift+Z)"
                 style={{ padding: "2px 7px", fontSize: 13, borderRadius: 5, background: "transparent", border: `1px solid ${canRedo ? "var(--border)" : "color-mix(in oklab, var(--border) 50%, transparent)"}`, color: canRedo ? "var(--text-muted)" : "color-mix(in oklab, var(--text-muted) 45%, transparent)", cursor: canRedo ? "pointer" : "default", transition: "all 120ms ease-out", lineHeight: 1.4 }}
@@ -2140,24 +2956,8 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
                   color: workingTimeLock ? "#fb923c" : "var(--text-muted)",
                   cursor: "pointer", transition: "all 120ms ease-out",
                 }}
-              >{workingTimeLock ? "🔒" : "🔓"}</button>
+              >{workingTimeLock ? <Lock size={14} strokeWidth={1.5} /> : <Unlock size={14} strokeWidth={1.5} />}</button>
             </div>
-          )}
-          {canEdit && builderPopoutOpen && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                builderPopoutRef.current?.close();
-                builderPopoutRef.current = null;
-                setBuilderPopoutOpen(false);
-              }}
-              className="h-8 text-xs"
-              style={{ borderColor: "var(--border)", background: "var(--surface-2)", color: "var(--text)" }}
-              title="Vrátit Job Builder do panelu"
-            >
-              ← Job Builder{queue.length > 0 && <span style={{ marginLeft: 6, background: "var(--brand)", color: "var(--brand-contrast)", borderRadius: 10, padding: "0 6px", fontSize: 10 }}>{queue.length}</span>}
-            </Button>
           )}
           {canEdit && (
             <Button
@@ -2166,7 +2966,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
               onClick={() => setShowShutdowns((s) => !s)}
               className="h-8 text-xs border-slate-700"
             >
-              📅 Odstávky
+              <CalendarDays size={12} strokeWidth={1.5} style={{ display: "inline-block", verticalAlign: "middle", marginRight: 5 }} />Odstávky
             </Button>
           )}
           <DatePickerField
@@ -2191,68 +2991,78 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
           </span>
           {currentUser.role === "ADMIN" && (
             <a
-              href="/planovani/admin"
+              href="/admin"
               style={{
                 padding: "3px 10px", fontSize: 11, borderRadius: 6,
-                background: "color-mix(in oklab, var(--brand) 10%, transparent)", border: "1px solid color-mix(in oklab, var(--brand) 20%, transparent)",
-                color: "var(--brand)", cursor: "pointer", textDecoration: "none",
+                background: "rgba(59,130,246,0.12)", border: "1px solid rgba(59,130,246,0.35)",
+                color: "#3b82f6", cursor: "pointer", textDecoration: "none",
                 whiteSpace: "nowrap", transition: "all 120ms ease-out",
               }}
             >
               Správa
             </a>
           )}
+          <ThemeToggle />
           {["ADMIN", "PLANOVAT"].includes(currentUser.role) && (
             <div style={{ position: "relative" }}>
               <button
                 onClick={handleOpenInfoPanel}
                 title="Aktivita DTP a MTZ za poslední 3 dny"
                 style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 7,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  width: 28, height: 28, borderRadius: 7, display: "flex", alignItems: "center", justifyContent: "center",
                   background: showInfoPanel ? "rgba(59,130,246,0.14)" : "transparent",
                   border: `1px solid ${showInfoPanel ? "rgba(59,130,246,0.35)" : "var(--border)"}`,
                   color: showInfoPanel ? "#3b82f6" : "var(--text-muted)",
-                  cursor: "pointer",
-                  transition: "all 120ms ease-out",
-                  padding: 0,
+                  cursor: "pointer", transition: "all 120ms ease-out", padding: 0,
                 }}
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
               </button>
               {auditNewCount > 0 && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: -3,
-                    right: -3,
-                    width: 14,
-                    height: 14,
-                    borderRadius: "50%",
-                    background: "#ef4444",
-                    color: "#fff",
-                    fontSize: 8,
-                    fontWeight: 700,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    pointerEvents: "none",
-                  }}
-                >
+                <span style={{
+                  position: "absolute", top: -3, right: -3,
+                  width: 14, height: 14, borderRadius: "50%",
+                  background: "#ef4444", color: "#fff",
+                  fontSize: 8, fontWeight: 700,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  pointerEvents: "none",
+                }}>
                   {auditNewCount > 9 ? "9+" : auditNewCount}
                 </span>
               )}
             </div>
           )}
+          {/* Lasso badge — počet vybraných bloků nebo hint pro nové uživatele */}
+          {canEdit && selectedBlockIds.size > 0 && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "4px 10px", borderRadius: 8,
+              background: "color-mix(in oklab, var(--accent) 12%, var(--surface))",
+              border: "1px solid color-mix(in oklab, var(--accent) 35%, var(--border))",
+              color: "var(--accent)", fontSize: 12, whiteSpace: "nowrap",
+            }}>
+              <span style={{ fontWeight: 600 }}>Vybráno {selectedBlockIds.size} {selectedBlockIds.size === 1 ? "blok" : selectedBlockIds.size < 5 ? "bloky" : "bloků"}</span>
+              <button
+                onClick={() => setSelectedBlockIds(new Set())}
+                style={{ background: "none", border: "none", color: "var(--accent)", cursor: "pointer", padding: "0 2px", fontSize: 14, lineHeight: 1, opacity: 0.7, display: "flex", alignItems: "center" }}
+              >×</button>
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            style={{
+              padding: "3px 10px", fontSize: 11, borderRadius: 6,
+              background: "transparent", border: "1px solid var(--border)",
+              color: "var(--text-muted)", cursor: "pointer", transition: "all 120ms ease-out",
+            }}
+          >
+            Odhlásit
+          </button>
         </div>
-      </header>
+      </header>}
 
       {/* ── Tělo ── */}
       <section style={{ display: "flex", flex: 1, minHeight: 0, overflow: "hidden" }}>
@@ -2268,6 +3078,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
             scrollRef={scrollRef}
             queueDragItem={draggingQueueItem}
             onQueueDrop={handleQueueDrop}
+            onQueueDragCancel={() => setDraggingQueueItem(null)}
             onBlockDoubleClick={handleBlockDoubleClick}
             companyDays={companyDays}
             slotHeight={slotHeight}
@@ -2275,28 +3086,35 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
             onGridClick={(machine, time) => setPasteTarget({ machine, time })}
             onBlockCopy={(block) => { setCopiedBlock(block); setIsCut(false); }}
             selectedBlockIds={selectedBlockIds}
-            onMultiSelect={(ids) => { setSelectedBlockIds(ids); if (ids.size > 0) dismissLassoHint(); }}
+            onMultiSelect={(ids) => { setSelectedBlockIds(ids); }}
             onMultiBlockUpdate={handleMultiBlockUpdate}
-            daysAhead={daysAhead}
-            daysBack={daysBack}
+            daysAhead={isTiskar ? 2 : daysAhead}
+            daysBack={effectiveDaysBack}
             canEdit={canEdit}
+            canEditData={canEditData}
+            canEditMat={canEditMat}
             onError={(msg) => showToast(msg, "error")}
             workingTimeLock={workingTimeLock}
+            badgeColorMap={badgeColorMap}
+            machineWorkHours={machineWorkHours}
+            machineExceptions={machineExceptions}
+            onExceptionUpsert={canEdit ? handleExceptionUpsert : undefined}
+            onExceptionDelete={canEdit ? handleExceptionDelete : undefined}
+            isTiskar={isTiskar}
+            onPrintComplete={isTiskar || canEdit ? handlePrintComplete : undefined}
+            assignedMachine={isTiskar ? (currentUser.assignedMachine ?? null) : null}
           />
         </div>
 
-        {/* Resize handle + aside — skryté když je Job Builder v popup a nic jiného není otevřeno */}
-        {canEdit && !(builderPopoutOpen && !showInfoPanel && !showShutdowns && !editingBlock && !selectedBlock) && (
-          <ResizeHandle onMouseDown={() => {
-            isResizing.current = true;
-            document.body.style.cursor = "col-resize";
-            document.body.style.userSelect = "none";
-          }} />
-        )}
+        {/* Resize handle + aside — skryté pro non-editors (NOTE etapa 8) */}
+        {canEdit && <ResizeHandle onMouseDown={() => {
+          isResizing.current = true;
+          document.body.style.cursor = "col-resize";
+          document.body.style.userSelect = "none";
+        }} />}
 
-        {/* PRAVÁ ČÁST – detail nebo builder (skrytá když Job Builder v popup) */}
-        {canEdit && !(builderPopoutOpen && !showInfoPanel && !showShutdowns && !editingBlock && !selectedBlock) && (
-        <aside style={{ width: asideWidth, flexShrink: 0, position: "relative", zIndex: 10, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        {/* PRAVÁ ČÁST – detail nebo builder */}
+        {canEdit && <aside style={{ width: asideWidth, flexShrink: 0, position: "relative", zIndex: 10, overflow: "hidden", display: "flex", flexDirection: "column" }}>
           {showInfoPanel ? (
             <InfoPanel
               logs={todayAuditLogs}
@@ -2307,6 +3125,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
             <ShutdownManager
               companyDays={companyDays}
               onAdd={handleAddCompanyDay}
+              onUpdate={handleUpdateCompanyDay}
               onDelete={handleDeleteCompanyDay}
               onClose={() => setShowShutdowns(false)}
             />
@@ -2322,83 +3141,416 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
               canEdit={canEdit}
               canEditData={canEditData}
               canEditMat={canEditMat}
+              dataOpts={bDataOpts}
+              materialOpts={bMaterialOpts}
+              barvyOpts={bBarvyOpts}
+              lakOpts={bLakOpts}
             />
           ) : selectedBlock ? (
             <BlockDetail block={selectedBlock} onClose={() => setSelectedBlock(null)} onDelete={handleDeleteBlock} />
           ) : (
             <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", background: "var(--surface)", borderLeft: "1px solid var(--border)" }}>
-              {builderPopoutOpen ? (
-                /* Kompaktní režim — Job Builder je v popup okně */
-                <div style={{ padding: "16px", flex: 1, display: "flex", flexDirection: "column", gap: 12 }}>
-                  <div style={{ padding: "12px 16px", background: "linear-gradient(135deg, color-mix(in oklab, var(--surface-2) 95%, transparent) 0%, var(--surface) 100%)", borderRadius: 8, border: "1px solid var(--border)" }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--text)", marginBottom: 4 }}>Job Builder v okně</div>
-                    <div style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 10 }}>Formulář je otevřen v samostatném okně. Přetáhni ho na druhý monitor.</div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => builderPopoutRef.current?.focus()}
-                      className="h-8 text-xs"
-                      style={{ borderColor: "var(--border)", background: "var(--surface-2)", color: "var(--text)" }}
-                    >
-                      Zaměřit okno
-                    </Button>
+
+              {/* ── Builder Header ── */}
+              <div style={{ padding: "12px 16px", background: "linear-gradient(135deg, color-mix(in oklab, var(--surface-2) 95%, transparent) 0%, var(--surface) 100%)", borderBottom: "1px solid var(--border)", flexShrink: 0 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #e53e3e 0%, #dd6b20 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#fff", fontSize: 15, flexShrink: 0 }}>
+                    J
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", lineHeight: 1.2 }}>Job Builder</div>
+                    <div style={{ fontSize: 9, color: "var(--text-muted)", letterSpacing: "0.15em", textTransform: "uppercase", marginTop: 2 }}>Integraf</div>
                   </div>
                 </div>
-              ) : (
-                <>
-                  {/* Header s tlačítkem pro otevření v novém okně */}
-                  <div style={{ padding: "12px 16px", background: "linear-gradient(135deg, color-mix(in oklab, var(--surface-2) 95%, transparent) 0%, var(--surface) 100%)", borderBottom: "1px solid var(--border)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #e53e3e 0%, #dd6b20 100%)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 900, color: "#fff", fontSize: 15, flexShrink: 0 }}>J</div>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "var(--text)", lineHeight: 1.2 }}>Job Builder</div>
-                        <div style={{ fontSize: 9, color: "var(--text-muted)", letterSpacing: "0.15em", textTransform: "uppercase", marginTop: 2 }}>Integraf</div>
+              </div>
+
+              {/* ── Formulář ── */}
+              <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column" }}>
+                <div style={{ padding: "0 16px", flex: 1 }}>
+
+                  {/* ── Typ záznamu ── */}
+                  <div style={{ paddingTop: 16, paddingBottom: 14, borderBottom: type === "ZAKAZKA" ? "none" : "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 10 }}>
+                      Typ záznamu
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {(Object.entries(TYPE_BUILDER_CONFIG) as [string, typeof TYPE_BUILDER_CONFIG[keyof typeof TYPE_BUILDER_CONFIG]][]).map(([key, cfg]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => { setType(key); if (key !== "ZAKAZKA") setBlockVariant("STANDARD"); }}
+                          style={{
+                            flex: 1, padding: "8px 4px", borderRadius: 7,
+                            border: type === key ? `1px solid ${cfg.color}` : "1px solid var(--border)",
+                            background: type === key ? `${cfg.color}22` : "var(--surface-2)",
+                            cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          <cfg.icon size={16} strokeWidth={1.5} color={type === key ? cfg.color : "var(--text-muted)"} />
+                          <span style={{ fontSize: 9, fontWeight: 600, color: type === key ? cfg.color : "var(--text-muted)", letterSpacing: "0.04em", lineHeight: 1.3, textAlign: "center" }}>
+                            {cfg.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* ── Stav zakázky — jen pro ZAKAZKA ── */}
+                  {type === "ZAKAZKA" && (
+                    <div style={{ paddingTop: 10, paddingBottom: 14, borderBottom: "1px solid var(--border)" }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>
+                        Stav zakázky
+                      </div>
+                      <div style={{ display: "flex", gap: 5 }}>
+                        {(BLOCK_VARIANTS as readonly BlockVariant[]).map((v) => {
+                          const cfg = VARIANT_CONFIG[v];
+                          const isActive = blockVariant === v;
+                          return (
+                            <button
+                              key={v}
+                              type="button"
+                              onClick={() => setBlockVariant(v)}
+                              style={{
+                                flex: 1, padding: "7px 4px", borderRadius: 7,
+                                border: isActive ? `1px solid ${cfg.color}` : "1px solid var(--border)",
+                                background: isActive ? `${cfg.color}22` : "var(--surface-2)",
+                                cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                                transition: "all 0.12s",
+                              }}
+                            >
+                              <div style={{ width: 8, height: 8, borderRadius: "50%", background: isActive ? cfg.color : "var(--border)" }} />
+                              <span style={{ fontSize: 8, fontWeight: 600, color: isActive ? cfg.color : "var(--text-muted)", lineHeight: 1.2, textAlign: "center" }}>
+                                {cfg.label}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const w = window.open("/planovani/builder", "JobBuilder", "width=440,height=900,scrollbars=yes,resizable=yes");
-                        if (w) { builderPopoutRef.current = w; setBuilderPopoutOpen(true); }
-                      }}
-                      className="h-7 px-3 text-xs text-slate-400 hover:text-slate-200"
-                      title="Otevřít Job Builder v samostatném okně (např. na druhý monitor)"
-                    >
-                      ↗ Okno
-                    </Button>
+                  )}
+
+                  {/* ── Zakázka ── */}
+                  <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-muted)" }}>
+                      {type === "UDRZBA" ? "Popis" : "Zakázka"}
+                    </div>
+
+                    {/* Číslo zakázky + Délka tisku */}
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
+                      <div style={{ flex: "0 0 130px" }}>
+                        <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, display: "block" }}>
+                          {type === "UDRZBA" ? "Název / označení" : "Číslo zakázky"} *
+                        </Label>
+                        <Input
+                          value={orderNumber}
+                          onChange={(e) => setOrderNumber(e.target.value)}
+                          placeholder={type === "UDRZBA" ? "Čištění hlavy…" : "17001"}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, display: "block", fontWeight: 500 }}>Délka tisku</label>
+                        <div style={{ position: "relative" }}>
+                          <select
+                            value={String(durationHours)}
+                            onChange={(e) => setDurationHours(Number(e.target.value))}
+                            style={{
+                              appearance: "none",
+                              width: "100%",
+                              height: 32,
+                              background: "var(--surface-2)",
+                              border: "1px solid var(--border)",
+                              borderRadius: 10,
+                              color: "var(--text)",
+                              fontSize: 13,
+                              fontWeight: 600,
+                              padding: "0 36px 0 14px",
+                              cursor: "pointer",
+                              outline: "none",
+                            }}
+                            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--ring)")}
+                            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
+                          >
+                            {DURATION_OPTIONS.map((opt) => (
+                              <option key={opt.hours} value={String(opt.hours)}>{opt.label}</option>
+                            ))}
+                          </select>
+                          <svg
+                            viewBox="0 0 20 20"
+                            fill="none"
+                            stroke="currentColor"
+                            color="var(--text-muted)"
+                            strokeWidth="1.8"
+                            style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", width: 14, height: 14, pointerEvents: "none" }}
+                          >
+                            <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Popis */}
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+                        <Label style={{ fontSize: 10, color: "var(--text-muted)" }}>Popis</Label>
+                        <button
+                          type="button"
+                          onClick={() => navigator.clipboard.writeText(description)}
+                          title="Kopírovat popis"
+                          style={{ display: "flex", alignItems: "center", gap: 3, fontSize: 10, color: "var(--text-muted)", background: "none", border: "none", cursor: "pointer", padding: "0 2px", lineHeight: 1, transition: "color 120ms ease-out" }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--text)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                        >
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                          Kopírovat
+                        </button>
+                      </div>
+                      <Textarea
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                        rows={2}
+                        placeholder="Firma – produkt – počet tisků…"
+                        className="text-xs resize-none"
+                      />
+                    </div>
                   </div>
-                  <JobBuilderForm
-                    onAddToQueue={(item) => {
-                      setQueue((prev) => [
-                        ...prev,
-                        {
-                          id: ++queueIdRef.current,
-                          orderNumber: item.orderNumber,
-                          type: item.type,
-                          durationHours: item.durationHours,
-                          description: item.description,
-                          dataStatusId: item.dataStatusId,
-                          dataStatusLabel: item.dataStatusLabel,
-                          dataRequiredDate: item.dataRequiredDate,
-                          materialStatusId: item.materialStatusId,
-                          materialStatusLabel: item.materialStatusLabel,
-                          materialRequiredDate: item.materialRequiredDate,
-                          barvyStatusId: item.barvyStatusId,
-                          barvyStatusLabel: item.barvyStatusLabel,
-                          lakStatusId: item.lakStatusId,
-                          lakStatusLabel: item.lakStatusLabel,
-                          specifikace: item.specifikace,
-                          deadlineExpedice: item.deadlineExpedice,
-                          recurrenceType: item.recurrenceType,
-                          recurrenceCount: item.recurrenceCount,
-                        },
-                      ]);
-                    }}
-                    showHeader={false}
-                  />
-                </>
-              )}
+
+                  {/* ── Výrobní sloupečky (skryté pro Údržbu) ── */}
+                  {type !== "UDRZBA" && (
+                    <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: 10 }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-muted)" }}>Výrobní sloupečky</div>
+                      {/* DATA — datum + dropdown v jednom řádku */}
+                      <div>
+                        <label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, display: "block", fontWeight: 500 }}>Data</label>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <div style={{ flex: "0 0 130px" }}>
+                            <DatePickerField value={bDataRequiredDate} onChange={setBDataRequiredDate} placeholder="Datum dodání…" />
+                          </div>
+                          <div style={{ position: "relative", flex: 1 }}>
+                            <select
+                              value={bDataStatusId}
+                              onChange={(e) => setBDataStatusId(e.target.value)}
+                              style={{
+                                appearance: "none", width: "100%", height: 32,
+                                background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10,
+                                color: bDataStatusId ? "var(--text)" : "var(--text-muted)", fontSize: 12, fontWeight: 600,
+                                padding: "0 32px 0 12px", cursor: "pointer", outline: "none",
+                              }}
+                              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--ring)")}
+                              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
+                            >
+                              <option value="">— info —</option>
+                              {bDataOpts.map((o) => (
+                                <option key={o.id} value={String(o.id)}>{o.isWarning ? "⚠ " : ""}{o.label}</option>
+                              ))}
+                            </select>
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" color="var(--text-muted)"
+                              style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, pointerEvents: "none" }}>
+                              <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Materiál — datum + dropdown v jednom řádku */}
+                      <div>
+                        <label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, display: "block", fontWeight: 500 }}>Materiál</label>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <div style={{ flex: "0 0 130px" }}>
+                            <DatePickerField value={bMaterialRequiredDate} onChange={setBMaterialRequiredDate} placeholder="Datum dodání…" />
+                          </div>
+                          <div style={{ position: "relative", flex: 1 }}>
+                            <select
+                              value={bMaterialStatusId}
+                              onChange={(e) => setBMaterialStatusId(e.target.value)}
+                              style={{
+                                appearance: "none", width: "100%", height: 32,
+                                background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10,
+                                color: bMaterialStatusId ? "var(--text)" : "var(--text-muted)", fontSize: 12, fontWeight: 600,
+                                padding: "0 32px 0 12px", cursor: "pointer", outline: "none",
+                              }}
+                              onFocus={(e) => (e.currentTarget.style.borderColor = "var(--ring)")}
+                              onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
+                            >
+                              <option value="">— info —</option>
+                              {bMaterialOpts.map((o) => (
+                                <option key={o.id} value={String(o.id)}>{o.isWarning ? "⚠ " : ""}{o.label}</option>
+                              ))}
+                            </select>
+                            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" color="var(--text-muted)"
+                              style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, pointerEvents: "none" }}>
+                              <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Barvy, Lak — 2×2 grid */}
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                        {([
+                          { label: "Barvy",   value: bBarvyStatusId,    setter: setBBarvyStatusId,    opts: bBarvyOpts },
+                          { label: "Lak",     value: bLakStatusId,      setter: setBLakStatusId,      opts: bLakOpts },
+                        ] as { label: string; value: string; setter: (v: string) => void; opts: CodebookOption[] }[]).map(({ label, value, setter, opts }) => (
+                          <div key={label}>
+                            <label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, display: "block", fontWeight: 500 }}>{label}</label>
+                            <div style={{ position: "relative" }}>
+                              <select
+                                value={value}
+                                onChange={(e) => setter(e.target.value)}
+                                style={{
+                                  appearance: "none", width: "100%", height: 32,
+                                  background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10,
+                                  color: value ? "var(--text)" : "var(--text-muted)", fontSize: 12, fontWeight: 600,
+                                  padding: "0 32px 0 12px", cursor: "pointer", outline: "none",
+                                }}
+                                onFocus={(e) => (e.currentTarget.style.borderColor = "var(--ring)")}
+                                onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+                                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--surface-3)")}
+                                onMouseLeave={(e) => (e.currentTarget.style.background = "var(--surface-2)")}
+                              >
+                                <option value="">— nezadáno —</option>
+                                {opts.map((o) => (
+                                  <option key={o.id} value={String(o.id)}>{o.isWarning ? "⚠ " : ""}{o.label}</option>
+                                ))}
+                              </select>
+                              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" color="var(--text-muted)"
+                                style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, pointerEvents: "none" }}>
+                                <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      <div>
+                        <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, display: "block" }}>Specifikace</Label>
+                        <Input value={bSpecifikace} onChange={(e) => setBSpecifikace(e.target.value)} placeholder="Volný text…" className="h-8 text-xs" />
+                      </div>
+                      <div>
+                        <Label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, display: "block" }}>Termín expedice</Label>
+                        <DatePickerField value={bDeadlineExpedice} onChange={setBDeadlineExpedice} placeholder="Datum expedice…" />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Opakování ── */}
+                  <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 10 }}>Opakování</div>
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-end" }}>
+                      <div style={{ flex: 1 }}>
+                        <label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, display: "block", fontWeight: 500 }}>Interval</label>
+                        <div style={{ position: "relative" }}>
+                          <select
+                            value={bRecurrenceType}
+                            onChange={(e) => setBRecurrenceType(e.target.value)}
+                            style={{
+                              appearance: "none", width: "100%", height: 32,
+                              background: "var(--surface-2)", border: "1px solid var(--border)", borderRadius: 10,
+                              color: "var(--text)", fontSize: 12, fontWeight: 600,
+                              padding: "0 32px 0 12px", cursor: "pointer", outline: "none",
+                            }}
+                            onFocus={(e) => (e.currentTarget.style.borderColor = "var(--ring)")}
+                            onBlur={(e) => (e.currentTarget.style.borderColor = "var(--border)")}
+                          >
+                            <option value="NONE">— bez opakování —</option>
+                            <option value="DAILY">↻ Každý den</option>
+                            <option value="WEEKLY">↻ Každý týden</option>
+                            <option value="MONTHLY">↻ Každý měsíc</option>
+                          </select>
+                          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" color="var(--text-muted)"
+                            style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, pointerEvents: "none" }}>
+                            <path d="M5 8l5 5 5-5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </div>
+                      </div>
+                      {bRecurrenceType !== "NONE" && (
+                        <div style={{ flex: "0 0 90px" }}>
+                          <label style={{ fontSize: 10, color: "var(--text-muted)", marginBottom: 5, display: "block", fontWeight: 500 }}>Počet bloků</label>
+                          <input
+                            type="number"
+                            min={2}
+                            max={52}
+                            value={bRecurrenceCount}
+                            onChange={(e) => setBRecurrenceCount(Math.max(2, Math.min(52, parseInt(e.target.value) || 2)))}
+                            style={{
+                              width: "100%", height: 32, background: "var(--surface-2)",
+                              border: "1px solid var(--border)", borderRadius: 10,
+                              color: "var(--text)", fontSize: 13, fontWeight: 700,
+                              padding: "0 10px", outline: "none", textAlign: "center",
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    {bRecurrenceType !== "NONE" && (
+                      <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 6 }}>
+                        Vytvoří se {bRecurrenceCount} bloků · interval: {bRecurrenceType === "DAILY" ? "1 den" : bRecurrenceType === "WEEKLY" ? "7 dní" : "1 měsíc"}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Live náhled ── */}
+                  <div style={{ paddingTop: 14, paddingBottom: 14, borderBottom: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--text-muted)", marginBottom: 8 }}>Náhled bloku</div>
+                    <div style={{
+                      borderRadius: 6, padding: "9px 11px",
+                      background: `${typeConfig?.color ?? "#334155"}18`,
+                      borderTop: `1px solid ${typeConfig?.color ?? "var(--text-muted)"}33`,
+                      borderRight: `1px solid ${typeConfig?.color ?? "var(--text-muted)"}33`,
+                      borderBottom: `1px solid ${typeConfig?.color ?? "var(--text-muted)"}33`,
+                      borderLeft: `3px solid ${typeConfig?.color ?? "var(--text-muted)"}`,
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "var(--text)", lineHeight: 1.2 }}>
+                        {orderNumber || <span style={{ color: "var(--text-muted)", fontWeight: 400 }}>—</span>}
+                      </div>
+                      {description && (
+                        <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 3, lineHeight: 1.4 }}>{description}</div>
+                      )}
+                      <div style={{ fontSize: 10, color: typeConfig?.color ?? "var(--text-muted)", marginTop: 5 }}>
+                        {typeConfig && <typeConfig.icon size={10} strokeWidth={1.5} style={{ display: "inline-block", verticalAlign: "middle", marginRight: 3 }} />}{typeConfig?.label} · {formatDuration(durationHours)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Přidat do fronty ── */}
+                  <div style={{ paddingTop: 14, paddingBottom: 16 }}>
+                    <button
+                      type="button"
+                      onClick={handleAddToQueue}
+                      disabled={!orderNumber.trim()}
+                      style={{
+                        width: "100%",
+                        paddingTop: 11,
+                        paddingBottom: 11,
+                        borderRadius: 10,
+                        border: "none",
+                        background: orderNumber.trim() ? "#FFE600" : "rgba(255,255,255,0.06)",
+                        color: orderNumber.trim() ? "#111" : "rgba(255,255,255,0.2)",
+                        fontSize: 13,
+                        fontWeight: 700,
+                        letterSpacing: "0.02em",
+                        cursor: orderNumber.trim() ? "pointer" : "default",
+                        transition: "background 120ms ease-out, transform 80ms ease-out",
+                        fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif",
+                      }}
+                      onMouseDown={(e) => { if (orderNumber.trim()) (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.97)"; }}
+                      onMouseUp={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)"; }}
+                    >
+                      + Přidat do fronty
+                    </button>
+                    <div style={{ fontSize: 9, color: "var(--text-muted)", textAlign: "center", marginTop: 6 }}>
+                      Přetáhni kartu z fronty na timeline → stroj a čas
+                    </div>
+                  </div>
+                </div>
 
                 {/* ── Fronta ── */}
                 {queue.length > 0 && (
@@ -2415,21 +3567,19 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
                         return (
                           <div
                             key={item.id}
-                            draggable
                             className="pressable-card"
-                            onDragStart={(e) => {
-                              e.dataTransfer.effectAllowed = "copy";
-                              e.dataTransfer.setData("text/plain", String(item.id));
+                            onMouseDown={(e) => {
+                              if (e.button !== 0) return;
+                              e.preventDefault();
                               setDraggingQueueItem(item);
                             }}
-                            onDragEnd={() => setDraggingQueueItem(null)}
                             style={{
                               display: "flex", alignItems: "stretch",
                               background: "var(--surface)",
                               borderRadius: 6,
                               border: "1px solid var(--border)",
                               overflow: "hidden",
-                              cursor: "grab",
+                              cursor: draggingQueueItem?.id === item.id ? "grabbing" : "grab",
                             }}
                           >
                             {/* Barevný pruh vlevo */}
@@ -2438,7 +3588,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
                             <div style={{ flex: 1, padding: "7px 9px", minWidth: 0 }}>
                               <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text)" }}>{item.orderNumber}</div>
                               <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
-                                {itemCfg?.emoji} {itemCfg?.label} · {formatDuration(item.durationHours)}
+                                {itemCfg && <itemCfg.icon size={10} strokeWidth={1.5} style={{ display: "inline-block", verticalAlign: "middle", marginRight: 3 }} />}{itemCfg?.label} · {formatDuration(item.durationHours)}
                               </div>
                               {item.description && (
                                 <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -2450,6 +3600,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
                             <button
                               type="button"
                               onClick={() => setQueue((prev) => prev.filter((q) => q.id !== item.id))}
+                              onMouseDown={(e) => e.stopPropagation()}
                               style={{ flexShrink: 0, background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: 16, padding: "0 10px", display: "flex", alignItems: "center", lineHeight: 1 }}
                             >
                               ×
@@ -2460,10 +3611,10 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
                     </div>
                   </div>
                 )}
+              </div>
             </div>
           )}
-        </aside>
-        )}
+        </aside>}
       </section>
 
       {/* ── Push chain notifikace ── */}
@@ -2478,7 +3629,7 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
           whiteSpace: "nowrap",
         }}>
           <span style={{ fontSize: 11, color: "var(--danger)" }}>
-            🔒 Blok vrácen — v cestě je zamknutý blok
+            <Lock size={11} strokeWidth={1.5} style={{ display: "inline-block", verticalAlign: "middle", marginRight: 4 }} />Blok vrácen — v cestě je zamknutý blok
             {pushSuggestion.lockedBlock && <b> {pushSuggestion.lockedBlock.orderNumber}</b>}
           </span>
           <button
@@ -2492,26 +3643,6 @@ export default function PlannerPage({ initialBlocks, initialCompanyDays, current
 
       <ToastContainer toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
 
-      {/* Lasso hint — floating badge, zmizí při prvním použití nebo kliknutím × */}
-      {canEdit && !lassoHintSeen && (
-        <div style={{
-          position: "fixed", bottom: 20, left: "50%", transform: "translateX(-50%)",
-          display: "flex", alignItems: "center", gap: 6,
-          padding: "6px 12px", borderRadius: 20, zIndex: 9000,
-          background: "color-mix(in oklab, var(--surface) 88%, transparent)", backdropFilter: "blur(12px)",
-          border: "1px solid color-mix(in oklab, var(--accent) 30%, transparent)",
-          color: "var(--accent)", fontSize: 12, whiteSpace: "nowrap",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-          animation: "fadeInUp 300ms ease-out",
-        }}>
-          <span style={{ fontSize: 10, background: "color-mix(in oklab, var(--accent) 20%, transparent)", borderRadius: 5, padding: "1px 5px", fontFamily: "monospace", color: "var(--accent)" }}>⌥ Alt</span>
-          <span style={{ opacity: 0.85 }}>+ tah na timeline = výběr více bloků</span>
-          <button
-            onClick={dismissLassoHint}
-            style={{ marginLeft: 4, background: "none", border: "none", color: "var(--accent)", cursor: "pointer", padding: "0 2px", fontSize: 15, lineHeight: 1, opacity: 0.6, display: "flex", alignItems: "center" }}
-          >×</button>
-        </div>
-      )}
     </main>
   );
 }

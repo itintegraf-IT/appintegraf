@@ -113,6 +113,15 @@ body {
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
   --shadow-md-primary: 0 4px 14px -2px rgba(185,28,28,0.25);
   --sidebar-shadow: 2px 0 12px rgba(0,0,0,0.06);
+  --badge-blue: #93c5fd;
+  --badge-green: #86efac;
+  --badge-orange: #fdba74;
+  --badge-red: #fca5a5;
+  --badge-purple: #c4b5fd;
+  --badge-cyan: #67e8f9;
+  --badge-lime: #bef264;
+  --badge-pink: #f9a8d4;
+  --badge-black: #475569;
 }
 
 .dark {
@@ -159,6 +168,15 @@ body {
   --shadow-lg: 0 10px 25px rgba(0,0,0,0.3);
   --shadow-md-primary: 0 4px 14px -2px rgba(251,191,36,0.35);
   --sidebar-shadow: 2px 0 16px rgba(0,0,0,0.2);
+  --badge-blue: #60a5fa;
+  --badge-green: #4ade80;
+  --badge-orange: #fb923c;
+  --badge-red: #f87171;
+  --badge-purple: #a78bfa;
+  --badge-cyan: #22d3ee;
+  --badge-lime: #a3e635;
+  --badge-pink: #f472b6;
+  --badge-black: #64748b;
 }
 
 /* Ikony na kartách – pastel červeň s dobrým kontrastem */

@@ -34,7 +34,8 @@ export async function GET(
     return new NextResponse("PDF nenalezeno", { status: 404 });
   }
 
-  return new NextResponse(product.pdf_data, {
+  const pdfBuf = Buffer.isBuffer(product.pdf_data) ? product.pdf_data : Buffer.from(product.pdf_data);
+  return new NextResponse(new Uint8Array(pdfBuf), {
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": "inline; filename=\"tiskova-data.pdf\"",

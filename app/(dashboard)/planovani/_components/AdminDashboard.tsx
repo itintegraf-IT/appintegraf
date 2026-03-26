@@ -13,6 +13,7 @@ interface CodebookItem {
   isActive: boolean;
   isWarning: boolean;
   shortCode: string | null;
+  badgeColor?: string | null;
 }
 
 // ─── Konstanty ───────────────────────────────────────────────────────────────
@@ -195,7 +196,9 @@ const AUDIT_FIELD_LABELS: Record<string, string> = {
   materialStatusLabel: "Materiál stav",
   materialRequiredDate: "Materiál datum",
   materialOk: "Materiál OK",
+  materialNote: "Materiál poznámka",
   deadlineExpedice: "Expedice termín",
+  blockVariant: "Varianta zakázky",
 };
 
 function AuditLogSection() {

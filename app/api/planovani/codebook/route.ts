@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getPlanovaniRole } from "@/lib/planovani-auth";
+import { parseBadgeColor } from "@/lib/badgeColors";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -45,6 +46,15 @@ export async function POST(request: NextRequest) {
     });
     const nextSortOrder = (maxItem?.sortOrder ?? -1) + 1;
 
+    let badgeColor: string | null = null;
+    if (body.badgeColor !== undefined) {
+      const parsed = parseBadgeColor(body.badgeColor);
+      if ("error" in parsed) {
+        return NextResponse.json({ error: parsed.error }, { status: 400 });
+      }
+      badgeColor = parsed.color;
+    }
+
     const option = await prisma.planovani_codebook_options.create({
       data: {
         category: String(body.category),
@@ -53,6 +63,7 @@ export async function POST(request: NextRequest) {
         isActive: body.isActive ?? true,
         shortCode: body.shortCode ?? null,
         isWarning: body.isWarning ?? false,
+        badgeColor,
       },
     });
     return NextResponse.json(option, { status: 201 });

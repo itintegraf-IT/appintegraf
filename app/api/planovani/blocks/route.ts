@@ -1,28 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma, type PrismaTransactionClient } from "@/lib/db";
-import { getPlanovaniRole } from "@/lib/planovani-auth";
+import { getPlanovaniAssignedMachine, getPlanovaniRole } from "@/lib/planovani-auth";
+import { checkPlanovaniScheduleViolation } from "@/lib/planovani-schedule";
+import { normalizeBlockVariant } from "@/lib/blockVariants";
 
-export async function GET() {
+function serializeBlock<T extends Record<string, unknown>>(b: T) {
+  const row = b as unknown as {
+    startTime: Date;
+    endTime: Date;
+    deadlineExpedice?: Date | null;
+    dataRequiredDate?: Date | null;
+    materialRequiredDate?: Date | null;
+    printCompletedAt?: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  };
+  return {
+    ...b,
+    startTime: row.startTime.toISOString(),
+    endTime: row.endTime.toISOString(),
+    deadlineExpedice: row.deadlineExpedice?.toISOString() ?? null,
+    dataRequiredDate: row.dataRequiredDate?.toISOString() ?? null,
+    materialRequiredDate: row.materialRequiredDate?.toISOString() ?? null,
+    printCompletedAt: row.printCompletedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
+    const url = new URL(req.url);
+    const machineParam = url.searchParams.get("machine");
+    const role = await getPlanovaniRole(parseInt(session.user.id, 10));
+
+    let machineFilter: string | undefined;
+    if (role === "TISKAR") {
+      const assigned = await getPlanovaniAssignedMachine(parseInt(session.user.id, 10));
+      if (!assigned) {
+        return NextResponse.json({ error: "Tiskař nemá přiřazený stroj" }, { status: 400 });
+      }
+      if (machineParam && machineParam !== assigned) {
+        return NextResponse.json({ error: "Forbidden — cizí stroj" }, { status: 403 });
+      }
+      machineFilter = assigned;
+    } else if (machineParam) {
+      machineFilter = machineParam;
+    }
+
     const blocks = await prisma.planovani_blocks.findMany({
+      where: machineFilter ? { machine: machineFilter } : undefined,
       orderBy: { startTime: "asc" },
     });
-    type BlockRow = (typeof blocks)[number];
-    const serialized = blocks.map((b: BlockRow) => ({
-      ...b,
-      startTime: b.startTime.toISOString(),
-      endTime: b.endTime.toISOString(),
-      deadlineExpedice: b.deadlineExpedice?.toISOString() ?? null,
-      dataRequiredDate: b.dataRequiredDate?.toISOString() ?? null,
-      materialRequiredDate: b.materialRequiredDate?.toISOString() ?? null,
-      createdAt: b.createdAt.toISOString(),
-      updatedAt: b.updatedAt.toISOString(),
-    }));
-    return NextResponse.json(serialized);
+    return NextResponse.json(blocks.map((b) => serializeBlock(b as unknown as Record<string, unknown>)));
   } catch (error) {
     console.error("[GET /api/planovani/blocks]", error);
     return NextResponse.json({ error: "Chyba při načítání bloků" }, { status: 500 });
@@ -33,7 +67,8 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const role = await getPlanovaniRole(parseInt(session.user.id, 10));
+  const userId = parseInt(session.user.id, 10);
+  const role = await getPlanovaniRole(userId);
   if (!["ADMIN", "PLANOVAT"].includes(role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
@@ -48,7 +83,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const username = (session.user as { username?: string }).username ?? session.user.name ?? session.user.email ?? "uživatel";
+    const blockType = body.type ?? "ZAKAZKA";
+    const blockVariant = normalizeBlockVariant(body.blockVariant, blockType);
+    if (blockType === "ZAKAZKA") {
+      const violation = await checkPlanovaniScheduleViolation(
+        body.machine,
+        new Date(body.startTime),
+        new Date(body.endTime)
+      );
+      if (violation) return NextResponse.json({ error: violation }, { status: 422 });
+    }
+
+    const username =
+      (session.user as { username?: string }).username ?? session.user.name ?? session.user.email ?? "uživatel";
 
     const block = await prisma.$transaction(async (tx: PrismaTransactionClient) => {
       const newBlock = await tx.planovani_blocks.create({
@@ -57,7 +104,8 @@ export async function POST(request: NextRequest) {
           machine: body.machine,
           startTime: new Date(body.startTime),
           endTime: new Date(body.endTime),
-          type: body.type ?? "ZAKAZKA",
+          type: blockType,
+          blockVariant,
           description: body.description ?? null,
           locked: body.locked ?? false,
           deadlineExpedice: body.deadlineExpedice ? new Date(body.deadlineExpedice) : null,
@@ -74,6 +122,7 @@ export async function POST(request: NextRequest) {
           lakStatusId: body.lakStatusId ?? null,
           lakStatusLabel: body.lakStatusLabel ?? null,
           specifikace: body.specifikace ?? null,
+          materialNote: body.materialNote ?? null,
           recurrenceType: body.recurrenceType ?? "NONE",
           recurrenceParentId: body.recurrenceParentId ?? null,
         },
@@ -83,7 +132,7 @@ export async function POST(request: NextRequest) {
         data: {
           blockId: newBlock.id,
           orderNumber: newBlock.orderNumber,
-          userId: parseInt(session.user.id, 10),
+          userId,
           username,
           action: "CREATE",
         },
@@ -92,17 +141,7 @@ export async function POST(request: NextRequest) {
       return newBlock;
     });
 
-    const serialized = {
-      ...block,
-      startTime: block.startTime.toISOString(),
-      endTime: block.endTime.toISOString(),
-      deadlineExpedice: block.deadlineExpedice?.toISOString() ?? null,
-      dataRequiredDate: block.dataRequiredDate?.toISOString() ?? null,
-      materialRequiredDate: block.materialRequiredDate?.toISOString() ?? null,
-      createdAt: block.createdAt.toISOString(),
-      updatedAt: block.updatedAt.toISOString(),
-    };
-    return NextResponse.json(serialized, { status: 201 });
+    return NextResponse.json(serializeBlock(block as unknown as Record<string, unknown>), { status: 201 });
   } catch (error) {
     console.error("[POST /api/planovani/blocks]", error);
     return NextResponse.json({ error: "Chyba při vytváření bloku" }, { status: 500 });
