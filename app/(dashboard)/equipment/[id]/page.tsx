@@ -3,6 +3,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
 import { ArrowLeft } from "lucide-react";
 import { EquipmentAssignClient } from "./EquipmentAssignClient";
 
@@ -44,10 +45,8 @@ export default async function EquipmentViewPage({
         last_name: activeAssignment.users_equipment_assignments_user_idTousers.last_name,
       }
     : null;
-  const isAssignedToMe = activeAssignment?.user_id === userId;
-  const canAssign = (admin || equipmentWrite) && item.status !== "vy_azeno";
-  const canReturn =
-    (admin || equipmentWrite || isAssignedToMe) && !!activeAssignment;
+  const canAssign = (admin || equipmentWrite) && item.status !== EQUIPMENT_ITEM_STATUS.VYRAZENO;
+  const canReturn = (admin || equipmentWrite) && !!activeAssignment;
 
   return (
     <>

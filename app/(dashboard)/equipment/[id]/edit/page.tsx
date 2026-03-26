@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
 
 type Category = { id: number; name: string; code: string };
 type Equipment = {
@@ -42,7 +43,7 @@ export default function EditEquipmentPage() {
     purchase_price: "",
     supplier: "",
     invoice_number: "",
-    status: "skladem",
+    status: EQUIPMENT_ITEM_STATUS.SKLADEM,
     location: "",
     notes: "",
   });
@@ -67,7 +68,7 @@ export default function EditEquipmentPage() {
           purchase_price: item.purchase_price != null ? String(item.purchase_price) : "",
           supplier: item.supplier ?? "",
           invoice_number: item.invoice_number ?? "",
-          status: item.status ?? "skladem",
+          status: item.status ?? EQUIPMENT_ITEM_STATUS.SKLADEM,
           location: item.location ?? "",
           notes: item.notes ?? "",
         });
@@ -169,10 +170,10 @@ export default function EditEquipmentPage() {
               onChange={(e) => setForm({ ...form, status: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             >
-              <option value="skladem">Skladem</option>
-              <option value="p_i_azeno">Přiřazeno</option>
-              <option value="servis">Servis</option>
-              <option value="vy_azeno">Vyřazeno</option>
+              <option value={EQUIPMENT_ITEM_STATUS.SKLADEM}>Skladem</option>
+              <option value={EQUIPMENT_ITEM_STATUS.PRIRAZENO}>Přiřazeno</option>
+              <option value={EQUIPMENT_ITEM_STATUS.SERVIS}>Servis</option>
+              <option value={EQUIPMENT_ITEM_STATUS.VYRAZENO}>Vyřazeno</option>
             </select>
           </div>
           <div>

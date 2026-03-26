@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
 
 /** POST – vrácení vybavení (ukončení přiřazení) */
 export async function POST(
@@ -28,8 +29,8 @@ export async function POST(
     return NextResponse.json({ error: "Vybavení není přiřazeno žádnému uživateli" }, { status: 400 });
   }
 
-  const isAssignedUser = assignment.user_id === userId;
-  const canReturn = isAssignedUser || (await isAdmin(userId)) || (await hasModuleAccess(userId, "equipment", "write"));
+  const canReturn =
+    (await isAdmin(userId)) || (await hasModuleAccess(userId, "equipment", "write"));
   if (!canReturn) {
     return NextResponse.json({ error: "Nemáte oprávnění vracet toto vybavení" }, { status: 403 });
   }
@@ -41,7 +42,7 @@ export async function POST(
     }),
     prisma.equipment_items.update({
       where: { id: equipmentId },
-      data: { status: "skladem", updated_at: new Date() },
+      data: { status: EQUIPMENT_ITEM_STATUS.SKLADEM, updated_at: new Date() },
     }),
   ]);
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
 
 /** POST – přiřazení vybavení uživateli */
 export async function POST(
@@ -46,11 +47,11 @@ export async function POST(
     return NextResponse.json({ error: "Vybavení nenalezeno" }, { status: 404 });
   }
 
-  if (item.status === "vy_azeno") {
+  if (item.status === EQUIPMENT_ITEM_STATUS.VYRAZENO) {
     return NextResponse.json({ error: "Vyřazené vybavení nelze přiřadit" }, { status: 400 });
   }
 
-  if (item.status !== "skladem") {
+  if (item.status !== EQUIPMENT_ITEM_STATUS.SKLADEM) {
     return NextResponse.json({ error: "K přiřazení je dostupné pouze vybavení se statusem Skladem" }, { status: 400 });
   }
 
@@ -76,7 +77,7 @@ export async function POST(
     }),
     prisma.equipment_items.update({
       where: { id: equipmentId },
-      data: { status: "p_i_azeno", updated_at: new Date() },
+      data: { status: EQUIPMENT_ITEM_STATUS.PRIRAZENO, updated_at: new Date() },
     }),
   ]);
 

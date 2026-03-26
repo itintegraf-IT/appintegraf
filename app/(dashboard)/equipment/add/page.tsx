@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
 
 type Category = { id: number; name: string; code: string };
 
@@ -23,7 +24,7 @@ export default function AddEquipmentPage() {
     purchase_price: "",
     supplier: "",
     invoice_number: "",
-    status: "skladem",
+    status: EQUIPMENT_ITEM_STATUS.SKLADEM,
     location: "",
     notes: "",
   });
@@ -120,10 +121,10 @@ export default function AddEquipmentPage() {
               onChange={(e) => setForm({ ...form, status: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             >
-              <option value="skladem">Skladem</option>
-              <option value="p_i_azeno">Přiřazeno</option>
-              <option value="servis">Servis</option>
-              <option value="vy_azeno">Vyřazeno</option>
+              <option value={EQUIPMENT_ITEM_STATUS.SKLADEM}>Skladem</option>
+              <option value={EQUIPMENT_ITEM_STATUS.PRIRAZENO}>Přiřazeno</option>
+              <option value={EQUIPMENT_ITEM_STATUS.SERVIS}>Servis</option>
+              <option value={EQUIPMENT_ITEM_STATUS.VYRAZENO}>Vyřazeno</option>
             </select>
           </div>
           <div>

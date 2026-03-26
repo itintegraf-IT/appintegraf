@@ -209,7 +209,7 @@ model equipment_items {
   purchase_price        Decimal?                @db.Decimal(10, 2)
   supplier              String?                 @db.VarChar(200)
   invoice_number        String?                 @db.VarChar(100)
-  status                equipment_items_status? @default(skladem)
+  status                String?                 @default("skladem")
   location              String?                 @db.VarChar(200)
   notes                 String?                 @db.Text
   disposed_at           DateTime?               @db.DateTime(0)
@@ -735,13 +735,6 @@ enum questions_correct_answer {
   B
   C
   D
-}
-
-enum equipment_items_status {
-  skladem
-  p_i_azeno @map("přiřazeno")
-  servis
-  vy_azeno  @map("vyřazeno")
 }
 
 // ─── Modul Plánování výroby (PlanovaniVyroby) ─────────────────────────────────

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus, RotateCcw } from "lucide-react";
+import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
 
 type User = { id: number; first_name: string; last_name: string };
 
@@ -31,8 +32,8 @@ export function EquipmentAssignClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const isAssigned = status === "p_i_azeno" && assignedTo;
-  const isAvailable = status === "skladem";
+  const isAssigned = status === EQUIPMENT_ITEM_STATUS.PRIRAZENO && assignedTo;
+  const isAvailable = status === EQUIPMENT_ITEM_STATUS.SKLADEM;
 
   useEffect(() => {
     if (canAssign && showAssignForm) {

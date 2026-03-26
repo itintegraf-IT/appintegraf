@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { isAdmin } from "@/lib/auth-utils";
+import {
+  EQUIPMENT_ITEM_STATUS,
+  isEquipmentItemStatus,
+} from "@/lib/equipment-status";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -89,7 +93,9 @@ export async function POST(req: NextRequest) {
         purchase_price: purchase_price != null ? parseFloat(purchase_price) : null,
         supplier: supplier ? String(supplier).trim() : null,
         invoice_number: invoice_number ? String(invoice_number).trim() : null,
-        status: ["skladem", "p_i_azeno", "servis", "vy_azeno"].includes(status) ? status : "skladem",
+        status: isEquipmentItemStatus(String(status))
+          ? status
+          : EQUIPMENT_ITEM_STATUS.SKLADEM,
         location: location ? String(location).trim() : null,
         notes: notes ? String(notes).trim() : null,
       },
