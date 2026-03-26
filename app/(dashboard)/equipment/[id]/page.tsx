@@ -119,6 +119,7 @@ export default async function EquipmentViewPage({
 
       <EquipmentAssignClient
         equipmentId={item.id}
+        assignmentId={activeAssignment?.id ?? null}
         status={item.status}
         canAssign={canAssign && !activeAssignment}
         canReturn={canReturn}

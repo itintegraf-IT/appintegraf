@@ -19,3 +19,10 @@ export const EQUIPMENT_ITEM_STATUS_LIST: EquipmentItemStatus[] = Object.values(
 export function isEquipmentItemStatus(s: string): s is EquipmentItemStatus {
   return (EQUIPMENT_ITEM_STATUS_LIST as readonly string[]).includes(s);
 }
+
+/** Aktivní přiřazení včetně legacy hodnot ze staršího zápisu do DB. */
+export function isEquipmentAssignedStatus(status: string | null | undefined): boolean {
+  if (!status) return false;
+  if (status === EQUIPMENT_ITEM_STATUS.PRIRAZENO) return true;
+  return status === "p_i_azeno";
+}

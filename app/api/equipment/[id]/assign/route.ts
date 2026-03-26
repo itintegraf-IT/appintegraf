@@ -66,20 +66,21 @@ export async function POST(
     return NextResponse.json({ error: "Uživatel nenalezen nebo není aktivní" }, { status: 400 });
   }
 
-  await prisma.$transaction([
-    prisma.equipment_assignments.create({
+  const assignmentId = await prisma.$transaction(async (tx) => {
+    const row = await tx.equipment_assignments.create({
       data: {
         equipment_id: equipmentId,
         user_id: targetUser,
         assigned_by: userId,
         notes: notes ? String(notes).trim() : null,
       },
-    }),
-    prisma.equipment_items.update({
+    });
+    await tx.equipment_items.update({
       where: { id: equipmentId },
       data: { status: EQUIPMENT_ITEM_STATUS.PRIRAZENO, updated_at: new Date() },
-    }),
-  ]);
+    });
+    return row.id;
+  });
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, assignmentId });
 }

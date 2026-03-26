@@ -1,0 +1,86 @@
+/* Odpovídá stylům v APPIntegraf modules/equipment/print-protocol.php a print-return-protocol.php */
+.equipment-protocol-print {
+  font-family: "DejaVu Sans", Arial, sans-serif;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 8px;
+  font-size: 9px;
+  color: #111;
+}
+
+.equipment-protocol-print .ep-header {
+  text-align: center;
+  border-bottom: 3px solid #000;
+  padding-bottom: 10px;
+  margin-bottom: 15px;
+}
+
+.equipment-protocol-print .ep-header h1 {
+  margin: 0;
+  font-size: 18px;
+  color: #c41e3a;
+}
+
+.equipment-protocol-print .ep-section {
+  margin-bottom: 10px;
+}
+
+.equipment-protocol-print .ep-section-title {
+  background: #f0f0f0;
+  padding: 4px 8px;
+  font-weight: bold;
+  font-size: 10px;
+  border-left: 4px solid #c41e3a;
+  margin-bottom: 6px;
+}
+
+.equipment-protocol-print .ep-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.equipment-protocol-print .ep-label {
+  font-weight: bold;
+  color: #666;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.equipment-protocol-print .ep-value {
+  font-size: 10px;
+  padding: 2px 0;
+}
+
+.equipment-protocol-print .ep-signatures {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+}
+
+.equipment-protocol-print .ep-sig-box {
+  border-top: 2px solid #000;
+  padding-top: 6px;
+  min-height: 40px;
+  font-size: 9px;
+}
+
+.equipment-protocol-print .ep-footer {
+  margin-top: 10px;
+  text-align: center;
+  font-size: 7px;
+  color: #999;
+  border-top: 1px solid #ddd;
+  padding-top: 5px;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  @page {
+    size: A4;
+    margin: 10mm;
+  }
+}

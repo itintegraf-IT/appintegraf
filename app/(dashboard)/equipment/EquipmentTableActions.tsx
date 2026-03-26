@@ -2,10 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, Pencil, UserPlus, Trash2 } from "lucide-react";
+import { Eye, Pencil, UserPlus, Trash2, Printer, FileText } from "lucide-react";
 
 type Props = {
   equipmentId: number;
+  /** Aktivní přiřazení – tisk protokolů */
+  assignmentId?: number | null;
   canEdit: boolean;
   canAssign: boolean;
   canDelete: boolean;
@@ -13,6 +15,7 @@ type Props = {
 
 export function EquipmentTableActions({
   equipmentId,
+  assignmentId = null,
   canEdit,
   canAssign,
   canDelete,
@@ -60,6 +63,28 @@ export function EquipmentTableActions({
         >
           <UserPlus className="h-4 w-4" />
         </Link>
+      )}
+      {assignmentId != null && (
+        <>
+          <Link
+            href={`/equipment/protokol/predani?assignmentId=${assignmentId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded p-2 text-gray-600 hover:bg-gray-100"
+            title="Předávací protokol"
+          >
+            <Printer className="h-4 w-4" />
+          </Link>
+          <Link
+            href={`/equipment/protokol/vraceni?assignmentId=${assignmentId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded p-2 text-gray-600 hover:bg-gray-100"
+            title="Protokol o vrácení"
+          >
+            <FileText className="h-4 w-4" />
+          </Link>
+        </>
       )}
       {canDelete && (
         <button

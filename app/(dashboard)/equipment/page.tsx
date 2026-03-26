@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { Laptop, Plus, ClipboardList } from "lucide-react";
+import { Laptop, Plus, ClipboardList, UserCheck } from "lucide-react";
 import { EquipmentRequestsTab } from "./EquipmentRequestsTab";
 import { EquipmentTableActions } from "./EquipmentTableActions";
 
@@ -29,14 +29,30 @@ export default async function EquipmentPage({
     status: string | null;
     purchase_date: Date | null;
     equipment_categories?: { name: string };
+    assignment_id?: number | null;
   };
   let equipment: EquipmentRow[] = [];
 
   if (admin && scope === "all") {
-    equipment = await prisma.equipment_items.findMany({
+    const rows = await prisma.equipment_items.findMany({
       take: 200,
       orderBy: { id: "desc" },
-      include: { equipment_categories: { select: { name: true } } },
+      include: {
+        equipment_categories: { select: { name: true } },
+        equipment_assignments: {
+          where: { returned_at: null },
+          take: 1,
+          select: { id: true },
+        },
+      },
+    });
+    equipment = rows.map((r) => {
+      const a = r.equipment_assignments[0];
+      const { equipment_assignments: _, ...item } = r;
+      return {
+        ...item,
+        assignment_id: a?.id ?? null,
+      };
     });
   } else {
     const assignments = await prisma.equipment_assignments.findMany({
@@ -48,8 +64,10 @@ export default async function EquipmentPage({
       },
       orderBy: { assigned_at: "desc" },
     });
-    type AssignmentRow = { equipment_items: (typeof equipment)[number] };
-    equipment = (assignments as AssignmentRow[]).map((a) => a.equipment_items);
+    equipment = assignments.map((a) => ({
+      ...a.equipment_items,
+      assignment_id: a.id,
+    }));
   }
 
   const formatDate = (d: Date | null) =>
@@ -91,6 +109,13 @@ export default async function EquipmentPage({
               >
                 <Laptop className="h-4 w-4" />
                 Vybavení
+              </Link>
+              <Link
+                href="/equipment/prirazeni"
+                className="flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900"
+              >
+                <UserCheck className="h-4 w-4" />
+                Přiřazení
               </Link>
             </div>
           )}
@@ -154,6 +179,7 @@ export default async function EquipmentPage({
                     <td className="px-4 py-3">
                       <EquipmentTableActions
                         equipmentId={e.id}
+                        assignmentId={e.assignment_id ?? null}
                         canEdit={admin}
                         canAssign={(admin || equipmentWrite) && scope === "all"}
                         canDelete={admin}

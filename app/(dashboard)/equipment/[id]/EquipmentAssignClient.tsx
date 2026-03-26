@@ -2,13 +2,16 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { UserPlus, RotateCcw } from "lucide-react";
-import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
+import Link from "next/link";
+import { UserPlus, RotateCcw, Printer } from "lucide-react";
+import { EQUIPMENT_ITEM_STATUS, isEquipmentAssignedStatus } from "@/lib/equipment-status";
 
 type User = { id: number; first_name: string; last_name: string };
 
 type Props = {
   equipmentId: number;
+  /** ID řádku equipment_assignments — stejné jako PHP assignment_id v URL protokolů */
+  assignmentId: number | null;
   status: string | null;
   canAssign: boolean;
   canReturn: boolean;
@@ -18,6 +21,7 @@ type Props = {
 
 export function EquipmentAssignClient({
   equipmentId,
+  assignmentId,
   status,
   canAssign,
   canReturn,
@@ -32,7 +36,7 @@ export function EquipmentAssignClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const isAssigned = status === EQUIPMENT_ITEM_STATUS.PRIRAZENO && assignedTo;
+  const isAssigned = isEquipmentAssignedStatus(status) && assignedTo;
   const isAvailable = status === EQUIPMENT_ITEM_STATUS.SKLADEM;
 
   useEffect(() => {
@@ -61,6 +65,14 @@ export function EquipmentAssignClient({
         setLoading(false);
         return;
       }
+      const newAid = typeof data.assignmentId === "number" ? data.assignmentId : null;
+      if (newAid != null) {
+        window.open(
+          `/equipment/protokol/predani?assignmentId=${newAid}`,
+          "_blank",
+          "noopener,noreferrer",
+        );
+      }
       setShowAssignForm(false);
       setAssignUserId("");
       setAssignNotes("");
@@ -84,6 +96,10 @@ export function EquipmentAssignClient({
         setError(data.error ?? "Chyba při vracení");
         setLoading(false);
         return;
+      }
+      const aid = typeof data.assignmentId === "number" ? data.assignmentId : null;
+      if (aid != null) {
+        window.open(`/equipment/protokol/vraceni?assignmentId=${aid}`, "_blank", "noopener,noreferrer");
       }
       router.refresh();
     } catch {
@@ -114,6 +130,29 @@ export function EquipmentAssignClient({
           {assignedAt && (
             <p className="mt-1 text-sm text-gray-500">Od: {formatDate(assignedAt)}</p>
           )}
+        </div>
+      )}
+
+      {isAssigned && assignmentId != null && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Link
+            href={`/equipment/protokol/predani?assignmentId=${assignmentId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50"
+          >
+            <Printer className="h-4 w-4" />
+            Předávací protokol
+          </Link>
+          <Link
+            href={`/equipment/protokol/vraceni?assignmentId=${assignmentId}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50"
+          >
+            <Printer className="h-4 w-4" />
+            Protokol o vrácení
+          </Link>
         </div>
       )}
 

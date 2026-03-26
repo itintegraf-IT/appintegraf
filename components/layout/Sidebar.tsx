@@ -39,6 +39,7 @@ import {
   Package,
   Factory,
   GripVertical,
+  UserCheck,
 } from "lucide-react";
 import {
   Tooltip,
@@ -63,7 +64,14 @@ type NavItem = {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   module: string | null;
+  isActive?: (pathname: string) => boolean;
 };
+
+function navItemIsActive(item: NavItem, pathname: string): boolean {
+  if (item.href === "/") return pathname === "/";
+  if (item.isActive) return item.isActive(pathname);
+  return pathname.startsWith(item.href);
+}
 
 function SortableNavItem({
   item,
@@ -194,7 +202,23 @@ function NavLink({
 const navItems: NavItem[] = [
   { href: "/", icon: LayoutDashboard, label: "Dashboard", module: null },
   { href: "/contacts", icon: Users, label: "Kontakty", module: "contacts" },
-  { href: "/equipment", icon: Laptop, label: "Majetek", module: "equipment" },
+  {
+    href: "/equipment",
+    icon: Laptop,
+    label: "Majetek",
+    module: "equipment",
+    isActive: (p) =>
+      p.startsWith("/equipment") &&
+      !p.startsWith("/equipment/prirazeni") &&
+      !p.startsWith("/equipment/protokol"),
+  },
+  {
+    href: "/equipment/prirazeni",
+    icon: UserCheck,
+    label: "Přiřazení majetku",
+    module: "equipment",
+    isActive: (p) => p.startsWith("/equipment/prirazeni"),
+  },
   { href: "/calendar", icon: Calendar, label: "Kalendář", module: "calendar" },
   { href: "/planovani", icon: CalendarDays, label: "Plánování výroby", module: "planovani" },
   { href: "/vyroba", icon: Factory, label: "Výroba", module: "vyroba" },
@@ -232,7 +256,11 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
   const isPinned = pinned && !mobileOpen;
   const userId = user?.id;
 
-  const visibleItems = navItems.filter((item) => !item.module || moduleAccess[item.module]);
+  const visibleItems = navItems.filter((item) => {
+    if (item.module && !moduleAccess[item.module]) return false;
+    if (item.equipmentWriteOnly && !isAdmin && !equipmentWrite) return false;
+    return true;
+  });
   const visibleHrefs = visibleItems.map((i) => i.href).join(",");
 
   const [orderedItems, setOrderedItems] = useState<NavItem[]>(() => visibleItems);
@@ -240,7 +268,10 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
-    const items = navItems.filter((item) => !item.module || moduleAccess[item.module]);
+    const items = navItems.filter((item) => {
+      if (item.module && !moduleAccess[item.module]) return false;
+      return true;
+    });
     const stored = getStoredOrder(userId);
     const orderMap = new Map(stored.map((href, i) => [href, i]));
     const next = [...items].sort((a, b) => {
@@ -350,10 +381,7 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
                 strategy={verticalListSortingStrategy}
               >
                 {orderedItems.map((item) => {
-                  const isActive =
-                    item.href === "/"
-                      ? pathname === "/"
-                      : pathname.startsWith(item.href);
+                  const isActive = navItemIsActive(item, pathname);
                   return (
                     <li key={item.href}>
                       <SortableNavItem
@@ -369,10 +397,7 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
             </DndContext>
           ) : (
             orderedItems.map((item) => {
-              const isActive =
-                item.href === "/"
-                  ? pathname === "/"
-                  : pathname.startsWith(item.href);
+              const isActive = navItemIsActive(item, pathname);
               return (
                 <li key={item.href}>
                   <NavLink
