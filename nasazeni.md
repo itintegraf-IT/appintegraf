@@ -17,6 +17,8 @@ chmod +x scripts/deploy-server.sh   # jednou
 ./scripts/deploy-server.sh
 ```
 
+Pokud Linux hlásí `bash\r: No such file or directory`, soubor má **Windows konce řádků (CRLF)**. Oprava na serveru: `sed -i 's/\r$//' scripts/deploy-server.sh` — nebo stáhněte z Gitu verzi s `.gitattributes` (`*.sh` → LF).
+
 ### Přepínače
 
 | Přepínač | Význam |

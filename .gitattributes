@@ -1,0 +1,2 @@
+# Bash skripty musí mít konce řádků LF (jinak na Linuxu selže shebang).
+*.sh text eol=lf

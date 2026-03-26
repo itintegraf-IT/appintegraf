@@ -4,7 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
+import {
+  EQUIPMENT_ITEM_STATUS,
+  isEquipmentItemStatus,
+} from "@/lib/equipment-status";
 
 type Category = { id: number; name: string; code: string };
 type Equipment = {
@@ -55,6 +58,7 @@ export default function EditEquipmentPage() {
     ]).then(([cats, item]: [Category[], Equipment | undefined]) => {
       setCategories(Array.isArray(cats) ? cats : []);
       if (item?.id) {
+        const statusRaw = item.status ?? "";
         setForm({
           name: item.name,
           brand: item.brand ?? "",
@@ -68,7 +72,9 @@ export default function EditEquipmentPage() {
           purchase_price: item.purchase_price != null ? String(item.purchase_price) : "",
           supplier: item.supplier ?? "",
           invoice_number: item.invoice_number ?? "",
-          status: item.status ?? EQUIPMENT_ITEM_STATUS.SKLADEM,
+          status: isEquipmentItemStatus(statusRaw)
+            ? statusRaw
+            : EQUIPMENT_ITEM_STATUS.SKLADEM,
           location: item.location ?? "",
           notes: item.notes ?? "",
         });
