@@ -258,7 +258,6 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
 
   const visibleItems = navItems.filter((item) => {
     if (item.module && !moduleAccess[item.module]) return false;
-    if (item.equipmentWriteOnly && !isAdmin && !equipmentWrite) return false;
     return true;
   });
   const visibleHrefs = visibleItems.map((i) => i.href).join(",");
