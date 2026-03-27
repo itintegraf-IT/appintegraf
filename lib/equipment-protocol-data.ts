@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/db";
-import type { Decimal } from "@prisma/client/runtime/library";
 
 /** Data pro tisk protokolů — odpovídá dotazům v PHP print-protocol / print-return-protocol */
 export type AssignmentProtocolRow = {
@@ -23,7 +22,8 @@ export type AssignmentProtocolRow = {
     serial_number: string | null;
     description: string | null;
     purchase_date: Date | null;
-    purchase_price: Decimal | null;
+    /** Prisma Decimal | null */
+    purchase_price: unknown | null;
   };
 };
 
