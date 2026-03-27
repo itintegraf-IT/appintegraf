@@ -59,6 +59,20 @@ Při nesouladu skript skončí chybou a build ani restart se nespustí.
 6. `npm run build`
 7. `pm2 restart appintegraf` (nebo váš název procesu)
 
+### Ruční SQL (moduly mimo Prisma migrate)
+
+Po změnách v `schema.prisma` mohou v `prisma/migrations/*.sql` ležet skripty, které je potřeba na produkci spustit ručně (např. modul smluv, osobní údaje u kontaktů). Bez toho může aplikace při dotazu na chybějící sloupce/tabulky spadnout (Next.js „Application error“).
+
+| Soubor | Účel |
+|--------|------|
+| [`prisma/migrations/20260327_add_contracts_module.sql`](prisma/migrations/20260327_add_contracts_module.sql) | Tabulky evidence smluv |
+| [`prisma/migrations/20260327_file_uploads_record_id.sql`](prisma/migrations/20260327_file_uploads_record_id.sql) | `file_uploads.record_id` |
+| [`prisma/migrations/20260328_users_personal_contact.sql`](prisma/migrations/20260328_users_personal_contact.sql) | Sloupce `users.personal_phone`, `users.personal_email` (kontakty) |
+
+```bash
+mysql -u root -p appintegraf < prisma/migrations/20260328_users_personal_contact.sql
+```
+
 ## Přenos dat plánování (vývoj → produkce)
 
 Skript **nenahrazuje** kopírování dat v MySQL. Mezi prostředími se tabulky `planovani_*` přenášejí např. přes **`mysqldump`** / import SQL. U dumpu z MySQL 8 na MariaDB může být potřeba nahradit kolaci `utf8mb4_0900_ai_ci` za např. `utf8mb4_unicode_ci` před importem.
