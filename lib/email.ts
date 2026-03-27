@@ -1,15 +1,31 @@
 import nodemailer from "nodemailer";
 import { getEmailSettings } from "./email-settings";
 
-/** Základní URL aplikace pro odkazy v e-mailech */
+/**
+ * Kanonická URL aplikace pro absolutní odkazy v e-mailech.
+ * Priorita: AUTH_URL → NEXTAUTH_URL → APP_URL → VERCEL_URL (nasazení na Vercel) → localhost.
+ * Pozor: dříve se kvůli vazbě ?? a ?: při nastaveném AUTH_URL používal špatně jen VERCEL_URL → https://undefined.
+ */
 function getBaseUrl(): string {
-  return (
-    process.env.AUTH_URL ??
-    process.env.NEXTAUTH_URL ??
-    process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : "http://localhost:3000"
-  );
+  const explicit =
+    process.env.AUTH_URL?.trim() ||
+    process.env.NEXTAUTH_URL?.trim() ||
+    process.env.APP_URL?.trim();
+
+  if (explicit) {
+    return explicit.replace(/\/+$/, "");
+  }
+
+  const vercel = process.env.VERCEL_URL?.trim();
+  if (vercel) {
+    const withProto =
+      vercel.startsWith("http://") || vercel.startsWith("https://")
+        ? vercel
+        : `https://${vercel}`;
+    return withProto.replace(/\/+$/, "");
+  }
+
+  return "http://localhost:3000";
 }
 
 export type SendCalendarApprovalEmailParams = {
