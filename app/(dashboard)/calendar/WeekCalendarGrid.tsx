@@ -35,11 +35,14 @@ type Props = {
 
 const ROW_HEIGHT = 32;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
+/** Mřížka = 24 řádků (0–23), celková výška v px – nic nesmí přesáhnout */
+const DAY_GRID_HEIGHT = 24 * ROW_HEIGHT;
 
-/** Vypočítá top a height pro daný den – událost může být vícenásobná přes několik dní */
+/** Vypočítá top a height pro daný den – výška je vždy oříznutá na konec dne (24 hodin). */
 function getEventSliceForDay(
   event: CalendarEvent,
-  day: Date
+  day: Date,
+  options?: { onlyFirstDayOfMultiDay?: boolean }
 ): { top: number; height: number } | null {
   const start = new Date(event.start_date);
   const end = new Date(event.end_date);
@@ -48,6 +51,14 @@ function getEventSliceForDay(
   dayStart.setHours(0, 0, 0, 0);
   const dayEnd = new Date(day);
   dayEnd.setHours(23, 59, 59, 999);
+
+  const startDayStr = formatDateLocal(start);
+  const endDayStr = formatDateLocal(end);
+  const dayStr = formatDateLocal(day);
+
+  if (options?.onlyFirstDayOfMultiDay && startDayStr !== endDayStr) {
+    if (dayStr !== startDayStr) return null;
+  }
 
   if (end <= dayStart || start >= dayEnd) return null;
 
@@ -58,7 +69,11 @@ function getEventSliceForDay(
     (sliceStart.getHours() + sliceStart.getMinutes() / 60) * ROW_HEIGHT;
   const durationHours =
     (sliceEnd.getTime() - sliceStart.getTime()) / (60 * 60 * 1000);
-  const height = Math.max(18, durationHours * ROW_HEIGHT);
+  let height = Math.max(18, durationHours * ROW_HEIGHT);
+
+  /** Nikdy nepřetéct pod řádek 23 (den = přesně 24 hodin od 0:00 do 23:59) */
+  const maxHeight = DAY_GRID_HEIGHT - top;
+  height = Math.min(height, maxHeight);
 
   return { top, height };
 }
@@ -361,10 +376,10 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
             {days.map((d) => (
               <div
                 key={d.toISOString()}
-                className={`relative flex-1 border-r border-gray-200 last:border-r-0 ${
+                className={`relative flex-1 overflow-hidden border-r border-gray-200 last:border-r-0 ${
                   d.toDateString() === today ? "bg-amber-50/30" : ""
                 }`}
-                style={{ minHeight: totalHeight }}
+                style={{ minHeight: totalHeight, height: totalHeight }}
                 onDrop={(ev) => {
                   ev.preventDefault();
                   const rect = ev.currentTarget.getBoundingClientRect();
@@ -386,7 +401,13 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                 {/* Události - absolutní pozicování, vícedenní se zobrazí ve všech dnech */}
                 {timedEvents
                   .map((e) => {
-                    const slice = getEventSliceForDay(e, d);
+                    const onlyFirst =
+                      requiresDeputy(e.event_type) &&
+                      formatDateLocal(new Date(e.start_date)) !==
+                        formatDateLocal(new Date(e.end_date));
+                    const slice = getEventSliceForDay(e, d, {
+                      onlyFirstDayOfMultiDay: onlyFirst,
+                    });
                     if (!slice) return null;
                     const eventStart = new Date(e.start_date);
                     const dayStart = new Date(d);
