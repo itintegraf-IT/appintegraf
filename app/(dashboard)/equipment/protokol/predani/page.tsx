@@ -10,7 +10,7 @@ function fmtDate(d: Date | null) {
   return new Date(d).toLocaleDateString("cs-CZ");
 }
 
-function fmtPrice(p: Decimal | null): string | null {
+function fmtPrice(p: unknown): string | null {
   if (p == null) return null;
   const n = Number(p);
   if (Number.isNaN(n)) return null;
