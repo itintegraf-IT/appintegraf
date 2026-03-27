@@ -98,6 +98,100 @@ model calendar_events {
   @@index([start_date], map: "idx_start_date")
 }
 
+// --- Evidence smluv (MODUL_EVIDENCE_SMLOUV.md) ---
+
+model contract_types {
+  id                      Int                       @id @default(autoincrement())
+  name                    String                    @db.VarChar(100)
+  code                    String?                   @unique(map: "uq_contract_types_code") @db.VarChar(50)
+  description             String?                   @db.Text
+  sort_order              Int?                      @default(0)
+  is_active               Boolean?                  @default(true)
+  created_at              DateTime                  @default(now()) @db.Timestamp(0)
+  updated_at              DateTime                  @default(now()) @db.Timestamp(0)
+  contract_workflow_steps contract_workflow_steps[]
+  contracts               contracts[]
+
+  @@index([is_active], map: "idx_contract_types_active")
+  @@index([sort_order], map: "idx_contract_types_sort")
+}
+
+/// Šablona schvalovacích kroků podle typu smlouvy (resolver určuje způsob výběru schvalovatele při odeslání).
+model contract_workflow_steps {
+  id               Int            @id @default(autoincrement())
+  contract_type_id Int
+  step_order       Int
+  /// Např. department_manager, legal_counsel, financial_approval, executive, fixed_user
+  resolver         String         @db.VarChar(50)
+  fixed_user_id    Int?
+  created_at       DateTime       @default(now()) @db.Timestamp(0)
+  updated_at       DateTime       @default(now()) @db.Timestamp(0)
+  contract_types   contract_types @relation(fields: [contract_type_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "contract_workflow_steps_type_fk")
+  users_fixed      users?         @relation("contract_workflow_steps_fixed_user", fields: [fixed_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "contract_workflow_steps_fixed_fk")
+
+  @@unique([contract_type_id, step_order], map: "uq_contract_workflow_type_step")
+  @@index([contract_type_id], map: "idx_contract_workflow_steps_type")
+  @@index([resolver], map: "idx_contract_workflow_steps_resolver")
+}
+
+model contracts {
+  id                    Int                  @id @default(autoincrement())
+  title                 String               @db.VarChar(500)
+  /// Číslo / externí ID smlouvy
+  contract_number       String?              @db.VarChar(100)
+  party_company         String?              @db.VarChar(255)
+  party_contact         String?              @db.VarChar(255)
+  contract_type_id      Int
+  description           String?              @db.Text
+  /// draft | in_approval | approval_completed | signature_pending | signed | archived | rejected | returned
+  approval_status       String               @default("draft") @db.VarChar(30)
+  value_amount          Decimal?             @db.Decimal(15, 2)
+  value_currency        String?              @default("CZK") @db.VarChar(10)
+  effective_from        DateTime?            @db.DateTime(0)
+  valid_until           DateTime?            @db.DateTime(0)
+  expires_at            DateTime?            @db.DateTime(0)
+  signed_at             DateTime?            @db.DateTime(0)
+  created_by            Int
+  responsible_user_id   Int?
+  department_id         Int?
+  created_at            DateTime             @default(now()) @db.Timestamp(0)
+  updated_at            DateTime             @default(now()) @db.Timestamp(0)
+  contract_types        contract_types       @relation(fields: [contract_type_id], references: [id], onUpdate: NoAction, map: "contracts_contract_type_fk")
+  users_created_by      users                @relation("contracts_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "contracts_created_by_fk")
+  users_responsible     users?               @relation("contracts_responsible_user", fields: [responsible_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "contracts_responsible_fk")
+  departments           departments?         @relation(fields: [department_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "contracts_department_fk")
+  contract_approvals    contract_approvals[]
+
+  @@index([contract_type_id], map: "idx_contracts_type")
+  @@index([approval_status], map: "idx_contracts_approval_status")
+  @@index([created_by], map: "idx_contracts_created_by")
+  @@index([responsible_user_id], map: "idx_contracts_responsible")
+  @@index([department_id], map: "idx_contracts_department")
+  @@index([valid_until], map: "idx_contracts_valid_until")
+  @@index([contract_number], map: "idx_contracts_number")
+}
+
+model contract_approvals {
+  id              Int       @id @default(autoincrement())
+  contract_id     Int
+  approver_id     Int
+  /// Kód kroku / role ze šablony (např. legal, manager)
+  approval_type   String?   @default("step") @db.VarChar(50)
+  approval_order  Int?      @default(1)
+  status          String?   @default("pending") @db.VarChar(20)
+  comment         String?   @db.Text
+  approved_at     DateTime? @db.DateTime(0)
+  created_at      DateTime  @default(now()) @db.Timestamp(0)
+  updated_at      DateTime  @default(now()) @db.Timestamp(0)
+  contracts       contracts @relation(fields: [contract_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "contract_approvals_contract_fk")
+  users           users     @relation(fields: [approver_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "contract_approvals_approver_fk")
+
+  @@index([contract_id], map: "idx_contract_approvals_contract")
+  @@index([approver_id], map: "idx_contract_approvals_approver")
+  @@index([approval_order], map: "idx_contract_approvals_order")
+  @@index([status], map: "idx_contract_approvals_status")
+}
+
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model contact_imports {
   id            Int      @id @default(autoincrement())
@@ -140,6 +234,7 @@ model departments {
   created_at      DateTime          @default(now()) @db.Timestamp(0)
   updated_at      DateTime          @default(now()) @db.Timestamp(0)
   calendar_events           calendar_events[]
+  contracts                 contracts[]
   user_secondary_departments user_secondary_departments[]
   users                     users?            @relation(fields: [manager_id], references: [id], onUpdate: NoAction, map: "departments_ibfk_1")
 
@@ -292,6 +387,8 @@ model file_uploads {
   file_size         Int
   mime_type         String   @db.VarChar(100)
   module            String   @db.VarChar(50)
+  /// ID záznamu v cílové tabulce (např. contracts.id pro module = contracts)
+  record_id         Int?
   uploaded_by       Int
   is_public         Boolean? @default(false)
   created_at        DateTime @default(now()) @db.Timestamp(0)
@@ -299,6 +396,7 @@ model file_uploads {
 
   @@index([created_at], map: "idx_created")
   @@index([module], map: "idx_module")
+  @@index([module, record_id], map: "idx_file_uploads_module_record")
   @@index([uploaded_by], map: "idx_uploaded_by")
 }
 
@@ -646,6 +744,10 @@ model users {
   calendar_events                                                calendar_events[]
   calendar_events_deputy                                         calendar_events[]             @relation("calendar_events_deputy")
   contact_imports                                                contact_imports[]
+  contract_approvals                                             contract_approvals[]
+  contracts_created                                              contracts[]                   @relation("contracts_created_by")
+  contracts_as_responsible                                       contracts[]                   @relation("contracts_responsible_user")
+  contract_workflow_steps_fixed                                  contract_workflow_steps[]     @relation("contract_workflow_steps_fixed_user")
   departments                                                    departments[]
   equipment_assignments_equipment_assignments_user_idTousers     equipment_assignments[]       @relation("equipment_assignments_user_idTousers")
   equipment_assignments_equipment_assignments_assigned_byTousers equipment_assignments[]       @relation("equipment_assignments_assigned_byTousers")

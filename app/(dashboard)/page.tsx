@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { countMyContractsExpiringWithin } from "@/lib/contracts/expiry-reminders";
 import { NotificationLink } from "./NotificationLink";
 import {
   LayoutDashboard,
@@ -28,7 +29,7 @@ export default async function DashboardPage() {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
 
-  const [stats, contactsRead, equipmentRead, calendarRead, kioskRead, trainingRead, trainingWrite, contactsWrite, equipmentWrite, kioskWrite, imlRead, imlWrite, pendingEvents, notifications] =
+  const [stats, contactsRead, equipmentRead, calendarRead, kioskRead, trainingRead, trainingWrite, contactsWrite, equipmentWrite, kioskWrite, imlRead, imlWrite, pendingEvents, notifications, contractsExpiring90] =
     await Promise.all([
       Promise.all([
         prisma.users.count({ where: { is_active: true } }),
@@ -92,6 +93,7 @@ export default async function DashboardPage() {
           take: 10,
         });
       })(),
+      userId > 0 ? countMyContractsExpiringWithin(userId, 90) : Promise.resolve(0),
     ]);
 
   type NotificationRow = { id: number; title: string; message: string | null; link: string | null; read_at: Date | null; created_at: Date };
@@ -157,6 +159,26 @@ export default async function DashboardPage() {
               />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Smlouvy – končící platnost */}
+      {contractsExpiring90 > 0 && (
+        <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50/50 p-6 dark:border-amber-900 dark:bg-amber-950/30">
+          <h2 className="mb-2 flex items-center gap-2 text-lg font-semibold text-amber-900 dark:text-amber-100">
+            <FileText className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            Evidence smluv – končící platnost ({contractsExpiring90})
+          </h2>
+          <p className="mb-4 text-sm text-amber-900/90 dark:text-amber-100/90">
+            Jako autor nebo odpovědná osoba máte smlouvy s koncem platnosti nebo expirací do 90 dnů.
+          </p>
+          <Link
+            href="/contracts?expiring=90"
+            className="inline-flex items-center gap-2 text-sm font-medium text-amber-800 hover:text-amber-900 dark:text-amber-200 dark:hover:text-amber-50"
+          >
+            Otevřít přehled smluv
+            <ChevronRight className="h-4 w-4" />
+          </Link>
         </div>
       )}
 

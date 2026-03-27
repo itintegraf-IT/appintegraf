@@ -40,6 +40,7 @@ import {
   Factory,
   GripVertical,
   UserCheck,
+  FileText,
 } from "lucide-react";
 import {
   Tooltip,
@@ -220,6 +221,7 @@ const navItems: NavItem[] = [
     isActive: (p) => p.startsWith("/equipment/prirazeni"),
   },
   { href: "/calendar", icon: Calendar, label: "Kalendář", module: "calendar" },
+  { href: "/contracts", icon: FileText, label: "Evidence smluv", module: null },
   { href: "/planovani", icon: CalendarDays, label: "Plánování výroby", module: "planovani" },
   { href: "/vyroba", icon: Factory, label: "Výroba", module: "vyroba" },
   { href: "/iml", icon: Package, label: "IML", module: "iml" },
