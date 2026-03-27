@@ -19,7 +19,8 @@
     "db:planovani-upgrade": "node scripts/run-planovani-db-upgrade.mjs",
     "migrate:planovani": "node migrations/planovani-igvyroba/migrate.mjs",
     "migrate:idvyroba": "node migrations/planovani-igvyroba/migrate.mjs",
-    "migrate:passwords": "node scripts/migrate-passwords-to-hash.mjs"
+    "migrate:passwords": "node scripts/migrate-passwords-to-hash.mjs",
+    "seed:calendar": "node scripts/seed-calendar-sample.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

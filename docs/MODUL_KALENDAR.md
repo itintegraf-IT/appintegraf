@@ -21,6 +21,18 @@ Modul kalendáře slouží ke správě událostí a termínů v aplikaci INTEGRA
 
 ---
 
+## Vzorová data (vývoj / demo)
+
+Skript vytvoří cca 30 událostí na příštích 20 dní pro aktivní uživatele z kontaktů:
+
+```bash
+npm run seed:calendar
+```
+
+Vyžaduje `DATABASE_URL` v `.env`. Opakované spuštění přidá další záznamy.
+
+---
+
 ## Struktura souborů
 
 ```

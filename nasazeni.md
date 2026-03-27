@@ -4,7 +4,7 @@ Stručný návod pro nasazení aplikace **APPIntegraf** na Linux server po odesl
 
 ## Automatický skript (doporučeno)
 
-Skript stáhne kód z `origin/main`, ověří shodu s Gitem, nainstaluje závislosti, zkusí Prisma migrace, volitelně SQL upgrade plánování, provede build a restartuje PM2.
+Skript před stažením obnoví `package-lock.json` z repa (aby `git pull` nepadal po předchozím `npm install` na serveru), stáhne kód z `origin/main`, ověří shodu s Gitem, nainstaluje závislosti, zkusí Prisma migrace, volitelně SQL upgrade plánování, provede build a restartuje PM2.
 
 | | |
 |---|---|

@@ -51,6 +51,9 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+echo "==> Git: package-lock.json – zahodit lokální změny (po npm install na serveru často přepsán)"
+git restore package-lock.json 2>/dev/null || true
+
 echo "==> Git: fetch + pull (jen fast-forward)"
 git fetch origin main
 git pull --ff-only origin main
