@@ -39,7 +39,6 @@ import {
   Package,
   Factory,
   GripVertical,
-  UserCheck,
   FileText,
 } from "lucide-react";
 import {
@@ -60,12 +59,16 @@ type SidebarProps = {
   onClose?: () => void;
 };
 
+type NavSubItem = { href: string; label: string };
+
 type NavItem = {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   module: string | null;
   isActive?: (pathname: string) => boolean;
+  /** Podnabídka (např. Majetek → Přiřazení majetku) */
+  subItems?: NavSubItem[];
 };
 
 function navItemIsActive(item: NavItem, pathname: string): boolean {
@@ -74,16 +77,59 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
   return pathname.startsWith(item.href);
 }
 
+function NavSubLinks({
+  subItems,
+  pathname,
+  onClick,
+  collapsed,
+}: {
+  subItems: NavSubItem[];
+  pathname: string;
+  onClick?: () => void;
+  collapsed: boolean;
+}) {
+  if (collapsed || !subItems.length) return null;
+  return (
+    <ul className="ml-2 mt-1 space-y-0.5 border-l border-[var(--sidebar-border)] pl-2">
+      {subItems.map((sub) => {
+        const subActive = pathname === sub.href || pathname.startsWith(`${sub.href}/`);
+        return (
+          <li key={sub.href}>
+            <Link
+              href={sub.href}
+              onClick={onClick}
+              className={`block rounded py-1.5 pl-2 pr-1 text-xs transition-colors ${
+                subActive
+                  ? "font-medium text-[var(--sidebar-accent-foreground)]"
+                  : "text-[var(--sidebar-foreground)]/90 hover:bg-[var(--sidebar-accent)]/60"
+              }`}
+              style={
+                subActive
+                  ? { background: "var(--sidebar-accent)" }
+                  : undefined
+              }
+            >
+              {sub.label}
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 function SortableNavItem({
   item,
   isActive,
   onClick,
   collapsed,
+  pathname,
 }: {
   item: NavItem;
   isActive: boolean;
   onClick?: () => void;
   collapsed: boolean;
+  pathname: string;
 }) {
   const Icon = item.icon;
   const {
@@ -100,11 +146,9 @@ function SortableNavItem({
     transition,
   };
 
-  const linkContent = (
+  const mainRow = (
     <div
-      ref={setNodeRef}
       style={{
-        ...style,
         borderLeftColor: isActive ? "var(--sidebar-primary)" : "transparent",
         background: isActive ? "var(--sidebar-accent)" : "transparent",
       }}
@@ -139,10 +183,26 @@ function SortableNavItem({
     </div>
   );
 
+  const sortableBlock = (
+    <div ref={setNodeRef} style={style}>
+      {mainRow}
+      <NavSubLinks
+        subItems={item.subItems ?? []}
+        pathname={pathname}
+        onClick={onClick}
+        collapsed={collapsed}
+      />
+    </div>
+  );
+
   if (collapsed) {
     return (
       <Tooltip delayDuration={0}>
-        <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+        <TooltipTrigger asChild>
+          <div ref={setNodeRef} style={style}>
+            {mainRow}
+          </div>
+        </TooltipTrigger>
         <TooltipContent side="right" sideOffset={8}>
           {item.label}
         </TooltipContent>
@@ -150,7 +210,7 @@ function SortableNavItem({
     );
   }
 
-  return linkContent;
+  return sortableBlock;
 }
 
 function NavLink({
@@ -160,6 +220,8 @@ function NavLink({
   isActive,
   onClick,
   collapsed,
+  subItems,
+  pathname,
 }: {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
@@ -167,6 +229,8 @@ function NavLink({
   isActive: boolean;
   onClick?: () => void;
   collapsed: boolean;
+  subItems?: NavSubItem[];
+  pathname: string;
 }) {
   const linkContent = (
     <Link
@@ -197,7 +261,17 @@ function NavLink({
     );
   }
 
-  return linkContent;
+  return (
+    <>
+      {linkContent}
+      <NavSubLinks
+        subItems={subItems ?? []}
+        pathname={pathname}
+        onClick={onClick}
+        collapsed={collapsed}
+      />
+    </>
+  );
 }
 
 const navItems: NavItem[] = [
@@ -208,17 +282,8 @@ const navItems: NavItem[] = [
     icon: Laptop,
     label: "Majetek",
     module: "equipment",
-    isActive: (p) =>
-      p.startsWith("/equipment") &&
-      !p.startsWith("/equipment/prirazeni") &&
-      !p.startsWith("/equipment/protokol"),
-  },
-  {
-    href: "/equipment/prirazeni",
-    icon: UserCheck,
-    label: "Přiřazení majetku",
-    module: "equipment",
-    isActive: (p) => p.startsWith("/equipment/prirazeni"),
+    subItems: [{ href: "/equipment/prirazeni", label: "Přiřazení majetku" }],
+    isActive: (p) => p.startsWith("/equipment"),
   },
   { href: "/calendar", icon: Calendar, label: "Kalendář", module: "calendar" },
   { href: "/contracts", icon: FileText, label: "Evidence smluv", module: null },
@@ -390,6 +455,7 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
                         isActive={!!isActive}
                         onClick={onClose}
                         collapsed={isCollapsed}
+                        pathname={pathname}
                       />
                     </li>
                   );
@@ -408,6 +474,8 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
                     isActive={!!isActive}
                     onClick={onClose}
                     collapsed={isCollapsed}
+                    subItems={item.subItems}
+                    pathname={pathname}
                   />
                 </li>
               );
@@ -425,6 +493,7 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
                   isActive={pathname.startsWith("/admin")}
                   onClick={onClose}
                   collapsed={isCollapsed}
+                  pathname={pathname}
                 />
               </li>
               <li>
@@ -435,6 +504,7 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
                   isActive={pathname === "/admin/reports"}
                   onClick={onClose}
                   collapsed={isCollapsed}
+                  pathname={pathname}
                 />
               </li>
             </>
@@ -449,6 +519,7 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
               isActive={false}
               onClick={onClose}
               collapsed={isCollapsed}
+              pathname={pathname}
             />
           </li>
           <li>
@@ -459,6 +530,7 @@ export function Sidebar({ user, isAdmin, moduleAccess, mobileOpen = false, onClo
               isActive={false}
               onClick={onClose}
               collapsed={isCollapsed}
+              pathname={pathname}
             />
           </li>
         </ul>
