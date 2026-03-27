@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { ArrowLeft, Mail, Phone, Building2, Pencil, QrCode } from "lucide-react";
+import { ContactDetailTabs } from "../ContactDetailTabs";
 
 export default async function ContactViewPage({
   params,
@@ -53,92 +54,94 @@ export default async function ContactViewPage({
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-6 md:flex-row">
-          <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-red-600 text-2xl font-bold text-white">
-            {contact.first_name[0]}{contact.last_name[0]}
-          </div>
-          <div className="flex-1 space-y-4">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">{name}</h2>
-              {contact.position && (
-                <p className="text-gray-600">{contact.position}</p>
-              )}
-              {contact.roles?.name && (
-                <span className="mt-1 inline-block rounded bg-red-100 px-2 py-0.5 text-sm text-red-700">
-                  {contact.roles.name}
-                </span>
-              )}
+      <ContactDetailTabs personalPhone={contact.personal_phone} personalEmail={contact.personal_email}>
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-6 md:flex-row">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-red-600 text-2xl font-bold text-white">
+              {contact.first_name[0]}{contact.last_name[0]}
             </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex items-center gap-3">
-                <Mail className="h-5 w-5 text-gray-400" />
-                <div>
-                  <p className="text-xs text-gray-500">E-mail</p>
-                  <a href={`mailto:${contact.email}`} className="text-red-600 hover:underline">
-                    {contact.email}
-                  </a>
-                </div>
+            <div className="flex-1 space-y-4">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">{name}</h2>
+                {contact.position && (
+                  <p className="text-gray-600">{contact.position}</p>
+                )}
+                {contact.roles?.name && (
+                  <span className="mt-1 inline-block rounded bg-red-100 px-2 py-0.5 text-sm text-red-700">
+                    {contact.roles.name}
+                  </span>
+                )}
               </div>
-              {contact.phone && (
+
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex items-center gap-3">
-                  <Phone className="h-5 w-5 text-gray-400" />
+                  <Mail className="h-5 w-5 text-gray-400" />
                   <div>
-                    <p className="text-xs text-gray-500">Mobil</p>
-                    <a href={`tel:${contact.phone}`} className="text-red-600 hover:underline">
-                      {contact.phone}
+                    <p className="text-xs text-gray-500">E-mail</p>
+                    <a href={`mailto:${contact.email}`} className="text-red-600 hover:underline">
+                      {contact.email}
                     </a>
                   </div>
                 </div>
-              )}
-              {contact.landline && (
-                <div className="flex items-center gap-3">
-                  <Phone className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500">Pevná linka</p>
-                    <span>{contact.landline}</span>
+                {contact.phone && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-5 w-5 text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-500">Mobil</p>
+                      <a href={`tel:${contact.phone}`} className="text-red-600 hover:underline">
+                        {contact.phone}
+                      </a>
+                    </div>
                   </div>
-                </div>
-              )}
-              {contact.landline2 && (
-                <div className="flex items-center gap-3">
-                  <Phone className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500">Tel. linka 2</p>
-                    <span>{contact.landline2}</span>
+                )}
+                {contact.landline && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-5 w-5 text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-500">Pevná linka</p>
+                      <span>{contact.landline}</span>
+                    </div>
                   </div>
-                </div>
-              )}
-              {contact.department_name && (
-                <div className="flex items-center gap-3">
-                  <Building2 className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500">Oddělení</p>
-                    <span>{contact.department_name}</span>
+                )}
+                {contact.landline2 && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-5 w-5 text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-500">Tel. linka 2</p>
+                      <span>{contact.landline2}</span>
+                    </div>
                   </div>
-                </div>
-              )}
-              {contact.qr_code && (
-                <div className="flex items-center gap-3">
-                  <QrCode className="h-5 w-5 text-gray-400" />
-                  <div>
-                    <p className="text-xs text-gray-500">QR kód</p>
-                    <span className="font-mono">{contact.qr_code}</span>
+                )}
+                {contact.department_name && (
+                  <div className="flex items-center gap-3">
+                    <Building2 className="h-5 w-5 text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-500">Oddělení</p>
+                      <span>{contact.department_name}</span>
+                    </div>
                   </div>
+                )}
+                {contact.qr_code && (
+                  <div className="flex items-center gap-3">
+                    <QrCode className="h-5 w-5 text-gray-400" />
+                    <div>
+                      <p className="text-xs text-gray-500">QR kód</p>
+                      <span className="font-mono">{contact.qr_code}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {contact.notes && (
+                <div className="border-t border-gray-200 pt-4">
+                  <p className="text-xs text-gray-500">Poznámky</p>
+                  <p className="mt-1 text-gray-700">{contact.notes}</p>
                 </div>
               )}
             </div>
-
-            {contact.notes && (
-              <div className="border-t border-gray-200 pt-4">
-                <p className="text-xs text-gray-500">Poznámky</p>
-                <p className="mt-1 text-gray-700">{contact.notes}</p>
-              </div>
-            )}
           </div>
         </div>
-      </div>
+      </ContactDetailTabs>
     </>
   );
 }

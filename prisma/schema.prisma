@@ -728,6 +728,8 @@ model users {
   phone                                                          String?                       @db.VarChar(20)
   landline                                                       String?                       @db.VarChar(20)
   landline2                                                      String?                       @db.VarChar(20)
+  personal_phone                                                 String?                       @db.VarChar(20)
+  personal_email                                                 String?                       @db.VarChar(100)
   department_id                                                  Int?
   department_name                                                String?                       @db.VarChar(100)
   position                                                       String?                       @db.VarChar(100)

@@ -14,6 +14,8 @@ type ContactData = {
   phone?: string | null;
   landline?: string | null;
   landline2?: string | null;
+  personal_phone?: string | null;
+  personal_email?: string | null;
   position?: string | null;
   department_name?: string | null;
   display_in_list?: boolean | null;
@@ -24,6 +26,7 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
   const isEdit = !!contact?.id;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [tab, setTab] = useState<"main" | "personal">("main");
   const [form, setForm] = useState({
     username: contact?.username ?? "",
     email: contact?.email ?? "",
@@ -32,6 +35,8 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
     phone: contact?.phone ?? "",
     landline: contact?.landline ?? "",
     landline2: contact?.landline2 ?? "",
+    personal_phone: contact?.personal_phone ?? "",
+    personal_email: contact?.personal_email ?? "",
     position: contact?.position ?? "",
     department_name: contact?.department_name ?? "",
     display_in_list: contact?.display_in_list !== false,
@@ -74,6 +79,28 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
         <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
       )}
 
+      <div className="flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+        <button
+          type="button"
+          onClick={() => setTab("main")}
+          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            tab === "main" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          Pracovní údaje
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("personal")}
+          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+            tab === "personal" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          Osobní údaje
+        </button>
+      </div>
+
+      {tab === "main" && (
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Základní údaje</h2>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -148,7 +175,9 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
           </div>
         </div>
       </div>
+      )}
 
+      {tab === "main" && (
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Kontakt</h2>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -181,6 +210,36 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
           </div>
         </div>
       </div>
+      )}
+
+      {tab === "personal" && (
+      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h2 className="mb-2 text-lg font-semibold text-gray-900">Osobní kontakt</h2>
+        <p className="mb-4 text-sm text-gray-500">
+          Pouze informativní údaje, nepoužívají se pro přihlášení ani jiné funkce systému.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Osobní telefon</label>
+            <input
+              type="tel"
+              value={form.personal_phone}
+              onChange={(e) => setForm({ ...form, personal_phone: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Osobní e-mail</label>
+            <input
+              type="email"
+              value={form.personal_email}
+              onChange={(e) => setForm({ ...form, personal_email: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+          </div>
+        </div>
+      </div>
+      )}
 
       <div className="flex gap-3">
         <button

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import bcrypt from "bcryptjs";
+import { notifyContactsEditorsNewContact } from "@/lib/contacts-notify";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -105,6 +106,8 @@ export async function POST(req: NextRequest) {
       phone = "",
       landline = "",
       landline2 = "",
+      personal_phone = "",
+      personal_email = "",
       position = "",
       department_name = "",
       role_id = 1,
@@ -139,6 +142,8 @@ export async function POST(req: NextRequest) {
         phone: phone.trim() || null,
         landline: landline.trim() || null,
         landline2: landline2.trim() || null,
+        personal_phone: personal_phone.trim() || null,
+        personal_email: personal_email.trim() || null,
         position: position.trim() || null,
         department_name: department_name.trim() || null,
         role_id: role_id || null,
@@ -155,6 +160,9 @@ export async function POST(req: NextRequest) {
     } catch {
       // již existuje
     }
+
+    const displayName = `${first_name.trim()} ${last_name.trim()}`.trim();
+    await notifyContactsEditorsNewContact(userId, user.id, displayName || username.trim());
 
     return NextResponse.json({ success: true, id: user.id, qr_code: qrCode });
   } catch (e) {

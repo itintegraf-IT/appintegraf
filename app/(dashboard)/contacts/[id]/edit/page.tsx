@@ -33,6 +33,8 @@ export default async function EditContactPage({
       position: true,
       department_name: true,
       display_in_list: true,
+      personal_phone: true,
+      personal_email: true,
     },
   });
 
