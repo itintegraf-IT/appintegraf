@@ -30,6 +30,8 @@ export default async function EquipmentPage({
     purchase_date: Date | null;
     equipment_categories?: { name: string };
     assignment_id?: number | null;
+    /** Komu je přiřazeno (aktivní přiřazení) */
+    assigned_to_name?: string | null;
   };
   let equipment: EquipmentRow[] = [];
 
@@ -42,16 +44,24 @@ export default async function EquipmentPage({
         equipment_assignments: {
           where: { returned_at: null },
           take: 1,
-          select: { id: true },
+          select: {
+            id: true,
+            users_equipment_assignments_user_idTousers: {
+              select: { first_name: true, last_name: true },
+            },
+          },
         },
       },
     });
     equipment = rows.map((r) => {
       const a = r.equipment_assignments[0];
+      const u = a?.users_equipment_assignments_user_idTousers;
+      const assigned_to_name = u ? `${u.last_name} ${u.first_name}`.trim() : null;
       const { equipment_assignments: _, ...item } = r;
       return {
         ...item,
         assignment_id: a?.id ?? null,
+        assigned_to_name,
       };
     });
   } else {
@@ -61,13 +71,21 @@ export default async function EquipmentPage({
         equipment_items: {
           include: { equipment_categories: { select: { name: true } } },
         },
+        users_equipment_assignments_user_idTousers: {
+          select: { first_name: true, last_name: true },
+        },
       },
       orderBy: { assigned_at: "desc" },
     });
-    equipment = assignments.map((a) => ({
-      ...a.equipment_items,
-      assignment_id: a.id,
-    }));
+    equipment = assignments.map((a) => {
+      const u = a.users_equipment_assignments_user_idTousers;
+      const assigned_to_name = u ? `${u.last_name} ${u.first_name}`.trim() : null;
+      return {
+        ...a.equipment_items,
+        assignment_id: a.id,
+        assigned_to_name,
+      };
+    });
   }
 
   const formatDate = (d: Date | null) =>
@@ -173,7 +191,17 @@ export default async function EquipmentPage({
                     <td className="px-4 py-3 font-mono text-sm">{e.serial_number ?? "-"}</td>
                     <td className="px-4 py-3">{e.equipment_categories?.name ?? "-"}</td>
                     <td className="px-4 py-3">
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">{e.status ?? "-"}</span>
+                      <div className="flex flex-col gap-1">
+                        <span className="w-fit rounded bg-gray-100 px-2 py-0.5 text-sm">
+                          {e.status ?? "-"}
+                        </span>
+                        {scope === "all" && e.assigned_to_name ? (
+                          <span className="max-w-[14rem] text-xs leading-snug text-gray-600">
+                            <span className="text-gray-400">Uživatel: </span>
+                            {e.assigned_to_name}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td className="px-4 py-3">{formatDate(e.purchase_date)}</td>
                     <td className="px-4 py-3">
