@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -40,6 +40,7 @@ import {
   Factory,
   GripVertical,
   FileText,
+  ChevronDown,
 } from "lucide-react";
 import {
   Tooltip,
@@ -75,6 +76,53 @@ function navItemIsActive(item: NavItem, pathname: string): boolean {
   if (item.href === "/") return pathname === "/";
   if (item.isActive) return item.isActive(pathname);
   return pathname.startsWith(item.href);
+}
+
+const SUBMENU_LEAVE_MS = 220;
+
+function useSubmenuExpand(
+  subItems: NavSubItem[],
+  pathname: string,
+  collapsed: boolean
+) {
+  const hasSubs = subItems.length > 0;
+  const isSubActive =
+    hasSubs &&
+    subItems.some((s) => pathname === s.href || pathname.startsWith(`${s.href}/`));
+  const [hover, setHover] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (leaveTimer.current) clearTimeout(leaveTimer.current);
+    };
+  }, []);
+
+  const clearLeave = useCallback(() => {
+    if (leaveTimer.current) {
+      clearTimeout(leaveTimer.current);
+      leaveTimer.current = null;
+    }
+  }, []);
+
+  const onEnter = useCallback(() => {
+    if (!hasSubs || collapsed) return;
+    clearLeave();
+    setHover(true);
+  }, [hasSubs, collapsed, clearLeave]);
+
+  const onLeave = useCallback(() => {
+    if (!hasSubs || collapsed) return;
+    clearLeave();
+    leaveTimer.current = setTimeout(() => setHover(false), SUBMENU_LEAVE_MS);
+  }, [hasSubs, collapsed, clearLeave]);
+
+  const togglePinned = useCallback(() => setPinned((p) => !p), []);
+
+  const showSub = hasSubs && !collapsed && (isSubActive || hover || pinned);
+
+  return { showSub, onEnter, onLeave, togglePinned, hasSubs };
 }
 
 function NavSubLinks({
@@ -132,6 +180,12 @@ function SortableNavItem({
   pathname: string;
 }) {
   const Icon = item.icon;
+  const subs = item.subItems ?? [];
+  const { showSub, onEnter, onLeave, togglePinned, hasSubs } = useSubmenuExpand(
+    subs,
+    pathname,
+    collapsed
+  );
   const {
     attributes,
     listeners,
@@ -180,18 +234,56 @@ function SortableNavItem({
         <Icon className="h-5 w-5 shrink-0" />
         {!collapsed && <span className="truncate">{item.label}</span>}
       </Link>
+      {hasSubs && !collapsed && (
+        <button
+          type="button"
+          aria-expanded={showSub}
+          aria-label={showSub ? "Sbalit podnabídku" : "Rozbalit podnabídku"}
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            togglePinned();
+          }}
+          className="shrink-0 rounded p-0.5 hover:bg-[var(--sidebar-accent)]/80"
+          style={{ color: "var(--sidebar-foreground)" }}
+        >
+          <ChevronDown
+            className={`h-4 w-4 transition-transform duration-200 ${showSub ? "rotate-180" : ""}`}
+            aria-hidden
+          />
+        </button>
+      )}
     </div>
   );
 
+  const subPanel =
+    hasSubs && !collapsed ? (
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+          showSub ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+        aria-hidden={!showSub}
+      >
+        <div className={`min-h-0 overflow-hidden ${!showSub ? "pointer-events-none" : ""}`}>
+          <NavSubLinks
+            subItems={subs}
+            pathname={pathname}
+            onClick={onClick}
+            collapsed={false}
+          />
+        </div>
+      </div>
+    ) : null;
+
   const sortableBlock = (
-    <div ref={setNodeRef} style={style}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      onMouseEnter={hasSubs && !collapsed ? onEnter : undefined}
+      onMouseLeave={hasSubs && !collapsed ? onLeave : undefined}
+    >
       {mainRow}
-      <NavSubLinks
-        subItems={item.subItems ?? []}
-        pathname={pathname}
-        onClick={onClick}
-        collapsed={collapsed}
-      />
+      {subPanel}
     </div>
   );
 
@@ -232,28 +324,85 @@ function NavLink({
   subItems?: NavSubItem[];
   pathname: string;
 }) {
-  const linkContent = (
+  const subs = subItems ?? [];
+  const { showSub, onEnter, onLeave, togglePinned, hasSubs } = useSubmenuExpand(
+    subs,
+    pathname,
+    collapsed
+  );
+
+  const rowStyle = {
+    background: isActive ? "var(--sidebar-accent)" : "transparent",
+    color: isActive ? "var(--sidebar-accent-foreground)" : "var(--sidebar-foreground)",
+    borderLeftColor: isActive ? "var(--sidebar-primary)" : "transparent",
+  } as const;
+
+  const linkOnly = (
     <Link
       href={href}
       onClick={onClick}
       className={`flex items-center gap-3 rounded-lg border-l-[3px] px-3 py-2 text-sm transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)] ${
         collapsed ? "justify-center px-2" : ""
       }`}
-      style={{
-        background: isActive ? "var(--sidebar-accent)" : "transparent",
-        color: isActive ? "var(--sidebar-accent-foreground)" : "var(--sidebar-foreground)",
-        borderLeftColor: isActive ? "var(--sidebar-primary)" : "transparent",
-      }}
+      style={rowStyle}
     >
       <Icon className="h-5 w-5 shrink-0" />
       {!collapsed && <span>{label}</span>}
     </Link>
   );
 
+  const rowWithSubs = (
+    <div
+      className="flex items-center gap-1 rounded-lg border-l-[3px] px-2 py-2 text-sm transition-colors hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+      style={rowStyle}
+    >
+      <Link
+        href={href}
+        onClick={onClick}
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-r-lg py-0.5 hover:bg-[var(--sidebar-accent)] hover:text-[var(--sidebar-accent-foreground)]"
+        style={{ color: rowStyle.color }}
+      >
+        <Icon className="h-5 w-5 shrink-0" />
+        <span className="truncate">{label}</span>
+      </Link>
+      <button
+        type="button"
+        aria-expanded={showSub}
+        aria-label={showSub ? "Sbalit podnabídku" : "Rozbalit podnabídku"}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          togglePinned();
+        }}
+        className="shrink-0 rounded p-0.5 hover:bg-[var(--sidebar-accent)]/80"
+        style={{ color: "var(--sidebar-foreground)" }}
+      >
+        <ChevronDown
+          className={`h-4 w-4 transition-transform duration-200 ${showSub ? "rotate-180" : ""}`}
+          aria-hidden
+        />
+      </button>
+    </div>
+  );
+
+  const subPanel =
+    hasSubs && !collapsed ? (
+      <div
+        className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+          showSub ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+        }`}
+        aria-hidden={!showSub}
+      >
+        <div className={`min-h-0 overflow-hidden ${!showSub ? "pointer-events-none" : ""}`}>
+          <NavSubLinks subItems={subs} pathname={pathname} onClick={onClick} collapsed={false} />
+        </div>
+      </div>
+    ) : null;
+
   if (collapsed) {
     return (
       <Tooltip delayDuration={0}>
-        <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+        <TooltipTrigger asChild>{linkOnly}</TooltipTrigger>
         <TooltipContent side="right" sideOffset={8}>
           {label}
         </TooltipContent>
@@ -261,17 +410,16 @@ function NavLink({
     );
   }
 
-  return (
-    <>
-      {linkContent}
-      <NavSubLinks
-        subItems={subItems ?? []}
-        pathname={pathname}
-        onClick={onClick}
-        collapsed={collapsed}
-      />
-    </>
-  );
+  if (hasSubs) {
+    return (
+      <div onMouseEnter={onEnter} onMouseLeave={onLeave}>
+        {rowWithSubs}
+        {subPanel}
+      </div>
+    );
+  }
+
+  return linkOnly;
 }
 
 const navItems: NavItem[] = [
