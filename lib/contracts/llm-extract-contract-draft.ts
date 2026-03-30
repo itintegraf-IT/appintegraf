@@ -126,12 +126,26 @@ function normalizeDraft(
   };
 }
 
-async function callOllama(prompt: string): Promise<string> {
-  const base = (
-    process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434"
-  ).replace(/\/$/, "");
-  const model = process.env.OLLAMA_MODEL ?? "llama3.2";
-  const res = await fetch(`${base}/api/chat`, {
+/**
+ * Řetěz modelů Ollama: první (typicky mistral) = rychlejší, druhý (typicky llama3) = záloha při selhání.
+ * `OLLAMA_MODEL_FALLBACK=""` vypne zálohu (jen jeden model).
+ */
+export function getOllamaModelChain(): string[] {
+  const primary = process.env.OLLAMA_MODEL?.trim() || "mistral:latest";
+  if (process.env.OLLAMA_MODEL_FALLBACK === "") {
+    return [primary];
+  }
+  const fallback = process.env.OLLAMA_MODEL_FALLBACK?.trim() ?? "llama3:latest";
+  if (!fallback || fallback === primary) return [primary];
+  return [primary, fallback];
+}
+
+async function callOllama(
+  prompt: string,
+  model: string,
+  baseUrl: string
+): Promise<string> {
+  const res = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -150,6 +164,25 @@ async function callOllama(prompt: string): Promise<string> {
   const content = data.message?.content;
   if (!content) throw new Error("Ollama nevrátila obsah odpovědi.");
   return content;
+}
+
+function parseLlmJsonToDraft(
+  raw: string,
+  validTypeIds: Set<number>
+): ExtractedContractDraft {
+  let parsed: Record<string, unknown>;
+  try {
+    const j = parseJsonFromLlm(raw);
+    if (!j || typeof j !== "object") throw new Error("Neplatná JSON odpověď.");
+    parsed = j as Record<string, unknown>;
+  } catch (e) {
+    throw new Error(
+      e instanceof Error
+        ? `Parsování odpovědi LLM selhalo: ${e.message}`
+        : "Parsování odpovědi LLM selhalo."
+    );
+  }
+  return normalizeDraft(parsed, validTypeIds);
 }
 
 async function callOpenAiCompatible(prompt: string): Promise<string> {
@@ -182,31 +215,52 @@ async function callOpenAiCompatible(prompt: string): Promise<string> {
   return content;
 }
 
+export type ExtractContractDraftWithLlmResult = {
+  draft: ExtractedContractDraft;
+  /** Který model Ollama odpověď vygeneroval (při OpenAI-compat API undefined). */
+  ollamaModelUsed?: string;
+};
+
 /**
- * Vybere poskytovatele: pokud je nastavené OpenAI-kompatibilní URL, použije ho, jinak Ollama.
+ * Vybere poskytovatele: OpenAI-kompatibilní API, nebo Ollama s řetězením modelů (záloha při chybě).
  */
 export async function extractContractDraftWithLlm(
   contractText: string,
   types: ContractTypeForPrompt[]
-): Promise<ExtractedContractDraft> {
+): Promise<ExtractContractDraftWithLlmResult> {
   const prompt = buildPrompt(contractText, types);
   const validIds = new Set(types.map((t) => t.id));
 
   const useCompat = Boolean(process.env.CONTRACT_EXTRACT_OPENAI_COMPAT_URL?.trim());
-  const raw = useCompat ? await callOpenAiCompatible(prompt) : await callOllama(prompt);
-
-  let parsed: Record<string, unknown>;
-  try {
-    const j = parseJsonFromLlm(raw);
-    if (!j || typeof j !== "object") throw new Error("Neplatná JSON odpověď.");
-    parsed = j as Record<string, unknown>;
-  } catch (e) {
-    throw new Error(
-      e instanceof Error
-        ? `Parsování odpovědi LLM selhalo: ${e.message}`
-        : "Parsování odpovědi LLM selhalo."
-    );
+  if (useCompat) {
+    const raw = await callOpenAiCompatible(prompt);
+    return { draft: parseLlmJsonToDraft(raw, validIds) };
   }
 
-  return normalizeDraft(parsed, validIds);
+  const base = (
+    process.env.OLLAMA_BASE_URL ?? "http://127.0.0.1:11434"
+  ).replace(/\/$/, "");
+  const models = getOllamaModelChain();
+  const failures: string[] = [];
+
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+    try {
+      const raw = await callOllama(prompt, model, base);
+      const draft = parseLlmJsonToDraft(raw, validIds);
+      return { draft, ollamaModelUsed: model };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      failures.push(`${model}: ${msg}`);
+      if (i === models.length - 1) {
+        throw new Error(
+          models.length > 1
+            ? `Všechny modely selhaly (${failures.join(" → ")}).`
+            : failures[0] ?? "Neznámá chyba Ollama."
+        );
+      }
+    }
+  }
+
+  throw new Error("Žádný model Ollama.");
 }

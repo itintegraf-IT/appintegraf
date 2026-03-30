@@ -151,9 +151,14 @@ export function ContractForm({ mode, contractId, initial }: Props) {
       if (ex.expires_at) setExpiresAt(ex.expires_at.slice(0, 10));
       if (ex.contract_type_id != null) setContractTypeId(String(ex.contract_type_id));
 
-      const meta = data.meta as { pageCount?: number; textLength?: number } | undefined;
+      const meta = data.meta as {
+        pageCount?: number;
+        textLength?: number;
+        ollamaModel?: string;
+      } | undefined;
       const parts = [
         "Pole formuláře byla doplněna návrhem z AI – zkontrolujte je před uložením (zejména typ smlouvy a částky).",
+        meta?.ollamaModel ? `Model: ${meta.ollamaModel}.` : null,
         meta?.pageCount != null ? `Stran PDF: ${meta.pageCount}.` : null,
         meta?.textLength != null ? `Délka textu: ${meta.textLength} znaků.` : null,
         ex.notes ? `Poznámka k obsahu: ${ex.notes}` : null,

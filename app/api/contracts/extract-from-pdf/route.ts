@@ -5,7 +5,8 @@ import { extractTextFromPdfBuffer } from "@/lib/contracts/extract-text-from-pdf"
 import { extractContractDraftWithLlm } from "@/lib/contracts/llm-extract-contract-draft";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+/** Dva modely za sebou (mistral → záloha) mohou trvat déle než jeden běh. */
+export const maxDuration = 300;
 
 const MAX_BYTES = 15 * 1024 * 1024;
 
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const extracted = await extractContractDraftWithLlm(text, types);
+    const { draft: extracted, ollamaModelUsed } = await extractContractDraftWithLlm(text, types);
     return NextResponse.json({
       extracted,
       meta: {
@@ -97,6 +98,7 @@ export async function POST(req: NextRequest) {
         provider: process.env.CONTRACT_EXTRACT_OPENAI_COMPAT_URL?.trim()
           ? "openai_compat"
           : "ollama",
+        ollamaModel: ollamaModelUsed, // který model odpověď vygeneroval (při záloze např. llama3:latest)
       },
     });
   } catch (e) {
@@ -104,7 +106,7 @@ export async function POST(req: NextRequest) {
     const msg = e instanceof Error ? e.message : "Neznámá chyba";
     const hint =
       !process.env.CONTRACT_EXTRACT_OPENAI_COMPAT_URL?.trim()
-        ? "Spusťte lokálně Ollama (https://ollama.com) a model např. `ollama pull llama3.2`, nebo nastavte CONTRACT_EXTRACT_OPENAI_COMPAT_URL."
+        ? "Zkontrolujte OLLAMA_BASE_URL, modely (mistral + llama3) a síťový přístup, nebo nastavte CONTRACT_EXTRACT_OPENAI_COMPAT_URL."
         : "Zkontrolujte URL, klíč a model u poskytovatele API.";
     return NextResponse.json(
       {
