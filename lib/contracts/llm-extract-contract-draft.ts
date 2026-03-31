@@ -21,6 +21,21 @@ export type ExtractedContractDraft = {
 
 const MAX_TEXT = 28_000;
 
+/**
+ * Timeout na jeden požadavek k LLM (Ollama často běží na CPU – 2 min nestačí).
+ * Výchozí 10 min; lze zvýšit přes LLM_REQUEST_TIMEOUT_MS nebo OLLAMA_CHAT_TIMEOUT_MS (ms).
+ */
+function getLlmRequestTimeoutMs(): number {
+  const raw =
+    process.env.LLM_REQUEST_TIMEOUT_MS?.trim() ??
+    process.env.OLLAMA_CHAT_TIMEOUT_MS?.trim();
+  if (raw) {
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 10_000) return Math.min(n, 3_600_000);
+  }
+  return 600_000;
+}
+
 function truncateForLlm(text: string): string {
   if (text.length <= MAX_TEXT) return text;
   const half = Math.floor(MAX_TEXT / 2) - 100;
@@ -154,7 +169,7 @@ async function callOllama(
       stream: false,
       format: "json",
     }),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(getLlmRequestTimeoutMs()),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
@@ -201,7 +216,7 @@ async function callOpenAiCompatible(prompt: string): Promise<string> {
       model,
       messages: [{ role: "user", content: prompt }],
     }),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(getLlmRequestTimeoutMs()),
   });
   if (!res.ok) {
     const errText = await res.text().catch(() => "");

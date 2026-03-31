@@ -5,8 +5,8 @@ import { extractTextFromPdfBuffer } from "@/lib/contracts/extract-text-from-pdf"
 import { extractContractDraftWithLlm } from "@/lib/contracts/llm-extract-contract-draft";
 
 export const runtime = "nodejs";
-/** Dva modely za sebou (mistral → záloha) mohou trvat déle než jeden běh. */
-export const maxDuration = 300;
+/** Dva modely za sebou + dlouhý běh na CPU (výchozí timeout 10 min na model). */
+export const maxDuration = 1200;
 
 const MAX_BYTES = 15 * 1024 * 1024;
 

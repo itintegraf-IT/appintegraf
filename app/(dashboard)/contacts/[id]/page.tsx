@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
-import { hasModuleAccess } from "@/lib/auth-utils";
+import { canViewContactVizitka, hasModuleAccess } from "@/lib/auth-utils";
+import { buildOutlookContactSignatureHtml, getContactSignatureAssetBaseUrl } from "@/lib/contact-signature-html";
 import { prisma } from "@/lib/db";
 import { ArrowLeft, Mail, Phone, Building2, Pencil, QrCode } from "lucide-react";
 import { ContactDetailTabs } from "../ContactDetailTabs";
+import { ContactVizitkaTab } from "../ContactVizitkaTab";
 
 export default async function ContactViewPage({
   params,
@@ -24,6 +26,21 @@ export default async function ContactViewPage({
   });
 
   if (!contact) notFound();
+
+  const showVizitka = await canViewContactVizitka(userId, id);
+  const assetBaseUrl = await getContactSignatureAssetBaseUrl();
+  const signatureHtml = showVizitka
+    ? buildOutlookContactSignatureHtml(
+        {
+          firstName: contact.first_name,
+          lastName: contact.last_name,
+          position: contact.position,
+          email: contact.email,
+          phone: contact.phone,
+        },
+        assetBaseUrl
+      )
+    : "";
 
   const name = `${contact.first_name} ${contact.last_name}`;
 
@@ -54,7 +71,12 @@ export default async function ContactViewPage({
         </div>
       </div>
 
-      <ContactDetailTabs personalPhone={contact.personal_phone} personalEmail={contact.personal_email}>
+      <ContactDetailTabs
+        personalPhone={contact.personal_phone}
+        personalEmail={contact.personal_email}
+        showVizitka={showVizitka}
+        vizitkaSlot={showVizitka ? <ContactVizitkaTab signatureHtml={signatureHtml} /> : undefined}
+      >
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex flex-col gap-6 md:flex-row">
             <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-red-600 text-2xl font-bold text-white">

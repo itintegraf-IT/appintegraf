@@ -7,18 +7,27 @@ type Props = {
   personalPhone: string | null;
   personalEmail: string | null;
   children: React.ReactNode;
+  /** Zobrazí záložku Vizitka (HTML podpis Outlook) */
+  showVizitka?: boolean;
+  vizitkaSlot?: React.ReactNode;
 };
 
-export function ContactDetailTabs({ personalPhone, personalEmail, children }: Props) {
-  const [tab, setTab] = useState<"overview" | "personal">("overview");
+export function ContactDetailTabs({
+  personalPhone,
+  personalEmail,
+  children,
+  showVizitka = false,
+  vizitkaSlot,
+}: Props) {
+  const [tab, setTab] = useState<"overview" | "personal" | "vizitka">("overview");
 
   return (
     <>
-      <div className="mb-4 flex gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
+      <div className="mb-4 flex flex-wrap gap-1 rounded-lg border border-gray-200 bg-gray-50 p-1">
         <button
           type="button"
           onClick={() => setTab("overview")}
-          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+          className={`min-w-[7rem] flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
             tab === "overview" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
           }`}
         >
@@ -27,17 +36,28 @@ export function ContactDetailTabs({ personalPhone, personalEmail, children }: Pr
         <button
           type="button"
           onClick={() => setTab("personal")}
-          className={`flex-1 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+          className={`min-w-[7rem] flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
             tab === "personal" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
           }`}
         >
           Osobní údaje
         </button>
+        {showVizitka && vizitkaSlot && (
+          <button
+            type="button"
+            onClick={() => setTab("vizitka")}
+            className={`min-w-[7rem] flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
+              tab === "vizitka" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Vizitka
+          </button>
+        )}
       </div>
 
       {tab === "overview" ? (
         children
-      ) : (
+      ) : tab === "personal" ? (
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <p className="mb-4 text-sm text-gray-500">
             Slouží pouze k evidenci, nepoužívá se pro přihlášení ani jiné funkce systému.
@@ -65,6 +85,8 @@ export function ContactDetailTabs({ personalPhone, personalEmail, children }: Pr
             </div>
           </div>
         </div>
+      ) : (
+        vizitkaSlot
       )}
     </>
   );

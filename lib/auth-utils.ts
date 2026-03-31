@@ -131,6 +131,16 @@ export async function isAdmin(userId: number): Promise<boolean> {
 }
 
 /**
+ * Záložka „Vizitka“ u detailu kontaktu: uživatelé s oprávněním zápisu do modulu Kontakty
+ * (včetně administrátorů) ji vidí u všech kontaktů; ostatní jen u vlastního záznamu.
+ */
+export async function canViewContactVizitka(viewerUserId: number, contactUserId: number): Promise<boolean> {
+  if (viewerUserId <= 0) return false;
+  if (viewerUserId === contactUserId) return true;
+  return hasModuleAccess(viewerUserId, "contacts", "write");
+}
+
+/**
  * Vrátí ID uživatelů, kteří mají admin oprávnění pro daný modul (např. "equipment" = Majetek).
  * Použito pro notifikace při nových požadavcích.
  */
