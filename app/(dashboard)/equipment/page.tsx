@@ -3,8 +3,19 @@ import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { Laptop, Plus, ClipboardList, UserCheck } from "lucide-react";
+import { equipmentAgeFromRecord } from "@/lib/equipment-age";
 import { EquipmentRequestsTab } from "./EquipmentRequestsTab";
 import { EquipmentTableActions } from "./EquipmentTableActions";
+import { isEquipmentAssignedStatus } from "@/lib/equipment-status";
+
+/** Zachová `tab` a `scope` při přepínání záložek — bez toho zmizí `scope=all` a v seznamu nejsou jména přiřazených. */
+function equipmentListPath(opts: { tab?: "requests"; scope?: "all" }) {
+  const q = new URLSearchParams();
+  if (opts.tab === "requests") q.set("tab", "requests");
+  if (opts.scope === "all") q.set("scope", "all");
+  const s = q.toString();
+  return s ? `/equipment?${s}` : "/equipment";
+}
 
 export default async function EquipmentPage({
   searchParams,
@@ -28,6 +39,7 @@ export default async function EquipmentPage({
     serial_number: string | null;
     status: string | null;
     purchase_date: Date | null;
+    created_at: Date;
     equipment_categories?: { name: string };
     assignment_id?: number | null;
     /** Komu je přiřazeno (aktivní přiřazení) */
@@ -43,6 +55,7 @@ export default async function EquipmentPage({
         equipment_categories: { select: { name: true } },
         equipment_assignments: {
           where: { returned_at: null },
+          orderBy: { assigned_at: "desc" },
           take: 1,
           select: {
             id: true,
@@ -91,6 +104,9 @@ export default async function EquipmentPage({
   const formatDate = (d: Date | null) =>
     d ? new Date(d).toLocaleDateString("cs-CZ") : "-";
 
+  const scopeAll = scope === "all" ? ("all" as const) : undefined;
+  const onRequestsTab = tab === "requests";
+
   return (
     <>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -107,7 +123,10 @@ export default async function EquipmentPage({
           {equipmentRead && (
             <div className="flex rounded-lg border border-gray-200 bg-gray-50 p-1">
               <Link
-                href={tab === "requests" ? "/equipment" : "/equipment?tab=requests"}
+                href={equipmentListPath({
+                  tab: onRequestsTab ? undefined : "requests",
+                  scope: scopeAll,
+                })}
                 className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                   tab === "requests"
                     ? "bg-white text-gray-900 shadow-sm"
@@ -118,7 +137,7 @@ export default async function EquipmentPage({
                 Požadavky
               </Link>
               <Link
-                href={tab === "equipment" ? "/equipment" : "/equipment"}
+                href={equipmentListPath({ scope: scopeAll })}
                 className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                   tab === "equipment"
                     ? "bg-white text-gray-900 shadow-sm"
@@ -140,7 +159,10 @@ export default async function EquipmentPage({
           {admin && tab === "equipment" && (
             <>
               <Link
-                href={scope === "all" ? "/equipment" : "/equipment?scope=all"}
+                href={equipmentListPath({
+                  tab: onRequestsTab ? "requests" : undefined,
+                  scope: scope === "all" ? undefined : "all",
+                })}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
                 {scope === "all" ? "Moje vybavení" : "Všechno vybavení"}
@@ -171,18 +193,21 @@ export default async function EquipmentPage({
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kategorie</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nákup</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stáří</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Akce</th>
               </tr>
             </thead>
             <tbody>
               {equipment.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                     Žádné vybavení
                   </td>
                 </tr>
               ) : (
-                (equipment as EquipmentRow[]).map((e) => (
+                (equipment as EquipmentRow[]).map((e) => {
+                  const age = equipmentAgeFromRecord(e.purchase_date, e.created_at);
+                  return (
                   <tr key={e.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-4 py-3 font-medium text-gray-900">{e.name}</td>
                     <td className="px-4 py-3">
@@ -195,15 +220,24 @@ export default async function EquipmentPage({
                         <span className="w-fit rounded bg-gray-100 px-2 py-0.5 text-sm">
                           {e.status ?? "-"}
                         </span>
-                        {scope === "all" && e.assigned_to_name ? (
+                        {scope === "all" &&
+                        (e.assigned_to_name || isEquipmentAssignedStatus(e.status)) ? (
                           <span className="max-w-[14rem] text-xs leading-snug text-gray-600">
                             <span className="text-gray-400">Uživatel: </span>
-                            {e.assigned_to_name}
+                            {e.assigned_to_name ?? "—"}
                           </span>
                         ) : null}
                       </div>
                     </td>
                     <td className="px-4 py-3">{formatDate(e.purchase_date)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-sm text-gray-900">{age.text}</span>
+                        {age.source === "record" ? (
+                          <span className="text-xs text-gray-500">od zápisu (chybí nákup)</span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <EquipmentTableActions
                         equipmentId={e.id}
@@ -214,7 +248,8 @@ export default async function EquipmentPage({
                       />
                     </td>
                   </tr>
-                ))
+                  );
+                })
               )}
             </tbody>
           </table>

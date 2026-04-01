@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { Laptop, Printer, FileText, ArrowLeft } from "lucide-react";
+import { equipmentAgeFromRecord } from "@/lib/equipment-age";
 
 export default async function EquipmentPrirazeniPage() {
   const session = await auth();
@@ -35,6 +36,8 @@ export default async function EquipmentPrirazeniPage() {
           brand: true,
           model: true,
           serial_number: true,
+          purchase_date: true,
+          created_at: true,
         },
       },
     },
@@ -76,6 +79,7 @@ export default async function EquipmentPrirazeniPage() {
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Zaměstnanec</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Vybavení</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Sériové č.</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stáří</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Předáno</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Protokoly</th>
               </tr>
@@ -83,7 +87,7 @@ export default async function EquipmentPrirazeniPage() {
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
+                  <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
                     Žádná aktivní přiřazení – veškerý majetek je na skladě.
                   </td>
                 </tr>
@@ -91,6 +95,7 @@ export default async function EquipmentPrirazeniPage() {
                 rows.map((a) => {
                   const u = a.users_equipment_assignments_user_idTousers;
                   const e = a.equipment_items;
+                  const age = equipmentAgeFromRecord(e.purchase_date, e.created_at);
                   const name = u ? `${u.last_name} ${u.first_name}` : "—";
                   return (
                     <tr key={a.id} className="border-b border-gray-100 hover:bg-gray-50">
@@ -115,6 +120,12 @@ export default async function EquipmentPrirazeniPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3 font-mono text-sm">{e.serial_number ?? "—"}</td>
+                      <td className="px-4 py-3 text-sm">
+                        <div className="text-gray-900">{age.text}</div>
+                        {age.source === "record" ? (
+                          <div className="text-xs text-gray-500">od zápisu</div>
+                        ) : null}
+                      </td>
                       <td className="px-4 py-3 text-sm">{formatDate(a.assigned_at)}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center justify-end gap-2">

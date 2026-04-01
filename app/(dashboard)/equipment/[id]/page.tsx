@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
+import { equipmentAgeFromRecord } from "@/lib/equipment-age";
 import { ArrowLeft } from "lucide-react";
 import { EquipmentAssignClient } from "./EquipmentAssignClient";
 
@@ -47,6 +48,7 @@ export default async function EquipmentViewPage({
     : null;
   const canAssign = (admin || equipmentWrite) && item.status !== EQUIPMENT_ITEM_STATUS.VYRAZENO;
   const canReturn = (admin || equipmentWrite) && !!activeAssignment;
+  const age = equipmentAgeFromRecord(item.purchase_date, item.created_at);
 
   return (
     <>
@@ -99,6 +101,13 @@ export default async function EquipmentViewPage({
           <div>
             <p className="text-sm text-gray-500">Datum nákupu</p>
             <p>{item.purchase_date ? new Date(item.purchase_date).toLocaleDateString("cs-CZ") : "-"}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Stáří</p>
+            <p className="font-medium">{age.text}</p>
+            {age.source === "record" ? (
+              <p className="mt-0.5 text-xs text-gray-500">Počítáno od zápisu do evidence (chybí datum nákupu).</p>
+            ) : null}
           </div>
           <div>
             <p className="text-sm text-gray-500">Dodavatel</p>
