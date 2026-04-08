@@ -62,6 +62,7 @@ export async function GET(req: NextRequest) {
               contacts: "admin",
               equipment: "admin",
               calendar: "admin",
+              contracts: "admin",
               planovani: "admin",
               vyroba: "admin",
               kiosk: "admin",

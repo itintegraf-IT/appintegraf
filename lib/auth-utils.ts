@@ -244,6 +244,7 @@ export async function getLayoutAccess(userId: number): Promise<{
   contacts: boolean;
   equipment: boolean;
   calendar: boolean;
+  contracts: boolean;
   kiosk: boolean;
   training: boolean;
   planovani: boolean;
@@ -263,6 +264,7 @@ export async function getLayoutAccess(userId: number): Promise<{
     contacts: checkModule("contacts"),
     equipment: checkModule("equipment"),
     calendar: checkModule("calendar"),
+    contracts: checkModule("contracts"),
     kiosk: checkModule("kiosk"),
     training: checkModule("training"),
     planovani: checkModule("planovani"),

@@ -20,13 +20,14 @@ export default async function DashboardLayout({
   }
 
   const userId = parseInt(session.user.id, 10);
-  const { admin, contacts, equipment, calendar, kiosk, training, planovani, iml, vyroba, ukoly } =
+  const { admin, contacts, equipment, calendar, contracts, kiosk, training, planovani, iml, vyroba, ukoly } =
     await getLayoutAccess(userId);
 
   const moduleAccess = {
     contacts,
     equipment,
     calendar,
+    contracts,
     kiosk,
     training,
     planovani,

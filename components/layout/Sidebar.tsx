@@ -436,7 +436,7 @@ const navItems: NavItem[] = [
   },
   { href: "/calendar", icon: Calendar, label: "Kalendář", module: "calendar" },
   { href: "/ukoly", icon: ClipboardList, label: "Úkoly", module: "ukoly" },
-  { href: "/contracts", icon: FileText, label: "Evidence smluv", module: null },
+  { href: "/contracts", icon: FileText, label: "Evidence smluv", module: "contracts" },
   { href: "/planovani", icon: CalendarDays, label: "Plánování výroby", module: "planovani" },
   { href: "/vyroba", icon: Factory, label: "Výroba", module: "vyroba" },
   { href: "/iml", icon: Package, label: "IML", module: "iml" },

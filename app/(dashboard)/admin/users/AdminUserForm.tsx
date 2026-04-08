@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText } from "lucide-react";
 
 const AVAILABLE_MODULES = [
   { key: "contacts", label: "Kontakty", icon: Users },
@@ -11,6 +11,7 @@ const AVAILABLE_MODULES = [
   { key: "calendar", label: "Kalendář", icon: Calendar },
   { key: "planovani", label: "Plánování výroby", icon: CalendarDays },
   { key: "vyroba", label: "Výroba", icon: Factory },
+  { key: "contracts", label: "Evidence smluv", icon: FileText },
   { key: "kiosk", label: "Kiosk Monitory", icon: Tv },
   { key: "training", label: "IT Školení", icon: GraduationCap },
   { key: "iml", label: "IML", icon: Package },
