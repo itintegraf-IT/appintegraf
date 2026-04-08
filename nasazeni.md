@@ -68,6 +68,7 @@ Po změnách v `schema.prisma` mohou v `prisma/migrations/*.sql` ležet skripty,
 | [`prisma/migrations/20260327_add_contracts_module.sql`](prisma/migrations/20260327_add_contracts_module.sql) | Tabulky evidence smluv |
 | [`prisma/migrations/20260327_file_uploads_record_id.sql`](prisma/migrations/20260327_file_uploads_record_id.sql) | `file_uploads.record_id` |
 | [`prisma/migrations/20260328_users_personal_contact.sql`](prisma/migrations/20260328_users_personal_contact.sql) | Sloupce `users.personal_phone`, `users.personal_email` (kontakty) |
+| [`prisma/migrations/20260408_add_ukoly_module.sql`](prisma/migrations/20260408_add_ukoly_module.sql) | Tabulky modulu Úkoly (`ukoly`, `ukoly_departments`) |
 
 ```bash
 mysql -u root -p appintegraf < prisma/migrations/20260328_users_personal_contact.sql

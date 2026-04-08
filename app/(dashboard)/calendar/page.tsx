@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
-import { isAdmin } from "@/lib/auth-utils";
+import { isAdmin, hasModuleAccess } from "@/lib/auth-utils";
 import { Calendar, Plus, Download } from "lucide-react";
 import { CalendarNav } from "./CalendarNav";
 import { CalendarTabs } from "./CalendarTabs";
@@ -11,9 +11,13 @@ import { WeekCalendarGrid } from "./WeekCalendarGrid";
 import { MonthCalendarGrid } from "./MonthCalendarGrid";
 import { CalendarSearchResults } from "./CalendarSearchResults";
 import { CalendarListView } from "./CalendarListView";
-import { getCurrentWeek, getWeekStart, getWeekEnd, formatDateLocal, parseDateLocal } from "./lib/week-utils";
+import { getWeekStart, getWeekEnd, formatDateLocal, parseDateLocal } from "./lib/week-utils";
 import { getMonthGridStart, getMonthGridEnd } from "./lib/month-utils";
 import { getHolidaysForRange } from "./lib/holidays";
+import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
+import { fetchUkolyForCalendarRange, UKOLY_CALENDAR_COLOR } from "@/lib/ukoly-calendar";
+
+type CalendarScope = "all" | "mine";
 
 export default async function CalendarPage({
   searchParams,
@@ -33,9 +37,12 @@ export default async function CalendarPage({
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
   const admin = await isAdmin(userId);
+  const hasUkoly = await hasModuleAccess(userId, "ukoly", "read");
 
   const params = await searchParams;
-  const scope = params.scope === "mine" ? "mine" : "all";
+
+  const calendarScope: CalendarScope = params.scope === "mine" ? "mine" : "all";
+
   const view =
     params.view === "month"
       ? "month"
@@ -110,9 +117,8 @@ export default async function CalendarPage({
     end_date: { gte: fromDate } as const,
   };
 
-  const buildScopeWhere = async (useScope?: "mine" | "all") => {
-    const s = useScope ?? scope;
-    if (s !== "mine") return {};
+  const buildScopeWhere = async (effectiveScope: CalendarScope): Promise<Record<string, unknown>> => {
+    if (effectiveScope === "all") return {};
     const deptRows = await prisma.departments.findMany({
       where: { manager_id: userId },
       select: { id: true },
@@ -168,6 +174,27 @@ export default async function CalendarPage({
   };
 
   const searchWhere = await buildSearchWhere();
+  const buildTaskSearchWhere = async () => {
+    if (!searchQuery) return null;
+    const userRows = await prisma.users.findMany({
+      where: {
+        OR: [
+          { first_name: { contains: searchQuery } },
+          { last_name: { contains: searchQuery } },
+        ],
+      },
+      select: { id: true },
+    });
+    const matchingUserIds = (userRows as Array<{ id: number }>).map((u) => u.id);
+    const cond: Array<Record<string, unknown>> = [
+      { body: { contains: searchQuery } },
+      { order_number: { contains: searchQuery } },
+    ];
+    if (matchingUserIds.length > 0) {
+      cond.push({ assignee_user_id: { in: matchingUserIds } });
+    }
+    return { OR: cond };
+  };
 
   const baseInclude = {
     users: { select: { first_name: true, last_name: true } },
@@ -175,8 +202,9 @@ export default async function CalendarPage({
     users_deputy: { select: { first_name: true, last_name: true } },
   };
 
-  const listScope = view === "list_mine" ? "mine" : view === "list_all" ? "all" : null;
-  const effectiveScope = listScope ?? scope;
+  const listScope: CalendarScope | null =
+    view === "list_mine" ? "mine" : view === "list_all" ? "all" : null;
+  const effectiveScope: CalendarScope = listScope ?? calendarScope;
   const scopeWhere = await buildScopeWhere(effectiveScope);
 
   let where: Record<string, unknown>;
@@ -206,6 +234,46 @@ export default async function CalendarPage({
     include: showList || isListView ? listInclude : baseInclude,
   });
 
+  let taskSearchRows:
+    | Array<{
+        id: number;
+        body: string;
+        order_number: string | null;
+        assigned_at: Date;
+        due_at: Date;
+        urgent: boolean;
+        created_by: number;
+        users_assignee: { first_name: string; last_name: string } | null;
+      }>
+    | null = null;
+  if (hasUkoly && showList && searchQuery) {
+    const taskScope: CalendarScope = effectiveScope === "mine" ? "mine" : "all";
+    const taskWhereBase: Record<string, unknown> = {
+      status: { notIn: ["done", "cancelled"] },
+      assigned_at: { lte: toDate },
+      due_at: { gte: fromDate },
+    };
+    if (taskScope === "mine") {
+      const mineDeptIds = await getUserDepartmentIds(userId);
+      const or: Array<Record<string, unknown>> = [{ assignee_user_id: userId }];
+      if (mineDeptIds.length > 0) {
+        or.push({ ukoly_departments: { some: { department_id: { in: mineDeptIds } } } });
+      }
+      taskWhereBase.OR = or;
+    }
+    const taskSearchWhere = await buildTaskSearchWhere();
+    const mergedTaskWhere =
+      taskSearchWhere != null ? { AND: [taskWhereBase, taskSearchWhere] } : taskWhereBase;
+    taskSearchRows = await prisma.ukoly.findMany({
+      where: mergedTaskWhere,
+      orderBy: { due_at: "asc" },
+      take: 200,
+      include: {
+        users_assignee: { select: { first_name: true, last_name: true } },
+      },
+    });
+  }
+
   type GridEvent = {
     id: number;
     title: string;
@@ -220,13 +288,64 @@ export default async function CalendarPage({
     created_by: number;
     users: { first_name: string; last_name: string } | null;
     users_deputy: { first_name: string; last_name: string } | null;
+    ukoly_task_id?: number | null;
+    calendar_event_participants?: Array<{
+      users: { first_name: string; last_name: string } | null;
+    }>;
     [key: string]: unknown;
   };
-  const eventsForGrid = (events as GridEvent[]).map((e) => ({
+
+  const eventsAsGrid: GridEvent[] = (events as GridEvent[]).map((e) => ({
     ...e,
     start_date: e.start_date,
     end_date: e.end_date,
   }));
+
+  let eventsForGrid: GridEvent[] = eventsAsGrid;
+  let listMerged: GridEvent[] = eventsAsGrid;
+  let searchMerged: GridEvent[] = eventsAsGrid;
+
+  if (hasUkoly && !showList) {
+    const taskScope: CalendarScope = effectiveScope === "mine" ? "mine" : "all";
+    const ukolyItems = await fetchUkolyForCalendarRange({
+      fromDate,
+      toDate,
+      userId,
+      scope: taskScope,
+    });
+    const asGrid: GridEvent[] = ukolyItems.map((u) => ({ ...u }));
+
+    if (isListView) {
+      listMerged = [...eventsAsGrid, ...asGrid].sort(
+        (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      );
+    } else {
+      eventsForGrid = [...eventsAsGrid, ...asGrid].sort(
+        (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      );
+    }
+  }
+  if (showList && taskSearchRows) {
+    const taskAsSearchRows: GridEvent[] = taskSearchRows.map((t) => ({
+      id: t.id,
+      title: t.order_number ? `Úkol -> zak. ${t.order_number}${t.urgent ? " ⚠" : ""}` : "Úkol",
+      description: t.body,
+      start_date: new Date(new Date(t.assigned_at).setHours(0, 0, 0, 0)),
+      end_date: new Date(new Date(t.due_at).setHours(23, 59, 0, 0)),
+      event_type: "ukol",
+      color: UKOLY_CALENDAR_COLOR,
+      location: null,
+      deputy_id: null,
+      approval_status: null,
+      created_by: t.created_by,
+      users: t.users_assignee,
+      users_deputy: null,
+      ukoly_task_id: t.id,
+    }));
+    searchMerged = [...eventsAsGrid, ...taskAsSearchRows].sort(
+      (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+    );
+  }
 
   const holidays = getHolidaysForRange(from, to);
 
@@ -250,7 +369,7 @@ export default async function CalendarPage({
             <Calendar className="h-7 w-7 text-red-600" />
             Kalendář
           </h1>
-          <p className="mt-1 text-gray-600">Události a termíny</p>
+          <p className="mt-1 text-gray-600">Události, úkoly a termíny</p>
         </div>
         <div className="flex gap-2">
           <a
@@ -271,21 +390,21 @@ export default async function CalendarPage({
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-4">
-        {!isListView && <CalendarTabs scope={scope} />}
+        {!isListView && <CalendarTabs scope={calendarScope} />}
         <CalendarViewToggle view={view} />
         <CalendarSearch initialQuery={searchQuery} showList={showList} />
       </div>
 
       {isListView ? (
         <CalendarListView
-          events={events}
+          events={listMerged}
           from={from}
           to={to}
           viewType={view as "list_mine" | "list_all"}
         />
       ) : showList ? (
         <CalendarSearchResults
-          events={events}
+          events={searchMerged}
           searchQuery={searchQuery}
           calendarUrl={calendarUrl}
         />

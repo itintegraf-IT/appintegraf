@@ -104,7 +104,9 @@ Přepínání mezi pohledy (zobrazuje se jen u Týden/Měsíc, u seznamů je sco
 - **Globální kalendář** – všechny události
 - **Osobní kalendář** – události uživatele, události kde je zástupem, události čekající na schválení vedoucím
 
-URL parametr `scope` (`all` | `mine`).
+URL parametr `scope` (`all` | `mine` | `department`).
+
+- **Kalendář oddělení** (`scope=department`) – vyžaduje parametr **`dept_id`** (číslo oddělení). Zobrazí události s `department_id` rovným tomuto oddělení a úkoly z modulu Úkoly vázané na oddělení přes `ukoly_departments`. Přístup mají jen uživatelé s **členstvím** v daném oddělení (primární `department_id` nebo sekundární oddělení). Viz [MODUL_UKOLY.md](./MODUL_UKOLY.md).
 
 ### CalendarSearch
 
@@ -292,7 +294,8 @@ Definice v `lib/event-types.ts`, výchozí typ: `jine`.
 - `month` – pro měsíční pohled (YYYY-MM)
 - `list_from` – začátek období pro seznam (YYYY-MM-DD)
 - `list_to` – konec období pro seznam (YYYY-MM-DD), vždy 14 dní od list_from
-- `scope` – `all` (výchozí) | `mine`
+- `scope` – `all` (výchozí) | `mine` | `department` (s `dept_id`)
+- `dept_id` – ID oddělení pro `scope=department`
 - `q` – vyhledávací řetězec (fulltext + lidé)
 - `display` – `calendar` = při vyhledávání zobrazit mřížku místo seznamu výsledků
 

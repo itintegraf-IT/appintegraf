@@ -236,6 +236,7 @@ model departments {
   calendar_events           calendar_events[]
   contracts                 contracts[]
   user_secondary_departments user_secondary_departments[]
+  ukoly_departments         ukoly_departments[]
   users                     users?            @relation(fields: [manager_id], references: [id], onUpdate: NoAction, map: "departments_ibfk_1")
 
   @@index([code], map: "idx_code")
@@ -255,6 +256,39 @@ model user_secondary_departments {
   @@unique([user_id, department_id], map: "unique_user_secondary_dept")
   @@index([user_id], map: "idx_user")
   @@index([department_id], map: "idx_department")
+}
+
+model ukoly {
+  id                       Int                 @id @default(autoincrement())
+  body                     String              @db.Text
+  order_number             String?             @db.VarChar(100)
+  assigned_at              DateTime            @default(now()) @db.DateTime(0)
+  due_at                   DateTime            @db.DateTime(0)
+  urgent                   Boolean             @default(false)
+  assignee_user_id         Int?
+  created_by               Int
+  attachment_path          String?             @db.VarChar(500)
+  attachment_original_name String?             @db.VarChar(255)
+  status                   String              @default("open") @db.VarChar(20)
+  created_at               DateTime            @default(now()) @db.Timestamp(0)
+  updated_at               DateTime            @default(now()) @updatedAt @db.Timestamp(0)
+  users_assignee           users?              @relation("ukoly_assignee", fields: [assignee_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "ukoly_assignee_fk")
+  users_creator            users               @relation("ukoly_creator", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ukoly_creator_fk")
+  ukoly_departments        ukoly_departments[]
+
+  @@index([assignee_user_id], map: "idx_ukoly_assignee")
+  @@index([created_by], map: "idx_ukoly_creator")
+  @@index([due_at], map: "idx_ukoly_due")
+}
+
+model ukoly_departments {
+  ukol_id       Int
+  department_id Int
+  ukoly         ukoly       @relation(fields: [ukol_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ukoly_departments_ukol_fk")
+  departments   departments @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "ukoly_departments_dept_fk")
+
+  @@id([ukol_id, department_id])
+  @@index([department_id], map: "idx_ukoly_departments_dept")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -774,6 +808,8 @@ model users {
   user_groups                                                    user_groups[]
   user_roles                                                     user_roles[]
   user_secondary_departments                                     user_secondary_departments[]
+  ukoly_assigned                                                 ukoly[]                       @relation("ukoly_assignee")
+  ukoly_created                                                  ukoly[]                       @relation("ukoly_creator")
   notifications                                                  notifications[]
   roles                                                          roles?                        @relation(fields: [role_id], references: [id], onUpdate: NoAction, map: "fk_users_role")
 

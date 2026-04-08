@@ -73,6 +73,7 @@ export async function GET(
             kiosk: "admin",
             training: "admin",
             iml: "admin",
+            ukoly: "admin",
           };
         } else {
           module_access = decoded as Record<string, string>;

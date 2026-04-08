@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, ExternalLink, User, Globe } from "lucide-react";
 import { isAllDayEvent } from "./lib/event-types";
 import { formatDateLocal } from "./lib/week-utils";
+import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 
 type EventRow = {
   id: number;
@@ -16,6 +17,7 @@ type EventRow = {
   color: string | null;
   users: { first_name: string; last_name: string } | null;
   users_deputy: { first_name: string; last_name: string } | null;
+  ukoly_task_id?: number | null;
   calendar_event_participants?: Array<{
     users: { first_name: string; last_name: string } | null;
   }>;
@@ -151,7 +153,7 @@ export function CalendarListView({ events, from, to, viewType }: Props) {
             {events.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
-                  V tomto období nejsou žádné události.
+                  V tomto období nejsou žádné položky.
                 </td>
               </tr>
             ) : (
@@ -159,7 +161,7 @@ export function CalendarListView({ events, from, to, viewType }: Props) {
                 const allDay = isAllDayEvent(new Date(e.start_date), new Date(e.end_date));
                 return (
                   <tr
-                    key={e.id}
+                    key={calendarGridItemKey(e)}
                     className="border-b border-gray-100 transition-colors hover:bg-gray-50/50"
                   >
                     <td className="px-4 py-3 text-sm text-gray-700">
@@ -172,7 +174,7 @@ export function CalendarListView({ events, from, to, viewType }: Props) {
                     </td>
                     <td className="px-4 py-3">
                       <Link
-                        href={`/calendar/${e.id}`}
+                        href={calendarGridItemHref(e)}
                         className="font-medium text-red-600 hover:underline"
                         style={{ color: e.color ?? "#DC2626" }}
                       >
@@ -192,7 +194,7 @@ export function CalendarListView({ events, from, to, viewType }: Props) {
                     </td>
                     <td className="px-4 py-3">
                       <Link
-                        href={`/calendar/${e.id}`}
+                        href={calendarGridItemHref(e)}
                         className="inline-flex rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-red-600"
                         title="Otevřít detail"
                         aria-label="Otevřít detail"

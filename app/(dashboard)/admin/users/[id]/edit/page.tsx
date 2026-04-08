@@ -68,6 +68,7 @@ export default async function AdminUserEditPage({
             kiosk: "admin",
             training: "admin",
             iml: "admin",
+            ukoly: "admin",
           };
         } else {
           module_access = decoded as Record<string, string>;

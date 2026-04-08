@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList } from "lucide-react";
 
 const AVAILABLE_MODULES = [
   { key: "contacts", label: "Kontakty", icon: Users },
@@ -14,6 +14,7 @@ const AVAILABLE_MODULES = [
   { key: "kiosk", label: "Kiosk Monitory", icon: Tv },
   { key: "training", label: "IT Školení", icon: GraduationCap },
   { key: "iml", label: "IML", icon: Package },
+  { key: "ukoly", label: "Úkoly", icon: ClipboardList },
 ] as const;
 
 /** Mapování UI úrovní na hodnoty v DB (auth-utils: read/write/admin); u plánování navíc tiskař */
@@ -24,6 +25,17 @@ const PERMISSION_LEVELS = [
 ] as const;
 
 const PLANOVA_EXTRA_LEVELS = [{ value: "tiskar", label: "Tiskař" }] as const;
+
+function getPermissionOptions(moduleKey: string) {
+  if (moduleKey === "ukoly") {
+    return [
+      { value: "read", label: "Zaměstnanec (úkolovaný)" },
+      { value: "write", label: "Zadavatel úkolů" },
+      { value: "admin", label: "Admin" },
+    ] as const;
+  }
+  return PERMISSION_LEVELS;
+}
 
 type Role = { id: number; name: string };
 type Department = { id: number; name: string; code?: string | null };
@@ -424,7 +436,7 @@ export function AdminUserForm({ user }: { user?: User }) {
                   className="rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <option value="">—</option>
-                  {PERMISSION_LEVELS.map((opt) => (
+                  {getPermissionOptions(mod.key).map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
                     </option>

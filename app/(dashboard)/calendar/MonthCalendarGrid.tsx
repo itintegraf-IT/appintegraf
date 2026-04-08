@@ -11,6 +11,7 @@ import {
 import { CreateEventModal } from "./CreateEventModal";
 import { WEEKDAY_NAMES_MONDAY, formatDateLocal } from "./lib/week-utils";
 import type { Holiday } from "./lib/holidays";
+import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 
 type CalendarEvent = {
   id: number;
@@ -26,6 +27,7 @@ type CalendarEvent = {
   created_by: number;
   users: { first_name: string; last_name: string } | null;
   users_deputy: { first_name: string; last_name: string } | null;
+  ukoly_task_id?: number | null;
 };
 
 type Props = {
@@ -160,8 +162,8 @@ export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: 
                         const isApproved = e.approval_status === "approved";
                         return (
                           <Link
-                            key={e.id}
-                            href={`/calendar/${e.id}`}
+                            key={`${calendarGridItemKey(e)}-${day.toDateString()}`}
+                            href={calendarGridItemHref(e)}
                             onClick={(ev) => ev.stopPropagation()}
                             className="block truncate rounded px-1 py-0.5 text-[10px] font-medium hover:opacity-90"
                             style={{

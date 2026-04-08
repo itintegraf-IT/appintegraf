@@ -14,6 +14,7 @@ import {
   Package,
   Tv,
   GraduationCap,
+  ClipboardList,
 } from "lucide-react";
 
 const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -25,6 +26,7 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   iml: Package,
   kiosk: Tv,
   training: GraduationCap,
+  ukoly: ClipboardList,
 };
 
 const MODULE_LABELS: Record<string, string> = {
@@ -36,6 +38,7 @@ const MODULE_LABELS: Record<string, string> = {
   iml: "IML",
   kiosk: "Kiosk Monitory",
   training: "IT Školení",
+  ukoly: "Úkoly",
 };
 
 type User = {
@@ -52,6 +55,13 @@ type User = {
   roles: { name: string } | null;
   module_access?: Record<string, string>;
 };
+
+function ukolyRoleLabel(level?: string): string {
+  if (level === "write") return "Zadavatel";
+  if (level === "read") return "Úkolovaný";
+  if (level === "admin") return "Admin";
+  return "Bez přístupu";
+}
 
 export function AdminUsersClient() {
   const [users, setUsers] = useState<User[]>([]);
@@ -138,7 +148,10 @@ export function AdminUsersClient() {
                   </td>
                   <td className="px-4 py-3">{u.email}</td>
                   <td className="px-4 py-3">{u.department_name ?? "-"}</td>
-                  <td className="px-4 py-3">{u.roles?.name ?? "-"}</td>
+                  <td className="px-4 py-3">
+                    <div>{u.roles?.name ?? "-"}</div>
+                    <div className="text-xs text-gray-500">Úkoly: {ukolyRoleLabel(u.module_access?.ukoly)}</div>
+                  </td>
                   <td className="px-4 py-3">
                     <div
                       className="flex flex-wrap gap-1"
