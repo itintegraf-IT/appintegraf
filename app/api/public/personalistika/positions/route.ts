@@ -9,7 +9,7 @@ type PublicPositionRow = {
 
 function isActiveFlag(value: PublicPositionRow["is_active"]): boolean {
   if (typeof value === "boolean") return value;
-  if (typeof value === "bigint") return value !== 0n;
+  if (typeof value === "bigint") return value.toString() !== "0";
   if (typeof value === "number") return value !== 0;
   if (typeof value === "string") return value !== "0" && value.toLowerCase() !== "false";
   return false;
