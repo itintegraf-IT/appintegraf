@@ -68,7 +68,8 @@ export async function GET(req: NextRequest) {
               kiosk: "admin",
               training: "admin",
               iml: "admin",
-                ukoly: "admin",
+              ukoly: "admin",
+              personalistika: "admin",
             };
           } else {
             module_access = decoded as Record<string, string>;

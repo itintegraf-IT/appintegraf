@@ -27,10 +27,11 @@ Viditelnost úkolu v přehledu API:
 - **Zadání úkolu:** text úkolu, číslo zakázky, termín splnění (datum + čas), příznak „urgent“ (splnit obratem), volitelný **příjemce (uživatel)**, **zaškrtnutí oddělení** (M:N), příloha (Word/Excel/PDF/JPG – viz API).
 - **Přehled zadaných úkolů** (`/ukoly`) + **Archiv** (`/ukoly/archive`).
 - **Detail** (`/ukoly/[id]`).
-- **Statistiky** (`/ukoly/stats`) – zatím zástupná stránka.
-- **Kalendář:** úkoly se zobrazují v mřížce spolu s událostmi; odkaz vede na detail úkolu. V týdenním pohledu jako průběžná červená linka od data zadání do termínu.
+- **Statistiky** (`/ukoly/stats`) – živé metriky (stavy, termíny, SLA, top oddělení).
+- **Kalendář:** úkoly se zobrazují v mřížce spolu s událostmi; odkaz vede na detail úkolu. V týdenním pohledu jako průběžná linka od data zadání do termínu.
 - **Notifikace a e-mail** při přidělení (nový úkol) a při **změně `due_at`**.
 - **Potvrzení rozpracování a splnění** na detailu úkolu.
+- **Export archivu** do CSV/XLSX se zachováním filtrů.
 
 Schvalovací workflow **není** – stačí přiřazení a upozornění.
 
@@ -63,7 +64,12 @@ Stavy:
 - Používá se **Globální** a **Osobní** pohled.
 - Režim „Kalendář oddělení“ je aktuálně deaktivovaný.
 - Úkoly v osobním pohledu se propisují uživatelům, kterých se týkají (přiřazený uživatel a členové zadaných oddělení).
-- V týdenním pohledu je úkol zobrazen jako průběžná červená linka se šipkou od data zadání (`assigned_at`) do termínu (`due_at`), s omezeným počtem popisků (začátek/konec/střed).
+- V týdenním pohledu je úkol zobrazen jako průběžná linka se šipkou od data zadání (`assigned_at`) do termínu (`due_at`), s omezeným počtem popisků (začátek/konec/střed).
+- Barva linky podle stavu:
+  - `open` = červená,
+  - `in_progress` = oranžová,
+  - `done` = zelená (v praxi se v kalendáři nezobrazuje, protože je archivovaný).
+- Úkoly se stavem `done` a `cancelled` jsou z kalendáře odfiltrovány.
 
 ---
 
@@ -105,6 +111,9 @@ Stavy:
 | GET | `/api/ukoly/[id]` | `read` | Detail |
 | PUT | `/api/ukoly/[id]` | `write` | Úprava (JSON); při změně `due_at` notifikace + mail |
 | DELETE | `/api/ukoly/[id]` | `write` | Smazání; pouze tvůrce |
+| POST | `/api/ukoly/[id]/start` | `read` | Potvrzení rozpracování (`open` -> `in_progress`) |
+| POST | `/api/ukoly/[id]/complete` | `read` | Potvrzení splnění (`-> done`), notifikace zadavateli |
+| GET | `/api/ukoly/archive/export` | `read` | Export archivu (`format=csv|xlsx`, respektuje `status` a `term`) |
 
 ---
 
@@ -114,13 +123,17 @@ Stavy:
 app/(dashboard)/ukoly/
   layout.tsx
   page.tsx              # přehled
+  archive/page.tsx      # archiv + export
   new/page.tsx          # nový úkol
   [id]/page.tsx         # detail
-  stats/page.tsx        # statistiky (placeholder)
+  stats/page.tsx        # statistiky
 
 app/api/ukoly/
   route.ts
   [id]/route.ts
+  [id]/start/route.ts
+  [id]/complete/route.ts
+  archive/export/route.ts
 
 lib/ukoly-recipients.ts   # členové oddělení, sjednocení příjemců
 lib/ukoly-notify.ts       # notifikace + volání e-mailu
@@ -153,8 +166,9 @@ Kalendář oddělení vyžaduje přístup k modulu **kalendář** (`calendar`: `
 
 ## Chování úkolu v kalendářové mřížce
 
-- Položka má typově barvu odlišnou od běžných událostí (např. modrá).
+- Položka je vedena jako typ `ukol` a v týdenním pohledu se vykreslí jako průběžná linka.
 - Úkoly **nelze** přetahovat (drag & drop) jako události kalendáře.
 - Klik vede na `/ukoly/[id]`, nikoli na `/calendar/[id]`.
+- `done`/`cancelled` úkoly se v kalendáři nezobrazují (jsou v archivu modulu Úkoly).
 
 Interně se předává flag `ukoly_task_id` na sloučené položce události v UI.

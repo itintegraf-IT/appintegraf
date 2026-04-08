@@ -165,6 +165,24 @@ function LoginForm() {
       >
         {loading ? "Přihlašování…" : "Přihlásit se"}
       </button>
+
+      <div
+        style={{
+          marginTop: 12,
+          textAlign: "center",
+          fontSize: 12,
+          color: "var(--text-muted)",
+        }}
+      >
+        Uchazeč? Vyplňte{" "}
+        <a
+          href="/public/personalistika"
+          style={{ color: "var(--text)", fontWeight: 600, textDecoration: "underline" }}
+        >
+          veřejný formulář
+        </a>
+        .
+      </div>
     </form>
   );
 }

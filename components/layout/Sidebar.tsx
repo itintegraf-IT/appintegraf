@@ -42,6 +42,7 @@ import {
   FileText,
   ChevronDown,
   ClipboardList,
+  BriefcaseBusiness,
 } from "lucide-react";
 import {
   Tooltip,
@@ -436,6 +437,7 @@ const navItems: NavItem[] = [
   },
   { href: "/calendar", icon: Calendar, label: "Kalendář", module: "calendar" },
   { href: "/ukoly", icon: ClipboardList, label: "Úkoly", module: "ukoly" },
+  { href: "/personalistika", icon: BriefcaseBusiness, label: "Personalistika", module: "personalistika" },
   { href: "/contracts", icon: FileText, label: "Evidence smluv", module: "contracts" },
   { href: "/planovani", icon: CalendarDays, label: "Plánování výroby", module: "planovani" },
   { href: "/vyroba", icon: Factory, label: "Výroba", module: "vyroba" },

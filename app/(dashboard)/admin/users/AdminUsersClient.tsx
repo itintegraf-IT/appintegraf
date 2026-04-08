@@ -15,6 +15,7 @@ import {
   Tv,
   GraduationCap,
   ClipboardList,
+  BriefcaseBusiness,
 } from "lucide-react";
 
 const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -27,6 +28,7 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   kiosk: Tv,
   training: GraduationCap,
   ukoly: ClipboardList,
+  personalistika: BriefcaseBusiness,
 };
 
 const MODULE_LABELS: Record<string, string> = {
@@ -39,6 +41,7 @@ const MODULE_LABELS: Record<string, string> = {
   kiosk: "Kiosk Monitory",
   training: "IT Školení",
   ukoly: "Úkoly",
+  personalistika: "Personalistika",
 };
 
 type User = {

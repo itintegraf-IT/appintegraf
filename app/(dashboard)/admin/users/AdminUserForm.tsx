@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText, BriefcaseBusiness } from "lucide-react";
 
 const AVAILABLE_MODULES = [
   { key: "contacts", label: "Kontakty", icon: Users },
@@ -16,6 +16,7 @@ const AVAILABLE_MODULES = [
   { key: "training", label: "IT Školení", icon: GraduationCap },
   { key: "iml", label: "IML", icon: Package },
   { key: "ukoly", label: "Úkoly", icon: ClipboardList },
+  { key: "personalistika", label: "Personalistika", icon: BriefcaseBusiness },
 ] as const;
 
 /** Mapování UI úrovní na hodnoty v DB (auth-utils: read/write/admin); u plánování navíc tiskař */

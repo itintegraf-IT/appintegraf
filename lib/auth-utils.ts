@@ -251,6 +251,7 @@ export async function getLayoutAccess(userId: number): Promise<{
   iml: boolean;
   vyroba: boolean;
   ukoly: boolean;
+  personalistika: boolean;
 }> {
   const roles = await getUserRoles(userId);
   type RoleItem = (typeof roles)[number];
@@ -271,6 +272,7 @@ export async function getLayoutAccess(userId: number): Promise<{
     iml: checkModule("iml"),
     vyroba: checkModule("vyroba"),
     ukoly: checkModule("ukoly"),
+    personalistika: checkModule("personalistika"),
   };
 }
 

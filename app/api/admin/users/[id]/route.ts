@@ -75,6 +75,7 @@ export async function GET(
             training: "admin",
             iml: "admin",
             ukoly: "admin",
+            personalistika: "admin",
           };
         } else {
           module_access = decoded as Record<string, string>;
