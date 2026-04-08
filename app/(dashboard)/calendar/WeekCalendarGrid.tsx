@@ -199,8 +199,10 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
   }, [weekStart]);
 
   const allDayEvents = useMemo(() => {
-    return events.filter((e) =>
-      isAllDayEvent(new Date(e.start_date), new Date(e.end_date))
+    return events.filter(
+      (e) =>
+        e.ukoly_task_id != null ||
+        isAllDayEvent(new Date(e.start_date), new Date(e.end_date))
     );
   }, [events]);
 
@@ -239,7 +241,9 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
 
   const timedEvents = useMemo(() => {
     return events.filter(
-      (e) => !isAllDayEvent(new Date(e.start_date), new Date(e.end_date))
+      (e) =>
+        e.ukoly_task_id == null &&
+        !isAllDayEvent(new Date(e.start_date), new Date(e.end_date))
     );
   }, [events]);
 
