@@ -254,7 +254,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
 
   return (
     <>
-      <div className="overflow-x-auto rounded-xl border-2 border-green-500 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="min-w-[700px] flex flex-col">
         {/* Řádek 1: Celý den + hlavičky dnů */}
         <div className="flex border-b border-gray-200">
@@ -301,7 +301,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                 onClick={() => handleAllDayClick(d)}
                 onDrop={(ev) => handleDrop(ev, d)}
                 onDragOver={handleDragOver}
-                className={`min-h-9 flex-1 cursor-pointer border-r border-gray-200 px-1 py-1 align-top last:border-r-0 transition-colors hover:bg-green-50/50 ${
+                    className={`min-h-9 flex-1 cursor-pointer border-r border-gray-200 px-1 py-1 align-top last:border-r-0 transition-colors hover:bg-[var(--accent)]/45 ${
                   d.toDateString() === today ? "bg-amber-50/50" : ""
                 }`}
               >
@@ -402,6 +402,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
             ))}
             {ukolyRangeEvents.map((item, idx) => {
               const { e, startIdx, endIdx, startsInThisWeek, endsInThisWeek } = item;
+              const lineColor = e.color ?? "#DC2626";
               const leftPercent = (startIdx / 7) * 100;
               const widthPercent = ((endIdx - startIdx + 1) / 7) * 100;
               const top = 4 + idx * 22;
@@ -411,17 +412,20 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                   key={`line-${calendarGridItemKey(e)}-${idx}`}
                   href={calendarGridItemHref(e)}
                   onClick={(ev) => ev.stopPropagation()}
-                  className="absolute z-10 h-5 rounded-sm px-2 text-[11px] font-medium text-red-700 hover:opacity-90"
+                  className="absolute z-10 h-5 rounded-sm px-2 text-[11px] font-medium hover:opacity-90"
                   style={{
                     left: `${leftPercent}%`,
                     width: `${widthPercent}%`,
                     top,
-                    background: "linear-gradient(90deg, rgba(220,38,38,0.10), rgba(220,38,38,0.22))",
-                    borderTop: "2px solid #DC2626",
+                    color: lineColor,
+                    backgroundColor: `${lineColor}1A`,
+                    borderTop: `2px solid ${lineColor}`,
                   }}
                   title={e.title}
                 >
-                  <span className="absolute -right-1 -top-[6px] text-red-600">➜</span>
+                  <span className="absolute -right-1 -top-[6px]" style={{ color: lineColor }}>
+                    ➜
+                  </span>
                   {startsInThisWeek && <span className="truncate">{e.title}</span>}
                   {endsInThisWeek && !startsInThisWeek && <span className="float-right truncate">{e.title}</span>}
                   {showCenterLabel && <span className="mx-auto block w-fit truncate">{e.title}</span>}
@@ -466,7 +470,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                   <div
                     key={h}
                     onClick={() => handleCellClick(d, h)}
-                    className="cursor-pointer border-b border-gray-100 transition-colors hover:bg-green-50/50"
+                    className="cursor-pointer border-b border-gray-100 transition-colors hover:bg-[var(--accent)]/45"
                     style={{ height: ROW_HEIGHT }}
                   />
                 ))}
@@ -532,7 +536,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                     const timedStyle = {
                       top: 2 + slice.top,
                       height: slice.height - 4,
-                      backgroundColor: `${e.color ?? "#DC2626"}30`,
+                      backgroundColor: `${e.color ?? "#DC2626"}24`,
                       color: e.color ?? "#DC2626",
                       borderLeft: `3px solid ${e.color ?? "#DC2626"}`,
                     };

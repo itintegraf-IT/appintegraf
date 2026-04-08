@@ -1,8 +1,22 @@
 import { prisma } from "@/lib/db";
 import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
 
-/** Barva úkolů v kalendáři (sjednocená s projektem). */
+/** Výchozí barva úkolů v kalendáři (stav "open"). */
 export const UKOLY_CALENDAR_COLOR = "#DC2626";
+export const UKOLY_CALENDAR_IN_PROGRESS_COLOR = "#F59E0B";
+export const UKOLY_CALENDAR_DONE_COLOR = "#16A34A";
+
+function ukolCalendarColorByStatus(status: string): string {
+  switch (status) {
+    case "in_progress":
+      return UKOLY_CALENDAR_IN_PROGRESS_COLOR;
+    case "done":
+      return UKOLY_CALENDAR_DONE_COLOR;
+    case "open":
+    default:
+      return UKOLY_CALENDAR_COLOR;
+  }
+}
 
 export type UkolyGridEvent = {
   id: number;
@@ -28,6 +42,7 @@ export function ukolToGridEvent(ukol: {
   assigned_at: Date;
   due_at: Date;
   urgent: boolean;
+  status: string;
   created_by: number;
   users_assignee: { first_name: string; last_name: string } | null;
 }): UkolyGridEvent {
@@ -48,7 +63,7 @@ export function ukolToGridEvent(ukol: {
     start_date: start,
     end_date: end,
     event_type: "ukol",
-    color: UKOLY_CALENDAR_COLOR,
+    color: ukolCalendarColorByStatus(ukol.status),
     location: null,
     deputy_id: null,
     approval_status: null,

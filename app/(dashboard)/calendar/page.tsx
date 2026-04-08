@@ -242,6 +242,7 @@ export default async function CalendarPage({
         assigned_at: Date;
         due_at: Date;
         urgent: boolean;
+        status: string;
         created_by: number;
         users_assignee: { first_name: string; last_name: string } | null;
       }>
@@ -333,7 +334,12 @@ export default async function CalendarPage({
       start_date: new Date(new Date(t.assigned_at).setHours(0, 0, 0, 0)),
       end_date: new Date(new Date(t.due_at).setHours(23, 59, 0, 0)),
       event_type: "ukol",
-      color: UKOLY_CALENDAR_COLOR,
+      color:
+        t.status === "in_progress"
+          ? "#F59E0B"
+          : t.status === "done"
+            ? "#16A34A"
+            : UKOLY_CALENDAR_COLOR,
       location: null,
       deputy_id: null,
       approval_status: null,

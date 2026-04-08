@@ -218,6 +218,7 @@ body {
 .bg-white { background-color: var(--card) !important; }
 .border-gray-200 { border-color: var(--border) !important; }
 .border-gray-300 { border-color: var(--border) !important; }
+.border-gray-100 { border-color: color-mix(in oklab, var(--border) 72%, var(--card)) !important; }
 .text-gray-900 { color: var(--foreground) !important; }
 .text-gray-700 { color: var(--foreground) !important; }
 .text-gray-600 { color: var(--muted-foreground) !important; }

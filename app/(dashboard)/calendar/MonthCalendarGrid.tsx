@@ -97,7 +97,7 @@ export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: 
 
   return (
     <>
-      <div className="overflow-x-auto rounded-xl border-2 border-green-500 bg-white shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="min-w-[600px]">
           <div className="border-b border-gray-200 bg-gray-50 px-4 py-2 text-center font-semibold text-gray-900">
             {formatMonth(monthDate)}
@@ -129,7 +129,7 @@ export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: 
                   <div
                     key={day.toISOString()}
                     onClick={() => handleDayClick(day)}
-                    className={`cursor-pointer border-r border-b border-gray-200 p-1 transition-colors last:border-r-0 hover:bg-green-50/50 ${
+                    className={`cursor-pointer border-r border-b border-gray-200 p-1 transition-colors last:border-r-0 hover:bg-[var(--accent)]/45 ${
                       !inMonth ? "bg-gray-50/50" : ""
                     } ${isToday ? "bg-amber-50" : ""} ${isHoliday && inMonth ? "bg-slate-50/70" : ""}`}
                   >
@@ -167,7 +167,7 @@ export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: 
                             onClick={(ev) => ev.stopPropagation()}
                             className="block truncate rounded px-1 py-0.5 text-[10px] font-medium hover:opacity-90"
                             style={{
-                              backgroundColor: `${e.color ?? "#DC2626"}30`,
+                              backgroundColor: `${e.color ?? "#DC2626"}24`,
                               color: e.color ?? "#DC2626",
                             }}
                           >
