@@ -56,9 +56,9 @@ export default function PublicPersonalistikaPage() {
   };
 
   useEffect(() => {
-    fetch("/api/personalistika/positions")
+    fetch("/api/public/personalistika/positions")
       .then((r) => r.json())
-      .then((data) => setPositions((data.positions ?? []).filter((p: Position) => p.is_active !== 0)))
+      .then((data) => setPositions((data.positions ?? []) as Position[]))
       .catch(() => setPositions([]));
   }, []);
 

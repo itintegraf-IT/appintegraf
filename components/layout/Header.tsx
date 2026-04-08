@@ -43,7 +43,7 @@ export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
 
   return (
     <header
-      className="sticky top-0 z-40 flex h-14 items-center border-b px-4"
+      className="fixed inset-x-0 top-0 z-40 flex h-14 items-center border-b px-4"
       style={{
         background: "color-mix(in oklab, var(--surface) 95%, transparent)",
         backdropFilter: "blur(20px)",
