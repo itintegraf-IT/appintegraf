@@ -2,6 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 
+const OUT_OF_OFFICE_TYPES = [
+  "dovolena",
+  "osobni",
+  "schuzka_mimo_firmu",
+  "sluzebni_cesta",
+  "lekar",
+  "nemoc",
+];
+
+function formatDateTimeCs(d: Date): string {
+  return d.toLocaleString("cs-CZ", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -77,7 +96,6 @@ export async function PUT(
         return NextResponse.json({ error: "Neplatný zástup" }, { status: 400 });
       }
       deputyIdNum = parsed;
-      const userId = parseInt(session.user!.id!, 10);
       const user = await prisma.users.findUnique({
         where: { id: userId },
         select: {
@@ -105,10 +123,58 @@ export async function PUT(
       }
     }
 
+    const userId = parseInt(session.user!.id!, 10);
     const start = new Date(start_date);
     const end = new Date(end_date);
     if (end <= start) {
       return NextResponse.json({ error: "Datum konce musí být po datu začátku" }, { status: 400 });
+    }
+
+    const ownOverlaps = await prisma.calendar_events.findMany({
+      where: {
+        id: { not: id },
+        created_by: userId,
+        start_date: { lte: end },
+        end_date: { gte: start },
+      },
+      orderBy: { start_date: "asc" },
+      take: 3,
+      select: {
+        id: true,
+        title: true,
+        start_date: true,
+        end_date: true,
+      },
+    });
+
+    if (deputyIdNum !== null) {
+      const deputyOutOfOfficeOverlap = await prisma.calendar_events.findFirst({
+        where: {
+          id: { not: id },
+          created_by: deputyIdNum,
+          event_type: { in: OUT_OF_OFFICE_TYPES },
+          start_date: { lte: end },
+          end_date: { gte: start },
+          OR: [{ approval_status: { not: "rejected" } }, { approval_status: null }],
+        },
+        orderBy: { start_date: "asc" },
+        select: {
+          title: true,
+          start_date: true,
+          end_date: true,
+        },
+      });
+
+      if (deputyOutOfOfficeOverlap) {
+        return NextResponse.json(
+          {
+            error: `Zvolený zástup má kolidující událost mimo firmu (${deputyOutOfOfficeOverlap.title}, ${formatDateTimeCs(
+              deputyOutOfOfficeOverlap.start_date
+            )}–${formatDateTimeCs(deputyOutOfOfficeOverlap.end_date)}). Vyberte jiného zástupa nebo jiný termín.`,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     await prisma.calendar_events.update({
@@ -129,7 +195,15 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json({ success: true });
+    let warning: string | null = null;
+    if (ownOverlaps.length > 0) {
+      const first = ownOverlaps[0];
+      warning = `Pozor: máte kolizi s ${ownOverlaps.length} událostí/událostmi (např. „${first.title}“ ${formatDateTimeCs(
+        first.start_date
+      )}–${formatDateTimeCs(first.end_date)}).`;
+    }
+
+    return NextResponse.json({ success: true, warning });
   } catch (e) {
     console.error("Calendar PUT error:", e);
     return NextResponse.json({ error: "Chyba při ukládání události" }, { status: 500 });

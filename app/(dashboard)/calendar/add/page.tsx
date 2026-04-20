@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { EVENT_TYPES, DEFAULT_EVENT_TYPE, requiresDeputy } from "../lib/event-types";
 
 type Department = { id: number; name: string; code: string | null };
@@ -15,6 +15,8 @@ export default function AddCalendarPage() {
   const [deputies, setDeputies] = useState<Deputy[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
+  const [deputyWarning, setDeputyWarning] = useState("");
 
   const now = new Date();
   const defaultStart = new Date(now);
@@ -50,9 +52,44 @@ export default function AddCalendarPage() {
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const checkDeputyAvailability = async () => {
+      if (!requiresDeputy(form.event_type) || !form.deputy_id) {
+        setDeputyWarning("");
+        return;
+      }
+
+      let startDate = form.start_date;
+      let endDate = form.end_date;
+      if (form.is_all_day) {
+        const start = form.start_date.slice(0, 10);
+        const end = form.end_date.slice(0, 10);
+        startDate = `${start}T00:00`;
+        endDate = `${end}T23:59`;
+      }
+
+      const query = new URLSearchParams({
+        deputy_id: form.deputy_id,
+        start_date: startDate,
+        end_date: endDate,
+      });
+
+      const res = await fetch(`/api/calendar/deputies/check?${query.toString()}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeputyWarning("");
+        return;
+      }
+      setDeputyWarning(data.hasConflict ? (data.warning ?? "Zástup má kolidující událost mimo firmu.") : "");
+    };
+
+    checkDeputyAvailability().catch(() => setDeputyWarning(""));
+  }, [form.event_type, form.deputy_id, form.start_date, form.end_date, form.is_all_day]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setWarning("");
     setLoading(true);
 
     let startDate = form.start_date;
@@ -85,6 +122,11 @@ export default function AddCalendarPage() {
         return;
       }
 
+      if (data.warning) {
+        setWarning(String(data.warning));
+        window.alert(String(data.warning));
+      }
+
       router.push("/calendar");
       router.refresh();
     } catch {
@@ -112,6 +154,9 @@ export default function AddCalendarPage() {
       <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        )}
+        {warning && (
+          <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{warning}</div>
         )}
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -225,7 +270,11 @@ export default function AddCalendarPage() {
                 required
                 value={form.deputy_id}
                 onChange={(e) => setForm({ ...form, deputy_id: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                className={`w-full rounded-lg px-3 py-2 ${
+                  deputyWarning
+                    ? "border border-red-400 bg-red-50 text-red-900 focus:border-red-500 focus:ring-1 focus:ring-red-500"
+                    : "border border-gray-300"
+                }`}
               >
                 <option value="">— Vyberte zástupa —</option>
                 {deputies.map((d) => (
@@ -238,6 +287,12 @@ export default function AddCalendarPage() {
                 <p className="mt-1 text-xs text-amber-600">
                   Nemáte přiřazeno oddělení nebo v oddělení nejsou další uživatelé.
                 </p>
+              )}
+              {deputyWarning && (
+                <div className="mt-2 flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-800">
+                  <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <p>{deputyWarning}</p>
+                </div>
               )}
             </div>
           )}

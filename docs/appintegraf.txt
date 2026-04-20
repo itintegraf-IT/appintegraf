@@ -1,0 +1,23 @@
+appintegraf
+
+- globálně
+	- dvoufaktor autentifikace (google authentificator)
+	- zapomenuté heslo uživatele obnova uživatelem. Uživatel dá žádost, systém vygeneruje odkaz pošle na mail. Odkaz 	  vede na stránku kde půjde heslo změnit. (bezpečnost? dvoufaktor?)
+
+
+- kalendář 
+	- kontroly při zadávání události, zda už na stejný termín něco nemám (minimálně upozornit na kolizi)
+	- Při zadávání události která vyžaduje schvalovací proces zkontrolovat, zda schvalovatel (zastupující) nemá v 	 	  kalendáři kolidující událost (dovolená, služebka atd ...) nesmí být mimo firmu oba účastníci
+
+- Kontakty
+	- Přidat generování kartičky formát vizitky 
+						1) Jméno a příjmení
+						2) QR kód (jpg, png)
+						3) Pod kódem i číselný kód
+	- generovat PDF pro tisk 
+
+- Telefonní seznam
+	- opravit tiskové sestavy které se při migraci do .next.js rozsypali (grafika, layout stránky)
+	- skupinoivé maily aliasy - členové
+
+	
