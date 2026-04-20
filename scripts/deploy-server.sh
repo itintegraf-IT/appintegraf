@@ -10,6 +10,9 @@
 #
 # Přepínače:
 #   --planovani-upgrade   spustí npm run db:planovani-upgrade (SQL změny plánování)
+#   --apply-sql SOUBOR    spustí konkrétní SQL soubor z prisma/migrations/ přes mysql klienta
+#                         (lze uvést víckrát). Vyžaduje .env s DATABASE_URL.
+#                         Příklad: --apply-sql 20260420_auth_tokens.sql
 #   --skip-migrate        přeskočí npx prisma migrate deploy
 #   --skip-build          přeskočí npm run build (jen pro nouzi)
 #   --pm2-name JMÉNO       výchozí: appintegraf (nebo env PM2_APP_NAME)
@@ -23,15 +26,20 @@ PM2_NAME="${PM2_APP_NAME:-appintegraf}"
 SKIP_MIGRATE=0
 SKIP_BUILD=0
 DO_PLANOVANI=0
+SQL_FILES=()
 
 usage() {
-  sed -n '1,25p' "$0" | tail -n +2
+  sed -n '1,28p' "$0" | tail -n +2
   exit 0
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --planovani-upgrade) DO_PLANOVANI=1; shift ;;
+    --apply-sql)
+      SQL_FILES+=("${2:?chybí cesta k SQL souboru}")
+      shift 2
+      ;;
     --skip-migrate) SKIP_MIGRATE=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
     --pm2-name)
@@ -103,6 +111,47 @@ fi
 if [[ "$DO_PLANOVANI" -eq 1 ]]; then
   echo "==> SQL upgrade plánování (db:planovani-upgrade)"
   npm run db:planovani-upgrade
+fi
+
+if [[ "${#SQL_FILES[@]}" -gt 0 ]]; then
+  echo "==> SQL migrace (--apply-sql)"
+  if [[ -z "${DATABASE_URL:-}" ]]; then
+    # Načti z .env, pokud není v prostředí
+    set -a; . ./.env; set +a
+  fi
+  if [[ -z "${DATABASE_URL:-}" ]]; then
+    echo "CHYBA: DATABASE_URL není k dispozici (ani v .env)." >&2
+    exit 1
+  fi
+
+  # Rozparsuj DATABASE_URL ve tvaru mysql://user:pass@host:port/dbname
+  # (bash regex; hesla s URL-encoded znaky prosím dekódovat ručně v .env, kdyby bylo potřeba)
+  if [[ "$DATABASE_URL" =~ ^mysql://([^:]+):([^@]+)@([^:/]+)(:([0-9]+))?/([^?]+) ]]; then
+    DB_USER="${BASH_REMATCH[1]}"
+    DB_PASS="${BASH_REMATCH[2]}"
+    DB_HOST="${BASH_REMATCH[3]}"
+    DB_PORT="${BASH_REMATCH[5]:-3306}"
+    DB_NAME="${BASH_REMATCH[6]}"
+  else
+    echo "CHYBA: neumím rozparsovat DATABASE_URL." >&2
+    exit 1
+  fi
+
+  for f in "${SQL_FILES[@]}"; do
+    # Přijmi buď plnou cestu, nebo jen jméno souboru uvnitř prisma/migrations/
+    if [[ -f "$f" ]]; then
+      sql_path="$f"
+    elif [[ -f "prisma/migrations/$f" ]]; then
+      sql_path="prisma/migrations/$f"
+    else
+      echo "CHYBA: SQL soubor nenalezen: $f (ani v prisma/migrations/)" >&2
+      exit 1
+    fi
+    echo "  -> aplikuji: $sql_path"
+    mysql --default-character-set=utf8mb4 \
+      -u "$DB_USER" -p"$DB_PASS" -h "$DB_HOST" -P "$DB_PORT" "$DB_NAME" \
+      < "$sql_path"
+  done
 fi
 
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
