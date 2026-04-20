@@ -3,6 +3,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { isAdmin } from "@/lib/auth-utils";
 import bcrypt from "bcryptjs";
+import { validatePassword } from "@/lib/password-policy";
+import { logAuthAudit } from "@/lib/auth-audit";
 
 export async function GET(
   _req: NextRequest,
@@ -200,15 +202,34 @@ export async function PUT(
       role_id: roleIdNum,
     };
 
-    if (password_new && password_new.length >= 6) {
+    let passwordChanged = false;
+    if (password_new) {
+      const v = validatePassword(password_new);
+      if (!v.ok) {
+        return NextResponse.json(
+          { error: v.error ?? "Heslo neodpovídá politice." },
+          { status: 400 }
+        );
+      }
       updateData.password_hash = await bcrypt.hash(password_new, 10);
       updateData.password_custom = null;
+      updateData.password_version = { increment: 1 };
+      passwordChanged = true;
     }
 
     await prisma.users.update({
       where: { id },
       data: updateData,
     });
+
+    if (passwordChanged) {
+      await logAuthAudit({
+        userId: adminId,
+        targetUserId: id,
+        action: "password_set_by_admin",
+        details: {},
+      });
+    }
 
     // Sekundární oddělení – smazat stará a vytvořit nová
     await prisma.user_secondary_departments.deleteMany({ where: { user_id: id } });

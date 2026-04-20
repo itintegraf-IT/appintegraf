@@ -3,6 +3,11 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { isAdmin } from "@/lib/auth-utils";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
+import { createUserToken } from "@/lib/tokens";
+import { sendAccountActivationEmail } from "@/lib/email";
+import { logAuthAudit, getRequestIp } from "@/lib/auth-audit";
+import { validatePassword } from "@/lib/password-policy";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -114,7 +119,8 @@ export async function POST(req: NextRequest) {
       module_access = {},
       is_active = true,
       display_in_list = true,
-      password_custom = "heslo123",
+      password_custom,
+      send_activation_email = false,
     } = body;
 
     if (!username || !email || !first_name || !last_name) {
@@ -144,7 +150,23 @@ export async function POST(req: NextRequest) {
     }
 
     const qrCode = String(Math.floor(Math.random() * 1e12)).padStart(12, "0");
-    const passwordHash = await bcrypt.hash(password_custom || "heslo123", 10);
+
+    const useActivation = !!send_activation_email;
+    let passwordHash: string;
+    if (useActivation) {
+      // Uživatel si heslo nastaví přes aktivační link. Do password_hash ukládáme
+      // dlouhý náhodný řetězec, který nepůjde uhádnout (login nebude fungovat, dokud se nenastaví nové heslo).
+      passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
+    } else {
+      if (!password_custom || typeof password_custom !== "string") {
+        return NextResponse.json({ error: "Zadejte heslo nebo zvolte aktivační e-mail." }, { status: 400 });
+      }
+      const v = validatePassword(password_custom);
+      if (!v.ok) {
+        return NextResponse.json({ error: v.error ?? "Heslo neodpovídá politice." }, { status: 400 });
+      }
+      passwordHash = await bcrypt.hash(password_custom, 10);
+    }
 
     const deptIdNum = department_id != null ? parseInt(String(department_id), 10) : null;
     let department_name: string | null = null;
@@ -201,7 +223,49 @@ export async function POST(req: NextRequest) {
       // ignore
     }
 
-    return NextResponse.json({ success: true, id: user.id, qr_code: qrCode });
+    let activationEmailed: boolean | null = null;
+    if (useActivation) {
+      try {
+        const ip = await getRequestIp();
+        const { token, expiresAt } = await createUserToken({
+          userId: user.id,
+          purpose: "account_activation",
+          ip,
+        });
+        const admin = await prisma.users.findUnique({
+          where: { id: userId },
+          select: { first_name: true, last_name: true },
+        });
+        const invitedBy = admin
+          ? `${admin.first_name} ${admin.last_name}`.trim()
+          : null;
+        const sendRes = await sendAccountActivationEmail({
+          toEmail: user.email,
+          toName: `${user.first_name} ${user.last_name}`.trim() || user.username,
+          username: user.username,
+          token,
+          expiresAt,
+          invitedBy,
+        });
+        activationEmailed = sendRes.success;
+        await logAuthAudit({
+          userId,
+          targetUserId: user.id,
+          action: "account_activation_sent",
+          details: { by_admin: true, on_create: true, emailed: sendRes.success },
+        });
+      } catch (e) {
+        console.error("activation email on create failed:", e);
+        activationEmailed = false;
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      id: user.id,
+      qr_code: qrCode,
+      activation_email_sent: activationEmailed,
+    });
   } catch (e) {
     console.error("Admin user POST error:", e);
     return NextResponse.json({ error: "Chyba při vytváření uživatele" }, { status: 500 });

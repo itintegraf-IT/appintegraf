@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText, BriefcaseBusiness, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound } from "lucide-react";
+import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
 
 const AVAILABLE_MODULES = [
   { key: "contacts", label: "Kontakty", icon: Users },
@@ -68,6 +69,16 @@ export function AdminUserForm({ user }: { user?: User }) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  /** Režim nastavení hesla při vytváření: aktivační e-mail (doporučeno) vs. ruční zadání. */
+  const [passwordMode, setPasswordMode] = useState<"activation_email" | "manual">(
+    "activation_email"
+  );
+  const [sendResetStatus, setSendResetStatus] = useState<{
+    kind: "reset" | "activation" | null;
+    ok: boolean | null;
+    msg: string;
+  }>({ kind: null, ok: null, msg: "" });
+  const [sendingReset, setSendingReset] = useState(false);
   const [form, setForm] = useState({
     username: user?.username ?? "",
     email: user?.email ?? "",
@@ -177,6 +188,40 @@ export function AdminUserForm({ user }: { user?: User }) {
   const selectedRole = roles.find((r) => r.id === form.role_id);
   const isAdminRoleSelected = selectedRole?.name?.toLowerCase() === "admin";
 
+  const handleSendLink = async (kind: "reset" | "activation") => {
+    if (!user?.id) return;
+    setSendResetStatus({ kind, ok: null, msg: "Odesílám…" });
+    setSendingReset(true);
+    try {
+      const res = await fetch(`/api/admin/users/${user.id}/send-reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSendResetStatus({
+          kind,
+          ok: false,
+          msg: data.error ?? "Nepodařilo se odeslat odkaz.",
+        });
+        return;
+      }
+      setSendResetStatus({
+        kind,
+        ok: true,
+        msg:
+          kind === "activation"
+            ? "Aktivační odkaz byl odeslán na e-mail uživatele."
+            : "Odkaz pro obnovu hesla byl odeslán na e-mail uživatele.",
+      });
+    } catch {
+      setSendResetStatus({ kind, ok: false, msg: "Chyba při odesílání odkazu." });
+    } finally {
+      setSendingReset(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -184,6 +229,22 @@ export function AdminUserForm({ user }: { user?: User }) {
     if (form.role_id == null) {
       setError("Vyberte roli uživatele.");
       return;
+    }
+
+    // Při ručním hesle ověř politiku (platí jen když je heslo zadané – na editaci je volitelné)
+    if (!isEdit && passwordMode === "manual") {
+      const v = validatePassword(form.password_custom);
+      if (!v.ok) {
+        setError(v.error ?? "Heslo neodpovídá politice.");
+        return;
+      }
+    }
+    if (isEdit && form.password_custom) {
+      const v = validatePassword(form.password_custom);
+      if (!v.ok) {
+        setError(v.error ?? "Heslo neodpovídá politice.");
+        return;
+      }
     }
 
     setLoading(true);
@@ -194,8 +255,14 @@ export function AdminUserForm({ user }: { user?: User }) {
       const body: Record<string, unknown> = {
         ...form,
         module_access: form.module_access,
-        password_custom: form.password_custom || (isEdit ? undefined : "heslo123"),
+        password_custom: form.password_custom || undefined,
       };
+      if (!isEdit) {
+        body.send_activation_email = passwordMode === "activation_email";
+        if (passwordMode === "activation_email") {
+          delete body.password_custom;
+        }
+      }
       if (isEdit) {
         delete body.username;
         body.password_new = form.password_custom || undefined;
@@ -384,17 +451,107 @@ export function AdminUserForm({ user }: { user?: User }) {
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
           />
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">
-            {isEdit ? "Nové heslo (nechte prázdné)" : "Heslo"}
-          </label>
-          <input
-            type="password"
-            value={form.password_custom}
-            onChange={(e) => setForm({ ...form, password_custom: e.target.value })}
-            placeholder={isEdit ? "Min 6 znaků" : "heslo123 (výchozí), min 6 znaků"}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2"
-          />
+        <div className="sm:col-span-2">
+          {isEdit ? (
+            <>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Ruční nastavení hesla (volitelné)
+              </label>
+              <input
+                type="password"
+                value={form.password_custom}
+                onChange={(e) => setForm({ ...form, password_custom: e.target.value })}
+                placeholder="Nechte prázdné, pokud heslo měnit nechcete"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+              <p className="mt-1 text-xs text-gray-500">{PASSWORD_RULES_TEXT}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={sendingReset}
+                  onClick={() => handleSendLink("reset")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Mail className="h-4 w-4" />
+                  Poslat uživateli odkaz pro obnovu hesla
+                </button>
+                <button
+                  type="button"
+                  disabled={sendingReset}
+                  onClick={() => handleSendLink("activation")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  Poslat aktivační odkaz
+                </button>
+              </div>
+              {sendResetStatus.kind && (
+                <p
+                  className={`mt-2 text-xs ${
+                    sendResetStatus.ok ? "text-emerald-700" : "text-red-700"
+                  }`}
+                >
+                  {sendResetStatus.msg}
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Způsob nastavení hesla
+              </label>
+              <div className="mb-2 space-y-2">
+                <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 bg-white p-3">
+                  <input
+                    type="radio"
+                    name="password_mode"
+                    value="activation_email"
+                    checked={passwordMode === "activation_email"}
+                    onChange={() => setPasswordMode("activation_email")}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-gray-900">
+                      Odeslat aktivační odkaz e-mailem <span className="text-emerald-700">(doporučeno)</span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Uživatel si sám nastaví první heslo. Odkaz platí 7 dní.
+                    </div>
+                  </div>
+                </label>
+                <label className="flex items-start gap-2 cursor-pointer rounded-lg border border-gray-200 bg-white p-3">
+                  <input
+                    type="radio"
+                    name="password_mode"
+                    value="manual"
+                    checked={passwordMode === "manual"}
+                    onChange={() => setPasswordMode("manual")}
+                    className="mt-0.5"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900">
+                      Zadat heslo ručně
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Předáte jej uživateli bezpečnou cestou. Uživatel bude přihlášen okamžitě.
+                    </div>
+                  </div>
+                </label>
+              </div>
+              {passwordMode === "manual" && (
+                <>
+                  <input
+                    type="password"
+                    value={form.password_custom}
+                    onChange={(e) => setForm({ ...form, password_custom: e.target.value })}
+                    placeholder="Zadejte heslo"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">{PASSWORD_RULES_TEXT}</p>
+                </>
+              )}
+            </>
+          )}
         </div>
         <div className="flex items-center gap-2 sm:col-span-2">
           <input

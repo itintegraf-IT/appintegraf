@@ -49,17 +49,41 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           username: user.username,
           roleId: user.role_id ?? undefined,
           departmentId: user.department_id ?? undefined,
+          passwordVersion: user.password_version ?? 1,
         };
       },
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.username = (user as { username?: string }).username;
         token.roleId = (user as { roleId?: number }).roleId;
         token.departmentId = (user as { departmentId?: number }).departmentId;
+        token.passwordVersion = (user as { passwordVersion?: number }).passwordVersion ?? 1;
+      }
+
+      // Při každém obnovení JWT ověříme, že password_version v DB odpovídá tokenu.
+      // Pokud ne (uživatel zresetoval heslo nebo admin vynutil reset), token invalidujeme
+      // vrácením null – next-auth pak uživatele odhlásí.
+      if (token?.id) {
+        try {
+          const idNum = parseInt(token.id as string, 10);
+          if (!isNaN(idNum)) {
+            const row = await prisma.users.findUnique({
+              where: { id: idNum },
+              select: { password_version: true, is_active: true },
+            });
+            if (!row || row.is_active === false) return null;
+            const tokenPv = (token.passwordVersion as number | undefined) ?? 1;
+            if (row.password_version !== tokenPv) {
+              return null;
+            }
+          }
+        } catch {
+          // ignore – raději session neruš při DB výpadku
+        }
       }
       return token;
     },

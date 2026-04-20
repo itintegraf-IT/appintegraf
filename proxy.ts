@@ -3,11 +3,17 @@ import { auth } from "@/auth";
 const publicPaths = [
   "/login",
   "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/activate",
   "/api/auth",
   "/api/health",
   "/public",
   "/api/public",
 ];
+
+/** Stránky pro přihlášení/registraci, na kterých nemá smysl být, pokud je uživatel přihlášen. */
+const loginLikePaths = new Set(["/login", "/register"]);
 
 function isPublicPath(pathname: string): boolean {
   return publicPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -18,7 +24,7 @@ const proxy = auth((req) => {
   const isLoggedIn = !!req.auth;
 
   if (isPublicPath(nextUrl.pathname)) {
-    if (isLoggedIn && (nextUrl.pathname === "/login" || nextUrl.pathname === "/register")) {
+    if (isLoggedIn && loginLikePaths.has(nextUrl.pathname)) {
       return Response.redirect(new URL("/", nextUrl.origin));
     }
     return;

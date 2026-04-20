@@ -440,6 +440,10 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     tips: [
       "Vždy testujte nové role na testovacím účtu, než je nasadíte do produkce.",
       "Globální e-mailová nastavení ovlivňují všechna automatická upozornění.",
+      "Nové uživatele doporučujeme zakládat s aktivačním e-mailem – uživatel si heslo nastaví sám, admin ho nevidí.",
+    ],
+    docs: [
+      { label: "Obnova hesla, aktivační odkazy, politika hesla", href: "/help/auth-sprava-hesel" },
     ],
   },
 

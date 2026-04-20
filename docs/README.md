@@ -10,6 +10,7 @@ Přehled dokumentace modulů a specifikací projektu.
 | [MODUL_UKOLY.md](MODUL_UKOLY.md) | Úkoly – zadání/úpravy, role, notifikace, kalendářová linka podle stavu, archiv a export CSV/XLSX |
 | [MODUL_MAJETEK_POZADAVKY.md](MODUL_MAJETEK_POZADAVKY.md) | Majetek – dvoufázové schvalování požadavků na techniku (IT → Vedení), stavy, datový model a API |
 | [KALENDAR_SCHVALOVANI_FAZE2.md](KALENDAR_SCHVALOVANI_FAZE2.md) | Specifikace dvoufázového schvalování (zástup → vedoucí oddělení) |
+| [AUTH_SPRAVA_HESEL.md](AUTH_SPRAVA_HESEL.md) | Obnova hesla, aktivační odkazy, politika, audit, invalidace sessionů |
 
 ## Modul IML
 

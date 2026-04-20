@@ -3,6 +3,7 @@
 import { signIn } from "next-auth/react";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import Link from "next/link";
 
 function LoginForm() {
   const [username, setUsername] = useState("");
@@ -169,6 +170,25 @@ function LoginForm() {
       <div
         style={{
           marginTop: 12,
+          textAlign: "center",
+          fontSize: 12,
+        }}
+      >
+        <Link
+          href="/forgot-password"
+          style={{
+            color: "var(--text)",
+            fontWeight: 600,
+            textDecoration: "underline",
+          }}
+        >
+          Zapomenuté heslo?
+        </Link>
+      </div>
+
+      <div
+        style={{
+          marginTop: 8,
           textAlign: "center",
           fontSize: 12,
           color: "var(--text-muted)",
