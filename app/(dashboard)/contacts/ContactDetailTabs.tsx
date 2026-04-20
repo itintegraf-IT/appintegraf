@@ -10,6 +10,8 @@ type Props = {
   /** Zobrazí záložku Vizitka (HTML podpis Outlook) */
   showVizitka?: boolean;
   vizitkaSlot?: React.ReactNode;
+  /** Zobrazí záložku Osobní údaje (vlastník kontaktu nebo editor/admin modulu) */
+  showPersonal?: boolean;
 };
 
 export function ContactDetailTabs({
@@ -18,6 +20,7 @@ export function ContactDetailTabs({
   children,
   showVizitka = false,
   vizitkaSlot,
+  showPersonal = false,
 }: Props) {
   const [tab, setTab] = useState<"overview" | "personal" | "vizitka">("overview");
 
@@ -33,15 +36,17 @@ export function ContactDetailTabs({
         >
           Přehled
         </button>
-        <button
-          type="button"
-          onClick={() => setTab("personal")}
-          className={`min-w-[7rem] flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
-            tab === "personal" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Osobní údaje
-        </button>
+        {showPersonal && (
+          <button
+            type="button"
+            onClick={() => setTab("personal")}
+            className={`min-w-[7rem] flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${
+              tab === "personal" ? "bg-white text-gray-900 shadow-sm" : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            Osobní údaje
+          </button>
+        )}
         {showVizitka && vizitkaSlot && (
           <button
             type="button"
@@ -57,7 +62,7 @@ export function ContactDetailTabs({
 
       {tab === "overview" ? (
         children
-      ) : tab === "personal" ? (
+      ) : tab === "personal" && showPersonal ? (
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <p className="mb-4 text-sm text-gray-500">
             Slouží pouze k evidenci, nepoužívá se pro přihlášení ani jiné funkce systému.

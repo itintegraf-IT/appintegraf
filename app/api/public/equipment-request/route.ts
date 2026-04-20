@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
           title: "Nový požadavek na techniku",
           message: `${requesterName} odeslal/a požadavek na ${equipmentType} (č. #${request.id}).`,
           type: "equipment_request",
-          link: "/equipment",
+          link: `/equipment?tab=requests&id=${request.id}`,
         })),
       });
     }

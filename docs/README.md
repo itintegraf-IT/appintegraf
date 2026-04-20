@@ -8,6 +8,7 @@ Přehled dokumentace modulů a specifikací projektu.
 |----------|-------|
 | [MODUL_KALENDAR.md](MODUL_KALENDAR.md) | Kalendář – týdenní/měsíční zobrazení, CRUD událostí, filtry (Globální/Osobní), drag & drop, dvoufázové schvalování, export .ics |
 | [MODUL_UKOLY.md](MODUL_UKOLY.md) | Úkoly – zadání/úpravy, role, notifikace, kalendářová linka podle stavu, archiv a export CSV/XLSX |
+| [MODUL_MAJETEK_POZADAVKY.md](MODUL_MAJETEK_POZADAVKY.md) | Majetek – dvoufázové schvalování požadavků na techniku (IT → Vedení), stavy, datový model a API |
 | [KALENDAR_SCHVALOVANI_FAZE2.md](KALENDAR_SCHVALOVANI_FAZE2.md) | Specifikace dvoufázového schvalování (zástup → vedoucí oddělení) |
 
 ## Modul IML

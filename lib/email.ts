@@ -106,6 +106,108 @@ export async function sendCalendarApprovalEmail(
   }
 }
 
+export type SendEquipmentRequestResultEmailParams = {
+  toEmail: string;
+  toName: string;
+  requestId: number;
+  equipmentType: string;
+  /** "approved" | "rejected" | "resolved" */
+  result: "approved" | "rejected" | "resolved";
+  adminResponse?: string | null;
+  itResponse?: string | null;
+};
+
+/**
+ * Odešle e-mail žadateli o výsledku schvalování požadavku na techniku.
+ * Žadatel nemusí mít účet – tato cesta je jediná, jak se o výsledku dozví.
+ */
+export async function sendEquipmentRequestResultEmail(
+  params: SendEquipmentRequestResultEmailParams
+): Promise<{ success: boolean; error?: string }> {
+  const settings = await getEmailSettings();
+  if (!settings.enabled) return { success: true };
+
+  if (!settings.user || !settings.password || !settings.from) {
+    return {
+      success: false,
+      error: "E-mail není nakonfigurován (chybí SMTP údaje nebo odesílatel)",
+    };
+  }
+
+  const resultText =
+    params.result === "approved"
+      ? "schválen"
+      : params.result === "rejected"
+      ? "zamítnut"
+      : "vyřízen";
+  const color =
+    params.result === "rejected"
+      ? "#dc2626"
+      : params.result === "resolved"
+      ? "#2563eb"
+      : "#16a34a";
+
+  const itBlock = params.itResponse
+    ? `<p><strong>Stanovisko IT:</strong><br>${String(params.itResponse).replace(/\n/g, "<br>")}</p>`
+    : "";
+  const adminBlock = params.adminResponse
+    ? `<p><strong>Stanovisko vedení:</strong><br>${String(params.adminResponse).replace(/\n/g, "<br>")}</p>`
+    : "";
+
+  const subject = `Požadavek na techniku #${params.requestId} – ${resultText}`;
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
+  <p>Dobrý den, ${params.toName},</p>
+  <p>Váš požadavek <strong>#${params.requestId}</strong> na <strong>${params.equipmentType}</strong> byl
+    <strong style="color: ${color};">${resultText}</strong>.</p>
+  ${itBlock}
+  ${adminBlock}
+  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+  <p style="color: #999; font-size: 11px;">Tento e-mail byl odeslán automaticky z aplikace INTEGRAF.</p>
+</body>
+</html>
+  `.trim();
+
+  const textLines: string[] = [
+    `Dobrý den, ${params.toName},`,
+    `Váš požadavek #${params.requestId} na ${params.equipmentType} byl ${resultText}.`,
+  ];
+  if (params.itResponse) textLines.push(`Stanovisko IT: ${params.itResponse}`);
+  if (params.adminResponse) textLines.push(`Stanovisko vedení: ${params.adminResponse}`);
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: settings.host,
+      port: settings.port,
+      secure: settings.secure,
+      auth: { user: settings.user, pass: settings.password },
+      tls:
+        settings.host.includes("office365") || settings.host.includes("outlook")
+          ? { ciphers: "SSLv3", rejectUnauthorized: false }
+          : undefined,
+    });
+
+    await transporter.sendMail({
+      from: settings.fromName
+        ? `"${settings.fromName}" <${settings.from}>`
+        : settings.from,
+      to: params.toEmail,
+      subject,
+      text: textLines.join("\n\n"),
+      html,
+    });
+
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("sendEquipmentRequestResultEmail error:", msg);
+    return { success: false, error: msg };
+  }
+}
+
 export type SendUkolEmailParams = {
   toEmail: string;
   toName: string;

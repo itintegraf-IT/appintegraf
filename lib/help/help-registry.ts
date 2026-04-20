@@ -179,6 +179,10 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     tips: [
       "U položek bez data nákupu systém dopočítává stáří od data zápisu.",
       "Při vrácení majetku vždy aktualizujte stav i dokumentaci.",
+      "Požadavek na techniku prochází dvoufázovým schvalováním: stanovisko IT → schválení Vedení.",
+    ],
+    docs: [
+      { label: "Schvalovací proces požadavků na techniku", href: "/help/modul-majetek-pozadavky" },
     ],
   },
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { hasModuleAccess } from "@/lib/auth-utils";
+import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 
 async function isInDepartment(userId: number, departmentName: string): Promise<boolean> {
   const dept = await prisma.departments.findFirst({
@@ -68,7 +68,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
-  const inIT = await isInDepartment(userId, "IT");
+  const admin = await isAdmin(userId);
+  const inIT = admin || (await isInDepartment(userId, "IT"));
   if (!inIT) {
     return NextResponse.json({ error: "Stanovisko mohou dávat pouze uživatelé z oddělení IT" }, { status: 403 });
   }
@@ -88,6 +89,35 @@ export async function PATCH(
   const approvalTo = approval_requested_to != null ? parseInt(String(approval_requested_to), 10) : null;
   if (!approvalTo || isNaN(approvalTo)) {
     return NextResponse.json({ error: "Vyberte příjemce ke schválení" }, { status: 400 });
+  }
+
+  // Ověření, že vybraný uživatel skutečně patří do oddělení Vedení (primární nebo sekundární)
+  const vedeni = await prisma.departments.findFirst({
+    where: { name: "Vedení", is_active: true },
+    select: { id: true },
+  });
+  if (!vedeni) {
+    return NextResponse.json(
+      { error: "Oddělení „Vedení“ není v systému nalezeno" },
+      { status: 400 }
+    );
+  }
+  const approverOk = await prisma.users.findFirst({
+    where: {
+      id: approvalTo,
+      is_active: true,
+      OR: [
+        { department_id: vedeni.id },
+        { user_secondary_departments: { some: { department_id: vedeni.id } } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (!approverOk) {
+    return NextResponse.json(
+      { error: "Vybraný schvalovatel není členem oddělení Vedení" },
+      { status: 400 }
+    );
   }
 
   const existing = await prisma.equipment_requests.findUnique({ where: { id } });
@@ -117,7 +147,7 @@ export async function PATCH(
       title: "Požadavek na techniku čeká na schválení",
       message: `IT odeslal požadavek #${id} ke schválení.`,
       type: "equipment_approval",
-      link: "/equipment?tab=requests",
+      link: `/equipment?tab=requests&id=${id}`,
     },
   });
 

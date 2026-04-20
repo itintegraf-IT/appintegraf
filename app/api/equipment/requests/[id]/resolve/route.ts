@@ -19,9 +19,9 @@ async function isInDepartment(userId: number, departmentName: string): Promise<b
   return !!inSecondary;
 }
 
-/** PATCH – Vedení schválí nebo zamítne požadavek */
+/** PATCH – IT označí schválený požadavek jako vyřízený (technika dodána/předána) */
 export async function PATCH(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -35,13 +35,10 @@ export async function PATCH(
   }
 
   const admin = await isAdmin(userId);
-  const [inIT, inVedeni] = await Promise.all([
-    isInDepartment(userId, "IT"),
-    isInDepartment(userId, "Vedení"),
-  ]);
-  if (!admin && !inIT && !inVedeni) {
+  const inIT = admin || (await isInDepartment(userId, "IT"));
+  if (!inIT) {
     return NextResponse.json(
-      { error: "Schvalovat mohou pouze uživatelé z oddělení IT nebo Vedení" },
+      { error: "Vyřídit mohou pouze uživatelé z oddělení IT" },
       { status: 403 }
     );
   }
@@ -51,48 +48,21 @@ export async function PATCH(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const { action, admin_response } = body;
-
-  if (action !== "approve" && action !== "reject") {
-    return NextResponse.json({ error: "Neplatná akce (approve/reject)" }, { status: 400 });
-  }
-
   const existing = await prisma.equipment_requests.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Požadavek nenalezen" }, { status: 404 });
   }
-
-  // IT / admin smí rozhodnout přímo ve stavu "nov_" (bez předání vedení),
-  // Vedení rozhoduje ve stavu "cek_na_schv_len_" pouze pokud je jim požadavek přidělen.
-  if (existing.status === "nov_") {
-    if (!admin && !inIT) {
-      return NextResponse.json(
-        { error: "Přímé schválení ve stavu „Nový“ mohou provést jen IT / admin" },
-        { status: 403 }
-      );
-    }
-  } else if (existing.status === "cek_na_schv_len_") {
-    if (!admin && existing.approval_requested_to !== userId) {
-      return NextResponse.json(
-        { error: "Tento požadavek vám nebyl určen ke schválení" },
-        { status: 403 }
-      );
-    }
-  } else {
-    return NextResponse.json({ error: "Požadavek již byl zpracován" }, { status: 400 });
+  if (existing.status !== "schv_leno") {
+    return NextResponse.json(
+      { error: "Vyřídit lze pouze schválený požadavek" },
+      { status: 400 }
+    );
   }
-
-  const newStatus = action === "approve" ? "schv_leno" : "zam_tnuto";
-  const adminResponseText = admin_response ? String(admin_response).trim() : null;
 
   await prisma.equipment_requests.update({
     where: { id },
     data: {
-      status: newStatus,
-      admin_response: adminResponseText,
-      processed_by: userId,
-      processed_at: new Date(),
+      status: "vy__zeno",
       updated_at: new Date(),
     },
   });
@@ -104,12 +74,12 @@ export async function PATCH(
         toName: existing.requester_name ?? "uživateli",
         requestId: id,
         equipmentType: existing.equipment_type ?? "",
-        result: action === "approve" ? "approved" : "rejected",
+        result: "resolved",
         itResponse: existing.it_response,
-        adminResponse: adminResponseText,
+        adminResponse: existing.admin_response,
       });
     } catch (e) {
-      console.error("approve email send failed:", e);
+      console.error("resolve email send failed:", e);
     }
   }
 
