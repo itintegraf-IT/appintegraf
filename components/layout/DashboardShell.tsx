@@ -19,6 +19,7 @@ export function DashboardShell({ user, isAdmin, moduleAccess }: Props) {
         <Header
           user={user}
           isAdmin={isAdmin}
+          moduleAccess={moduleAccess}
           onMenuClick={() => setSidebarOpen((o) => !o)}
         />
         <Sidebar

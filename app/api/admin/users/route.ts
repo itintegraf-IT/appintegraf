@@ -110,7 +110,7 @@ export async function POST(req: NextRequest) {
       position = "",
       department_id = null,
       secondary_department_ids = [],
-      role_id = 1,
+      role_id = null,
       module_access = {},
       is_active = true,
       display_in_list = true,
@@ -131,9 +131,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const roleIdNum = role_id != null ? parseInt(String(role_id), 10) : NaN;
+    if (!roleIdNum || isNaN(roleIdNum)) {
+      return NextResponse.json({ error: "Vyberte roli uživatele" }, { status: 400 });
+    }
+    const roleRow = await prisma.roles.findUnique({
+      where: { id: roleIdNum },
+      select: { id: true, name: true, is_active: true },
+    });
+    if (!roleRow || roleRow.is_active === false) {
+      return NextResponse.json({ error: "Vybraná role neexistuje nebo není aktivní" }, { status: 400 });
+    }
+
     const qrCode = String(Math.floor(Math.random() * 1e12)).padStart(12, "0");
     const passwordHash = await bcrypt.hash(password_custom || "heslo123", 10);
-    const roleIdNum = role_id ? parseInt(String(role_id), 10) : 1;
 
     const deptIdNum = department_id != null ? parseInt(String(department_id), 10) : null;
     let department_name: string | null = null;
@@ -177,8 +188,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const role = await prisma.roles.findUnique({ where: { id: roleIdNum }, select: { name: true } });
-    const isAdminRole = role?.name?.toLowerCase() === "admin";
+    const isAdminRole = roleRow.name?.toLowerCase() === "admin";
     const moduleAccessJson = isAdminRole
       ? JSON.stringify({ all: true })
       : JSON.stringify(module_access as Record<string, string>);

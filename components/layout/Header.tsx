@@ -14,6 +14,7 @@ import {
   PanelLeft,
 } from "lucide-react";
 import { NotificationsDropdown } from "./NotificationsDropdown";
+import { HelpButton } from "./HelpButton";
 import { useState } from "react";
 import { ThemeToggle } from "./ThemeToggle";
 import { useSidebar } from "./SidebarContext";
@@ -25,10 +26,11 @@ type HeaderProps = {
     id?: string;
   };
   isAdmin: boolean;
+  moduleAccess: Record<string, boolean>;
   onMenuClick?: () => void;
 };
 
-export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
+export function Header({ user, isAdmin, moduleAccess, onMenuClick }: HeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const { state, toggleCollapsed, expandToFull } = useSidebar();
 
@@ -114,6 +116,8 @@ export function Header({ user, isAdmin, onMenuClick }: HeaderProps) {
           </div>
 
           <ThemeToggle />
+
+          <HelpButton moduleAccess={moduleAccess} isAdmin={isAdmin} />
 
           <NotificationsDropdown />
 

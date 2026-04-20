@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText, BriefcaseBusiness } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText, BriefcaseBusiness, ShieldAlert } from "lucide-react";
 
 const AVAILABLE_MODULES = [
   { key: "contacts", label: "Kontakty", icon: Users },
@@ -79,7 +79,7 @@ export function AdminUserForm({ user }: { user?: User }) {
     position: user?.position ?? "",
     department_id: user?.department_id ?? null,
     secondary_department_ids: (user?.secondary_department_ids ?? []) as number[],
-    role_id: user?.role_id ?? 1,
+    role_id: (user?.role_id ?? null) as number | null,
     module_access: (user?.module_access ?? {}) as ModuleAccessMap,
     is_active: user?.is_active !== false,
     display_in_list: user?.display_in_list !== false,
@@ -89,9 +89,21 @@ export function AdminUserForm({ user }: { user?: User }) {
   useEffect(() => {
     fetch("/api/roles")
       .then((r) => r.json())
-      .then(setRoles)
+      .then((data: Role[]) => {
+        setRoles(data);
+        if (!isEdit) {
+          setForm((prev) => {
+            if (prev.role_id != null && data.some((r) => r.id === prev.role_id)) {
+              return prev;
+            }
+            const nonAdmin = data.find((r) => r.name?.toLowerCase() !== "admin");
+            const fallback = nonAdmin ?? data[0];
+            return fallback ? { ...prev, role_id: fallback.id } : prev;
+          });
+        }
+      })
       .catch(() => {});
-  }, []);
+  }, [isEdit]);
 
   useEffect(() => {
     fetch("/api/departments")
@@ -113,7 +125,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         position: user.position ?? "",
         department_id: user.department_id ?? null,
         secondary_department_ids: user.secondary_department_ids ?? [],
-        role_id: user.role_id ?? 1,
+        role_id: (user.role_id ?? null) as number | null,
         module_access: user.module_access ?? {},
         is_active: user.is_active !== false,
         display_in_list: user.display_in_list !== false,
@@ -162,9 +174,18 @@ export function AdminUserForm({ user }: { user?: User }) {
     });
   };
 
+  const selectedRole = roles.find((r) => r.id === form.role_id);
+  const isAdminRoleSelected = selectedRole?.name?.toLowerCase() === "admin";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (form.role_id == null) {
+      setError("Vyberte roli uživatele.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -196,7 +217,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         return;
       }
 
-      router.push(isEdit ? "/admin/users" : `/admin/users/${data.id}/edit`);
+      router.push("/admin/users");
       router.refresh();
     } catch {
       setError("Chyba při ukládání");
@@ -331,16 +352,28 @@ export function AdminUserForm({ user }: { user?: User }) {
           </select>
         </div>
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Role</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">Role *</label>
           <select
-            value={form.role_id}
-            onChange={(e) => setForm({ ...form, role_id: parseInt(e.target.value, 10) })}
+            value={form.role_id ?? ""}
+            onChange={(e) =>
+              setForm({
+                ...form,
+                role_id: e.target.value ? parseInt(e.target.value, 10) : null,
+              })
+            }
+            required
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
           >
+            <option value="">— Vyberte roli —</option>
             {roles.map((r) => (
               <option key={r.id} value={r.id}>{r.name}</option>
             ))}
           </select>
+          {isAdminRoleSelected && (
+            <p className="mt-1 text-xs text-amber-700">
+              Role <strong>Admin</strong> automaticky uděluje plný přístup ke všem modulům.
+            </p>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Pozice</label>
@@ -411,7 +444,23 @@ export function AdminUserForm({ user }: { user?: User }) {
         <p className="mb-4 text-sm text-gray-600">
           Zaškrtnutím povolíte uživateli přístup k modulu (zobrazí se v menu). U každého modulu nastavte úroveň: Viewer = pouze prohlížení, Editor = může přidávat a měnit, Admin = plný přístup v modulu.
         </p>
-        <div className="space-y-3">
+        {isAdminRoleSelected && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+            <div>
+              <p className="font-semibold">Role Admin – plný přístup</p>
+              <p>
+                Vybraná role <strong>Admin</strong> uživateli automaticky udělí plný přístup ke všem modulům.
+                Nastavení níže bude při uložení ignorováno. Pokud chcete přístup řídit ručně,
+                změňte roli na ne-administrátorskou (např. <em>uživatel</em>).
+              </p>
+            </div>
+          </div>
+        )}
+        <div
+          className={`space-y-3 ${isAdminRoleSelected ? "pointer-events-none opacity-50" : ""}`}
+          aria-disabled={isAdminRoleSelected}
+        >
           {AVAILABLE_MODULES.map((mod) => {
             const Icon = mod.icon;
             const level = form.module_access[mod.key] ?? "";
@@ -426,6 +475,7 @@ export function AdminUserForm({ user }: { user?: User }) {
                     type="checkbox"
                     checked={isVisible}
                     onChange={(e) => setModuleVisible(mod.key, e.target.checked)}
+                    disabled={isAdminRoleSelected}
                     className="rounded"
                   />
                   <Icon className="h-5 w-5 shrink-0 text-gray-600" />
@@ -434,7 +484,7 @@ export function AdminUserForm({ user }: { user?: User }) {
                 <select
                   value={isVisible ? level : ""}
                   onChange={(e) => setModulePermission(mod.key, e.target.value)}
-                  disabled={!isVisible}
+                  disabled={!isVisible || isAdminRoleSelected}
                   className="rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <option value="">—</option>
@@ -462,6 +512,7 @@ export function AdminUserForm({ user }: { user?: User }) {
                         },
                       }))
                     }
+                    disabled={isAdminRoleSelected}
                     className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
                     title="Stroj pro zobrazení v náhledu tiskaře"
                   >

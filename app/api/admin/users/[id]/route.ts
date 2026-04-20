@@ -160,6 +160,16 @@ export async function PUT(
     }
 
     const roleIdNum = role_id != null ? parseInt(String(role_id), 10) : null;
+    if (!roleIdNum || isNaN(roleIdNum)) {
+      return NextResponse.json({ error: "Vyberte roli uživatele" }, { status: 400 });
+    }
+    const roleRow = await prisma.roles.findUnique({
+      where: { id: roleIdNum },
+      select: { id: true, name: true, is_active: true },
+    });
+    if (!roleRow || roleRow.is_active === false) {
+      return NextResponse.json({ error: "Vybraná role neexistuje nebo není aktivní" }, { status: 400 });
+    }
 
     // department_name se synchronizuje z hlavního oddělení
     let department_name: string | null = null;
@@ -210,24 +220,21 @@ export async function PUT(
       }
     }
 
-    if (roleIdNum) {
-      const role = await prisma.roles.findUnique({ where: { id: roleIdNum }, select: { name: true } });
-      const isAdminRole = role?.name?.toLowerCase() === "admin";
-      const moduleAccessJson = isAdminRole
-        ? JSON.stringify({ all: true })
-        : JSON.stringify(module_access);
+    const isAdminRole = roleRow.name?.toLowerCase() === "admin";
+    const moduleAccessJson = isAdminRole
+      ? JSON.stringify({ all: true })
+      : JSON.stringify(module_access);
 
-      const existing = await prisma.user_roles.findFirst({ where: { user_id: id } });
-      if (existing) {
-        await prisma.user_roles.update({
-          where: { id: existing.id },
-          data: { role_id: roleIdNum, module_access: moduleAccessJson },
-        });
-      } else {
-        await prisma.user_roles.create({
-          data: { user_id: id, role_id: roleIdNum, module_access: moduleAccessJson },
-        });
-      }
+    const existing = await prisma.user_roles.findFirst({ where: { user_id: id } });
+    if (existing) {
+      await prisma.user_roles.update({
+        where: { id: existing.id },
+        data: { role_id: roleIdNum, module_access: moduleAccessJson },
+      });
+    } else {
+      await prisma.user_roles.create({
+        data: { user_id: id, role_id: roleIdNum, module_access: moduleAccessJson },
+      });
     }
 
     return NextResponse.json({ success: true });
