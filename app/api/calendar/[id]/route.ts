@@ -65,6 +65,8 @@ export async function PUT(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
+  const userId = parseInt(session.user.id, 10);
+
   try {
     const body = await req.json();
     const {
@@ -123,7 +125,6 @@ export async function PUT(
       }
     }
 
-    const userId = parseInt(session.user!.id!, 10);
     const start = new Date(start_date);
     const end = new Date(end_date);
     if (end <= start) {
