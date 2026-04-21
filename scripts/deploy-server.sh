@@ -1,27 +1,33 @@
 #!/usr/bin/env bash
-# Nasazení na produkční Linux server (po git push).
+# Nasazení aplikace na Linux server (produkce i test) – po git push.
 # Spouštějte z kořene repozitáře na serveru, např.:
 #   chmod +x scripts/deploy-server.sh
-#   ./scripts/deploy-server.sh
+#   ./scripts/deploy-server.sh                             # produkce (main + PM2 appintegraf)
+#   DEPLOY_BRANCH=test PM2_APP_NAME=appintegraf-test ./scripts/deploy-server.sh
+#   ./scripts/deploy-server.sh --branch test --pm2-name appintegraf-test
 #
 # Vyžaduje: .env s DATABASE_URL, Node 20.x, PM2, oprávnění k git pull.
 #
-# Po stažení kódu ověří: větev main, HEAD == origin/main, čistý working tree.
+# Po stažení kódu ověří: aktuální větev = požadovaná, HEAD == origin/<větev>, čistý working tree.
 #
 # Přepínače:
+#   --branch JMÉNO        větev, kterou pullnout a zbuildit
+#                         výchozí: main (lze přepsat env DEPLOY_BRANCH)
+#   --pm2-name JMÉNO      PM2 proces k restartu
+#                         výchozí: appintegraf (lze přepsat env PM2_APP_NAME)
 #   --planovani-upgrade   spustí npm run db:planovani-upgrade (SQL změny plánování)
 #   --apply-sql SOUBOR    spustí konkrétní SQL soubor z prisma/migrations/ přes mysql klienta
 #                         (lze uvést víckrát). Vyžaduje .env s DATABASE_URL.
 #                         Příklad: --apply-sql 20260420_auth_tokens.sql
 #   --skip-migrate        přeskočí npx prisma migrate deploy
 #   --skip-build          přeskočí npm run build (jen pro nouzi)
-#   --pm2-name JMÉNO       výchozí: appintegraf (nebo env PM2_APP_NAME)
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+BRANCH="${DEPLOY_BRANCH:-main}"
 PM2_NAME="${PM2_APP_NAME:-appintegraf}"
 SKIP_MIGRATE=0
 SKIP_BUILD=0
@@ -29,12 +35,16 @@ DO_PLANOVANI=0
 SQL_FILES=()
 
 usage() {
-  sed -n '1,28p' "$0" | tail -n +2
+  sed -n '1,30p' "$0" | tail -n +2
   exit 0
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --branch)
+      BRANCH="${2:?chybí název větve}"
+      shift 2
+      ;;
     --planovani-upgrade) DO_PLANOVANI=1; shift ;;
     --apply-sql)
       SQL_FILES+=("${2:?chybí cesta k SQL souboru}")
@@ -59,26 +69,28 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+echo "==> Nasazení: větev=$BRANCH | PM2 proces=$PM2_NAME | adresář=$ROOT"
+
 echo "==> Git: package-lock.json – zahodit lokální změny (po npm install na serveru často přepsán)"
 git restore package-lock.json 2>/dev/null || true
 
-echo "==> Git: fetch + pull (jen fast-forward)"
-git fetch origin main
-git pull --ff-only origin main
+echo "==> Git: fetch + pull (jen fast-forward, větev: $BRANCH)"
+git fetch origin "$BRANCH"
+git pull --ff-only origin "$BRANCH"
 
-echo "==> Git: ověření (musí odpovídat origin/main, žádné lokální změny)"
+echo "==> Git: ověření (musí odpovídat origin/$BRANCH, žádné lokální změny)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
-if [[ "$branch" != "main" ]]; then
-  echo "CHYBA: očekávána větev main, aktuální: $branch" >&2
+if [[ "$branch" != "$BRANCH" ]]; then
+  echo "CHYBA: očekávána větev $BRANCH, aktuální: $branch" >&2
   exit 1
 fi
 
 head_sha="$(git rev-parse HEAD)"
-origin_sha="$(git rev-parse origin/main)"
+origin_sha="$(git rev-parse "origin/$BRANCH")"
 if [[ "$head_sha" != "$origin_sha" ]]; then
-  echo "CHYBA: HEAD se neshoduje s origin/main." >&2
-  echo "  HEAD:         $head_sha" >&2
-  echo "  origin/main:  $origin_sha" >&2
+  echo "CHYBA: HEAD se neshoduje s origin/$BRANCH." >&2
+  echo "  HEAD:              $head_sha" >&2
+  echo "  origin/$BRANCH:    $origin_sha" >&2
   exit 1
 fi
 

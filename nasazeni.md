@@ -23,12 +23,25 @@ Pokud Linux hlásí `bash\r: No such file or directory`, soubor má **Windows ko
 
 | Přepínač | Význam |
 |----------|--------|
+| `--branch NÁZEV` | Git větev k nasazení (výchozí `main`). |
+| `--pm2-name NÁZEV` | Název procesu PM2 (výchozí `appintegraf`). |
 | `--planovani-upgrade` | Spustí `npm run db:planovani-upgrade` (SQL změny modulu plánování výroby). |
+| `--apply-sql SOUBOR` | Aplikuje SQL soubor z `prisma/migrations/` (lze uvést víckrát). |
 | `--skip-migrate` | Přeskočí `npx prisma migrate deploy`. |
 | `--skip-build` | Přeskočí `npm run build` (nouzově). |
-| `--pm2-name NÁZEV` | Jiný název procesu PM2 než výchozí `appintegraf`. |
 
-Proměnná prostředí `PM2_APP_NAME` místo `--pm2-name` také funguje.
+Proměnné prostředí `DEPLOY_BRANCH` a `PM2_APP_NAME` mají stejný efekt jako `--branch` a `--pm2-name`.
+
+### Nasazení test prostředí
+
+Vedle produkce může na stejném serveru běžet **test instance** (jiný adresář, jiná větev, jiný PM2 proces, jiný port, jiná databáze). Detailní setup: viz [`git.md`](./git.md).
+
+```bash
+cd /var/www/appintegraf-test
+DEPLOY_BRANCH=test PM2_APP_NAME=appintegraf-test ./scripts/deploy-server.sh
+# nebo ekvivalentně:
+./scripts/deploy-server.sh --branch test --pm2-name appintegraf-test
+```
 
 ### Co skript po `git pull` ověří
 
