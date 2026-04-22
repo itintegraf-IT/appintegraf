@@ -50,3 +50,8 @@ next-env.d.ts
 # user uploads
 /public/uploads/*
 !/public/uploads/.gitkeep
+
+# DB backups (obsahují citlivá data, drzime mimo git)
+/backups/*
+!/backups/.gitkeep
+!/backups/README.md

@@ -135,32 +135,32 @@ model contract_workflow_steps {
 }
 
 model contracts {
-  id                    Int                  @id @default(autoincrement())
-  title                 String               @db.VarChar(500)
+  id                  Int                  @id @default(autoincrement())
+  title               String               @db.VarChar(500)
   /// Číslo / externí ID smlouvy
-  contract_number       String?              @db.VarChar(100)
-  party_company         String?              @db.VarChar(255)
-  party_contact         String?              @db.VarChar(255)
-  contract_type_id      Int
-  description           String?              @db.Text
+  contract_number     String?              @db.VarChar(100)
+  party_company       String?              @db.VarChar(255)
+  party_contact       String?              @db.VarChar(255)
+  contract_type_id    Int
+  description         String?              @db.Text
   /// draft | in_approval | approval_completed | signature_pending | signed | archived | rejected | returned
-  approval_status       String               @default("draft") @db.VarChar(30)
-  value_amount          Decimal?             @db.Decimal(15, 2)
-  value_currency        String?              @default("CZK") @db.VarChar(10)
-  effective_from        DateTime?            @db.DateTime(0)
-  valid_until           DateTime?            @db.DateTime(0)
-  expires_at            DateTime?            @db.DateTime(0)
-  signed_at             DateTime?            @db.DateTime(0)
-  created_by            Int
-  responsible_user_id   Int?
-  department_id         Int?
-  created_at            DateTime             @default(now()) @db.Timestamp(0)
-  updated_at            DateTime             @default(now()) @db.Timestamp(0)
-  contract_types        contract_types       @relation(fields: [contract_type_id], references: [id], onUpdate: NoAction, map: "contracts_contract_type_fk")
-  users_created_by      users                @relation("contracts_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "contracts_created_by_fk")
-  users_responsible     users?               @relation("contracts_responsible_user", fields: [responsible_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "contracts_responsible_fk")
-  departments           departments?         @relation(fields: [department_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "contracts_department_fk")
-  contract_approvals    contract_approvals[]
+  approval_status     String               @default("draft") @db.VarChar(30)
+  value_amount        Decimal?             @db.Decimal(15, 2)
+  value_currency      String?              @default("CZK") @db.VarChar(10)
+  effective_from      DateTime?            @db.DateTime(0)
+  valid_until         DateTime?            @db.DateTime(0)
+  expires_at          DateTime?            @db.DateTime(0)
+  signed_at           DateTime?            @db.DateTime(0)
+  created_by          Int
+  responsible_user_id Int?
+  department_id       Int?
+  created_at          DateTime             @default(now()) @db.Timestamp(0)
+  updated_at          DateTime             @default(now()) @db.Timestamp(0)
+  contract_types      contract_types       @relation(fields: [contract_type_id], references: [id], onUpdate: NoAction, map: "contracts_contract_type_fk")
+  users_created_by    users                @relation("contracts_created_by", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "contracts_created_by_fk")
+  users_responsible   users?               @relation("contracts_responsible_user", fields: [responsible_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "contracts_responsible_fk")
+  departments         departments?         @relation(fields: [department_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "contracts_department_fk")
+  contract_approvals  contract_approvals[]
 
   @@index([contract_type_id], map: "idx_contracts_type")
   @@index([approval_status], map: "idx_contracts_approval_status")
@@ -172,19 +172,19 @@ model contracts {
 }
 
 model contract_approvals {
-  id              Int       @id @default(autoincrement())
-  contract_id     Int
-  approver_id     Int
+  id             Int       @id @default(autoincrement())
+  contract_id    Int
+  approver_id    Int
   /// Kód kroku / role ze šablony (např. legal, manager)
-  approval_type   String?   @default("step") @db.VarChar(50)
-  approval_order  Int?      @default(1)
-  status          String?   @default("pending") @db.VarChar(20)
-  comment         String?   @db.Text
-  approved_at     DateTime? @db.DateTime(0)
-  created_at      DateTime  @default(now()) @db.Timestamp(0)
-  updated_at      DateTime  @default(now()) @db.Timestamp(0)
-  contracts       contracts @relation(fields: [contract_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "contract_approvals_contract_fk")
-  users           users     @relation(fields: [approver_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "contract_approvals_approver_fk")
+  approval_type  String?   @default("step") @db.VarChar(50)
+  approval_order Int?      @default(1)
+  status         String?   @default("pending") @db.VarChar(20)
+  comment        String?   @db.Text
+  approved_at    DateTime? @db.DateTime(0)
+  created_at     DateTime  @default(now()) @db.Timestamp(0)
+  updated_at     DateTime  @default(now()) @db.Timestamp(0)
+  contracts      contracts @relation(fields: [contract_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "contract_approvals_contract_fk")
+  users          users     @relation(fields: [approver_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "contract_approvals_approver_fk")
 
   @@index([contract_id], map: "idx_contract_approvals_contract")
   @@index([approver_id], map: "idx_contract_approvals_approver")
@@ -219,25 +219,25 @@ model contact_tags {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model departments {
-  id              Int               @id @default(autoincrement())
-  name            String            @db.VarChar(100)
-  code            String?           @unique(map: "code") @db.VarChar(20)
-  description     String?           @db.Text
-  manager_id      Int?
-  phone           String?           @db.VarChar(20)
-  email           String?           @db.VarChar(100)
-  landline        String?           @db.VarChar(20)
-  landline2       String?           @db.VarChar(20)
-  notes           String?           @db.Text
-  is_active       Boolean?          @default(true)
-  display_in_list Boolean?          @default(true)
-  created_at      DateTime          @default(now()) @db.Timestamp(0)
-  updated_at      DateTime          @default(now()) @db.Timestamp(0)
-  calendar_events           calendar_events[]
-  contracts                 contracts[]
+  id                         Int                          @id @default(autoincrement())
+  name                       String                       @db.VarChar(100)
+  code                       String?                      @unique(map: "code") @db.VarChar(20)
+  description                String?                      @db.Text
+  manager_id                 Int?
+  phone                      String?                      @db.VarChar(20)
+  email                      String?                      @db.VarChar(100)
+  landline                   String?                      @db.VarChar(20)
+  landline2                  String?                      @db.VarChar(20)
+  notes                      String?                      @db.Text
+  is_active                  Boolean?                     @default(true)
+  display_in_list            Boolean?                     @default(true)
+  created_at                 DateTime                     @default(now()) @db.Timestamp(0)
+  updated_at                 DateTime                     @default(now()) @db.Timestamp(0)
+  calendar_events            calendar_events[]
+  contracts                  contracts[]
   user_secondary_departments user_secondary_departments[]
-  ukoly_departments         ukoly_departments[]
-  users                     users?            @relation(fields: [manager_id], references: [id], onUpdate: NoAction, map: "departments_ibfk_1")
+  ukoly_departments          ukoly_departments[]
+  users                      users?                       @relation(fields: [manager_id], references: [id], onUpdate: NoAction, map: "departments_ibfk_1")
 
   @@index([code], map: "idx_code")
   @@index([name], map: "idx_name")
@@ -246,11 +246,11 @@ model departments {
 
 /// Sekundární oddělení uživatele (až 2 na uživatele)
 model user_secondary_departments {
-  id            Int        @id @default(autoincrement())
+  id            Int         @id @default(autoincrement())
   user_id       Int
   department_id Int
-  created_at   DateTime   @default(now()) @db.Timestamp(0)
-  users         users      @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  created_at    DateTime    @default(now()) @db.Timestamp(0)
+  users         users       @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
   departments   departments @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([user_id, department_id], map: "unique_user_secondary_dept")
@@ -360,29 +360,29 @@ model equipment_items {
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model equipment_requests {
-  id                     Int                          @id @default(autoincrement())
-  requester_name         String                       @db.VarChar(100)
-  requester_email        String                       @db.VarChar(100)
-  requester_phone        String?                      @db.VarChar(20)
-  department             String?                      @db.VarChar(100)
-  position               String?                      @db.VarChar(100)
-  equipment_type         String                       @db.VarChar(100)
-  description            String                       @db.Text
-  priority               equipment_requests_priority? @default(st_edn_)
-  status                 equipment_requests_status?   @default(nov_)
-  admin_response         String?                      @db.Text
-  it_response            String?                      @db.Text
-  it_response_by         Int?
-  it_response_at         DateTime?                    @db.Timestamp(0)
+  id                    Int                          @id @default(autoincrement())
+  requester_name        String                       @db.VarChar(100)
+  requester_email       String                       @db.VarChar(100)
+  requester_phone       String?                      @db.VarChar(20)
+  department            String?                      @db.VarChar(100)
+  position              String?                      @db.VarChar(100)
+  equipment_type        String                       @db.VarChar(100)
+  description           String                       @db.Text
+  priority              equipment_requests_priority? @default(st_edn_)
+  status                equipment_requests_status?   @default(nov_)
+  admin_response        String?                      @db.Text
+  it_response           String?                      @db.Text
+  it_response_by        Int?
+  it_response_at        DateTime?                    @db.Timestamp(0)
   approval_requested_to Int?
-  approval_requested_at  DateTime?                    @db.Timestamp(0)
-  processed_by           Int?
+  approval_requested_at DateTime?                    @db.Timestamp(0)
+  processed_by          Int?
   processed_at          DateTime?                    @db.Timestamp(0)
-  created_at             DateTime                     @default(now()) @db.Timestamp(0)
-  updated_at             DateTime                     @default(now()) @db.Timestamp(0)
-  users                  users?                       @relation("equipment_requests_processed", fields: [processed_by], references: [id], onUpdate: NoAction, map: "equipment_requests_ibfk_1")
-  users_it               users?                       @relation("equipment_requests_it", fields: [it_response_by], references: [id], onUpdate: NoAction)
-  users_approval         users?                       @relation("equipment_requests_approval", fields: [approval_requested_to], references: [id], onUpdate: NoAction)
+  created_at            DateTime                     @default(now()) @db.Timestamp(0)
+  updated_at            DateTime                     @default(now()) @db.Timestamp(0)
+  users                 users?                       @relation("equipment_requests_processed", fields: [processed_by], references: [id], onUpdate: NoAction, map: "equipment_requests_ibfk_1")
+  users_it              users?                       @relation("equipment_requests_it", fields: [it_response_by], references: [id], onUpdate: NoAction)
+  users_approval        users?                       @relation("equipment_requests_approval", fields: [approval_requested_to], references: [id], onUpdate: NoAction)
 
   @@index([approval_requested_to], map: "idx_approval_requested_to")
   @@index([created_at], map: "idx_created")
@@ -788,9 +788,9 @@ model users {
   departments                                                    departments[]
   equipment_assignments_equipment_assignments_user_idTousers     equipment_assignments[]       @relation("equipment_assignments_user_idTousers")
   equipment_assignments_equipment_assignments_assigned_byTousers equipment_assignments[]       @relation("equipment_assignments_assigned_byTousers")
-  equipment_requests                                             equipment_requests[]             @relation("equipment_requests_processed")
-  equipment_requests_approval                                    equipment_requests[]             @relation("equipment_requests_approval")
-  equipment_requests_it                                          equipment_requests[]             @relation("equipment_requests_it")
+  equipment_requests                                             equipment_requests[]          @relation("equipment_requests_processed")
+  equipment_requests_approval                                    equipment_requests[]          @relation("equipment_requests_approval")
+  equipment_requests_it                                          equipment_requests[]          @relation("equipment_requests_it")
   equipment_transfers_equipment_transfers_from_user_idTousers    equipment_transfers[]         @relation("equipment_transfers_from_user_idTousers")
   equipment_transfers_equipment_transfers_to_user_idTousers      equipment_transfers[]         @relation("equipment_transfers_to_user_idTousers")
   equipment_transfers_equipment_transfers_transferred_byTousers  equipment_transfers[]         @relation("equipment_transfers_transferred_byTousers")
@@ -813,6 +813,7 @@ model users {
   ukoly_assigned                                                 ukoly[]                       @relation("ukoly_assignee")
   ukoly_created                                                  ukoly[]                       @relation("ukoly_creator")
   notifications                                                  notifications[]
+  iml_product_files_uploaded                                     iml_product_files[]           @relation("iml_product_files_uploader")
   roles                                                          roles?                        @relation(fields: [role_id], references: [id], onUpdate: NoAction, map: "fk_users_role")
 
   @@index([is_active], map: "idx_active")
@@ -864,12 +865,12 @@ enum equipment_requests_priority {
 }
 
 enum equipment_requests_status {
-  nov_            @map("nový")
+  nov_             @map("nový")
   cek_na_schv_len_ @map("čeká na schválení")
-  schv_leno       @map("schváleno")
-  zam_tnuto       @map("zamítnuto")
-  odlo_eno        @map("odloženo")
-  vy__zeno        @map("vyřízeno")
+  schv_leno        @map("schváleno")
+  zam_tnuto        @map("zamítnuto")
+  odlo_eno         @map("odloženo")
+  vy__zeno         @map("vyřízeno")
 }
 
 enum questions_correct_answer {
@@ -881,40 +882,40 @@ enum questions_correct_answer {
 
 // ─── Modul Plánování výroby (PlanovaniVyroby) ─────────────────────────────────
 model planovani_blocks {
-  id                         Int       @id @default(autoincrement())
-  orderNumber                String    @db.VarChar(100)
-  machine                    String    @db.VarChar(20)
-  startTime                  DateTime  @db.DateTime(0)
-  endTime                    DateTime  @db.DateTime(0)
-  type                       String    @default("ZAKAZKA") @db.VarChar(20)
-  blockVariant               String    @default("STANDARD") @db.VarChar(32)
-  description                String?   @db.Text
-  locked                     Boolean   @default(false)
-  deadlineExpedice           DateTime? @db.DateTime(0)
-  dataStatusId               Int?
-  dataStatusLabel            String?   @db.VarChar(100)
-  dataRequiredDate           DateTime? @db.DateTime(0)
-  dataOk                     Boolean   @default(false)
-  materialStatusId           Int?
-  materialStatusLabel        String?   @db.VarChar(100)
-  materialRequiredDate       DateTime? @db.DateTime(0)
-  materialOk                 Boolean   @default(false)
-  barvyStatusId              Int?
-  barvyStatusLabel           String?   @db.VarChar(100)
-  lakStatusId                Int?
-  lakStatusLabel             String?   @db.VarChar(100)
-  specifikace                String?   @db.Text
-  materialNote               String?   @db.Text
-  materialNoteByUsername     String?   @db.VarChar(100)
-  recurrenceType             String    @default("NONE") @db.VarChar(20)
-  recurrenceParentId         Int?
-  printCompletedAt           DateTime? @db.DateTime(0)
-  printCompletedByUserId     Int?
-  printCompletedByUsername   String?   @db.VarChar(100)
-  createdAt                  DateTime  @default(now()) @db.DateTime(0)
-  updatedAt                  DateTime  @updatedAt @db.DateTime(0)
-  recurrenceParent           planovani_blocks?  @relation("RecurrenceChildren", fields: [recurrenceParentId], references: [id])
-  recurrenceChildren         planovani_blocks[] @relation("RecurrenceChildren")
+  id                       Int                @id @default(autoincrement())
+  orderNumber              String             @db.VarChar(100)
+  machine                  String             @db.VarChar(20)
+  startTime                DateTime           @db.DateTime(0)
+  endTime                  DateTime           @db.DateTime(0)
+  type                     String             @default("ZAKAZKA") @db.VarChar(20)
+  blockVariant             String             @default("STANDARD") @db.VarChar(32)
+  description              String?            @db.Text
+  locked                   Boolean            @default(false)
+  deadlineExpedice         DateTime?          @db.DateTime(0)
+  dataStatusId             Int?
+  dataStatusLabel          String?            @db.VarChar(100)
+  dataRequiredDate         DateTime?          @db.DateTime(0)
+  dataOk                   Boolean            @default(false)
+  materialStatusId         Int?
+  materialStatusLabel      String?            @db.VarChar(100)
+  materialRequiredDate     DateTime?          @db.DateTime(0)
+  materialOk               Boolean            @default(false)
+  barvyStatusId            Int?
+  barvyStatusLabel         String?            @db.VarChar(100)
+  lakStatusId              Int?
+  lakStatusLabel           String?            @db.VarChar(100)
+  specifikace              String?            @db.Text
+  materialNote             String?            @db.Text
+  materialNoteByUsername   String?            @db.VarChar(100)
+  recurrenceType           String             @default("NONE") @db.VarChar(20)
+  recurrenceParentId       Int?
+  printCompletedAt         DateTime?          @db.DateTime(0)
+  printCompletedByUserId   Int?
+  printCompletedByUsername String?            @db.VarChar(100)
+  createdAt                DateTime           @default(now()) @db.DateTime(0)
+  updatedAt                DateTime           @updatedAt @db.DateTime(0)
+  recurrenceParent         planovani_blocks?  @relation("RecurrenceChildren", fields: [recurrenceParentId], references: [id])
+  recurrenceChildren       planovani_blocks[] @relation("RecurrenceChildren")
 
   @@index([recurrenceParentId])
   @@map("planovani_blocks")
@@ -991,92 +992,125 @@ model planovani_audit_log {
 
 // ─── Modul IML (zákazníci, produkty, objednávky) ─────────────────────────────────
 model iml_customers {
-  id                               Int           @id @default(autoincrement())
-  name                             String        @db.VarChar(255)
-  email                            String?       @unique @db.VarChar(255)
-  phone                            String?       @db.VarChar(50)
-  contact_person                   String?       @db.VarChar(255)
-  allow_under_over_delivery_percent Decimal?      @db.Decimal(5, 2)
-  customer_note                    String?       @db.Text
-  billing_address                  String?       @db.Text
-  shipping_address                 String?       @db.Text
-  individual_requirements         String?       @db.Text
-  city                             String?       @db.VarChar(100)
-  postal_code                      String?       @db.VarChar(20)
-  country                          String?       @default("Česká republika") @db.VarChar(100)
-  created_at                       DateTime      @default(now()) @db.DateTime(0)
-  updated_at                       DateTime      @updatedAt @db.DateTime(0)
+  id                                Int      @id @default(autoincrement())
+  name                              String   @db.VarChar(255)
+  email                             String?  @unique @db.VarChar(255)
+  phone                             String?  @db.VarChar(50)
+  contact_person                    String?  @db.VarChar(255)
+  allow_under_over_delivery_percent Decimal? @db.Decimal(5, 2)
+  customer_note                     String?  @db.Text
+  billing_address                   String?  @db.Text
+  shipping_address                  String?  @db.Text
+  individual_requirements           String?  @db.Text
+  city                              String?  @db.VarChar(100)
+  postal_code                       String?  @db.VarChar(20)
+  country                           String?  @default("Česká republika") @db.VarChar(100)
 
-  iml_products iml_products[]
-  iml_orders   iml_orders[]
+  billing_company    String? @db.VarChar(255)
+  ico                String? @db.VarChar(20)
+  dic                String? @db.VarChar(30)
+  label_requirements String? @db.Text
+  pallet_packaging   String? @db.Text
+  prepress_notes     String? @db.Text
+
+  created_at DateTime @default(now()) @db.DateTime(0)
+  updated_at DateTime @updatedAt @db.DateTime(0)
+
+  iml_products                    iml_products[]
+  iml_orders                      iml_orders[]
+  iml_customer_shipping_addresses iml_customer_shipping_addresses[]
+  iml_inquiries                   iml_inquiries[]
 
   @@map("iml_customers")
 }
 
 model iml_products {
-  id                   Int       @id @default(autoincrement())
-  customer_id          Int?
-  ig_code              String?   @db.VarChar(100)
-  ig_short_name        String?   @db.VarChar(255)
-  client_code          String?   @db.VarChar(100)
-  client_name          String?   @db.VarChar(255)
-  requester            String?   @db.VarChar(255)
-  label_shape_code     String?   @db.VarChar(100)
-  product_format       String?   @db.VarChar(100)
-  die_cut_tool_code    String?   @db.VarChar(100)
-  assembly_code        String?   @db.VarChar(100)
-  positions_on_sheet   Int?
-  pieces_per_box       Int?
-  pieces_per_pallet    Int?
-  foil_type            String?   @db.VarChar(255)
-  color_coverage       String?   @db.VarChar(255)
-  print_note           String?   @db.Text
-  image_data           Bytes?    @db.LongBlob
-  pdf_data             Bytes?    @db.LongBlob
-  has_print_sample     Boolean   @default(false)
-  ean_code             String?   @db.VarChar(50)
-  production_notes     String?   @db.Text
-  approval_status      String?   @db.VarChar(50)
-  realization_log      String?   @db.Text
-  internal_note        String?   @db.Text
-  last_edited_by       String?   @db.VarChar(255)
-  item_status          String?   @db.VarChar(50)
-  print_data_version   String?   @db.VarChar(20)
-  stock_quantity       Int?
-  sku                  String?   @unique @db.VarChar(100)
-  is_active            Boolean   @default(true)
-  custom_data          Json?     @db.Json
-  created_at           DateTime  @default(now()) @db.DateTime(0)
-  updated_at           DateTime  @updatedAt @db.DateTime(0)
+  id                 Int     @id @default(autoincrement())
+  customer_id        Int?
+  ig_code            String? @db.VarChar(100)
+  ig_short_name      String? @db.VarChar(255)
+  client_code        String? @db.VarChar(100)
+  client_name        String? @db.VarChar(255)
+  requester          String? @db.VarChar(255)
+  label_shape_code   String? @db.VarChar(100)
+  product_format     String? @db.VarChar(100)
+  die_cut_tool_code  String? @db.VarChar(100)
+  assembly_code      String? @db.VarChar(100)
+  positions_on_sheet Int?
+  pieces_per_box     Int?
+  pieces_per_pallet  Int?
+  foil_type          String? @db.VarChar(255)
+  color_coverage     String? @db.VarChar(255)
+  print_note         String? @db.Text
+  image_data         Bytes?  @db.LongBlob
+  pdf_data           Bytes?  @db.LongBlob
+  has_print_sample   Boolean @default(false)
+  ean_code           String? @db.VarChar(50)
+  production_notes   String? @db.Text
+  approval_status    String? @db.VarChar(50)
+  realization_log    String? @db.Text
+  internal_note      String? @db.Text
+  last_edited_by     String? @db.VarChar(255)
+  item_status        String? @db.VarChar(50)
+  print_data_version String? @db.VarChar(20)
+  stock_quantity     Int?
+  sku                String? @unique @db.VarChar(100)
+  is_active          Boolean @default(true)
+  custom_data        Json?   @db.Json
 
-  iml_customers   iml_customers?    @relation(fields: [customer_id], references: [id], onDelete: SetNull)
-  iml_order_items iml_order_items[]
+  foil_id          Int?
+  labels_per_sheet Int?
+
+  created_at DateTime @default(now()) @db.DateTime(0)
+  updated_at DateTime @updatedAt @db.DateTime(0)
+
+  iml_customers      iml_customers?       @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+  iml_foils          iml_foils?           @relation(fields: [foil_id], references: [id], onDelete: SetNull)
+  iml_order_items    iml_order_items[]
+  iml_product_colors iml_product_colors[]
+  iml_product_files  iml_product_files[]
+  iml_inquiry_items  iml_inquiry_items[]
 
   @@index([customer_id])
   @@index([ig_code])
   @@index([sku])
   @@index([item_status])
+  @@index([foil_id])
   @@map("iml_products")
 }
 
 model iml_orders {
-  id           Int       @id @default(autoincrement())
+  id           Int      @id @default(autoincrement())
   customer_id  Int
-  order_number String    @unique @db.VarChar(50)
-  order_date   DateTime  @db.DateTime(0)
-  status       String    @default("nová") @db.VarChar(50)
-  total        Decimal?  @db.Decimal(10, 2)
-  notes        String?   @db.Text
-  custom_data  Json?     @db.Json
-  created_at   DateTime  @default(now()) @db.DateTime(0)
-  updated_at   DateTime  @updatedAt @db.DateTime(0)
+  order_number String   @unique @db.VarChar(50)
+  order_date   DateTime @db.DateTime(0)
+  status       String   @default("nová") @db.VarChar(50)
+  total        Decimal? @db.Decimal(10, 2)
+  notes        String?  @db.Text
+  custom_data  Json?    @db.Json
 
-  iml_customers   iml_customers    @relation(fields: [customer_id], references: [id], onDelete: Restrict)
-  iml_order_items iml_order_items[]
+  inquiry_id          Int? @unique
+  shipping_address_id Int?
+
+  shipping_snapshot_label       String? @db.VarChar(100)
+  shipping_snapshot_recipient   String? @db.VarChar(255)
+  shipping_snapshot_street      String? @db.VarChar(255)
+  shipping_snapshot_city        String? @db.VarChar(100)
+  shipping_snapshot_postal_code String? @db.VarChar(20)
+  shipping_snapshot_country     String? @db.VarChar(100)
+
+  created_at DateTime @default(now()) @db.DateTime(0)
+  updated_at DateTime @updatedAt @db.DateTime(0)
+
+  iml_customers                   iml_customers                    @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  iml_order_items                 iml_order_items[]
+  iml_customer_shipping_addresses iml_customer_shipping_addresses? @relation(fields: [shipping_address_id], references: [id], onDelete: SetNull)
+  iml_inquiry_converted           iml_inquiries?                   @relation("inquiry_to_order")
 
   @@index([customer_id])
   @@index([order_date])
   @@index([status])
+  @@index([shipping_address_id])
   @@map("iml_orders")
 }
 
@@ -1110,6 +1144,137 @@ model iml_custom_fields {
   @@unique([entity, field_key])
   @@index([entity])
   @@map("iml_custom_fields")
+}
+
+// ─── IML rozšíření dle iml_newsec.md (fáze 1) ───────────────────────────
+
+model iml_customer_shipping_addresses {
+  id                 Int      @id @default(autoincrement())
+  customer_id        Int
+  label              String?  @db.VarChar(100)
+  recipient          String?  @db.VarChar(255)
+  street             String?  @db.VarChar(255)
+  city               String?  @db.VarChar(100)
+  postal_code        String?  @db.VarChar(20)
+  country            String?  @default("Česká republika") @db.VarChar(100)
+  is_default         Boolean  @default(false)
+  label_requirements String?  @db.Text
+  pallet_packaging   String?  @db.Text
+  prepress_notes     String?  @db.Text
+  created_at         DateTime @default(now()) @db.DateTime(0)
+  updated_at         DateTime @updatedAt @db.DateTime(0)
+
+  iml_customers iml_customers @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  iml_orders    iml_orders[]
+
+  @@index([customer_id])
+  @@index([customer_id, is_default])
+  @@map("iml_customer_shipping_addresses")
+}
+
+model iml_foils {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique @db.VarChar(50)
+  name       String   @db.VarChar(255)
+  thickness  String?  @db.VarChar(50)
+  note       String?  @db.Text
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.DateTime(0)
+  updated_at DateTime @updatedAt @db.DateTime(0)
+
+  iml_products iml_products[]
+
+  @@map("iml_foils")
+}
+
+model iml_pantone_colors {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique @db.VarChar(32)
+  name       String?  @db.VarChar(100)
+  hex        String?  @db.VarChar(7)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now()) @db.DateTime(0)
+
+  iml_product_colors iml_product_colors[]
+
+  @@map("iml_pantone_colors")
+}
+
+model iml_product_colors {
+  id           Int      @id @default(autoincrement())
+  product_id   Int
+  pantone_id   Int
+  coverage_pct Decimal  @db.Decimal(5, 2)
+  sort_order   Int      @default(0)
+  created_at   DateTime @default(now()) @db.DateTime(0)
+
+  iml_products       iml_products       @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  iml_pantone_colors iml_pantone_colors @relation(fields: [pantone_id], references: [id], onDelete: Restrict)
+
+  @@unique([product_id, pantone_id])
+  @@index([product_id])
+  @@index([pantone_id])
+  @@map("iml_product_colors")
+}
+
+model iml_product_files {
+  id          Int      @id @default(autoincrement())
+  product_id  Int
+  version     Int
+  filename    String   @db.VarChar(255)
+  file_size   Int
+  mime_type   String   @db.VarChar(100)
+  pdf_data    Bytes    @db.LongBlob
+  is_primary  Boolean  @default(true)
+  uploaded_by Int
+  uploaded_at DateTime @default(now()) @db.DateTime(0)
+
+  iml_products iml_products @relation(fields: [product_id], references: [id], onDelete: Cascade)
+  users        users        @relation("iml_product_files_uploader", fields: [uploaded_by], references: [id], onDelete: Restrict)
+
+  @@unique([product_id, version])
+  @@index([product_id, is_primary])
+  @@index([uploaded_by])
+  @@map("iml_product_files")
+}
+
+model iml_inquiries {
+  id                 Int      @id @default(autoincrement())
+  customer_id        Int
+  inquiry_number     String   @unique @db.VarChar(50)
+  inquiry_date       DateTime @db.DateTime(0)
+  status             String   @default("nová") @db.VarChar(50)
+  notes              String?  @db.Text
+  converted_order_id Int?     @unique
+  custom_data        Json?    @db.Json
+  created_at         DateTime @default(now()) @db.DateTime(0)
+  updated_at         DateTime @updatedAt @db.DateTime(0)
+
+  iml_customers     iml_customers       @relation(fields: [customer_id], references: [id], onDelete: Restrict)
+  iml_inquiry_items iml_inquiry_items[]
+  iml_orders        iml_orders?         @relation("inquiry_to_order", fields: [converted_order_id], references: [id], onDelete: SetNull)
+
+  @@index([customer_id])
+  @@index([status])
+  @@index([inquiry_date])
+  @@map("iml_inquiries")
+}
+
+model iml_inquiry_items {
+  id         Int      @id @default(autoincrement())
+  inquiry_id Int
+  product_id Int
+  quantity   Int
+  unit_price Decimal? @db.Decimal(10, 2)
+  subtotal   Decimal? @db.Decimal(10, 2)
+  created_at DateTime @default(now()) @db.DateTime(0)
+
+  iml_inquiries iml_inquiries @relation(fields: [inquiry_id], references: [id], onDelete: Cascade)
+  iml_products  iml_products  @relation(fields: [product_id], references: [id], onDelete: Restrict)
+
+  @@index([inquiry_id])
+  @@index([product_id])
+  @@map("iml_inquiry_items")
 }
 
 // ─── Modul Výroba (IG52 migrace) ────────────────────────────────────────
@@ -1154,15 +1319,15 @@ model vyroba_employees {
 }
 
 model vyroba_box_state {
-  id                Int      @id @default(autoincrement())
-  job               String   @db.VarChar(50)
-  production        Int      @db.Int
-  cislo_role        String   @db.VarChar(100)
-  cislo_do          Int?     @db.Int
-  ks                Int      @default(0) @db.Int
-  ks_v_krabici      Int      @db.Int
-  c_krab_na_palete  Int?     @db.Int
-  updated_at        DateTime @updatedAt @db.DateTime(0)
+  id               Int      @id @default(autoincrement())
+  job              String   @db.VarChar(50)
+  production       Int      @db.Int
+  cislo_role       String   @db.VarChar(100)
+  cislo_do         Int?     @db.Int
+  ks               Int      @default(0) @db.Int
+  ks_v_krabici     Int      @db.Int
+  c_krab_na_palete Int?     @db.Int
+  updated_at       DateTime @updatedAt @db.DateTime(0)
 
   @@unique([job, production], map: "vyroba_box_state_job_production")
   @@index([job])
