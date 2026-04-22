@@ -76,7 +76,19 @@ export default async function ImlProductDetailPage({
       label: "Identifikace",
       icon: <CircleCheckBig className="h-4 w-4" />,
       content: (
-        <div className="grid gap-6 md:grid-cols-[1fr,auto]">
+        <div>
+          {hasImage && (
+            <div className="mb-4 md:float-right md:ml-6 md:mb-2 md:w-60">
+              <ProductImagePreview
+                productId={product.id}
+                hasImage={hasImage}
+                className="h-60 w-full md:w-60"
+              />
+              <p className="mt-1 text-center text-xs text-gray-400">
+                Kliknutím zvětšit
+              </p>
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <InfoField label="Kód IG" value={fmt(product.ig_code)} />
             <InfoField label="Zkrácený název" value={fmt(product.ig_short_name)} />
@@ -86,18 +98,7 @@ export default async function ImlProductDetailPage({
             <InfoField label="Zadavatel" value={fmt(product.requester)} />
             <InfoField label="SKU" value={fmt(product.sku)} mono />
           </div>
-          <div className="md:w-60">
-            <ProductImagePreview
-              productId={product.id}
-              hasImage={hasImage}
-              className="h-60 w-full md:w-60"
-            />
-            {hasImage && (
-              <p className="mt-1 text-center text-xs text-gray-400">
-                Kliknutím zvětšit
-              </p>
-            )}
-          </div>
+          <div className="clear-both" />
         </div>
       ),
     },
