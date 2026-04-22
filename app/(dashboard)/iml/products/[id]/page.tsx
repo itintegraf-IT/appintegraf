@@ -15,6 +15,7 @@ import ProductDetailView, {
   type ProductDetailSection,
 } from "../_components/ProductDetailView";
 import ProductImagePreview from "../_components/ProductImagePreview";
+import ProductPdfHistory from "../_components/ProductPdfHistory";
 import { consumptionKg } from "@/lib/iml-color-consumption";
 
 export default async function ImlProductDetailPage({
@@ -183,18 +184,26 @@ export default async function ImlProductDetailPage({
       label: "Tisková data",
       icon: <Printer className="h-4 w-4" />,
       content: (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <InfoField label="Stav schválení" value={fmt(product.approval_status)} />
-          <InfoField label="Stav položky" value={fmt(product.item_status)} />
-          <InfoField label="Verze tiskových dat" value={fmt(product.print_data_version)} />
-          <InfoField label="Skladem" value={fmtNum(product.stock_quantity)} />
-          <InfoField label="Naposledy editoval" value={fmt(product.last_edited_by)} />
-          {product.realization_log && (
-            <InfoField label="LOG realizací" value={product.realization_log} span={2} pre />
-          )}
-          {product.internal_note && (
-            <InfoField label="Interní poznámka" value={product.internal_note} span={2} pre />
-          )}
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <InfoField label="Stav schválení" value={fmt(product.approval_status)} />
+            <InfoField label="Stav položky" value={fmt(product.item_status)} />
+            <InfoField label="Verze tiskových dat" value={fmt(product.print_data_version)} />
+            <InfoField label="Skladem" value={fmtNum(product.stock_quantity)} />
+            <InfoField label="Naposledy editoval" value={fmt(product.last_edited_by)} />
+            {product.realization_log && (
+              <InfoField label="LOG realizací" value={product.realization_log} span={2} pre />
+            )}
+            {product.internal_note && (
+              <InfoField label="Interní poznámka" value={product.internal_note} span={2} pre />
+            )}
+          </div>
+          <div>
+            <h4 className="mb-2 text-sm font-semibold text-gray-700">
+              Historie verzí PDF
+            </h4>
+            <ProductPdfHistory productId={product.id} canWrite={canWrite} />
+          </div>
         </div>
       ),
     },

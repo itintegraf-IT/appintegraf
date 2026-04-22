@@ -164,7 +164,7 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
         </div>
 
         <div>
-          <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max 20 MB)</p>
+          <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max 50 MB)</p>
           {hasPdf ? (
             <div className="flex items-center gap-2">
               <div className="flex h-24 w-24 items-center justify-center rounded-lg border bg-gray-100">

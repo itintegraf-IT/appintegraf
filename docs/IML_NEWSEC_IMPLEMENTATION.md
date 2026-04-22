@@ -486,13 +486,15 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 
 ### 3.4 Verzování PDF + limit 50 MB
 
-- [ ] `app/api/iml/products/[id]/pdf/route.ts` – `MAX_PDF_SIZE = 50 * 1024 * 1024`
-- [ ] `GET ?version=N` – načte konkrétní verzi, jinak primary; fallback na legacy `iml_products.pdf_data`
-- [ ] `POST` – vytvoří novou verzi (`max(version)+1`), starou přepne `is_primary=false`
-- [ ] `DELETE` – downgrade na předchozí verzi
-- [ ] `app/api/iml/products/[id]/pdf/versions/route.ts` – `GET` (list bez blobů), `DELETE ?version=N`
-- [ ] `app/api/iml/products/[id]/pdf/versions/[version]/primary/route.ts` – `PATCH` pro obnovu staré verze jako primární
-- [ ] UI tab „Tisková data" – tabulka historie verzí (`Uživatel | Čas | Filename | Verze`)
+- [x] `app/api/iml/products/[id]/pdf/route.ts` – `MAX_PDF_SIZE = 50 * 1024 * 1024`
+- [x] `GET ?version=N` – načte konkrétní verzi, jinak primary; fallback na legacy `iml_products.pdf_data`
+- [x] `POST` – vytvoří novou verzi (`max(version)+1`), starou přepne `is_primary=false` (transakce + magic-bytes check `%PDF-`)
+- [x] `DELETE` – downgrade na předchozí verzi (pokud existuje), jinak fallback na legacy blob
+- [x] `app/api/iml/products/[id]/pdf/versions/route.ts` – `GET` (list bez blobů, s info o uploaderovi), `DELETE ?version=N` (primary nelze)
+- [x] `app/api/iml/products/[id]/pdf/versions/[version]/primary/route.ts` – `PATCH` pro obnovu staré verze jako primární
+- [x] UI tab „Tisková data" – tabulka historie verzí (`ProductPdfHistory.tsx`): verze, filename, velikost, uploader, datum + akce (stáhnout / obnovit / smazat)
+- [x] `next.config.ts` – `bodySizeLimit` a `proxyClientMaxBodySize` zvýšeny z `20mb` na `60mb` (rezerva nad 50 MB PDF)
+- [x] UI upload (`ProductFilesUpload.tsx`, `ProductFilesUploadPlaceholder.tsx`) – hint změněn na „max 50 MB"
 
 ### 3.5 Nové stavy
 

@@ -13,9 +13,10 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: "20mb",
+      // Musí být vyšší než nejvyšší aplikační limit (IML PDF upload = 50 MB).
+      bodySizeLimit: "60mb",
     },
-    proxyClientMaxBodySize: "20mb",
+    proxyClientMaxBodySize: "60mb",
   },
 };
 
