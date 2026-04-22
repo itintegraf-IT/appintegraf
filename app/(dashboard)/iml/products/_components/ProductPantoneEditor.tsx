@@ -222,8 +222,19 @@ function ColorRowEditor({
       ? consumptionKg(REFERENCE_PIECES, labelsPerSheet ?? null, coverageNum)
       : null;
 
+  const hasCode = row.code.trim() !== "";
+  const hasCoverage = row.coverage_pct !== "" && Number.isFinite(coverageNum);
+  const isPartial = (hasCode || hasCoverage) && !(hasCode && hasCoverage);
+  const codeInvalid = isPartial && !hasCode;
+  const coverageInvalid = isPartial && !hasCoverage;
+
   return (
-    <div className="grid grid-cols-[auto,2fr,2fr,1fr,1fr,auto] items-center gap-2 border-t border-gray-100 px-3 py-2">
+    <div
+      className={
+        "grid grid-cols-[auto,2fr,2fr,1fr,1fr,auto] items-center gap-2 border-t px-3 py-2 " +
+        (isPartial ? "border-amber-200 bg-amber-50/50" : "border-gray-100")
+      }
+    >
       <span
         className="flex h-6 w-6 items-center justify-center text-gray-300"
         title={`#${index + 1}`}
@@ -233,12 +244,12 @@ function ColorRowEditor({
 
       <PantoneCombobox
         row={row}
+        invalid={codeInvalid}
         catalog={catalog}
         catalogLoading={catalogLoading}
         onInput={(raw) =>
           onChange({
             code: raw,
-            // Jakmile uživatel začne přepisovat existující výběr, ztratí vazbu na číselník.
             pantone_id: null,
             name: null,
             hex: null,
@@ -262,7 +273,6 @@ function ColorRowEditor({
               hex: created.hex,
             });
           } else {
-            // Pokud se nepodařilo (duplicita/neplatný kód), aspoň ponecháme normalizovaný text.
             onChange({ code: normalized, pantone_id: null });
           }
         }}
@@ -283,7 +293,11 @@ function ColorRowEditor({
           value={row.coverage_pct}
           onChange={(e) => onChange({ coverage_pct: e.target.value })}
           placeholder="50"
-          className="w-full rounded-lg border border-gray-300 px-2 py-1 text-right text-sm"
+          className={
+            "w-full rounded-lg border px-2 py-1 text-right text-sm " +
+            (coverageInvalid ? "border-amber-400 bg-amber-50" : "border-gray-300")
+          }
+          title={coverageInvalid ? "Doplňte pokrytí v %" : undefined}
         />
       </div>
 
@@ -319,6 +333,7 @@ function ColorRowEditor({
  */
 function PantoneCombobox({
   row,
+  invalid,
   catalog,
   catalogLoading,
   onInput,
@@ -327,6 +342,7 @@ function PantoneCombobox({
   onEnterToCoverage,
 }: {
   row: ProductColorRow;
+  invalid?: boolean;
   catalog: PantoneCatalogItem[];
   catalogLoading: boolean;
   onInput: (raw: string) => void;
@@ -448,7 +464,11 @@ function PantoneCombobox({
           }}
           onKeyDown={handleKeyDown}
           placeholder="začněte psát P 485…"
-          className="w-full rounded-lg border border-gray-300 px-2 py-1 font-mono text-sm"
+          className={
+            "w-full rounded-lg border px-2 py-1 font-mono text-sm " +
+            (invalid ? "border-amber-400 bg-amber-50" : "border-gray-300")
+          }
+          title={invalid ? "Doplňte Pantone kód" : undefined}
         />
       </div>
 

@@ -128,6 +128,27 @@ export default function ImlProductEditPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    const invalidIdx = colors.findIndex((c) => {
+      const hasCode = c.code.trim() !== "";
+      const hasCoverage =
+        c.coverage_pct !== "" && Number.isFinite(parseFloat(c.coverage_pct));
+      const isNonEmpty = hasCode || hasCoverage;
+      return isNonEmpty && !(hasCode && hasCoverage);
+    });
+    if (invalidIdx >= 0) {
+      const row = colors[invalidIdx];
+      const missing: string[] = [];
+      if (!row.code.trim()) missing.push("kód");
+      if (row.coverage_pct === "" || !Number.isFinite(parseFloat(row.coverage_pct)))
+        missing.push("pokrytí");
+      setError(
+        `Záložka Barvy: řádek ${invalidIdx + 1} – doplňte ${missing.join(" a ")}, ` +
+          "nebo řádek odeberte."
+      );
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -145,7 +166,12 @@ export default function ImlProductEditPage() {
           stock_quantity: form.stock_quantity ? parseInt(form.stock_quantity, 10) : null,
           custom_data: Object.keys(customData).length > 0 ? customData : null,
           colors: colors
-            .filter((c) => c.code && c.coverage_pct !== "")
+            .filter(
+              (c) =>
+                c.code.trim() !== "" &&
+                c.coverage_pct !== "" &&
+                Number.isFinite(parseFloat(c.coverage_pct))
+            )
             .map((c, i) => ({
               pantone_id: c.pantone_id,
               code: c.code,
