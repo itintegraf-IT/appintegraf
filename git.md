@@ -303,13 +303,107 @@ DEPLOY_BRANCH=test PM2_APP_NAME=appintegraf-test ./scripts/deploy-server.sh
 
 ---
 
-## 6. Typické scénáře a řešení problémů
+## 6. Konkrétní příklad workflow (dev → test → prod)
 
-### „git pull hlásí konflikt na package-lock.json“
+Reálná ukázka dne 22. 4. 2026: přidání UI indikátoru „TESTOVACÍ VERZE“ jako červený svislý overlay na pravé straně, viditelný jen v test prostředí (`APP_ENV=test`).
 
-Deploy skript to řeší sám (`git restore package-lock.json` před `git pull`). Pokud pouštíte ručně, udělejte to také.
+### 6.1 Localhost – vývoj a testy
 
-### „HEAD se neshoduje s origin/<branch>“
+Na Windows PC (v Cursoru / IDE):
+
+```powershell
+# 1) Jste na main, uděláte práci v repu
+git branch --show-current       # main
+
+# 2) Vytvoříte soubor, upravíte layout atd.
+#    (v tomto případě: components/TestEnvOverlay.tsx, app/layout.tsx, app/globals.css)
+
+# 3) Vyzkoušíte lokálně (volitelné – v .env dočasně APP_ENV=test + npm run dev)
+```
+
+### 6.2 Push do test větve
+
+```powershell
+git checkout test                             # přepnutí, rozpracované soubory jdou s vámi
+git add components/TestEnvOverlay.tsx app/layout.tsx app/globals.css
+git status                                    # ověření, že indexovány jen správné soubory
+git commit -m "UI: cerveny overlay 'TESTOVACI VERZE' na test instanci (APP_ENV=test)"
+git push origin test
+git checkout main                             # zpět na main, abyste dál dělal na produkční větvi
+```
+
+> **Pozn.** Bez českých znaků v commit message — Windows `cmd`/PowerShell může kódování zamíchat.
+
+### 6.3 Nasazení na server (test instance)
+
+SSH na server, pak:
+
+```bash
+cd /var/www/appintegraf-test
+
+# první nasazení po aktualizaci skriptu – skript nemusí mít +x:
+ls -l scripts/deploy-server.sh                # pokud chybí x → chmod +x scripts/deploy-server.sh
+
+# samotný deploy (větev + PM2 proces v proměnných):
+DEPLOY_BRANCH=test PM2_APP_NAME=appintegraf-test ./scripts/deploy-server.sh
+```
+
+Výstup končí `Nasazení dokončeno.` a PM2 `appintegraf-test` má uptime 0s (právě restartováno), ostatní procesy zůstávají.
+
+### 6.4 Test z prohlížeče
+
+Otevřít `http://192.168.10.210:3011` (dočasně) a ověřit vizuální změnu. Ctrl+F5 pro tvrdý refresh bez cache.
+
+### 6.5 Povýšení do produkce (pozdější krok)
+
+Až testeři funkci odsouhlasí:
+
+```powershell
+git checkout main
+git pull origin main                          # pro jistotu synchronizovat
+git merge test                                # přenést změny z test
+git push origin main
+```
+
+Na produkčním serveru:
+
+```bash
+cd /var/www/appintegraf
+./scripts/deploy-server.sh                    # bez env proměnných = main + appintegraf
+```
+
+Produkce dostane stejnou změnu, ale protože tam není `APP_ENV=test`, overlay se **neukáže**.
+
+---
+
+## 7. Typické scénáře a řešení problémů
+
+### 7.1 „git pull hlásí konflikt na package-lock.json“
+
+Po `npm install --legacy-peer-deps` může npm přepsat `package-lock.json` (platform-specific drobnosti). Deploy skript to řeší sám (`git restore package-lock.json` před `git pull`). Pokud pouštíte ručně, udělejte totéž.
+
+### 7.2 „CHYBA: pracovní kopie není čistá: M scripts/deploy-server.sh“
+
+Problém vznikne, když na Linux serveru ručně uděláte `chmod +x scripts/deploy-server.sh`. Git s `filemode=true` to detekuje jako změnu módu.
+
+**Okamžitý fix** (per-repo, na serveru):
+
+```bash
+cd /var/www/appintegraf-test
+git config core.filemode false
+```
+
+**Trvalý fix** (commit do repa, z Windows):
+
+```powershell
+git update-index --chmod=+x scripts/deploy-server.sh
+git commit -m "Fix: oznacit deploy-server.sh jako executable v git indexu"
+git push origin <větev>
+```
+
+Pak na serveru `git pull` propíše mode change 100644 → 100755 do indexu, a další klony už dostanou skript rovnou spustitelný.
+
+### 7.3 „HEAD se neshoduje s origin/<branch>“
 
 Někdo pushnul nový commit těsně před vámi, nebo na serveru zůstal lokální commit. Na serveru:
 
@@ -320,7 +414,7 @@ git reset --hard origin/<branch>
 
 **POZOR:** `reset --hard` zahodí vše neuložené! Prověřte `git status` před tímto krokem.
 
-### „Musím otestovat změnu bez pushnutí“
+### 7.4 „Musím otestovat změnu bez pushnutí“
 
 Na test serveru můžete udělat:
 
@@ -336,9 +430,21 @@ pm2 restart appintegraf-test
 
 Stejně jako deploy skript, jen ručně.
 
+### 7.5 „Prohlížeč pořád ukazuje starou verzi“
+
+Po deployi tvrdý refresh: **Ctrl+F5** (Chrome/Edge/Firefox). Next.js může sypat statické assety s dlouhým cache. Pokud to nestačí, otevřete v soukromém okně. V nouzi: `pm2 restart appintegraf-test --update-env` a pak hard refresh.
+
+### 7.6 „Prisma migrate skončil s kódem 1 (P3005)“
+
+Očekávané u tohoto projektu — databázové schéma se částečně spravuje mimo Prisma migrace. Deploy skript to vypíše jako upozornění a **pokračuje**. Není to chyba.
+
+### 7.7 „CRLF will be replaced by LF“ při git add
+
+Varování, ne chyba. `.gitattributes` v repu zajišťuje, že shell skripty (`*.sh`) se ukládají s LF (Linux line endings). Na Windows editor může přidat CRLF, git to při commitu automaticky převede.
+
 ---
 
-## 7. Související dokumenty
+## 8. Související dokumenty
 
 - [`nasazeni.md`](./nasazeni.md) – obecné nasazení, PM2, Prisma
 - [`scripts/deploy-server.sh`](./scripts/deploy-server.sh) – automatický deploy skript
