@@ -10,6 +10,7 @@ import ProductFormSections, {
   emptyProductForm,
   type ProductFormState,
   type CustomerOption,
+  type FoilOption,
 } from "../../_components/ProductFormSections";
 
 type Product = Record<string, string | number | boolean | null | undefined>;
@@ -19,6 +20,7 @@ export default function ImlProductEditPage() {
   const params = useParams();
   const id = params.id as string;
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [foils, setFoils] = useState<FoilOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
@@ -35,10 +37,16 @@ export default function ImlProductEditPage() {
   useEffect(() => {
     Promise.all([
       fetch("/api/iml/customers").then((r) => r.json()),
+      fetch("/api/iml/foils").then((r) => r.json()),
       fetch(`/api/iml/products/${id}`).then((r) => r.json()),
     ])
-      .then(([custData, prodData]: [{ customers?: CustomerOption[] }, Product]) => {
+      .then(([custData, foilData, prodData]: [
+        { customers?: CustomerOption[] },
+        { foils?: FoilOption[] },
+        Product
+      ]) => {
         setCustomers(custData.customers ?? []);
+        setFoils(foilData.foils ?? []);
         const p = prodData;
         if (p?.id) {
           setForm({
@@ -56,6 +64,7 @@ export default function ImlProductEditPage() {
             positions_on_sheet: p.positions_on_sheet != null ? String(p.positions_on_sheet) : "",
             pieces_per_box: p.pieces_per_box != null ? String(p.pieces_per_box) : "",
             pieces_per_pallet: p.pieces_per_pallet != null ? String(p.pieces_per_pallet) : "",
+            foil_id: p.foil_id != null ? String(p.foil_id) : "",
             foil_type: String(p.foil_type ?? ""),
             color_coverage: String(p.color_coverage ?? ""),
             ean_code: String(p.ean_code ?? ""),
@@ -97,6 +106,7 @@ export default function ImlProductEditPage() {
         body: JSON.stringify({
           ...form,
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
+          foil_id: form.foil_id ? parseInt(form.foil_id, 10) : null,
           positions_on_sheet: form.positions_on_sheet ? parseInt(form.positions_on_sheet, 10) : null,
           pieces_per_box: form.pieces_per_box ? parseInt(form.pieces_per_box, 10) : null,
           pieces_per_pallet: form.pieces_per_pallet ? parseInt(form.pieces_per_pallet, 10) : null,
@@ -160,6 +170,7 @@ export default function ImlProductEditPage() {
           form={form}
           setField={setField}
           customers={customers}
+          foils={foils}
         />
 
         <CustomFieldsFormSection

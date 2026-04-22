@@ -26,7 +26,10 @@ export default async function ImlProductDetailPage({
   const [product, customFields] = await Promise.all([
     prisma.iml_products.findUnique({
       where: { id },
-      include: { iml_customers: { select: { id: true, name: true } } },
+      include: {
+        iml_customers: { select: { id: true, name: true } },
+        iml_foils: { select: { id: true, code: true, name: true } },
+      },
     }),
     prisma.iml_custom_fields.findMany({
       where: { entity: "products", is_active: true },
@@ -147,7 +150,14 @@ export default async function ImlProductDetailPage({
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <h3 className="mb-4 text-sm font-semibold text-gray-700">Materiály a tisk</h3>
           <div className="grid gap-4 sm:grid-cols-2">
-            <div><p className="text-sm text-gray-500">Druh fólie</p><p className="font-medium">{fmt(product.foil_type)}</p></div>
+            <div>
+              <p className="text-sm text-gray-500">Druh fólie</p>
+              <p className="font-medium">
+                {product.iml_foils
+                  ? `${product.iml_foils.code} — ${product.iml_foils.name}`
+                  : fmt(product.foil_type)}
+              </p>
+            </div>
             <div><p className="text-sm text-gray-500">Barevnost / pokrytí</p><p className="font-medium">{fmt(product.color_coverage)}</p></div>
             <div><p className="text-sm text-gray-500">EAN kód</p><p className="font-mono">{fmt(product.ean_code)}</p></div>
             <div><p className="text-sm text-gray-500">Vzor min. tisku</p><p className="font-medium">{product.has_print_sample ? "Ano" : "Ne"}</p></div>

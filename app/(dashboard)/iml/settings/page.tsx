@@ -3,7 +3,7 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Package, ArrowLeft } from "lucide-react";
-import { ImlCustomFieldsClient } from "./ImlCustomFieldsClient";
+import { ImlSettingsClient } from "./ImlSettingsClient";
 
 export default async function ImlSettingsPage() {
   const session = await auth();
@@ -20,10 +20,10 @@ export default async function ImlSettingsPage() {
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold text-gray-900">
             <Package className="h-7 w-7 text-red-600" />
-            Nastavení IML – Vlastní pole
+            Nastavení IML
           </h1>
           <p className="mt-1 text-gray-600">
-            Přidejte vlastní pole k produktům a objednávkám
+            Vlastní pole pro produkty a objednávky, číselník fólií
           </p>
         </div>
         <Link
@@ -35,7 +35,7 @@ export default async function ImlSettingsPage() {
         </Link>
       </div>
 
-      <ImlCustomFieldsClient />
+      <ImlSettingsClient />
     </>
   );
 }

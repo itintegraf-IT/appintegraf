@@ -24,6 +24,7 @@ export type ProductFormState = {
   positions_on_sheet: string;
   pieces_per_box: string;
   pieces_per_pallet: string;
+  foil_id: string;
   foil_type: string;
   color_coverage: string;
   ean_code: string;
@@ -41,11 +42,13 @@ export type ProductFormState = {
 export type ProductFormErrors = Partial<Record<keyof ProductFormState, string>>;
 
 export type CustomerOption = { id: number; name: string };
+export type FoilOption = { id: number; code: string; name: string; is_active?: boolean };
 
 type Props = {
   form: ProductFormState;
   setField: <K extends keyof ProductFormState>(k: K, v: ProductFormState[K]) => void;
   customers: CustomerOption[];
+  foils?: FoilOption[];
   errors?: ProductFormErrors;
 };
 
@@ -65,9 +68,15 @@ export default function ProductFormSections({
   form,
   setField,
   customers,
+  foils = [],
   errors,
 }: Props) {
   const err = errors ?? {};
+
+  // Legacy fallback: pokud produkt má vyplněný starý `foil_type` (string),
+  // ale nemá `foil_id`, zobrazíme malou nápovědu, ať uživatel vybere z číselníku
+  // (plná migrace proběhne přes migraci F1 – tohle je safety net pro edit edge-cases).
+  const legacyFoilHint = form.foil_type && !form.foil_id ? form.foil_type : "";
 
   const tabs: TabDef[] = [
     {
@@ -215,13 +224,27 @@ export default function ProductFormSections({
       content: (
         <TabShell title="Materiály a tisk" subtitle="Fólie, barevnost, EAN, vzory a poznámky">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Druh fólie" error={err.foil_type}>
-              <input
-                type="text"
-                value={form.foil_type}
-                onChange={(e) => setField("foil_type", e.target.value)}
+            <Field
+              label="Druh fólie"
+              error={err.foil_id}
+              hint={
+                legacyFoilHint
+                  ? `Starý zápis: „${legacyFoilHint}" – prosím přemapujte na položku číselníku.`
+                  : "Číselník spravujete v Nastavení IML › Fólie."
+              }
+            >
+              <select
+                value={form.foil_id}
+                onChange={(e) => setField("foil_id", e.target.value)}
                 className={inputCls}
-              />
+              >
+                <option value="">— Vyberte —</option>
+                {foils.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.code} — {f.name}
+                  </option>
+                ))}
+              </select>
             </Field>
             <Field label="Barevnost / pokrytí" error={err.color_coverage}>
               <input
@@ -401,6 +424,7 @@ export const emptyProductForm: ProductFormState = {
   positions_on_sheet: "",
   pieces_per_box: "",
   pieces_per_pallet: "",
+  foil_id: "",
   foil_type: "",
   color_coverage: "",
   ean_code: "",

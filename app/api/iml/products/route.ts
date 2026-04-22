@@ -19,6 +19,7 @@ const productListSelect = {
   positions_on_sheet: true,
   pieces_per_box: true,
   pieces_per_pallet: true,
+  foil_id: true,
   foil_type: true,
   color_coverage: true,
   print_note: true,
@@ -37,6 +38,7 @@ const productListSelect = {
   created_at: true,
   updated_at: true,
   iml_customers: { select: { id: true, name: true } },
+  iml_foils: { select: { id: true, code: true, name: true } },
 } as const;
 
 export async function GET(req: NextRequest) {
@@ -153,6 +155,7 @@ function parseProductBody(body: Record<string, unknown>) {
     positions_on_sheet: int(body.positions_on_sheet),
     pieces_per_box: int(body.pieces_per_box),
     pieces_per_pallet: int(body.pieces_per_pallet),
+    foil_id: body.foil_id != null ? int(body.foil_id) : null,
     foil_type: str(body.foil_type),
     color_coverage: str(body.color_coverage),
     print_note: str(body.print_note),

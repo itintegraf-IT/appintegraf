@@ -25,7 +25,10 @@ export async function GET(
 
   const product = await prisma.iml_products.findUnique({
     where: { id },
-    include: { iml_customers: { select: { id: true, name: true } } },
+    include: {
+      iml_customers: { select: { id: true, name: true } },
+      iml_foils: { select: { id: true, code: true, name: true } },
+    },
   });
 
   if (!product) {
@@ -161,6 +164,7 @@ function parseProductBody(body: Record<string, unknown>) {
     positions_on_sheet: int(body.positions_on_sheet),
     pieces_per_box: int(body.pieces_per_box),
     pieces_per_pallet: int(body.pieces_per_pallet),
+    foil_id: body.foil_id != null ? int(body.foil_id) : null,
     foil_type: str(body.foil_type),
     color_coverage: str(body.color_coverage),
     print_note: str(body.print_note),

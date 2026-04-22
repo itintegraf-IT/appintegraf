@@ -10,10 +10,12 @@ import ProductFormSections, {
   emptyProductForm,
   type ProductFormState,
   type CustomerOption,
+  type FoilOption,
 } from "../_components/ProductFormSections";
 
 export default function ImlProductAddPage() {
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [foils, setFoils] = useState<FoilOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [createdProductId, setCreatedProductId] = useState<number | null>(null);
@@ -30,6 +32,10 @@ export default function ImlProductAddPage() {
       .then((r) => r.json())
       .then((data) => setCustomers(data.customers ?? []))
       .catch(() => {});
+    fetch("/api/iml/foils")
+      .then((r) => r.json())
+      .then((data) => setFoils(data.foils ?? []))
+      .catch(() => {});
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,6 +50,7 @@ export default function ImlProductAddPage() {
         body: JSON.stringify({
           ...form,
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
+          foil_id: form.foil_id ? parseInt(form.foil_id, 10) : null,
           positions_on_sheet: form.positions_on_sheet ? parseInt(form.positions_on_sheet, 10) : null,
           pieces_per_box: form.pieces_per_box ? parseInt(form.pieces_per_box, 10) : null,
           pieces_per_pallet: form.pieces_per_pallet ? parseInt(form.pieces_per_pallet, 10) : null,
@@ -125,6 +132,7 @@ export default function ImlProductAddPage() {
               form={form}
               setField={setField}
               customers={customers}
+              foils={foils}
             />
 
             <CustomFieldsFormSection
