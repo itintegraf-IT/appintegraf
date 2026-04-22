@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { getColorForEventType } from "@/lib/calendar-event-colors";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
@@ -67,6 +68,8 @@ export async function PUT(
 
   const userId = parseInt(session.user.id, 10);
 
+  const REMINDER_MINUTES_ALLOW = new Set([15, 30, 60, 120, 1440]);
+
   try {
     const body = await req.json();
     const {
@@ -79,7 +82,9 @@ export async function PUT(
       deputy_id = null,
       is_public = false,
       location = "",
-      color = "#DC2626",
+      remind_before_minutes: remindRaw = null,
+      reminder_notify_in_app: naRaw = true,
+      reminder_notify_email: neRaw = true,
     } = body;
 
     if (!title || !start_date || !end_date) {
@@ -87,6 +92,21 @@ export async function PUT(
     }
 
     const eventType = String(event_type).trim() || "jine";
+    let remindBefore: number | null = null;
+    if (remindRaw !== null && remindRaw !== undefined && String(remindRaw).trim() !== "") {
+      const n = parseInt(String(remindRaw), 10);
+      if (Number.isFinite(n) && REMINDER_MINUTES_ALLOW.has(n)) {
+        remindBefore = n;
+      }
+    }
+    const reminderInApp = naRaw !== false;
+    const reminderEmail = neRaw !== false;
+    if (remindBefore !== null && !reminderInApp && !reminderEmail) {
+      return NextResponse.json(
+        { error: "U připomínky zvolte alespoň notifikace v aplikaci nebo e-mail." },
+        { status: 400 }
+      );
+    }
     let deputyIdNum: number | null = null;
 
     if (eventType === "dovolena" || eventType === "osobni") {
@@ -129,6 +149,11 @@ export async function PUT(
     const end = new Date(end_date);
     if (end <= start) {
       return NextResponse.json({ error: "Datum konce musí být po datu začátku" }, { status: 400 });
+    }
+
+    const existing = await prisma.calendar_events.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Událost nenalezena" }, { status: 404 });
     }
 
     const ownOverlaps = await prisma.calendar_events.findMany({
@@ -178,6 +203,12 @@ export async function PUT(
       }
     }
 
+    const colorHex = getColorForEventType(eventType);
+    const startChanged = existing.start_date.getTime() !== start.getTime();
+    const endChanged = existing.end_date.getTime() !== end.getTime();
+    const remindChanged = (existing.remind_before_minutes ?? null) !== remindBefore;
+    const clearReminderSent = startChanged || endChanged || remindChanged;
+
     await prisma.calendar_events.update({
       where: { id },
       data: {
@@ -192,7 +223,11 @@ export async function PUT(
         approval_status: deputyIdNum !== null ? "pending" : null,
         is_public: !!is_public,
         location: location ? String(location).trim() : null,
-        color: color ? String(color).trim() : "#DC2626",
+        color: colorHex,
+        remind_before_minutes: remindBefore,
+        reminder_notify_in_app: reminderInApp,
+        reminder_notify_email: reminderEmail,
+        ...(clearReminderSent ? { reminder_notified_at: null } : {}),
       },
     });
 

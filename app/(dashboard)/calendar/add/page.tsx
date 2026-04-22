@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { EVENT_TYPES, DEFAULT_EVENT_TYPE, requiresDeputy } from "../lib/event-types";
+import { RECURRENCE_OPTIONS, REMINDER_MINUTE_OPTIONS } from "../lib/calendar-form-options";
 
 type Department = { id: number; name: string; code: string | null };
 type Deputy = { id: number; first_name: string; last_name: string };
@@ -24,6 +25,9 @@ export default function AddCalendarPage() {
   const defaultEnd = new Date(defaultStart);
   defaultEnd.setHours(defaultStart.getHours() + 1, 0, 0, 0);
 
+  const reDefault = new Date(defaultStart);
+  reDefault.setMonth(reDefault.getMonth() + 3);
+
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -35,7 +39,11 @@ export default function AddCalendarPage() {
     is_public: false,
     is_all_day: false,
     location: "",
-    color: "#DC2626",
+    recurrence: "none" as (typeof RECURRENCE_OPTIONS)[number]["value"],
+    recurrence_end: reDefault.toISOString().slice(0, 10),
+    remind_before_minutes: "" as string,
+    reminder_notify_in_app: true,
+    reminder_notify_email: true,
   });
 
   useEffect(() => {
@@ -106,11 +114,20 @@ export default function AddCalendarPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
+          title: form.title,
+          description: form.description,
           start_date: startDate,
           end_date: endDate,
+          event_type: form.event_type,
           department_id: form.department_id || null,
           deputy_id: form.deputy_id || null,
+          is_public: form.is_public,
+          location: form.location,
+          recurrence: form.recurrence,
+          recurrence_end: form.recurrence === "none" ? null : form.recurrence_end,
+          remind_before_minutes: form.remind_before_minutes || null,
+          reminder_notify_in_app: form.reminder_notify_in_app,
+          reminder_notify_email: form.reminder_notify_email,
         }),
       });
 
@@ -252,7 +269,12 @@ export default function AddCalendarPage() {
               value={form.event_type}
               onChange={(e) => {
                 const v = e.target.value;
-                setForm({ ...form, event_type: v, deputy_id: requiresDeputy(v) ? form.deputy_id : "" });
+                setForm({
+                  ...form,
+                  event_type: v,
+                  deputy_id: requiresDeputy(v) ? form.deputy_id : "",
+                  recurrence: requiresDeputy(v) ? "none" : form.recurrence,
+                });
               }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             >
@@ -319,14 +341,74 @@ export default function AddCalendarPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Barva</label>
-            <input
-              type="color"
-              value={form.color}
-              onChange={(e) => setForm({ ...form, color: e.target.value })}
-              className="h-10 w-full cursor-pointer rounded-lg border border-gray-300"
-            />
+            <label className="mb-1 block text-sm font-medium text-gray-700">Opakování</label>
+            <select
+              value={form.recurrence}
+              onChange={(e) =>
+                setForm({ ...form, recurrence: e.target.value as (typeof RECURRENCE_OPTIONS)[number]["value"] })
+              }
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              disabled={requiresDeputy(form.event_type)}
+              title={requiresDeputy(form.event_type) ? "U Dovolená/Osobní není opakování k dispozici." : undefined}
+            >
+              {RECURRENCE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
           </div>
+          {form.recurrence !== "none" && !requiresDeputy(form.event_type) && (
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Opakovat do (včetně) *</label>
+              <input
+                type="date"
+                required
+                value={form.recurrence_end}
+                onChange={(e) => setForm({ ...form, recurrence_end: e.target.value })}
+                className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2"
+              />
+            </div>
+          )}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Připomínka</label>
+            <select
+              value={form.remind_before_minutes}
+              onChange={(e) => setForm({ ...form, remind_before_minutes: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            >
+              {REMINDER_MINUTE_OPTIONS.map((o) => (
+                <option key={o.value || "none"} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {form.remind_before_minutes !== "" && (
+            <div className="flex flex-col gap-2 sm:col-span-2">
+              <span className="text-sm font-medium text-gray-700">Upozornit přes</span>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.reminder_notify_in_app}
+                    onChange={(e) => setForm({ ...form, reminder_notify_in_app: e.target.checked })}
+                    className="rounded"
+                  />
+                  Notifikace v aplikaci
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.reminder_notify_email}
+                    onChange={(e) => setForm({ ...form, reminder_notify_email: e.target.checked })}
+                    className="rounded"
+                  />
+                  E-mail
+                </label>
+              </div>
+            </div>
+          )}
           <div className="flex items-center gap-2 sm:col-span-2">
             <input
               type="checkbox"

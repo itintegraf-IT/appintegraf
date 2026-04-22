@@ -17,6 +17,9 @@ Modul kalendáře slouží ke správě událostí a termínů v aplikaci INTEGRA
 - **Drag & drop** – přesun vlastních událostí přetažením; u dovolené/osobní reset schválení
 - **Dvoufázové schvalování** – zástup schválí → vedoucí oddělení schválí (definitivní)
 - **Notifikace** – na dashboardu i v headeru (zvoneček); události ke schválení na dashboardu
+- **Barva podle typu události** – pevné barvy dle `event_type` (uživatel nevybírá); ukládá se do `color` v DB
+- **Opakování** (pouze u typů *bez* povinného zástupu) – denní / týdenní / měsíční série do zvoleného data; každý výskyt = samostatný záznam
+- **Připomínky** – volitelná doba před začátkem (např. 15 min, 1 den); notifikace v aplikaci a/nebo e-mail; vyžaduje plánované volání cron endpointu
 - **Export .ics** – stažení kalendáře pro import do Outlook, Google Calendar atd.
 
 ---
@@ -54,10 +57,16 @@ app/(dashboard)/calendar/
 ├── DeleteEventButton.tsx # Tlačítko Smazat s potvrzením (client)
 ├── ConfirmMoveModal.tsx  # Potvrzení přesunu události (client)
 └── lib/
-    ├── week-utils.ts     # Pomocné funkce pro práci s týdny
-    ├── month-utils.ts    # Pomocné funkce pro měsíční zobrazení
-    ├── event-types.ts    # Typy událostí (Dovolená, Osobní, …)
-    └── holidays.ts       # České státní svátky (pevné + Velikonoce)
+    ├── week-utils.ts          # Pomocné funkce pro práci s týdny
+    ├── month-utils.ts         # Pomocné funkce pro měsíční zobrazení
+    ├── event-types.ts         # Typy událostí, štítky, zástup; re-export getColorForEventType
+    ├── calendar-form-options.ts # Opakování a předvolby připomínek (UI)
+    └── holidays.ts            # České státní svátky (pevné + Velikonoce)
+
+lib/ (kořen projektu, sdílené s API)
+├── calendar-event-colors.ts   # mapování event_type → barva (#hex)
+├── calendar-recurrence.ts     # výpočet termínů opakování (denně/týdně/měsíčně)
+└── calendar-create-one.ts       # vytvoření jednoho záznamu (transakce, schvalování)
 
 app/api/calendar/
 ├── route.ts              # GET (seznam), POST (vytvoření)
@@ -66,6 +75,9 @@ app/api/calendar/
 ├── [id]/move/route.ts    # PATCH – přesunutí události
 ├── deputies/route.ts     # GET – seznam možných zástupců
 └── export/route.ts       # GET – export .ics
+
+app/api/cron/calendar-reminders/
+└── route.ts              # GET – odeslání dávkových připomínek (CRON_SECRET)
 ```
 
 ---
@@ -144,7 +156,7 @@ Týdenní mřížka:
 - **Hlavička** – sloupce pro jednotlivé dny (po 16. 3., út 17. 3., …)
 - **Řádek „Celý den“** – pro celodenní události
 - **Hodinové řádky** – 0–23
-- **Události** – barevné bloky s odkazem na detail; vícedenní události ve všech dnech
+- **Události** – barevné bloky (`color` v DB, při vytvoření/úpravě dle typu) s odkazem na detail; vícedenní události ve všech dnech
 - **Štítky stavu** – Čeká na schválení (žlutý), Čeká na vedoucího (modrý), Schváleno (červený)
 - **Drag & drop** – tvůrce může přetahovat své události na nové datum/čas
 - **Kliknutí** – buňka otevře modal pro novou událost, událost vede na detail
@@ -173,8 +185,14 @@ Měsíční mřížka:
 | PATCH | `/api/calendar/[id]/move` | Přesunutí události. Body: `{ start_date, end_date, all_day? }` |
 | GET | `/api/calendar/export` | Export .ics. Parametr: `scope=all` | `mine` (admin může `all`) |
 | GET | `/api/calendar/deputies` | Seznam možných zástupců (z hlavního + sekundárních oddělení) |
+| GET | `/api/cron/calendar-reminders` | Připomínky: `?secret=` = `CRON_SECRET` nebo `Authorization: Bearer` |
 
-### Vytvoření/úprava události (body)
+### Vytvoření události (POST /api/calendar, body)
+
+Barvu server **nepřijímá** – vždy nastaví `getColorForEventType(event_type)`.
+
+- **Opakování:** `recurrence` = `none` | `daily` | `weekly` | `monthly`. Pokud není `none`, vyplnit **`recurrence_end`** (datum YYYY-MM-DD, poslední den řady včetně). U typů **Dovolená** a **Osobní** není opakování povoleno (API vrátí 400).
+- **Připomínka:** `remind_before_minutes` = `null` nebo jedna z hodnot: `15`, `30`, `60`, `120`, `1440`. Volitelné `reminder_notify_in_app`, `reminder_notify_email` (výchozí true; pokud je připomínka zvolena, alespoň jeden kanál musí být zapnutý).
 
 ```json
 {
@@ -187,9 +205,19 @@ Měsíční mřížka:
   "deputy_id": 5,
   "is_public": false,
   "location": "Místo",
-  "color": "#DC2626"
+  "recurrence": "none",
+  "recurrence_end": "2026-12-31",
+  "remind_before_minutes": 15,
+  "reminder_notify_in_app": true,
+  "reminder_notify_email": true
 }
 ```
+
+Odpověď může obsahovat `ids` a `count` (počet vytvořených záznamů při opakování).
+
+### Úprava události (PUT /api/calendar/[id], body)
+
+Stejná pole jako u vytvoření kromě opakování (úprava jedné instance; barva se znovu odvodí z `event_type`). Připomínky: při změně začátku/konce nebo doby připomínky se `reminder_notified_at` vymaže, aby se připomínka znovu mohla odeslat.
 
 ---
 
@@ -209,8 +237,12 @@ Měsíční mřížka:
 | department_id | Int? | FK departments |
 | deputy_id | Int? | FK users (zástup; povinné u Dovolená, Osobní) |
 | is_public | Boolean? | Veřejná událost |
-| color | String? | Barva (#hex) |
+| color | String? | Barva v mřížce (#hex) – u nových/uložených událostí odpovídá typu (`lib/calendar-event-colors.ts`) |
 | location | String? | Místo |
+| remind_before_minutes | Int? | Minuty před začátkem, nebo null = bez připomínky |
+| reminder_notify_in_app | Boolean? | Upozornění v aplikaci (notifikace) |
+| reminder_notify_email | Boolean? | Upozornění e-mailem |
+| reminder_notified_at | DateTime? | Kdy byla připomínka naposledy odeslána (idempotence) |
 | requires_approval | Boolean? | true, pokud je deputy_id |
 | approval_status | String? | pending, deputy_approved, approved, rejected |
 
@@ -242,12 +274,34 @@ U typů **Dovolená** a **Osobní** je pole **Zástup** povinné. Workflow:
 | vzdelavani | Vzdělávání |
 | jine | Jiné |
 
-Definice v `lib/event-types.ts`, výchozí typ: `jine`.
+Definice v `app/(dashboard)/calendar/lib/event-types.ts`, mapování barev v `lib/calendar-event-colors.ts`, výchozí typ: `jine`.
 
 ### calendar_approvals | calendar_event_participants
 
 - **calendar_approvals** – workflow schvalování (zástup, vedoucí)
 - **calendar_event_participants** – účastníci události; využíváno při vyhledávání podle lidí a v řádkovém zobrazení (Seznam, výsledky vyhledávání)
+
+### Barva podle typu události
+
+- Uživatel **nevybírá** barvu; při `POST` a `PUT` server nastaví `color` z `getColorForEventType(event_type)`.
+- Definice odstínů: `lib/calendar-event-colors.ts` (dovolená, schůzky, lékař, jiné, …).
+
+### Opakování
+
+- Dostupné v **modalu** a na **`/calendar/add`**: Neopakovat / **Každý den** / **Každý týden** / **Každý měsíc** + **Opakovat do** (konec řady, včetně toho dne; výchozí obvykle +3 měsíce od začátku).
+- U **Dovolená** a **Osobní** je opakování v UI vypnuté; API to stejně odmítne.
+- Logika generování termínů: `lib/calendar-recurrence.ts` (horní strop počtu výskytů, např. 200).
+- Každá instance je **samostatný řádek** v `calendar_events` (žádné `series_id` v DB v1).
+
+### Připomínky a plánovaný job
+
+- Formulář: výběr doby před začátkem (nebo žádná) + zaškrtnutí **Notifikace v aplikaci** a/nebo **E-mail**.
+- Po naplánovaném čase vytvoří notifikaci typu `calendar_reminder` a volitelně odešle e-mail (`sendCalendarReminderEmail` v `lib/email.ts`); u záznamu se nastaví `reminder_notified_at`, aby se neposílalo opakovaně.
+- Produkce musí **pravidelně** volat např. `GET /api/cron/calendar-reminders?secret=<CRON_SECRET>` (tajemství v `.env` jako `CRON_SECRET`; alternativně hlavička `Authorization: Bearer <CRON_SECRET>`), doporučený interval **1–5 minut** (externí cron, plánovač OS, apod. bez běžícího `sleep` uvnitř Next).
+
+### Migrace DB (připomínky)
+
+- SQL soubor: `prisma/migrations/20260422_calendar_reminders.sql` (přidání sloupců do `calendar_events`). Nasazení např. `./scripts/deploy-server.sh --apply-sql 20260422_calendar_reminders.sql` po konzultaci s provozem.
 
 ---
 
@@ -288,6 +342,12 @@ Definice v `lib/event-types.ts`, výchozí typ: `jine`.
 10. **Vyhledávání** – fulltext (název, popis, místo) a podle lidí (tvůrce, zástup, účastníci); řádkové zobrazení výsledků s přepínačem na kalendář
 
 11. **Seznam osobní / Seznam globální** – řádkové zobrazení událostí na 14 dní dopředu s listováním (Předchozí/Další 14 dní)
+
+12. **(duben 2026) Barva podle typu** – odstranění výběru barvy v UI, `lib/calendar-event-colors.ts`
+
+13. **(duben 2026) Opakování** – denní/týdenní/měsíční série, `lib/calendar-recurrence.ts`, rozšíření `POST /api/calendar`
+
+14. **(duben 2026) Připomínky** – sloupce v `calendar_events`, endpoint `/api/cron/calendar-reminders`, e-mail `sendCalendarReminderEmail`
 
 ### URL parametry stránky
 

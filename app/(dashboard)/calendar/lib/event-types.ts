@@ -17,6 +17,8 @@ export const EVENT_TYPES = [
 
 export const DEFAULT_EVENT_TYPE = "jine";
 
+export { getColorForEventType } from "@/lib/calendar-event-colors";
+
 export function getEventTypeLabel(value: string | null): string {
   if (!value) return "Jiné";
   const found = EVENT_TYPES.find((t) => t.value === value);
