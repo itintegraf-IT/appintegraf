@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { ProductFilesUpload } from "../_components/ProductFilesUpload";
 import { ProductFilesUploadPlaceholder } from "../_components/ProductFilesUploadPlaceholder";
 import { CustomFieldsFormSection } from "../../_components/CustomFieldsFormSection";
+import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
 
 type Customer = { id: number; name: string };
 
@@ -368,10 +369,9 @@ export default function ImlProductAddPage() {
                   onChange={(e) => setForm({ ...form, item_status: e.target.value })}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2"
                 >
-                  <option value="aktivní">Aktivní</option>
-                  <option value="archivní">Archivní</option>
-                  <option value="testovací">Testovací</option>
-                  <option value="zablokovaná">Zablokovaná</option>
+                  {IML_ITEM_STATUSES.map((s) => (
+                    <option key={s} value={s}>{imlItemStatusLabel(s)}</option>
+                  ))}
                 </select>
               </div>
               <div>

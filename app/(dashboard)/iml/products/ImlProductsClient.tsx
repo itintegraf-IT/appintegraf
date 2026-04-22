@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Eye, Pencil, Trash2 } from "lucide-react";
+import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
 
 type Product = {
   id: number;
@@ -124,10 +125,9 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Všechny stavy</option>
-            <option value="aktivní">Aktivní</option>
-            <option value="archivní">Archivní</option>
-            <option value="testovací">Testovací</option>
-            <option value="zablokovaná">Zablokovaná</option>
+            {IML_ITEM_STATUSES.map((s) => (
+              <option key={s} value={s}>{imlItemStatusLabel(s)}</option>
+            ))}
           </select>
           <button
             type="submit"
