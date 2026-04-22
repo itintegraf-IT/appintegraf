@@ -182,7 +182,7 @@ Měsíční mřížka:
   "description": "Popis",
   "start_date": "2026-03-16T09:00:00",
   "end_date": "2026-03-16T10:00:00",
-  "event_type": "dovolena|osobni|schuzka_mimo_firmu|sluzebni_cesta|lekar|nemoc|jine",
+  "event_type": "dovolena|osobni|schuzka_mimo_firmu|schuzka_nachod|schuzka_praha|sluzebni_cesta|lekar|nemoc|vzdelavani|jine",
   "department_id": 1,
   "deputy_id": 5,
   "is_public": false,
@@ -204,7 +204,7 @@ Měsíční mřížka:
 | description | String? | Popis |
 | start_date | DateTime | Začátek |
 | end_date | DateTime | Konec |
-| event_type | String? | dovolena, osobni, schuzka_mimo_firmu, sluzebni_cesta, lekar, nemoc, jine |
+| event_type | String? | dovolena, osobni, schuzka_mimo_firmu, schuzka_nachod, schuzka_praha, sluzebni_cesta, lekar, nemoc, vzdelavani, jine |
 | created_by | Int | FK users |
 | department_id | Int? | FK departments |
 | deputy_id | Int? | FK users (zástup; povinné u Dovolená, Osobní) |
@@ -234,9 +234,12 @@ U typů **Dovolená** a **Osobní** je pole **Zástup** povinné. Workflow:
 | dovolena | Dovolená |
 | osobni | Osobní |
 | schuzka_mimo_firmu | Schůzka mimo firmu |
+| schuzka_nachod | Schůzka Náchod |
+| schuzka_praha | Schůzka Praha |
 | sluzebni_cesta | Služební cesta |
 | lekar | Lékař |
 | nemoc | Nemoc |
+| vzdelavani | Vzdělávání |
 | jine | Jiné |
 
 Definice v `lib/event-types.ts`, výchozí typ: `jine`.

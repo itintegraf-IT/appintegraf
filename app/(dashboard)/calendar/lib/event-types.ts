@@ -6,9 +6,12 @@ export const EVENT_TYPES = [
   { value: "dovolena", label: "Dovolená" },
   { value: "osobni", label: "Osobní" },
   { value: "schuzka_mimo_firmu", label: "Schůzka mimo firmu" },
+  { value: "schuzka_nachod", label: "Schůzka Náchod" },
+  { value: "schuzka_praha", label: "Schůzka Praha" },
   { value: "sluzebni_cesta", label: "Služební cesta" },
   { value: "lekar", label: "Lékař" },
   { value: "nemoc", label: "Nemoc" },
+  { value: "vzdelavani", label: "Vzdělávání" },
   { value: "jine", label: "Jiné" },
 ] as const;
 
