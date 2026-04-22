@@ -4,7 +4,15 @@ import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Package, ShoppingCart, BarChart3, Calendar } from "lucide-react";
+import {
+  ArrowLeft,
+  Package,
+  ShoppingCart,
+  BarChart3,
+  Calendar,
+  Info,
+} from "lucide-react";
+import CustomerShippingAddresses from "../_components/CustomerShippingAddresses";
 
 export default async function ImlCustomerDetailPage({
   params,
@@ -141,50 +149,150 @@ export default async function ImlCustomerDetailPage({
         </div>
       )}
 
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <p className="text-sm text-gray-500">E-mail</p>
-            <p className="font-medium">{customer.email ?? "-"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Telefon</p>
-            <p className="font-medium">{customer.phone ?? "-"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Kontaktní osoba</p>
-            <p className="font-medium">{customer.contact_person ?? "-"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">% odchylka pod-/nadnákladu</p>
-            <p className="font-medium">{customer.allow_under_over_delivery_percent != null ? `${customer.allow_under_over_delivery_percent} %` : "-"}</p>
-          </div>
-          {customer.billing_address && (
-            <div className="sm:col-span-2">
-              <p className="text-sm text-gray-500">Fakturační adresa</p>
-              <p className="whitespace-pre-wrap">{customer.billing_address}</p>
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* 1) Kontakt */}
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 border-b border-gray-100 pb-3 text-lg font-semibold text-gray-900">
+            Kontakt
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-sm text-gray-500">E-mail</p>
+              <p className="font-medium">{customer.email ?? "-"}</p>
             </div>
-          )}
-          {customer.shipping_address && (
-            <div className="sm:col-span-2">
-              <p className="text-sm text-gray-500">Doručovací adresa</p>
-              <p className="whitespace-pre-wrap">{customer.shipping_address}</p>
+            <div>
+              <p className="text-sm text-gray-500">Telefon</p>
+              <p className="font-medium">{customer.phone ?? "-"}</p>
             </div>
-          )}
-          {customer.individual_requirements && (
             <div className="sm:col-span-2">
-              <p className="text-sm text-gray-500">Individuální požadavky</p>
-              <p className="whitespace-pre-wrap">{customer.individual_requirements}</p>
+              <p className="text-sm text-gray-500">Kontaktní osoba</p>
+              <p className="font-medium">{customer.contact_person ?? "-"}</p>
             </div>
-          )}
-          {customer.customer_note && (
             <div className="sm:col-span-2">
-              <p className="text-sm text-gray-500">Poznámka</p>
-              <p className="whitespace-pre-wrap">{customer.customer_note}</p>
+              <p className="text-sm text-gray-500">% tolerance pod-/nadnákladu</p>
+              <p className="font-medium">
+                {customer.allow_under_over_delivery_percent != null
+                  ? `${customer.allow_under_over_delivery_percent} %`
+                  : "-"}
+              </p>
             </div>
-          )}
-        </div>
+          </div>
+        </section>
+
+        {/* 2) Fakturační údaje */}
+        <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 border-b border-gray-100 pb-3 text-lg font-semibold text-gray-900">
+            Fakturační údaje
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <p className="text-sm text-gray-500">Fakturační název firmy</p>
+              <p className="font-medium">
+                {customer.billing_company ?? customer.name}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">IČO</p>
+              <p className="font-medium">{customer.ico ?? "-"}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">DIČ</p>
+              <p className="font-medium">{customer.dic ?? "-"}</p>
+            </div>
+            {customer.billing_address && (
+              <div className="sm:col-span-2">
+                <p className="text-sm text-gray-500">Fakturační adresa</p>
+                <p className="whitespace-pre-wrap">{customer.billing_address}</p>
+              </div>
+            )}
+            {(customer.city || customer.postal_code || customer.country) && (
+              <div className="sm:col-span-2">
+                <p className="text-sm text-gray-500">Město / PSČ / Země</p>
+                <p className="font-medium">
+                  {[
+                    [customer.postal_code, customer.city].filter(Boolean).join(" "),
+                    customer.country,
+                  ]
+                    .filter(Boolean)
+                    .join(", ") || "-"}
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
       </div>
+
+      {/* 3) Individuální požadavky */}
+      {(customer.label_requirements ||
+        customer.pallet_packaging ||
+        customer.prepress_notes ||
+        customer.individual_requirements) && (
+        <section className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 border-b border-gray-100 pb-3 text-lg font-semibold text-gray-900">
+            Individuální požadavky zákazníka
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {customer.label_requirements && (
+              <div className="sm:col-span-2">
+                <p className="text-sm text-gray-500">Požadavky na etikety</p>
+                <p className="whitespace-pre-wrap">{customer.label_requirements}</p>
+              </div>
+            )}
+            {customer.pallet_packaging && (
+              <div className="sm:col-span-2">
+                <p className="text-sm text-gray-500">Palety / balení</p>
+                <p className="whitespace-pre-wrap">{customer.pallet_packaging}</p>
+              </div>
+            )}
+            {customer.prepress_notes && (
+              <div className="sm:col-span-2">
+                <p className="text-sm text-gray-500">Poznámky k pre-pressu</p>
+                <p className="whitespace-pre-wrap">{customer.prepress_notes}</p>
+              </div>
+            )}
+            {customer.individual_requirements && (
+              <div className="sm:col-span-2">
+                <p className="text-sm text-gray-500">
+                  Individuální požadavky (legacy)
+                </p>
+                <p className="whitespace-pre-wrap text-gray-700">
+                  {customer.individual_requirements}
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* 4) Doručovací adresy (nová multi-shipping komponenta) */}
+      <div className="mt-6">
+        <CustomerShippingAddresses customerId={customer.id} canWrite={canWrite} />
+      </div>
+
+      {/* 5) Legacy shipping_address - informativni pouze, pokud existuje stara hodnota */}
+      {customer.shipping_address && customer.shipping_address.trim() !== "" && (
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <div className="flex items-start gap-2">
+            <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <div>
+              <strong>Legacy pole „Doručovací adresa":</strong> Zákazník má vyplněné
+              staré jednořádkové pole, které bylo nahrazeno sekcí „Doručovací adresy"
+              výše.
+              <p className="mt-1 whitespace-pre-wrap rounded border border-amber-200 bg-white px-2 py-1 text-xs text-gray-700">
+                {customer.shipping_address}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6) Obecná poznámka */}
+      {customer.customer_note && (
+        <section className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-3 text-lg font-semibold text-gray-900">Poznámka</h2>
+          <p className="whitespace-pre-wrap text-gray-700">{customer.customer_note}</p>
+        </section>
+      )}
 
       {products.length > 0 && (
         <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">

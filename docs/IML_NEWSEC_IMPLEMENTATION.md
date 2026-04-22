@@ -327,25 +327,25 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 
 ### 2.1 API
 
-- [ ] `app/api/iml/customers/[id]/shipping-addresses/route.ts` – `GET`, `POST` (atomic flip defaultu)
-- [ ] `app/api/iml/customers/[id]/shipping-addresses/[addressId]/route.ts` – `GET`, `PUT`, `DELETE` (při mazání defaultu přenést na jinou)
-- [ ] `app/api/iml/customers/route.ts` – `POST` rozšířen o `billing_company`, `ico`, `dic`, `label_requirements`, `pallet_packaging`, `prepress_notes`
-- [ ] `app/api/iml/customers/[id]/route.ts` – `PUT` totéž
+- [x] `app/api/iml/customers/[id]/shipping-addresses/route.ts` – `GET`, `POST` (atomic flip defaultu)
+- [x] `app/api/iml/customers/[id]/shipping-addresses/[addressId]/route.ts` – `GET`, `PUT`, `DELETE` (při mazání defaultu přenést na jinou)
+- [x] `app/api/iml/customers/route.ts` – `POST` rozšířen o `billing_company`, `ico`, `dic`, `label_requirements`, `pallet_packaging`, `prepress_notes`
+- [x] `app/api/iml/customers/[id]/route.ts` – `PUT` totéž
 
 ### 2.2 UI
 
-- [ ] `app/(dashboard)/iml/customers/add/page.tsx` – rozdělení na sekce: Identifikace / Fakturační údaje / Individuální požadavky / Poznámky
-- [ ] `app/(dashboard)/iml/customers/[id]/edit/page.tsx` – totéž
-- [ ] `app/(dashboard)/iml/customers/[id]/page.tsx` – přidat sekci „Doručovací adresy"
-- [ ] Nová komponenta `app/(dashboard)/iml/customers/_components/CustomerShippingAddresses.tsx`
+- [x] `app/(dashboard)/iml/customers/add/page.tsx` – rozdělení na sekce: Identifikace / Fakturační údaje / Individuální požadavky / Ostatní
+- [x] `app/(dashboard)/iml/customers/[id]/edit/page.tsx` – totéž (+ zachování legacy `shipping_address` při ukládání)
+- [x] `app/(dashboard)/iml/customers/[id]/page.tsx` – přidat sekci „Doručovací adresy"
+- [x] Nová komponenta `app/(dashboard)/iml/customers/_components/CustomerShippingAddresses.tsx`
   - seznam adres, modal add/edit, tlačítko „Nastavit jako výchozí"
 
 ### 2.3 Akceptační kritéria
 
-- [ ] Zákazník má IČO, DIČ, rozdělená individuální pole
-- [ ] Vždy max. 1 doručovací adresa s `is_default=true` / zákazník
-- [ ] Mazání defaultu přenáší default na jinou (pokud existuje)
-- [ ] Audit log obsahuje záznamy pro `iml_customer_shipping_addresses`
+- [x] Zákazník má IČO, DIČ, rozdělená individuální pole
+- [x] Vždy max. 1 doručovací adresa s `is_default=true` / zákazník (atomic flip v transakci)
+- [x] Mazání defaultu přenáší default na jinou (pokud existuje) – transakce: delete + promote nejstarší
+- [x] Audit log obsahuje záznamy pro `iml_customer_shipping_addresses` (create/update/delete)
 
 ---
 
