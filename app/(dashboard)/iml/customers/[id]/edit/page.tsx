@@ -6,8 +6,13 @@ import { useRouter, useParams } from "next/navigation";
 import { ArrowLeft, Info } from "lucide-react";
 import CustomerFormSections, {
   emptyCustomerForm,
+  type CustomerFormErrors,
   type CustomerFormState,
 } from "../../_components/CustomerFormSections";
+import {
+  validateCustomerField,
+  validateCustomerForm,
+} from "../../_components/customerValidation";
 import {
   ViewToggle,
   useViewMode,
@@ -44,12 +49,32 @@ export default function ImlCustomerEditPage() {
   const [error, setError] = useState("");
   const [legacyShippingAddress, setLegacyShippingAddress] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerFormState>(emptyCustomerForm);
+  const [errors, setErrors] = useState<CustomerFormErrors>({});
   const [viewMode, setViewMode] = useViewMode("customerForm");
 
   const setField = <K extends keyof CustomerFormState>(
     k: K,
     v: CustomerFormState[K]
-  ) => setForm((f) => ({ ...f, [k]: v }));
+  ) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    if (errors[k]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[k];
+        return next;
+      });
+    }
+  };
+
+  const handleBlur = (field: keyof CustomerFormState) => {
+    const err = validateCustomerField(field, form);
+    setErrors((prev) => {
+      const next = { ...prev };
+      if (err) next[field] = err;
+      else delete next[field];
+      return next;
+    });
+  };
 
   useEffect(() => {
     fetch(`/api/iml/customers/${id}`)
@@ -88,6 +113,14 @@ export default function ImlCustomerEditPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    const formErrors = validateCustomerForm(form);
+    if (Object.keys(formErrors).length > 0) {
+      setErrors(formErrors);
+      setError("Opravte prosím chyby ve formuláři.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -108,6 +141,9 @@ export default function ImlCustomerEditPage() {
 
       if (!res.ok) {
         setError(data.error ?? "Chyba při ukládání");
+        if (data.field) {
+          setErrors((prev) => ({ ...prev, [data.field as keyof CustomerFormState]: data.error }));
+        }
         setLoading(false);
         return;
       }
@@ -154,7 +190,13 @@ export default function ImlCustomerEditPage() {
           </div>
         )}
 
-        <CustomerFormSections form={form} setField={setField} mode={viewMode} />
+        <CustomerFormSections
+          form={form}
+          setField={setField}
+          mode={viewMode}
+          errors={errors}
+          onBlurField={handleBlur}
+        />
 
         {legacyShippingAddress && legacyShippingAddress.trim() !== "" && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">

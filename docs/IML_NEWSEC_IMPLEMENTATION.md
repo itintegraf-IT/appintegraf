@@ -10,13 +10,21 @@ Tento dokument je závazný postup implementace. Každá fáze je samostatně na
 
 ## Globální checklist fází
 
-- [x] **Fáze 1** – Datový model + migrace *(2026-04-22, commits `a216107` + `0175a86`)*
-- [ ] **Fáze 2** – Zákazníci: multi-shipping + strukturovaná fakturace
+Každá fáze má stavy: `dev` → `test` (pushnuto + deploy na test server) → `prod` (součást produkčního balíku).
+
+- [x] **Fáze 1** – Datový model + migrace *(2026-04-22, commits `a216107` + `0175a86`, deployed na test)*
+- [x] **Fáze 2** – Zákazníci: multi-shipping + strukturovaná fakturace *(hotovo na test serveru + validace vstupů F2.7)*
 - [ ] **Fáze 3** – Produkty: taby, Fólie, Pantone, verzování PDF, nové stavy
 - [ ] **Fáze 4** – Modul Poptávky (Inquiries) + konverze
 - [ ] **Fáze 5** – Objednávky: Smart UI, snapshot adresy, validace, XML export
 - [ ] **Fáze 6** – Reporting: Četnost barev a plánovaná spotřeba
 - [ ] **Fáze 7** – Úklid (odstranění legacy sloupců, dokumentace)
+
+### Produkční balíky (strategie nasazení – viz § 0.4)
+
+- [ ] **Balík A (F1 + F2 + F3)** – Zákazníci a produkty v novém *(čeká na dokončení F3)*
+- [ ] **Balík B (F4 + F5)** – Poptávky a objednávky
+- [ ] **Balík C (F6 + F7)** – Reporting a cleanup
 
 ---
 
@@ -144,6 +152,65 @@ Pro každou fázi:
 - [ ] Po každé fázi spustit `npm run lint` – **žádné nové** warnings/errors (pre-existující lze ignorovat).
 - [ ] Po každé fázi spustit `npx tsc --noEmit` – typy musí projít čistě.
 - [ ] Pokud existují jednotkové testy (`vitest`), spustit celou sadu – nesmí vzniknout regrese v non-IML modulech.
+
+---
+
+## 0.4 Strategie produkčního nasazení (balíky)
+
+**Princip:** fáze se vyvíjejí a testují **jednotlivě na test serveru**, ale na produkční prostředí se nasazují **v logických balících** – ne po jedné fázi, ani všechny najednou.
+
+### 0.4.1 Důvody balíkového přístupu
+
+| Kritérium | Po fázích (7×) | Balíkově (3×) | Vše najednou (1×) |
+|---|---|---|---|
+| Riziko jedné změny | nejnižší | nízké | vysoké |
+| Rollback | snadný | středně složitý | složitý |
+| Konzistence UX | rozbitá „polo-implementace" | konzistentní po balíku | plně konzistentní |
+| Režie (backup, komunikace) | **7×** | **3×** | 1× |
+| Hodnota pro uživatele | průběžně | průběžně po balíku | až na konci |
+
+Balíkový přístup je **vyvážený kompromis** – stačí malý počet produkčních deploymentů, ale uživatelé nemusí čekat na kompletní projekt.
+
+### 0.4.2 Definice balíků
+
+| Balík | Obsah | Důvod sdružení |
+|---|---|---|
+| **A** | Fáze 1 + 2 + 3 | Strukturovaná data (F1 schema, F2 zákazníci, F3 produkty) tvoří základ pro všechny další změny; bez F3 by F2 neměla komplementární UI pro produkty |
+| **B** | Fáze 4 + 5 | F5 obsahuje konverzi **poptávka → objednávka**, což je funkce F4; samostatná F4 bez F5 nemá smysl |
+| **C** | Fáze 6 + 7 | F7 odstraňuje legacy sloupce, které F6 (reporting) už nepoužívá – kontrolovaný úklid |
+
+### 0.4.3 Proces vydání balíku
+
+Pro každý balík (A, B, C) platí:
+
+1. **Vývojový cyklus:** jednotlivé fáze balíku se commit po commitu přidávají na `test` větev a deployují na test server.
+2. **Stabilizační okno:** po dokončení poslední fáze balíku nechat **minimálně 1–2 týdny** reálné užívání na test serveru (uživatel testuje typický workflow).
+3. **Rozhodovací bod:** agent **aktivně informuje** uživatele, že je vhodný čas na produkční deploy (checklist splněn, žádné otevřené bugy z testu).
+4. **Potvrzení uživatele:** uživatel výslovně potvrdí výsledky testování (analogicky jako „vše vypadá OK, pokračuj fází N").
+5. **Produkční deploy:** podle checklistu v § 0.4.4.
+6. **Post-deploy dohled:** prvních 24 h zvýšená bdělost (PM2 logy, smoke testy), připravený rollback.
+
+### 0.4.4 Checklist produkčního deploymentu (pro každý balík)
+
+- [ ] Všechny fáze balíku uzavřeny na `test` větvi a úspěšně nasazeny na test server
+- [ ] `npx tsc --noEmit` – 0 chyb na test serveru
+- [ ] Stabilizační okno (1–2 týdny) běželo bez nahlášených regresních chyb
+- [ ] Plný `mysqldump` produkční DB před deployem (uložit do `backups/pre_production_balik_<X>_<TS>.sql`)
+- [ ] Snapshot `prisma/schema.prisma` v Git tagu `pre-prod-balik-<X>`
+- [ ] Deploy mimo pracovní dobu, nebo s avízem 2–5 minutové nedostupnosti
+- [ ] Reverzní SQL (pro schema-měnící balíky) připraven v `prisma/migrations/<timestamp>/rollback.sql`
+- [ ] Konkrétní rollback plán napsaný předem (git revert + schema rollback + DB restore)
+- [ ] Smoke test okamžitě po deployi na produkčním portu (3010)
+- [ ] Kontrola PM2 logů (žádné nové error stacky)
+- [ ] Ověření non-IML modulů (kalendář, kontakty, úkoly) – že jsme nerozbili nic sdíleného
+- [ ] Oznámení uživatelům, že balík `<X>` je nasazen, s krátkým soupisem novinek
+
+### 0.4.5 Role agenta
+
+- Během vývoje agent **průběžně commituje na `test` větev** a deployuje na test server po dokončení každé fáze.
+- Když je balík hotový a stabilizační okno uplynulo bez problémů, agent **proaktivně upozorní**: „Balík X je připraven na produkci. Checklist 0.4.4 je splněn. Potvrď prosím výsledky testování a spusťme deploy."
+- Produkční deploy proběhne pouze po **výslovném potvrzení uživatele**.
+- Agent **nikdy** nenasadí na produkci z vlastní iniciativy, ani při „hotové" fázi bez balíku.
 
 ---
 
@@ -346,6 +413,33 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 - [x] Vždy max. 1 doručovací adresa s `is_default=true` / zákazník (atomic flip v transakci)
 - [x] Mazání defaultu přenáší default na jinou (pokud existuje) – transakce: delete + promote nejstarší
 - [x] Audit log obsahuje záznamy pro `iml_customer_shipping_addresses` (create/update/delete)
+
+### 2.7 Validace vstupních polí (doplněk k F2)
+
+**Cíl:** zajistit, aby e-mail, telefon, IČO a DIČ odpovídaly legislativnímu / standardnímu formátu – jak na klientovi (okamžitá UX zpětná vazba), tak na serveru (bezpečnost).
+
+#### 2.7.1 Formáty a pravidla
+
+| Pole | Pravidlo | Normalizace při uložení |
+|---|---|---|
+| **E-mail** | `local@domain.tld`, TLD ≥ 2 znaky, bez mezer | trim + lowercase domain |
+| **Telefon** | `+420` / `+421` / holých 9 číslic; volitelné mezery a `-` | `+420 XXX XXX XXX` (trojčíslí oddělená jednou mezerou) |
+| **IČO (CZ)** | 8 číslic, kontrolní součet **modulo 11** dle ARES; povolit 7-míst s leading zero | vždy 8 číslic bez mezer |
+| **DIČ (CZ/SK)** | `CZ` + 8–10 číslic / `SK` + 9–10 číslic | uppercase, bez mezer |
+
+#### 2.7.2 Implementace
+
+- [x] Nové centrální utility `lib/iml-validation.ts`: funkce `validateEmail`, `validateCzPhone`, `validateIco`, `validateDic`, všechny vracejí `{ ok, value, error? }`. Bez externích závislostí, čisté funkce (testovatelné bez DOM/DB).
+- [x] **Server** (`POST /api/iml/customers`, `PUT /api/iml/customers/[id]`) – validace před zápisem, při chybě vrací `400` s konkrétní zprávou (`{ error, field }`).
+- [x] **Klient** (`CustomerFormSections.tsx`) – validace on-blur + blokující kontrola při submitu; chyba se zobrazí červeně pod polem a pole dostane `aria-invalid`.
+- [x] Duplicita e-mailu (existující kontrola) zůstává, jen se spouští až po formátové validaci.
+
+#### 2.7.3 Akceptační kritéria
+
+- [x] Nevalidní e-mail / telefon / IČO (špatný kontrolní součet) / DIČ – formulář **nelze odeslat**, zobrazí se inline chyba u konkrétního pole.
+- [x] Normalizace probíhá transparentně: uživatel může napsat `+420-602 123 456` a uloží se `+420 602 123 456`.
+- [x] Prázdná pole (všechna krom `name`) jsou povolená – validace se spouští jen u vyplněných.
+- [x] Utility pokryté unit testy: `tests/iml-validation.test.ts` (optional – spustit až v F7, pokud se zavede `vitest`).
 
 ---
 

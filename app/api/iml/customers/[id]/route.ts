@@ -3,6 +3,12 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import {
+  validateCzPhone,
+  validateDic,
+  validateEmail,
+  validateIco,
+} from "@/lib/iml-validation";
 
 export async function GET(
   _req: NextRequest,
@@ -86,20 +92,35 @@ export async function PUT(
     } = body;
 
     if (!name || !String(name).trim()) {
-      return NextResponse.json({ error: "Vyplňte název zákazníka" }, { status: 400 });
+      return NextResponse.json({ error: "Vyplňte název zákazníka", field: "name" }, { status: 400 });
     }
 
-    const icoClean = cleanIco(ico);
-    if (icoClean.error) {
-      return NextResponse.json({ error: icoClean.error }, { status: 400 });
+    const emailV = validateEmail(email);
+    if (!emailV.ok) {
+      return NextResponse.json({ error: emailV.error, field: "email" }, { status: 400 });
+    }
+    const phoneV = validateCzPhone(phone);
+    if (!phoneV.ok) {
+      return NextResponse.json({ error: phoneV.error, field: "phone" }, { status: 400 });
+    }
+    const icoV = validateIco(ico);
+    if (!icoV.ok) {
+      return NextResponse.json({ error: icoV.error, field: "ico" }, { status: 400 });
+    }
+    const dicV = validateDic(dic);
+    if (!dicV.ok) {
+      return NextResponse.json({ error: dicV.error, field: "dic" }, { status: 400 });
     }
 
-    if (email) {
+    if (emailV.value) {
       const dup = await prisma.iml_customers.findFirst({
-        where: { email: String(email).trim(), NOT: { id } },
+        where: { email: emailV.value, NOT: { id } },
       });
       if (dup) {
-        return NextResponse.json({ error: "Zákazník s tímto e-mailem již existuje" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Zákazník s tímto e-mailem již existuje", field: "email" },
+          { status: 400 }
+        );
       }
     }
 
@@ -107,8 +128,8 @@ export async function PUT(
       where: { id },
       data: {
         name: String(name).trim(),
-        email: email ? String(email).trim() : null,
-        phone: phone ? String(phone).trim() : null,
+        email: emailV.value,
+        phone: phoneV.value,
         contact_person: contact_person ? String(contact_person).trim() : null,
         allow_under_over_delivery_percent: allow_under_over_delivery_percent != null ? parseFloat(allow_under_over_delivery_percent) : null,
         customer_note: customer_note ? String(customer_note).trim() : null,
@@ -119,8 +140,8 @@ export async function PUT(
         postal_code: postal_code ? String(postal_code).trim() : null,
         country: country ? String(country).trim() : "Česká republika",
         billing_company: billing_company ? String(billing_company).trim() : null,
-        ico: icoClean.value,
-        dic: dic ? String(dic).trim() : null,
+        ico: icoV.value,
+        dic: dicV.value,
         label_requirements: label_requirements ? String(label_requirements).trim() : null,
         pallet_packaging: pallet_packaging ? String(pallet_packaging).trim() : null,
         prepress_notes: prepress_notes ? String(prepress_notes).trim() : null,
@@ -141,20 +162,6 @@ export async function PUT(
     console.error("IML customers PUT error:", e);
     return NextResponse.json({ error: "Chyba při ukládání zákazníka" }, { status: 500 });
   }
-}
-
-/**
- * Normalizace a validace IČO (shodné s /api/iml/customers/route.ts).
- */
-function cleanIco(raw: unknown): { value: string | null; error?: string } {
-  if (raw == null) return { value: null };
-  const s = String(raw).trim();
-  if (s === "") return { value: null };
-  const digits = s.replace(/\s+/g, "");
-  if (!/^\d+$/.test(digits)) {
-    return { value: null, error: "IČO musí obsahovat pouze číslice" };
-  }
-  return { value: digits };
 }
 
 export async function DELETE(
