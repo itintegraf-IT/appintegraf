@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 export type TabDef = {
   id: string;
@@ -17,24 +18,40 @@ export type TabDef = {
  * - Jediná aktivní záložka, stav držen v useState.
  * - Volitelný parametr `storageKey` persistuje aktivní tab v localStorage
  *   (např. aby po reloadu zůstala stejná záložka).
+ * - Volitelný parametr `urlParam` synchronizuje aktivní tab s URL query
+ *   parametrem (např. `?tab=material`); pokud je zadán, má přednost
+ *   před `storageKey` a umožňuje sdílet odkaz na konkrétní záložku.
  * - Skryté taby (`hidden: true`) se nerenderují.
  */
 export function Tabs({
   tabs,
   defaultId,
   storageKey,
+  urlParam,
   className = "",
 }: {
   tabs: TabDef[];
   defaultId?: string;
   storageKey?: string;
+  urlParam?: string;
   className?: string;
 }) {
   const visible = tabs.filter((t) => !t.hidden);
   const fallback = defaultId ?? visible[0]?.id ?? "";
   const [active, setActive] = useState<string>(fallback);
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
   useEffect(() => {
+    if (urlParam) {
+      const v = searchParams.get(urlParam);
+      if (v && visible.some((t) => t.id === v)) {
+        setActive(v);
+        return;
+      }
+    }
     if (!storageKey) return;
     try {
       const v = localStorage.getItem(`iml.activeTab.${storageKey}`);
@@ -42,10 +59,15 @@ export function Tabs({
     } catch {
       /* ignore */
     }
-  }, [storageKey, visible]);
+  }, [storageKey, urlParam, searchParams, visible]);
 
   const handleChange = (id: string) => {
     setActive(id);
+    if (urlParam) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set(urlParam, id);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
     if (storageKey) {
       try {
         localStorage.setItem(`iml.activeTab.${storageKey}`, id);
