@@ -20,6 +20,14 @@ export type ProductColorRow = {
   sort_order?: number;
 };
 
+type PantoneCatalogItem = {
+  id: number;
+  code: string;
+  name: string | null;
+  hex: string | null;
+  is_active: boolean;
+};
+
 type Props = {
   colors: ProductColorRow[];
   onChange: (rows: ProductColorRow[]) => void;
@@ -33,14 +41,59 @@ const REFERENCE_PIECES = 10_000;
  * Editor Pantone barev produktu.
  *
  * Funkce:
- * - Dynamické řádky (přidat / odebrat)
- * - onBlur kódu → volání /api/iml/pantone-colors/validate (normalizace + "exists?")
- * - Pokud kód v číselníku není, zobrazí se tlačítko „Vytvořit novou kartu" (auto_create=true
- *   se nastavuje až při save produktu)
- * - Live preview spotřeby na ref. nákladu (REFERENCE_PIECES)
- *   – pokud chybí labels_per_sheet, místo čísla hint „Doplňte etiket/TA…"
+ * - Combobox s autocomplete z číselníku (iml_pantone_colors) – dropdown
+ *   zobrazuje shody + volbu „Vytvořit kartu" přímo z editoru (POST /api/iml/pantone-colors).
+ * - Enter v comboboxu → focus na pokrytí.
+ * - Live preview spotřeby na ref. nákladu (REFERENCE_PIECES) – pokud chybí
+ *   `labels_per_sheet`, ukáže se žlutý hint místo čísla.
  */
 export default function ProductPantoneEditor({ colors, onChange, labelsPerSheet }: Props) {
+  const [catalog, setCatalog] = useState<PantoneCatalogItem[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
+
+  const loadCatalog = useCallback(async () => {
+    try {
+      const r = await fetch("/api/iml/pantone-colors");
+      const data = await r.json();
+      setCatalog(data.colors ?? []);
+    } catch {
+      // tichý fail – uživatel stále může psát ručně a onBlur/validate to zachytí
+    } finally {
+      setCatalogLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadCatalog();
+  }, [loadCatalog]);
+
+  /**
+   * Vytvoří novou Pantone kartu v číselníku. Vrací nově vytvořený záznam,
+   * nebo `null` (API vrátilo chybu – např. duplicita, neplatný kód).
+   */
+  const createInCatalog = useCallback(
+    async (code: string): Promise<PantoneCatalogItem | null> => {
+      try {
+        const r = await fetch("/api/iml/pantone-colors", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code }),
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.color) return null;
+        // optimistický update katalogu, ať to je hned k dispozici i v ostatních řádcích
+        setCatalog((prev) => {
+          const without = prev.filter((p) => p.id !== data.color.id);
+          return [...without, data.color].sort((a, b) => a.code.localeCompare(b.code));
+        });
+        return data.color as PantoneCatalogItem;
+      } catch {
+        return null;
+      }
+    },
+    []
+  );
+
   const add = () => {
     const next: ProductColorRow = {
       pantone_id: null,
@@ -77,7 +130,7 @@ export default function ProductPantoneEditor({ colors, onChange, labelsPerSheet 
           Zatím nejsou zadány žádné barvy. Klikněte na <strong>„+ Přidat barvu"</strong>.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="overflow-visible rounded-xl border border-gray-200 bg-white">
           <div className="grid grid-cols-[auto,2fr,2fr,1fr,1fr,auto] items-center gap-2 bg-gray-50 px-3 py-2 text-xs font-medium text-gray-600">
             <span />
             <span>Pantone kód</span>
@@ -93,6 +146,9 @@ export default function ProductPantoneEditor({ colors, onChange, labelsPerSheet 
               key={i}
               index={i}
               row={row}
+              catalog={catalog}
+              catalogLoading={catalogLoading}
+              onCreateInCatalog={createInCatalog}
               labelsPerSheet={labelsPerSheet}
               onChange={(patch) => update(i, patch)}
               onRemove={() => remove(i)}
@@ -142,61 +198,23 @@ export default function ProductPantoneEditor({ colors, onChange, labelsPerSheet 
 function ColorRowEditor({
   index,
   row,
+  catalog,
+  catalogLoading,
+  onCreateInCatalog,
   labelsPerSheet,
   onChange,
   onRemove,
 }: {
   index: number;
   row: ProductColorRow;
+  catalog: PantoneCatalogItem[];
+  catalogLoading: boolean;
+  onCreateInCatalog: (code: string) => Promise<PantoneCatalogItem | null>;
   labelsPerSheet: number | null;
   onChange: (patch: Partial<ProductColorRow>) => void;
   onRemove: () => void;
 }) {
-  const [validating, setValidating] = useState(false);
-  const [missing, setMissing] = useState(false);
-  const [error, setError] = useState("");
   const coverageInputRef = useRef<HTMLInputElement>(null);
-
-  const runValidate = useCallback(async (raw: string) => {
-    const normalized = normalizePantoneCode(raw);
-    if (!normalized) {
-      onChange({ code: "", pantone_id: null, name: null, hex: null });
-      setMissing(false);
-      setError("");
-      return;
-    }
-    setValidating(true);
-    setError("");
-    try {
-      const r = await fetch("/api/iml/pantone-colors/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: normalized }),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        setError(data.error ?? "Chyba validace");
-        onChange({ code: normalized, pantone_id: null, name: null, hex: null });
-        return;
-      }
-      onChange({
-        code: data.normalized,
-        pantone_id: data.id,
-        name: data.color?.name ?? null,
-        hex: data.color?.hex ?? null,
-      });
-      setMissing(!data.exists);
-    } catch {
-      setError("Chyba validace");
-    } finally {
-      setValidating(false);
-    }
-  }, [onChange]);
-
-  useEffect(() => {
-    // Při prvním mountu (např. při editaci) nepropočítávat znovu validaci – máme už pantone_id.
-    // Tohle nemusíme nic dělat, protože initial data přichází kompletní.
-  }, []);
 
   const coverageNum = parseFloat(row.coverage_pct);
   const kg =
@@ -206,46 +224,50 @@ function ColorRowEditor({
 
   return (
     <div className="grid grid-cols-[auto,2fr,2fr,1fr,1fr,auto] items-center gap-2 border-t border-gray-100 px-3 py-2">
-      <span className="flex h-6 w-6 items-center justify-center text-gray-300" title={`#${index + 1}`}>
+      <span
+        className="flex h-6 w-6 items-center justify-center text-gray-300"
+        title={`#${index + 1}`}
+      >
         <GripVertical className="h-4 w-4" />
       </span>
 
-      <div>
-        <div className="flex items-center gap-2">
-          {row.hex && /^#[0-9A-Fa-f]{6}$/.test(row.hex) && (
-            <span
-              className="inline-block h-5 w-5 shrink-0 rounded border border-gray-300"
-              style={{ backgroundColor: row.hex }}
-              title={row.hex}
-            />
-          )}
-          <input
-            type="text"
-            value={row.code}
-            onChange={(e) => onChange({ code: e.target.value })}
-            onBlur={(e) => {
-              const norm = normalizePantoneCode(e.target.value);
-              if (norm !== e.target.value) onChange({ code: norm });
-              runValidate(norm);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                coverageInputRef.current?.focus();
-              }
-            }}
-            placeholder="P 485 C"
-            className="w-full rounded-lg border border-gray-300 px-2 py-1 font-mono text-sm"
-          />
-        </div>
-        {error && <p className="mt-0.5 text-xs text-red-600">{error}</p>}
-        {missing && !error && (
-          <p className="mt-0.5 text-xs text-amber-700">
-            Není v číselníku – vytvoří se při uložení produktu.
-          </p>
-        )}
-        {validating && <p className="mt-0.5 text-xs text-gray-400">Ověřuji…</p>}
-      </div>
+      <PantoneCombobox
+        row={row}
+        catalog={catalog}
+        catalogLoading={catalogLoading}
+        onInput={(raw) =>
+          onChange({
+            code: raw,
+            // Jakmile uživatel začne přepisovat existující výběr, ztratí vazbu na číselník.
+            pantone_id: null,
+            name: null,
+            hex: null,
+          })
+        }
+        onSelect={(p) =>
+          onChange({
+            pantone_id: p.id,
+            code: p.code,
+            name: p.name,
+            hex: p.hex,
+          })
+        }
+        onCreate={async (normalized) => {
+          const created = await onCreateInCatalog(normalized);
+          if (created) {
+            onChange({
+              pantone_id: created.id,
+              code: created.code,
+              name: created.name,
+              hex: created.hex,
+            });
+          } else {
+            // Pokud se nepodařilo (duplicita/neplatný kód), aspoň ponecháme normalizovaný text.
+            onChange({ code: normalized, pantone_id: null });
+          }
+        }}
+        onEnterToCoverage={() => coverageInputRef.current?.focus()}
+      />
 
       <div className="text-sm text-gray-700">
         {row.name ? row.name : <span className="text-gray-400">—</span>}
@@ -283,6 +305,216 @@ function ColorRowEditor({
       >
         <Trash2 className="h-4 w-4" />
       </button>
+    </div>
+  );
+}
+
+/**
+ * Combobox pro výběr Pantone kódu:
+ * - onFocus / onChange otevírá dropdown s filtrovanými položkami z číselníku
+ * - kliknutí na položku vyplní pantone_id + name + hex
+ * - pokud uživatelův text neodpovídá žádné kartě, zobrazí se tlačítko
+ *   „Vytvořit kartu 'P 485 C'" které zavolá POST /api/iml/pantone-colors
+ *   a následně ji rovnou naváže na řádek.
+ */
+function PantoneCombobox({
+  row,
+  catalog,
+  catalogLoading,
+  onInput,
+  onSelect,
+  onCreate,
+  onEnterToCoverage,
+}: {
+  row: ProductColorRow;
+  catalog: PantoneCatalogItem[];
+  catalogLoading: boolean;
+  onInput: (raw: string) => void;
+  onSelect: (p: PantoneCatalogItem) => void;
+  onCreate: (normalized: string) => void | Promise<void>;
+  onEnterToCoverage: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const normalized = normalizePantoneCode(row.code);
+  const query = row.code.trim().toUpperCase();
+
+  const matches = useMemo(() => {
+    const active = catalog.filter((p) => p.is_active);
+    if (!query) return active.slice(0, 50);
+    return active
+      .filter(
+        (p) => p.code.includes(query) || (p.name ?? "").toUpperCase().includes(query)
+      )
+      .slice(0, 50);
+  }, [query, catalog]);
+
+  const exactMatch = matches.find((p) => p.code === normalized) ?? null;
+  const canCreate = normalized.length > 0 && !exactMatch;
+
+  // Resetuj zvýraznění při změně seznamu
+  useEffect(() => {
+    setHighlight(0);
+  }, [matches.length, canCreate]);
+
+  // Zavření při kliknutí mimo
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      if (!containerRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const totalOptions = matches.length + (canCreate ? 1 : 0);
+
+  const handleCreate = async () => {
+    if (!normalized) return;
+    setCreating(true);
+    try {
+      await onCreate(normalized);
+    } finally {
+      setCreating(false);
+      setOpen(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setOpen(true);
+      setHighlight((h) => Math.min(totalOptions - 1, h + 1));
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlight((h) => Math.max(0, h - 1));
+      return;
+    }
+    if (e.key === "Escape") {
+      setOpen(false);
+      return;
+    }
+    if (e.key === "Enter") {
+      // Enter = potvrď výběr, nebo přeskoč do pole Pokrytí
+      if (open && totalOptions > 0) {
+        e.preventDefault();
+        if (highlight < matches.length) {
+          const p = matches[highlight];
+          if (p) {
+            onSelect(p);
+            setOpen(false);
+            onEnterToCoverage();
+          }
+        } else if (canCreate) {
+          e.preventDefault();
+          void handleCreate().then(onEnterToCoverage);
+        }
+      } else {
+        e.preventDefault();
+        onEnterToCoverage();
+      }
+      return;
+    }
+  };
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex items-center gap-2">
+        {row.hex && /^#[0-9A-Fa-f]{6}$/.test(row.hex) && (
+          <span
+            className="inline-block h-5 w-5 shrink-0 rounded border border-gray-300"
+            style={{ backgroundColor: row.hex }}
+            title={row.hex}
+          />
+        )}
+        <input
+          type="text"
+          value={row.code}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => {
+            onInput(e.target.value);
+            setOpen(true);
+          }}
+          onBlur={(e) => {
+            // Normalizuj při opuštění pole (jen pokud uživatel nic nevybral z dropdownu).
+            const norm = normalizePantoneCode(e.target.value);
+            if (norm !== e.target.value) onInput(norm);
+          }}
+          onKeyDown={handleKeyDown}
+          placeholder="začněte psát P 485…"
+          className="w-full rounded-lg border border-gray-300 px-2 py-1 font-mono text-sm"
+        />
+      </div>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+          {catalogLoading && matches.length === 0 && (
+            <div className="px-3 py-2 text-xs text-gray-500">Načítám číselník…</div>
+          )}
+
+          {!catalogLoading && matches.length === 0 && !canCreate && (
+            <div className="px-3 py-2 text-xs text-gray-500">Žádná shoda v číselníku</div>
+          )}
+
+          {matches.map((p, idx) => (
+            <button
+              key={p.id}
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                onSelect(p);
+                setOpen(false);
+                onEnterToCoverage();
+              }}
+              onMouseEnter={() => setHighlight(idx)}
+              className={
+                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm " +
+                (highlight === idx ? "bg-red-50" : "hover:bg-gray-50")
+              }
+            >
+              {p.hex && /^#[0-9A-Fa-f]{6}$/.test(p.hex) ? (
+                <span
+                  className="inline-block h-4 w-4 shrink-0 rounded border border-gray-200"
+                  style={{ backgroundColor: p.hex }}
+                />
+              ) : (
+                <span className="inline-block h-4 w-4 shrink-0 rounded border border-dashed border-gray-200" />
+              )}
+              <span className="font-mono">{p.code}</span>
+              {p.name && (
+                <span className="truncate text-gray-500">— {p.name}</span>
+              )}
+            </button>
+          ))}
+
+          {canCreate && (
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleCreate}
+              onMouseEnter={() => setHighlight(matches.length)}
+              disabled={creating}
+              className={
+                "flex w-full items-center gap-2 border-t border-gray-100 bg-gray-50 px-3 py-1.5 text-left text-sm font-medium text-red-700 " +
+                (highlight === matches.length ? "bg-red-100" : "hover:bg-red-50") +
+                " disabled:opacity-50"
+              }
+              title="Vytvoří novou Pantone kartu v číselníku a naváže ji na tento řádek."
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {creating
+                ? "Vytvářím…"
+                : `Vytvořit kartu „${normalized}" v číselníku`}
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

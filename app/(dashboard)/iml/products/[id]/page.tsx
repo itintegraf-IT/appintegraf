@@ -164,26 +164,39 @@ export default async function ImlProductDetailPage({
         </div>
       ),
     },
-    ...(product.iml_product_colors.length > 0
-      ? [
-          {
-            id: "colors",
-            label: "Barvy",
-            icon: <Droplets className="h-4 w-4" />,
-            content: (
-              <ProductColorsTable
-                colors={product.iml_product_colors.map((c) => ({
-                  code: c.iml_pantone_colors?.code ?? "",
-                  name: c.iml_pantone_colors?.name ?? null,
-                  hex: c.iml_pantone_colors?.hex ?? null,
-                  coverage_pct: Number(c.coverage_pct),
-                }))}
-                labelsPerSheet={product.labels_per_sheet ?? null}
-              />
-            ),
-          } as ProductDetailSection,
-        ]
-      : []),
+    {
+      id: "colors",
+      label: "Barvy",
+      icon: <Droplets className="h-4 w-4" />,
+      content:
+        product.iml_product_colors.length > 0 ? (
+          <ProductColorsTable
+            colors={product.iml_product_colors.map((c) => ({
+              code: c.iml_pantone_colors?.code ?? "",
+              name: c.iml_pantone_colors?.name ?? null,
+              hex: c.iml_pantone_colors?.hex ?? null,
+              coverage_pct: Number(c.coverage_pct),
+            }))}
+            labelsPerSheet={product.labels_per_sheet ?? null}
+          />
+        ) : (
+          <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-6 text-center text-sm text-gray-500">
+            Zatím nejsou přiřazeny žádné Pantone barvy.
+            {canWrite && (
+              <>
+                {" "}
+                <a
+                  href={`/iml/products/${product.id}/edit?tab=colors`}
+                  className="font-medium text-red-700 underline hover:text-red-800"
+                >
+                  Přidat barvy
+                </a>
+                .
+              </>
+            )}
+          </div>
+        ),
+    } as ProductDetailSection,
     {
       id: "print",
       label: "Tisková data",
