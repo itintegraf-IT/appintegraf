@@ -14,6 +14,7 @@ import {
 import ProductDetailView, {
   type ProductDetailSection,
 } from "../_components/ProductDetailView";
+import ProductImagePreview from "../_components/ProductImagePreview";
 import { consumptionKg } from "@/lib/iml-color-consumption";
 
 export default async function ImlProductDetailPage({
@@ -75,14 +76,28 @@ export default async function ImlProductDetailPage({
       label: "Identifikace",
       icon: <CircleCheckBig className="h-4 w-4" />,
       content: (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <InfoField label="Kód IG" value={fmt(product.ig_code)} />
-          <InfoField label="Zkrácený název" value={fmt(product.ig_short_name)} />
-          <InfoField label="Kód u klienta" value={fmt(product.client_code)} />
-          <InfoField label="Název u klienta" value={fmt(product.client_name)} />
-          <InfoField label="Zákazník" value={product.iml_customers?.name ?? "-"} />
-          <InfoField label="Zadavatel" value={fmt(product.requester)} />
-          <InfoField label="SKU" value={fmt(product.sku)} mono />
+        <div className="grid gap-6 md:grid-cols-[1fr,auto]">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <InfoField label="Kód IG" value={fmt(product.ig_code)} />
+            <InfoField label="Zkrácený název" value={fmt(product.ig_short_name)} />
+            <InfoField label="Kód u klienta" value={fmt(product.client_code)} />
+            <InfoField label="Název u klienta" value={fmt(product.client_name)} />
+            <InfoField label="Zákazník" value={product.iml_customers?.name ?? "-"} />
+            <InfoField label="Zadavatel" value={fmt(product.requester)} />
+            <InfoField label="SKU" value={fmt(product.sku)} mono />
+          </div>
+          <div className="md:w-60">
+            <ProductImagePreview
+              productId={product.id}
+              hasImage={hasImage}
+              className="h-60 w-full md:w-60"
+            />
+            {hasImage && (
+              <p className="mt-1 text-center text-xs text-gray-400">
+                Kliknutím zvětšit
+              </p>
+            )}
+          </div>
         </div>
       ),
     },
@@ -222,7 +237,6 @@ export default async function ImlProductDetailPage({
       subtitle={subtitle}
       productId={product.id}
       canWrite={canWrite}
-      hasImage={hasImage}
       hasPdf={hasPdf}
       sections={sections}
     />
