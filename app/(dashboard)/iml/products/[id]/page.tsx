@@ -69,41 +69,6 @@ export default async function ImlProductDetailPage({
   const hasImage = !!(product.image_data && product.image_data.length > 0);
   const hasPdf = !!(product.pdf_data && product.pdf_data.length > 0);
 
-  const preview = hasImage || hasPdf ? (
-    <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-sm font-semibold text-gray-700">
-        {hasImage ? "Náhled" : "Tisková data"}
-      </h3>
-      <div className="flex flex-wrap items-start gap-4">
-        {hasImage && (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
-            src={`/api/iml/products/${product.id}/image`}
-            alt="Náhled produktu"
-            className="max-h-64 rounded-lg border border-gray-200 object-contain"
-          />
-        )}
-        {hasPdf && (
-          <a
-            href={`/api/iml/products/${product.id}/pdf`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-          >
-            <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Zobrazit PDF
-          </a>
-        )}
-      </div>
-    </div>
-  ) : null;
-
   const sections: ProductDetailSection[] = [
     {
       id: "id",
@@ -257,7 +222,8 @@ export default async function ImlProductDetailPage({
       subtitle={subtitle}
       productId={product.id}
       canWrite={canWrite}
-      preview={preview}
+      hasImage={hasImage}
+      hasPdf={hasPdf}
       sections={sections}
     />
   );

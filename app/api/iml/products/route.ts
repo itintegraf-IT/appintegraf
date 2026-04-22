@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -90,7 +91,34 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ products });
+  // Efektivní flagy bez stahování blobů: jen OCTET_LENGTH > 0.
+  let flagsById = new Map<number, { has_image: boolean; has_pdf: boolean }>();
+  if (products.length > 0) {
+    const ids = products.map((p) => p.id);
+    const rows = await prisma.$queryRaw<
+      Array<{ id: number; has_image: number; has_pdf: number }>
+    >`
+      SELECT id,
+             CASE WHEN image_data IS NOT NULL AND OCTET_LENGTH(image_data) > 0 THEN 1 ELSE 0 END AS has_image,
+             CASE WHEN pdf_data   IS NOT NULL AND OCTET_LENGTH(pdf_data)   > 0 THEN 1 ELSE 0 END AS has_pdf
+      FROM iml_products
+      WHERE id IN (${Prisma.join(ids)})
+    `;
+    flagsById = new Map(
+      rows.map((r) => [
+        Number(r.id),
+        { has_image: Number(r.has_image) === 1, has_pdf: Number(r.has_pdf) === 1 },
+      ])
+    );
+  }
+
+  const productsWithFlags = products.map((p) => ({
+    ...p,
+    has_image: flagsById.get(p.id)?.has_image ?? false,
+    has_pdf: flagsById.get(p.id)?.has_pdf ?? false,
+  }));
+
+  return NextResponse.json({ products: productsWithFlags });
 }
 
 export async function POST(req: NextRequest) {
