@@ -12,8 +12,22 @@ import ProductFormSections, {
   type CustomerOption,
   type FoilOption,
 } from "../../_components/ProductFormSections";
+import type { ProductColorRow } from "../../_components/ProductPantoneEditor";
 
-type Product = Record<string, string | number | boolean | null | undefined>;
+type ProductColorResp = {
+  id: number;
+  pantone_id: number;
+  coverage_pct: string | number;
+  sort_order: number;
+  iml_pantone_colors?: {
+    id: number;
+    code: string;
+    name: string | null;
+    hex: string | null;
+  } | null;
+};
+
+type Product = Record<string, unknown>;
 
 export default function ImlProductEditPage() {
   const router = useRouter();
@@ -26,6 +40,7 @@ export default function ImlProductEditPage() {
   const [error, setError] = useState("");
   const [form, setForm] = useState<ProductFormState>(emptyProductForm);
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
+  const [colors, setColors] = useState<ProductColorRow[]>([]);
   const [hasImage, setHasImage] = useState(false);
   const [hasPdf, setHasPdf] = useState(false);
 
@@ -47,39 +62,55 @@ export default function ImlProductEditPage() {
       ]) => {
         setCustomers(custData.customers ?? []);
         setFoils(foilData.foils ?? []);
-        const p = prodData;
+        const p = prodData as Record<string, unknown>;
         if (p?.id) {
+          const s = (k: string) => (p[k] != null ? String(p[k]) : "");
+          const si = (k: string) => (p[k] != null ? String(p[k] as number) : "");
           setForm({
-            customer_id: p.customer_id != null ? String(p.customer_id) : "",
-            ig_code: String(p.ig_code ?? ""),
-            ig_short_name: String(p.ig_short_name ?? ""),
-            client_code: String(p.client_code ?? ""),
-            client_name: String(p.client_name ?? ""),
-            requester: String(p.requester ?? ""),
-            sku: String(p.sku ?? ""),
-            label_shape_code: String(p.label_shape_code ?? ""),
-            product_format: String(p.product_format ?? ""),
-            die_cut_tool_code: String(p.die_cut_tool_code ?? ""),
-            assembly_code: String(p.assembly_code ?? ""),
-            positions_on_sheet: p.positions_on_sheet != null ? String(p.positions_on_sheet) : "",
-            pieces_per_box: p.pieces_per_box != null ? String(p.pieces_per_box) : "",
-            pieces_per_pallet: p.pieces_per_pallet != null ? String(p.pieces_per_pallet) : "",
-            foil_id: p.foil_id != null ? String(p.foil_id) : "",
-            foil_type: String(p.foil_type ?? ""),
-            color_coverage: String(p.color_coverage ?? ""),
-            ean_code: String(p.ean_code ?? ""),
+            customer_id: si("customer_id"),
+            ig_code: s("ig_code"),
+            ig_short_name: s("ig_short_name"),
+            client_code: s("client_code"),
+            client_name: s("client_name"),
+            requester: s("requester"),
+            sku: s("sku"),
+            label_shape_code: s("label_shape_code"),
+            product_format: s("product_format"),
+            die_cut_tool_code: s("die_cut_tool_code"),
+            assembly_code: s("assembly_code"),
+            positions_on_sheet: si("positions_on_sheet"),
+            labels_per_sheet: si("labels_per_sheet"),
+            pieces_per_box: si("pieces_per_box"),
+            pieces_per_pallet: si("pieces_per_pallet"),
+            foil_id: si("foil_id"),
+            foil_type: s("foil_type"),
+            color_coverage: s("color_coverage"),
+            ean_code: s("ean_code"),
             has_print_sample: !!p.has_print_sample,
-            print_note: String(p.print_note ?? ""),
-            production_notes: String(p.production_notes ?? ""),
-            approval_status: String(p.approval_status ?? ""),
-            item_status: String(p.item_status ?? "aktivní"),
-            print_data_version: String(p.print_data_version ?? ""),
-            stock_quantity: p.stock_quantity != null ? String(p.stock_quantity) : "",
-            realization_log: String(p.realization_log ?? ""),
-            internal_note: String(p.internal_note ?? ""),
+            print_note: s("print_note"),
+            production_notes: s("production_notes"),
+            approval_status: s("approval_status"),
+            item_status: s("item_status") || "aktivní",
+            print_data_version: s("print_data_version"),
+            stock_quantity: si("stock_quantity"),
+            realization_log: s("realization_log"),
+            internal_note: s("internal_note"),
           });
           setHasImage(!!p.has_image);
           setHasPdf(!!p.has_pdf);
+          if (Array.isArray(p.iml_product_colors)) {
+            const rows: ProductColorRow[] = (p.iml_product_colors as ProductColorResp[]).map(
+              (r, i) => ({
+                pantone_id: r.pantone_id,
+                code: r.iml_pantone_colors?.code ?? "",
+                name: r.iml_pantone_colors?.name ?? null,
+                hex: r.iml_pantone_colors?.hex ?? null,
+                coverage_pct: String(r.coverage_pct),
+                sort_order: r.sort_order ?? i,
+              })
+            );
+            setColors(rows);
+          }
           if (p.custom_data && typeof p.custom_data === "object") {
             const cd = p.custom_data as Record<string, unknown>;
             const init: Record<string, string | number | boolean> = {};
@@ -108,10 +139,19 @@ export default function ImlProductEditPage() {
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
           foil_id: form.foil_id ? parseInt(form.foil_id, 10) : null,
           positions_on_sheet: form.positions_on_sheet ? parseInt(form.positions_on_sheet, 10) : null,
+          labels_per_sheet: form.labels_per_sheet ? parseInt(form.labels_per_sheet, 10) : null,
           pieces_per_box: form.pieces_per_box ? parseInt(form.pieces_per_box, 10) : null,
           pieces_per_pallet: form.pieces_per_pallet ? parseInt(form.pieces_per_pallet, 10) : null,
           stock_quantity: form.stock_quantity ? parseInt(form.stock_quantity, 10) : null,
           custom_data: Object.keys(customData).length > 0 ? customData : null,
+          colors: colors
+            .filter((c) => c.code && c.coverage_pct !== "")
+            .map((c, i) => ({
+              pantone_id: c.pantone_id,
+              code: c.code,
+              coverage_pct: parseFloat(c.coverage_pct),
+              sort_order: c.sort_order ?? i,
+            })),
         }),
       });
 
@@ -171,6 +211,8 @@ export default function ImlProductEditPage() {
           setField={setField}
           customers={customers}
           foils={foils}
+          colors={colors}
+          onColorsChange={setColors}
         />
 
         <CustomFieldsFormSection

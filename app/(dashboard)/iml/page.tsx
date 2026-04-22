@@ -101,7 +101,7 @@ export default async function ImlPage() {
       icon: Settings,
       value: "",
       label: "Nastavení IML",
-      hint: "Vlastní pole • Fólie",
+      hint: "Vlastní pole • Fólie • Pantone",
     });
   }
 

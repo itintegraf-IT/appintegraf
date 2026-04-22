@@ -12,6 +12,7 @@ import ProductFormSections, {
   type CustomerOption,
   type FoilOption,
 } from "../_components/ProductFormSections";
+import type { ProductColorRow } from "../_components/ProductPantoneEditor";
 
 export default function ImlProductAddPage() {
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
@@ -21,6 +22,7 @@ export default function ImlProductAddPage() {
   const [createdProductId, setCreatedProductId] = useState<number | null>(null);
   const [form, setForm] = useState<ProductFormState>(emptyProductForm);
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
+  const [colors, setColors] = useState<ProductColorRow[]>([]);
 
   const setField = <K extends keyof ProductFormState>(
     k: K,
@@ -52,10 +54,19 @@ export default function ImlProductAddPage() {
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
           foil_id: form.foil_id ? parseInt(form.foil_id, 10) : null,
           positions_on_sheet: form.positions_on_sheet ? parseInt(form.positions_on_sheet, 10) : null,
+          labels_per_sheet: form.labels_per_sheet ? parseInt(form.labels_per_sheet, 10) : null,
           pieces_per_box: form.pieces_per_box ? parseInt(form.pieces_per_box, 10) : null,
           pieces_per_pallet: form.pieces_per_pallet ? parseInt(form.pieces_per_pallet, 10) : null,
           stock_quantity: form.stock_quantity ? parseInt(form.stock_quantity, 10) : null,
           custom_data: Object.keys(customData).length > 0 ? customData : undefined,
+          colors: colors
+            .filter((c) => c.code && c.coverage_pct !== "")
+            .map((c, i) => ({
+              pantone_id: c.pantone_id,
+              code: c.code,
+              coverage_pct: parseFloat(c.coverage_pct),
+              sort_order: c.sort_order ?? i,
+            })),
         }),
       });
 
@@ -133,6 +144,8 @@ export default function ImlProductAddPage() {
               setField={setField}
               customers={customers}
               foils={foils}
+              colors={colors}
+              onColorsChange={setColors}
             />
 
             <CustomFieldsFormSection

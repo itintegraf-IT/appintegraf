@@ -3,11 +3,15 @@
 import {
   Boxes,
   CircleCheckBig,
+  Droplets,
   Layers,
   Printer,
 } from "lucide-react";
 import { Tabs, type TabDef } from "../../_components/Tabs";
 import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
+import ProductPantoneEditor, {
+  type ProductColorRow,
+} from "./ProductPantoneEditor";
 
 export type ProductFormState = {
   customer_id: string;
@@ -22,6 +26,7 @@ export type ProductFormState = {
   die_cut_tool_code: string;
   assembly_code: string;
   positions_on_sheet: string;
+  labels_per_sheet: string;
   pieces_per_box: string;
   pieces_per_pallet: string;
   foil_id: string;
@@ -50,6 +55,12 @@ type Props = {
   customers: CustomerOption[];
   foils?: FoilOption[];
   errors?: ProductFormErrors;
+  /**
+   * Pole Pantone barev produktu (pro novou záložku "Barvy").
+   * Pokud je `undefined`, záložka se skryje (např. import formulář).
+   */
+  colors?: ProductColorRow[];
+  onColorsChange?: (colors: ProductColorRow[]) => void;
 };
 
 const inputCls = "w-full rounded-lg border border-gray-300 px-3 py-2";
@@ -70,6 +81,8 @@ export default function ProductFormSections({
   customers,
   foils = [],
   errors,
+  colors,
+  onColorsChange,
 }: Props) {
   const err = errors ?? {};
 
@@ -197,6 +210,21 @@ export default function ProductFormSections({
                 className={inputCls}
               />
             </Field>
+            <Field
+              label="Počet etiket na tiskový arch (TA)"
+              error={err.labels_per_sheet}
+              hint="Potřebné pro výpočet spotřeby barvy v reportu (viz tab Barvy)."
+            >
+              <input
+                type="number"
+                min={1}
+                step={1}
+                value={form.labels_per_sheet}
+                onChange={(e) => setField("labels_per_sheet", e.target.value)}
+                className={inputCls}
+                placeholder="např. 100"
+              />
+            </Field>
             <Field label="Kusů v krabici" error={err.pieces_per_box}>
               <input
                 type="number"
@@ -294,6 +322,29 @@ export default function ProductFormSections({
         </TabShell>
       ),
     },
+    ...(colors !== undefined && onColorsChange
+      ? [
+          {
+            id: "colors",
+            label: "Barvy",
+            icon: <Droplets className="h-4 w-4" />,
+            content: (
+              <TabShell
+                title="Barvy (Pantone)"
+                subtitle="Seznam barev s pokrytím v % a orientační spotřebou dle počtu etiket na TA"
+              >
+                <ProductPantoneEditor
+                  colors={colors}
+                  onChange={onColorsChange}
+                  labelsPerSheet={
+                    form.labels_per_sheet ? parseInt(form.labels_per_sheet, 10) : null
+                  }
+                />
+              </TabShell>
+            ),
+          } as TabDef,
+        ]
+      : []),
     {
       id: "print",
       label: "Tisková data",
@@ -422,6 +473,7 @@ export const emptyProductForm: ProductFormState = {
   die_cut_tool_code: "",
   assembly_code: "",
   positions_on_sheet: "",
+  labels_per_sheet: "",
   pieces_per_box: "",
   pieces_per_pallet: "",
   foil_id: "",

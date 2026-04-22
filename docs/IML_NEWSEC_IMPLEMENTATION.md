@@ -460,19 +460,29 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 - [ ] Propojit ze `settings/page.tsx` jako druhou záložku vedle „Vlastní pole"
 - [ ] Dropdown `foil_id` v tabu Materiály (fallback zobrazí legacy `foil_type` k remapování)
 
-### 3.3 Pantone barvy + výpočet spotřeby
+### 3.3 Pantone barvy + výpočet spotřeby (F3.4)
 
-- [ ] `app/api/iml/pantone-colors/route.ts` (`GET` se `search`, `POST`)
-- [ ] `app/api/iml/pantone-colors/[id]/route.ts` (`GET`, `PUT`, `DELETE`)
-- [ ] `app/api/iml/pantone-colors/validate/route.ts` (`POST { code }` → `{ exists, normalized }`)
-- [ ] `app/api/iml/products/[id]/colors/route.ts` (`GET`, `PUT` – replace semantika v transakci; 422 při neznámých kódech se seznamem)
-- [ ] `lib/iml-pantone.ts` – `normalizePantoneCode(raw)` (trim, toUpperCase, collapse whitespace, `P1234 → P 1234`)
-- [ ] `lib/iml-color-consumption.ts` – `consumptionKg(pieces, labelsPerSheet, coveragePct)` dle vzorce **Příloha C.1** (závazný vzorec: `(pieces / labelsPerSheet / 1000) × 1.2 × (coveragePct / 100)`)
-- [ ] Unit testy pro `consumptionKg` dle kontrolní matice v C.1 (min. 8 případů včetně `null` větví)
-- [ ] Komponenta `products/_components/ProductPantoneEditor.tsx` – dynamické řádky, Enter → focus na pokrytí, onBlur → validate, modal „Vytvořit novou kartu?"
-- [ ] Tlačítko `+ Přidat barvu`, validace pokrytí 0–100
-- [ ] UI (tab Výseky / Materiály) – input **„Počet etiket na tiskový arch"** (`labels_per_sheet`), typu `Int`, min 1, volitelný; helper text: „Potřebné pro výpočet spotřeby barvy v reportu"
-- [ ] Editor Pantone zobrazuje živý preview spotřeby pro referenční náklad (např. 10 000 ks) – pouze pokud `labels_per_sheet` vyplněno, jinak hint „Doplňte etiket/TA pro orientační spotřebu"
+- [x] `app/api/iml/pantone-colors/route.ts` (`GET` se `search` a `?all=true`, `POST` s normalizací/validací)
+- [x] `app/api/iml/pantone-colors/[id]/route.ts` (`GET`, `PUT`, `DELETE` – soft-delete, 409 pokud je barva navázaná na produkty)
+- [x] `app/api/iml/pantone-colors/validate/route.ts` (`POST { code }` → `{ normalized, exists, id, color }`)
+- [x] `app/api/iml/products/[id]/colors/route.ts` (`GET`, `PUT` – replace semantika v transakci; 422 při neznámých kódech se seznamem `missing_codes`)
+- [x] `lib/iml-pantone.ts` – `normalizePantoneCode(raw)` (trim, toUpperCase, collapse whitespace, `P<digit> → P <digit>`; slovo „PANTONE" se záměrně nemění) + `isValidPantoneCode`
+- [x] `lib/iml-color-consumption.ts` – `consumptionKg(pieces, labelsPerSheet, coveragePct)` dle vzorce **Příloha C.1**
+- [x] `lib/iml-product-colors.ts` – sdílený helper `validateProductColorsInput` + `replaceProductColorsInTx` (reuse v `/api/iml/products` POST/PUT i v dedikovaném `/colors` endpointu)
+- [x] Unit testy: `lib/iml-color-consumption.test.ts` (15 testů) + `lib/iml-pantone.test.ts` (10 testů)
+- [x] Komponenta `products/_components/ProductPantoneEditor.tsx` – dynamické řádky, onBlur → `/api/iml/pantone-colors/validate`, Enter → focus na pokrytí, hint u neznámých kódů („Vytvoří se při uložení produktu"), live preview spotřeby na ref. nákladu 10 000 ks
+- [x] Tlačítko `+ Přidat barvu`, validace pokrytí 0–100 (client-side i server-side)
+- [x] UI (tab Výseky) – input **„Počet etiket na tiskový arch (TA)"** (`labels_per_sheet`), typu `Int`, min 1, volitelný; helper text: „Potřebné pro výpočet spotřeby barvy v reportu (viz tab Barvy)."
+- [x] Editor Pantone zobrazuje živý preview spotřeby pro referenční náklad 10 000 ks – pokud `labels_per_sheet` není vyplněno, žluté upozornění „Doplňte Počet etiket na tiskový arch…"
+- [x] POST /api/iml/products i PUT /api/iml/products/[id] nově volitelně přijímají `colors: IncomingProductColor[]` (auto_create=true) – uložení proběhne v jedné transakci s produktem
+- [x] 3. záložka v Nastavení IML: **Pantone** (`ImlPantoneColorsClient` + `/api/iml/pantone-colors`)
+- [x] Read-only přehled barev v detailu produktu (sekce „Barvy") s HEX swatchem, % pokrytí, spotřebou na ref. nákladu a součtem pokrytí
+
+> **Poznámka k Příloze C.2**: referenční regex v původní specifikaci (`/^P(?!\s)/`) by mylně zasahoval i do slova „PANTONE" (výsledek „P ANTONE"). Skutečná implementace používá `/^P(?=\d)/`, takže:
+> – `"pantone 485 C"` → `"PANTONE 485 C"`
+> – `"p1234"` → `"P 1234"` (zachováno)
+> – `"P 485 C"` → `"P 485 C"` (beze změny)
+> Unit testy v `lib/iml-pantone.test.ts` tuto variantu pokrývají.
 
 ### 3.4 Verzování PDF + limit 50 MB
 
@@ -730,12 +740,25 @@ export function consumptionKg(
 ### C.2 Normalizace Pantone kódu
 
 ```ts
-// lib/iml-pantone.ts
+// lib/iml-pantone.ts (skutečná implementace)
 export function normalizePantoneCode(raw: string): string {
+  if (typeof raw !== "string") return "";
   return raw
     .trim()
     .toUpperCase()
     .replace(/\s+/g, " ")
-    .replace(/^P(?!\s)/, "P ");
+    // P následované číslicí doplníme mezerou (P1234 → P 1234).
+    // Nepoužíváme `(?!\s)`, protože by to matchlo i "PANTONE" a zlomilo ho na "P ANTONE".
+    .replace(/^P(?=\d)/, "P ");
 }
 ```
+
+Kontrolní příklady (kryté `lib/iml-pantone.test.ts`):
+
+| Vstup | Výstup |
+|---|---|
+| `"  pantone 485 C "` | `"PANTONE 485 C"` |
+| `"p1234"` | `"P 1234"` |
+| `"P 485 C"` | `"P 485 C"` |
+| `"p\t485\t c"` | `"P 485 C"` |
+| `"BLACK 6 C"` | `"BLACK 6 C"` |

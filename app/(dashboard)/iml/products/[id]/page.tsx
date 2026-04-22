@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import {
   Boxes,
   CircleCheckBig,
+  Droplets,
   Layers,
   Printer,
   Settings2,
@@ -13,6 +14,7 @@ import {
 import ProductDetailView, {
   type ProductDetailSection,
 } from "../_components/ProductDetailView";
+import { consumptionKg } from "@/lib/iml-color-consumption";
 
 export default async function ImlProductDetailPage({
   params,
@@ -37,6 +39,14 @@ export default async function ImlProductDetailPage({
       include: {
         iml_customers: { select: { id: true, name: true } },
         iml_foils: { select: { id: true, code: true, name: true } },
+        iml_product_colors: {
+          include: {
+            iml_pantone_colors: {
+              select: { id: true, code: true, name: true, hex: true },
+            },
+          },
+          orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+        },
       },
     }),
     prisma.iml_custom_fields.findMany({
@@ -122,6 +132,7 @@ export default async function ImlProductDetailPage({
           <InfoField label="Kód výsekového nástroje" value={fmt(product.die_cut_tool_code)} />
           <InfoField label="Kód montáže" value={fmt(product.assembly_code)} />
           <InfoField label="Pozic na archu" value={fmtNum(product.positions_on_sheet)} />
+          <InfoField label="Etiket na TA" value={fmtNum(product.labels_per_sheet)} />
           <InfoField label="Kusů v krabici" value={fmtNum(product.pieces_per_box)} />
           <InfoField label="Kusů na paletě" value={fmtNum(product.pieces_per_pallet)} />
         </div>
@@ -153,6 +164,26 @@ export default async function ImlProductDetailPage({
         </div>
       ),
     },
+    ...(product.iml_product_colors.length > 0
+      ? [
+          {
+            id: "colors",
+            label: "Barvy",
+            icon: <Droplets className="h-4 w-4" />,
+            content: (
+              <ProductColorsTable
+                colors={product.iml_product_colors.map((c) => ({
+                  code: c.iml_pantone_colors?.code ?? "",
+                  name: c.iml_pantone_colors?.name ?? null,
+                  hex: c.iml_pantone_colors?.hex ?? null,
+                  coverage_pct: Number(c.coverage_pct),
+                }))}
+                labelsPerSheet={product.labels_per_sheet ?? null}
+              />
+            ),
+          } as ProductDetailSection,
+        ]
+      : []),
     {
       id: "print",
       label: "Tisková data",
@@ -216,6 +247,92 @@ export default async function ImlProductDetailPage({
       preview={preview}
       sections={sections}
     />
+  );
+}
+
+/**
+ * Server-side (read-only) přehled Pantone barev produktu.
+ * Zobrazuje kód, název, % pokrytí a orientační spotřebu pro referenční náklad.
+ */
+function ProductColorsTable({
+  colors,
+  labelsPerSheet,
+}: {
+  colors: Array<{
+    code: string;
+    name: string | null;
+    hex: string | null;
+    coverage_pct: number;
+  }>;
+  labelsPerSheet: number | null;
+}) {
+  const REF = 10_000;
+  const totalCoverage = colors.reduce((s, c) => s + (Number.isFinite(c.coverage_pct) ? c.coverage_pct : 0), 0);
+  return (
+    <div className="space-y-3">
+      {!labelsPerSheet && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          Chybí <strong>Počet etiket na tiskový arch</strong> (tab Výseky) – doplňte pro výpočet spotřeby.
+        </div>
+      )}
+      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 text-left text-gray-600">
+            <tr>
+              <th className="px-3 py-2 font-medium w-10"></th>
+              <th className="px-3 py-2 font-medium">Pantone</th>
+              <th className="px-3 py-2 font-medium">Název</th>
+              <th className="px-3 py-2 font-medium text-right">Pokrytí %</th>
+              <th className="px-3 py-2 font-medium text-right">
+                Spotřeba @ {REF.toLocaleString("cs-CZ")} ks
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {colors.map((c, i) => {
+              const kg = consumptionKg(REF, labelsPerSheet, c.coverage_pct);
+              return (
+                <tr key={i} className="border-t">
+                  <td className="px-3 py-2">
+                    {c.hex && /^#[0-9A-Fa-f]{6}$/.test(c.hex) ? (
+                      <span
+                        className="inline-block h-5 w-5 rounded border border-gray-300"
+                        style={{ backgroundColor: c.hex }}
+                      />
+                    ) : (
+                      <span className="inline-block h-5 w-5 rounded border border-dashed border-gray-300" />
+                    )}
+                  </td>
+                  <td className="px-3 py-2 font-mono">{c.code}</td>
+                  <td className="px-3 py-2">{c.name ?? "—"}</td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {c.coverage_pct.toFixed(2)}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">
+                    {kg != null ? (
+                      <span className="font-medium">{kg.toFixed(4)} kg</span>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot className="bg-gray-50 text-xs text-gray-600">
+            <tr>
+              <td className="px-3 py-2" colSpan={3}>
+                Součet pokrytí
+              </td>
+              <td className="px-3 py-2 text-right tabular-nums">
+                {totalCoverage.toFixed(2)} %
+              </td>
+              <td />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
   );
 }
 

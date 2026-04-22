@@ -3,6 +3,11 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import {
+  replaceProductColorsInTx,
+  validateProductColorsInput,
+  type IncomingProductColor,
+} from "@/lib/iml-product-colors";
 
 const productListSelect = {
   id: true,
@@ -22,6 +27,7 @@ const productListSelect = {
   foil_id: true,
   foil_type: true,
   color_coverage: true,
+  labels_per_sheet: true,
   print_note: true,
   has_print_sample: true,
   ean_code: true,
@@ -117,8 +123,35 @@ export async function POST(req: NextRequest) {
 
     const customDataForPrisma = data.custom_data;
     const createPayload = { ...data, custom_data: customDataForPrisma, last_edited_by: editorName };
-    const product = await prisma.iml_products.create({
-      data: createPayload as Parameters<typeof prisma.iml_products.create>[0]["data"],
+
+    // Volitelné barvy – pokud jsou v body, uložíme je spolu s produktem v jedné transakci.
+    const incomingColors = Array.isArray(body.colors)
+      ? (body.colors as IncomingProductColor[])
+      : null;
+    const colorsValidation = incomingColors
+      ? validateProductColorsInput(incomingColors)
+      : null;
+    if (colorsValidation && !colorsValidation.ok) {
+      return NextResponse.json(
+        { error: "Neplatné barvy", details: colorsValidation.details },
+        { status: 400 }
+      );
+    }
+
+    const productId = await prisma.$transaction(async (tx) => {
+      const created = await tx.iml_products.create({
+        data: createPayload as Parameters<typeof tx.iml_products.create>[0]["data"],
+      });
+      if (colorsValidation && colorsValidation.ok) {
+        const res = await replaceProductColorsInTx(tx, created.id, colorsValidation.prepared, true);
+        if (!res.ok) throw new Error(res.error);
+      }
+      return created.id;
+    });
+
+    const product = await prisma.iml_products.findUniqueOrThrow({
+      where: { id: productId },
+      select: { id: true, ig_code: true, client_name: true },
     });
 
     await logImlAudit({
@@ -158,6 +191,7 @@ function parseProductBody(body: Record<string, unknown>) {
     foil_id: body.foil_id != null ? int(body.foil_id) : null,
     foil_type: str(body.foil_type),
     color_coverage: str(body.color_coverage),
+    labels_per_sheet: parseLabelsPerSheet(body.labels_per_sheet),
     print_note: str(body.print_note),
     has_print_sample: !!body.has_print_sample,
     ean_code: str(body.ean_code),
@@ -172,6 +206,17 @@ function parseProductBody(body: Record<string, unknown>) {
     is_active: body.is_active !== false,
     custom_data: parseCustomData(body.custom_data),
   };
+}
+
+/**
+ * labels_per_sheet je povinně > 0 nebo NULL.
+ * 0, prázdno, neplatný vstup → NULL (dle specifikace F3.4).
+ */
+function parseLabelsPerSheet(val: unknown): number | null {
+  if (val == null || val === "") return null;
+  const n = parseInt(String(val), 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
 }
 
 function parseCustomData(val: unknown): Record<string, unknown> | null {

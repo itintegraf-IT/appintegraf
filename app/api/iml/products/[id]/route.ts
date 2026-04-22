@@ -3,6 +3,11 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import {
+  replaceProductColorsInTx,
+  validateProductColorsInput,
+  type IncomingProductColor,
+} from "@/lib/iml-product-colors";
 
 export async function GET(
   _req: NextRequest,
@@ -28,6 +33,14 @@ export async function GET(
     include: {
       iml_customers: { select: { id: true, name: true } },
       iml_foils: { select: { id: true, code: true, name: true } },
+      iml_product_colors: {
+        include: {
+          iml_pantone_colors: {
+            select: { id: true, code: true, name: true, hex: true, is_active: true },
+          },
+        },
+        orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+      },
     },
   });
 
@@ -88,9 +101,29 @@ export async function PUT(
 
     const customDataForPrisma = data.custom_data;
     const updatePayload = { ...data, custom_data: customDataForPrisma, last_edited_by: editorName };
-    await prisma.iml_products.update({
-      where: { id },
-      data: updatePayload as Parameters<typeof prisma.iml_products.update>[0]["data"],
+
+    const incomingColors = Array.isArray(body.colors)
+      ? (body.colors as IncomingProductColor[])
+      : null;
+    const colorsValidation = incomingColors
+      ? validateProductColorsInput(incomingColors)
+      : null;
+    if (colorsValidation && !colorsValidation.ok) {
+      return NextResponse.json(
+        { error: "Neplatné barvy", details: colorsValidation.details },
+        { status: 400 }
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.iml_products.update({
+        where: { id },
+        data: updatePayload as Parameters<typeof tx.iml_products.update>[0]["data"],
+      });
+      if (colorsValidation && colorsValidation.ok) {
+        const res = await replaceProductColorsInTx(tx, id, colorsValidation.prepared, true);
+        if (!res.ok) throw new Error(res.error);
+      }
     });
 
     await logImlAudit({
@@ -167,6 +200,7 @@ function parseProductBody(body: Record<string, unknown>) {
     foil_id: body.foil_id != null ? int(body.foil_id) : null,
     foil_type: str(body.foil_type),
     color_coverage: str(body.color_coverage),
+    labels_per_sheet: parseLabelsPerSheet(body.labels_per_sheet),
     print_note: str(body.print_note),
     has_print_sample: !!body.has_print_sample,
     ean_code: str(body.ean_code),
@@ -181,6 +215,14 @@ function parseProductBody(body: Record<string, unknown>) {
     is_active: body.is_active !== false,
     custom_data: parseCustomData(body.custom_data),
   };
+}
+
+/** labels_per_sheet > 0 nebo NULL. */
+function parseLabelsPerSheet(val: unknown): number | null {
+  if (val == null || val === "") return null;
+  const n = parseInt(String(val), 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
 }
 
 function parseCustomData(val: unknown): Record<string, unknown> | null {
