@@ -17,6 +17,8 @@ Přehled dokumentace modulů a specifikací projektu.
 | Dokument | Popis |
 |----------|-------|
 | [MODUL_IML.md](MODUL_IML.md) | Kompletní dokumentace modulu IML – přehled, databáze, API, export/import, vlastní pole, fáze implementace |
+| [iml_newsec.md](iml_newsec.md) | Technická specifikace rozšíření IML (zákazníci, produkty, poptávky, objednávky, Pantone, reporty) |
+| [IML_NEWSEC_IMPLEMENTATION.md](IML_NEWSEC_IMPLEMENTATION.md) | **Implementační plán** rozšíření IML dle `iml_newsec.md` – odškrtávací checklist fází 1–7 |
 
 ## Modul Výroba
 
