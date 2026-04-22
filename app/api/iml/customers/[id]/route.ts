@@ -77,10 +77,21 @@ export async function PUT(
       city = null,
       postal_code = null,
       country = "Česká republika",
+      billing_company = null,
+      ico = null,
+      dic = null,
+      label_requirements = null,
+      pallet_packaging = null,
+      prepress_notes = null,
     } = body;
 
     if (!name || !String(name).trim()) {
       return NextResponse.json({ error: "Vyplňte název zákazníka" }, { status: 400 });
+    }
+
+    const icoClean = cleanIco(ico);
+    if (icoClean.error) {
+      return NextResponse.json({ error: icoClean.error }, { status: 400 });
     }
 
     if (email) {
@@ -107,6 +118,12 @@ export async function PUT(
         city: city ? String(city).trim() : null,
         postal_code: postal_code ? String(postal_code).trim() : null,
         country: country ? String(country).trim() : "Česká republika",
+        billing_company: billing_company ? String(billing_company).trim() : null,
+        ico: icoClean.value,
+        dic: dic ? String(dic).trim() : null,
+        label_requirements: label_requirements ? String(label_requirements).trim() : null,
+        pallet_packaging: pallet_packaging ? String(pallet_packaging).trim() : null,
+        prepress_notes: prepress_notes ? String(prepress_notes).trim() : null,
       },
     });
 
@@ -115,8 +132,8 @@ export async function PUT(
       action: "update",
       tableName: "iml_customers",
       recordId: id,
-      oldValues: { name: existing.name, email: existing.email },
-      newValues: { name: updated.name, email: updated.email },
+      oldValues: { name: existing.name, email: existing.email, ico: existing.ico },
+      newValues: { name: updated.name, email: updated.email, ico: updated.ico },
     });
 
     return NextResponse.json({ success: true });
@@ -124,6 +141,20 @@ export async function PUT(
     console.error("IML customers PUT error:", e);
     return NextResponse.json({ error: "Chyba při ukládání zákazníka" }, { status: 500 });
   }
+}
+
+/**
+ * Normalizace a validace IČO (shodné s /api/iml/customers/route.ts).
+ */
+function cleanIco(raw: unknown): { value: string | null; error?: string } {
+  if (raw == null) return { value: null };
+  const s = String(raw).trim();
+  if (s === "") return { value: null };
+  const digits = s.replace(/\s+/g, "");
+  if (!/^\d+$/.test(digits)) {
+    return { value: null, error: "IČO musí obsahovat pouze číslice" };
+  }
+  return { value: digits };
 }
 
 export async function DELETE(

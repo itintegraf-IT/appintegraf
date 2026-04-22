@@ -63,10 +63,21 @@ export async function POST(req: NextRequest) {
       city = null,
       postal_code = null,
       country = "Česká republika",
+      billing_company = null,
+      ico = null,
+      dic = null,
+      label_requirements = null,
+      pallet_packaging = null,
+      prepress_notes = null,
     } = body;
 
     if (!name || !String(name).trim()) {
       return NextResponse.json({ error: "Vyplňte název zákazníka" }, { status: 400 });
+    }
+
+    const icoClean = cleanIco(ico);
+    if (icoClean.error) {
+      return NextResponse.json({ error: icoClean.error }, { status: 400 });
     }
 
     if (email && (await prisma.iml_customers.findFirst({ where: { email: String(email).trim() } }))) {
@@ -87,6 +98,12 @@ export async function POST(req: NextRequest) {
         city: city ? String(city).trim() : null,
         postal_code: postal_code ? String(postal_code).trim() : null,
         country: country ? String(country).trim() : "Česká republika",
+        billing_company: billing_company ? String(billing_company).trim() : null,
+        ico: icoClean.value,
+        dic: dic ? String(dic).trim() : null,
+        label_requirements: label_requirements ? String(label_requirements).trim() : null,
+        pallet_packaging: pallet_packaging ? String(pallet_packaging).trim() : null,
+        prepress_notes: prepress_notes ? String(prepress_notes).trim() : null,
       },
     });
 
@@ -95,7 +112,7 @@ export async function POST(req: NextRequest) {
       action: "create",
       tableName: "iml_customers",
       recordId: customer.id,
-      newValues: { name: customer.name, email: customer.email },
+      newValues: { name: customer.name, email: customer.email, ico: customer.ico },
     });
 
     return NextResponse.json({ success: true, id: customer.id });
@@ -103,4 +120,20 @@ export async function POST(req: NextRequest) {
     console.error("IML customers POST error:", e);
     return NextResponse.json({ error: "Chyba při vytváření zákazníka" }, { status: 500 });
   }
+}
+
+/**
+ * Normalizace a validace IČO.
+ * Vrací trimovanou hodnotu (jen číslice) nebo null. Varuje, pokud nemá 8 číslic,
+ * ale přesto povolí uložit (zahraniční firmy, drobní podnikatelé apod.).
+ */
+function cleanIco(raw: unknown): { value: string | null; error?: string } {
+  if (raw == null) return { value: null };
+  const s = String(raw).trim();
+  if (s === "") return { value: null };
+  const digits = s.replace(/\s+/g, "");
+  if (!/^\d+$/.test(digits)) {
+    return { value: null, error: "IČO musí obsahovat pouze číslice" };
+  }
+  return { value: digits };
 }
