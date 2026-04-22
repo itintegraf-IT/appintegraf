@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import { normalizeAddressInput } from "@/lib/iml-shipping";
 
 /**
  * GET /api/iml/customers/[id]/shipping-addresses
@@ -129,23 +130,3 @@ export async function POST(
   }
 }
 
-/** Normalizuje vstupní pole adresy – trim, prázdné → null. */
-export function normalizeAddressInput(raw: Record<string, unknown>) {
-  const str = (v: unknown): string | null => {
-    if (v == null) return null;
-    const s = String(v).trim();
-    return s === "" ? null : s;
-  };
-  return {
-    label: str(raw.label),
-    recipient: str(raw.recipient),
-    street: str(raw.street),
-    city: str(raw.city),
-    postal_code: str(raw.postal_code),
-    country: str(raw.country),
-    is_default: raw.is_default === true || raw.is_default === "true",
-    label_requirements: str(raw.label_requirements),
-    pallet_packaging: str(raw.pallet_packaging),
-    prepress_notes: str(raw.prepress_notes),
-  };
-}

@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
-import { normalizeAddressInput } from "../route";
+import { normalizeAddressInput } from "@/lib/iml-shipping";
 
 type RouteParams = { params: Promise<{ id: string; addressId: string }> };
 

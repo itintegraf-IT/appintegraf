@@ -54,9 +54,16 @@ const emptyForm: FormState = {
 export default function CustomerShippingAddresses({
   customerId,
   canWrite = true,
+  embedded = false,
 }: {
   customerId: number;
   canWrite?: boolean;
+  /**
+   * Pokud true, komponenta nerenderuje vlastní vnější kartu (border + padding + nadpis)
+   * a očekává, že ji obalí rodič (např. SectionShell nebo Tab panel).
+   * V tomto režimu stále zobrazuje malý toolbar s tlačítkem „+ Přidat adresu".
+   */
+  embedded?: boolean;
 }) {
   const [addresses, setAddresses] = useState<ShippingAddress[]>([]);
   const [loading, setLoading] = useState(true);
@@ -211,27 +218,8 @@ export default function CustomerShippingAddresses({
     }
   };
 
-  return (
-    <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-      <header className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
-        <div>
-          <h2 className="text-lg font-semibold text-gray-900">Doručovací adresy</h2>
-          <p className="mt-0.5 text-sm text-gray-500">
-            Libovolný počet adres, jedna z nich označená jako výchozí.
-          </p>
-        </div>
-        {canWrite && (
-          <button
-            type="button"
-            onClick={openCreate}
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
-          >
-            <Plus className="h-4 w-4" />
-            Přidat adresu
-          </button>
-        )}
-      </header>
-
+  const body = (
+    <>
       {error && (
         <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
           {error}
@@ -522,6 +510,52 @@ export default function CustomerShippingAddresses({
           </div>
         </div>
       )}
+    </>
+  );
+
+  // Embedded: pouze toolbar + obsah; obal poskytuje rodič (SectionShell / tab panel).
+  if (embedded) {
+    return (
+      <div>
+        {canWrite && (
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={openCreate}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+            >
+              <Plus className="h-4 w-4" />
+              Přidat adresu
+            </button>
+          </div>
+        )}
+        {body}
+      </div>
+    );
+  }
+
+  // Standalone: vlastní karta s nadpisem (použití mimo detail / kdekoli).
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <header className="mb-4 flex items-center justify-between border-b border-gray-100 pb-3">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900">Doručovací adresy</h2>
+          <p className="mt-0.5 text-sm text-gray-500">
+            Libovolný počet adres, jedna z nich označená jako výchozí.
+          </p>
+        </div>
+        {canWrite && (
+          <button
+            type="button"
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+          >
+            <Plus className="h-4 w-4" />
+            Přidat adresu
+          </button>
+        )}
+      </header>
+      {body}
     </section>
   );
 }
