@@ -24,6 +24,9 @@ export default async function CalendarEventPage({
       users: { select: { first_name: true, last_name: true, department_id: true } },
       departments: { select: { name: true, manager_id: true } },
       users_deputy: { select: { first_name: true, last_name: true } },
+      calendar_event_participants: {
+        include: { users: { select: { first_name: true, last_name: true } } },
+      },
     },
   });
 
@@ -123,6 +126,23 @@ export default async function CalendarEventPage({
               <p className="font-medium">
                 {event.users_deputy.first_name} {event.users_deputy.last_name}
               </p>
+            </div>
+          )}
+          {event.calendar_event_participants && event.calendar_event_participants.length > 0 && (
+            <div className="sm:col-span-2">
+              <p className="text-sm text-gray-500">Pozvaní / účastníci</p>
+              <ul className="mt-1 list-inside list-disc text-gray-800">
+                {event.calendar_event_participants.map((p) => (
+                  <li key={p.id}>
+                    {p.users
+                      ? `${p.users.first_name} ${p.users.last_name}`
+                      : `Uživatel #${p.user_id}`}
+                    {p.status === "pending" ? (
+                      <span className="ml-1 text-xs text-amber-700">(pozvánka)</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
           {event.approval_status && (

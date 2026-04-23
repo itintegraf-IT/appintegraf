@@ -5,6 +5,12 @@ import { createCalendarEventUnit } from "@/lib/calendar-create-one";
 import { expandRecurrence, type RecurrenceKind } from "@/lib/calendar-recurrence";
 import { requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
 import { sendCalendarApprovalEmail } from "@/lib/email";
+import { findCreatorCalendarOverlap, formatOverlapErrorCs } from "@/lib/calendar-time-overlap";
+import {
+  normalizeParticipantUserIds,
+  replaceEventParticipants,
+  notifyCalendarInvitees,
+} from "@/lib/calendar-participant-sync";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
@@ -82,6 +88,7 @@ export async function POST(req: NextRequest) {
       remind_before_minutes: remindRaw = null,
       reminder_notify_in_app: naRaw = true,
       reminder_notify_email: neRaw = true,
+      participant_user_ids: participantUserIdsRaw = null,
     } = body;
 
     if (!title || !start_date || !end_date) {
@@ -185,6 +192,13 @@ export async function POST(req: NextRequest) {
     }
 
     for (const slot of slots) {
+      const selfOverlap = await findCreatorCalendarOverlap(prisma, userId, slot.start, slot.end, {});
+      if (selfOverlap) {
+        return NextResponse.json(
+          { error: formatOverlapErrorCs(selfOverlap, formatDateTimeCs) },
+          { status: 409 }
+        );
+      }
       if (deputyIdNum !== null) {
         const depOverlap = await prisma.calendar_events.findFirst({
           where: {
@@ -224,27 +238,15 @@ export async function POST(req: NextRequest) {
     const descTrim = description ? String(description).trim() : "";
     const locTrim = location ? String(location).trim() : "";
 
-    const firstSlot = slots[0];
-    const ownOverlaps = await prisma.calendar_events.findMany({
-      where: {
-        created_by: userId,
-        start_date: { lte: firstSlot.end },
-        end_date: { gte: firstSlot.start },
-      },
-      orderBy: { start_date: "asc" },
-      take: 3,
-      select: {
-        id: true,
-        title: true,
-        start_date: true,
-        end_date: true,
-      },
+    const participantUserIds = normalizeParticipantUserIds(participantUserIdsRaw, {
+      creatorId: userId,
+      deputyId: deputyIdNum,
     });
 
     const ids = await prisma.$transaction(async (tx) => {
       const created: number[] = [];
       for (const slot of slots) {
-        const { id } = await createCalendarEventUnit(tx, {
+        const { id: newId } = await createCalendarEventUnit(tx, {
           title: titleTrim,
           description: descTrim,
           start: slot.start,
@@ -260,7 +262,10 @@ export async function POST(req: NextRequest) {
           remindEmail: reminderEmail,
           creatorName,
         });
-        created.push(id);
+        created.push(newId);
+        if (participantUserIds.length > 0) {
+          await replaceEventParticipants(tx, newId, participantUserIds);
+        }
       }
       return created;
     });
@@ -285,12 +290,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let warning: string | null = null;
-    if (ownOverlaps.length > 0) {
-      const first = ownOverlaps[0];
-      warning = `Pozor: máte kolizi s ${ownOverlaps.length} událostí/událostmi (např. „${first.title}“ ${formatDateTimeCs(
-        first.start_date
-      )}–${formatDateTimeCs(first.end_date)}).`;
+    if (participantUserIds.length > 0) {
+      await notifyCalendarInvitees(prisma, {
+        userIds: participantUserIds,
+        eventId: ids[0]!,
+        eventTitle: titleTrim,
+        creatorName,
+        extraHint:
+          ids.length > 1
+            ? `(Více termínů u opakující se události: celkem ${ids.length}.)`
+            : undefined,
+      });
     }
 
     return NextResponse.json({
@@ -298,7 +308,6 @@ export async function POST(req: NextRequest) {
       id: ids[0],
       ids,
       count: ids.length,
-      warning,
     });
   } catch (e) {
     console.error("Calendar POST error:", e);
