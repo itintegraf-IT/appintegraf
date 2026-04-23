@@ -16,6 +16,8 @@ import { getMonthGridStart, getMonthGridEnd } from "./lib/month-utils";
 import { getHolidaysForRange } from "./lib/holidays";
 import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
 import { fetchUkolyForCalendarRange, UKOLY_CALENDAR_COLOR } from "@/lib/ukoly-calendar";
+import { isUserInVedeniDepartment } from "@/lib/calendar-vedeni";
+import type { CalendarEventMetaMode } from "@/lib/calendar-event-meta";
 
 type CalendarScope = "all" | "mine";
 
@@ -38,10 +40,11 @@ export default async function CalendarPage({
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
   const admin = await isAdmin(userId);
   const hasUkoly = await hasModuleAccess(userId, "ukoly", "read");
+  const isVedeni = userId > 0 ? await isUserInVedeniDepartment(userId) : false;
 
   const params = await searchParams;
 
-  const calendarScope: CalendarScope = params.scope === "mine" ? "mine" : "all";
+  const calendarScope: CalendarScope = params.scope === "all" ? "all" : "mine";
 
   const view =
     params.view === "month"
@@ -128,6 +131,11 @@ export default async function CalendarPage({
     const orConditions: Array<Record<string, unknown>> = [
       { created_by: userId },
       { deputy_id: userId },
+      {
+        calendar_event_participants: {
+          some: { user_id: userId },
+        },
+      },
     ];
     if (managerDeptIds.length > 0) {
       orConditions.push({
@@ -200,11 +208,25 @@ export default async function CalendarPage({
     users: { select: { first_name: true, last_name: true } },
     departments: { select: { name: true } },
     users_deputy: { select: { first_name: true, last_name: true } },
+    calendar_approvals: {
+      where: { approval_type: "manager", status: "approved" },
+      take: 1,
+      include: { users: { select: { first_name: true, last_name: true } } },
+    },
+    calendar_event_participants: {
+      include: { users: { select: { first_name: true, last_name: true } } },
+    },
   };
 
   const listScope: CalendarScope | null =
     view === "list_mine" ? "mine" : view === "list_all" ? "all" : null;
   const effectiveScope: CalendarScope = listScope ?? calendarScope;
+  const eventMetaMode: CalendarEventMetaMode =
+    effectiveScope !== "all"
+      ? "hidden"
+      : isVedeni
+        ? "global_vedeni"
+        : "global";
   const scopeWhere = await buildScopeWhere(effectiveScope);
 
   let where: Record<string, unknown>;
@@ -220,18 +242,15 @@ export default async function CalendarPage({
     }
   }
 
-  const listInclude = {
-    ...baseInclude,
-    calendar_event_participants: {
-      include: { users: { select: { first_name: true, last_name: true } } },
-    },
-  };
+  if (effectiveScope === "all") {
+    where = { ...where, is_private: { not: true } };
+  }
 
   const events = await prisma.calendar_events.findMany({
     where,
     orderBy: { start_date: "asc" },
     take: 200,
-    include: showList || isListView ? listInclude : baseInclude,
+    include: baseInclude,
   });
 
   let taskSearchRows:
@@ -289,6 +308,7 @@ export default async function CalendarPage({
     created_by: number;
     users: { first_name: string; last_name: string } | null;
     users_deputy: { first_name: string; last_name: string } | null;
+    calendar_approvals?: Array<{ users: { first_name: string; last_name: string } | null }>;
     ukoly_task_id?: number | null;
     calendar_event_participants?: Array<{
       users: { first_name: string; last_name: string } | null;
@@ -296,11 +316,7 @@ export default async function CalendarPage({
     [key: string]: unknown;
   };
 
-  const eventsAsGrid: GridEvent[] = (events as GridEvent[]).map((e) => ({
-    ...e,
-    start_date: e.start_date,
-    end_date: e.end_date,
-  }));
+  const eventsAsGrid: GridEvent[] = events as GridEvent[];
 
   let eventsForGrid: GridEvent[] = eventsAsGrid;
   let listMerged: GridEvent[] = eventsAsGrid;
@@ -407,20 +423,35 @@ export default async function CalendarPage({
           from={from}
           to={to}
           viewType={view as "list_mine" | "list_all"}
+          eventMetaMode={view === "list_all" ? eventMetaMode : "hidden"}
         />
       ) : showList ? (
         <CalendarSearchResults
           events={searchMerged}
           searchQuery={searchQuery}
           calendarUrl={calendarUrl}
+          eventMetaMode={eventMetaMode}
         />
       ) : (
         <>
           <CalendarNav view={view as "week" | "month"} from={from} to={to} month={month} />
           {view === "month" && month ? (
-            <MonthCalendarGrid events={eventsForGrid} holidays={holidays} month={month} userId={userId} />
+            <MonthCalendarGrid
+              events={eventsForGrid}
+              holidays={holidays}
+              month={month}
+              userId={userId}
+              eventMetaMode={eventMetaMode}
+            />
           ) : (
-            <WeekCalendarGrid events={eventsForGrid} holidays={holidays} from={from} to={to} userId={userId} />
+            <WeekCalendarGrid
+              events={eventsForGrid}
+              holidays={holidays}
+              from={from}
+              to={to}
+              userId={userId}
+              eventMetaMode={eventMetaMode}
+            />
           )}
         </>
       )}

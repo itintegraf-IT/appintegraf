@@ -4,9 +4,17 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, X } from "lucide-react";
 import { EVENT_TYPES, DEFAULT_EVENT_TYPE, requiresDeputy } from "./lib/event-types";
+import { RECURRENCE_OPTIONS, REMINDER_MINUTE_OPTIONS } from "./lib/calendar-form-options";
+import {
+  allDayYmdRangeToIsoStrings,
+  formatDateLocal,
+  formatDateTimeLocalForInput,
+} from "./lib/week-utils";
+import { CalendarInviteeSelect } from "./CalendarInviteeSelect";
 
 type Department = { id: number; name: string; code: string | null };
 type Deputy = { id: number; first_name: string; last_name: string };
+type Invitee = { id: number; first_name: string; last_name: string };
 
 type Props = {
   open: boolean;
@@ -26,23 +34,32 @@ export function CreateEventModal({
   const router = useRouter();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [deputies, setDeputies] = useState<Deputy[]>([]);
+  const [invitees, setInvitees] = useState<Invitee[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [warning, setWarning] = useState("");
   const [deputyWarning, setDeputyWarning] = useState("");
 
   const [form, setForm] = useState({
     title: "",
     description: "",
-    start_date: initialStart.toISOString().slice(0, 16),
-    end_date: initialEnd.toISOString().slice(0, 16),
+    start_date: formatDateTimeLocalForInput(initialStart),
+    end_date: formatDateTimeLocalForInput(initialEnd),
     event_type: DEFAULT_EVENT_TYPE,
     department_id: "",
     deputy_id: "",
-    is_public: false,
+    is_private: false,
     is_all_day: allDay,
     location: "",
-    color: "#DC2626",
+    recurrence: "none" as (typeof RECURRENCE_OPTIONS)[number]["value"],
+    recurrence_end: (() => {
+      const d = new Date(initialStart);
+      d.setMonth(d.getMonth() + 3);
+      return formatDateLocal(d);
+    })(),
+    remind_before_minutes: "" as string,
+    reminder_notify_in_app: true,
+    reminder_notify_email: true,
+    participant_ids: [] as number[],
   });
 
   useEffect(() => {
@@ -53,14 +70,16 @@ export function CreateEventModal({
         start.setHours(0, 0, 0, 0);
         end.setHours(23, 59, 0, 0);
       }
+      const re = new Date(start);
+      re.setMonth(re.getMonth() + 3);
       setForm((f) => ({
         ...f,
-        start_date: start.toISOString().slice(0, 16),
-        end_date: end.toISOString().slice(0, 16),
+        start_date: formatDateTimeLocalForInput(start),
+        end_date: formatDateTimeLocalForInput(end),
         is_all_day: allDay,
+        recurrence_end: formatDateLocal(re),
       }));
       setError("");
-      setWarning("");
       setDeputyWarning("");
     }
   }, [open, initialStart, initialEnd, allDay]);
@@ -80,6 +99,13 @@ export function CreateEventModal({
   }, []);
 
   useEffect(() => {
+    fetch("/api/calendar/invitees")
+      .then((r) => r.json())
+      .then((data) => (Array.isArray(data.users) ? setInvitees(data.users) : setInvitees([])))
+      .catch(() => setInvitees([]));
+  }, []);
+
+  useEffect(() => {
     const checkDeputyAvailability = async () => {
       if (!open || !requiresDeputy(form.event_type) || !form.deputy_id) {
         setDeputyWarning("");
@@ -89,10 +115,15 @@ export function CreateEventModal({
       let startDate = form.start_date;
       let endDate = form.end_date;
       if (form.is_all_day) {
-        const start = form.start_date.slice(0, 10);
-        const end = form.end_date.slice(0, 10);
-        startDate = `${start}T00:00`;
-        endDate = `${end}T23:59`;
+        const { start, end } = allDayYmdRangeToIsoStrings(
+          form.start_date.slice(0, 10),
+          form.end_date.slice(0, 10)
+        );
+        startDate = start;
+        endDate = end;
+      } else {
+        startDate = new Date(form.start_date).toISOString();
+        endDate = new Date(form.end_date).toISOString();
       }
 
       const query = new URLSearchParams({
@@ -116,16 +147,19 @@ export function CreateEventModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setWarning("");
     setLoading(true);
 
-    let startDate = form.start_date;
-    let endDate = form.end_date;
+    let startDate: string;
+    let endDate: string;
     if (form.is_all_day) {
-      const start = form.start_date.slice(0, 10);
-      const end = form.end_date.length >= 10 ? form.end_date.slice(0, 10) : start;
-      startDate = `${start}T00:00`;
-      endDate = `${end}T23:59`;
+      const s = form.start_date.slice(0, 10);
+      const e = form.end_date.length >= 10 ? form.end_date.slice(0, 10) : s;
+      const r = allDayYmdRangeToIsoStrings(s, e);
+      startDate = r.start;
+      endDate = r.end;
+    } else {
+      startDate = new Date(form.start_date).toISOString();
+      endDate = new Date(form.end_date).toISOString();
     }
 
     try {
@@ -133,11 +167,21 @@ export function CreateEventModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
+          title: form.title,
+          description: form.description,
           start_date: startDate,
           end_date: endDate,
+          event_type: form.event_type,
           department_id: form.department_id || null,
           deputy_id: form.deputy_id || null,
+          is_private: form.is_private,
+          location: form.location,
+          recurrence: form.recurrence,
+          recurrence_end: form.recurrence === "none" ? null : form.recurrence_end,
+          remind_before_minutes: form.remind_before_minutes || null,
+          reminder_notify_in_app: form.reminder_notify_in_app,
+          reminder_notify_email: form.reminder_notify_email,
+          participant_user_ids: form.participant_ids,
         }),
       });
 
@@ -145,19 +189,14 @@ export function CreateEventModal({
 
       if (!res.ok) {
         setError(data.error ?? "Chyba při ukládání");
-        setLoading(false);
         return;
-      }
-
-      if (data.warning) {
-        setWarning(String(data.warning));
-        window.alert(String(data.warning));
       }
 
       onClose();
       router.refresh();
     } catch {
       setError("Chyba při ukládání");
+    } finally {
       setLoading(false);
     }
   };
@@ -190,12 +229,6 @@ export function CreateEventModal({
               {error}
             </div>
           )}
-          {warning && (
-            <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-              {warning}
-            </div>
-          )}
-
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -297,7 +330,12 @@ export function CreateEventModal({
                 value={form.event_type}
                 onChange={(e) => {
                   const v = e.target.value;
-                  setForm({ ...form, event_type: v, deputy_id: requiresDeputy(v) ? form.deputy_id : "" });
+                  setForm({
+                    ...form,
+                    event_type: v,
+                    deputy_id: requiresDeputy(v) ? form.deputy_id : "",
+                    recurrence: requiresDeputy(v) ? "none" : form.recurrence,
+                  });
                 }}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2"
               >
@@ -371,28 +409,109 @@ export function CreateEventModal({
                 className="w-full rounded-lg border border-gray-300 px-3 py-2"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Barva
-              </label>
-              <input
-                type="color"
-                value={form.color}
-                onChange={(e) => setForm({ ...form, color: e.target.value })}
-                className="h-10 w-full cursor-pointer rounded-lg border border-gray-300"
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Další účastníci</label>
+              <p className="mb-2 text-xs text-gray-500">Hledáním nebo hromadně podle oddělení.</p>
+              <CalendarInviteeSelect
+                invitees={invitees}
+                value={form.participant_ids}
+                onChange={(ids) => setForm({ ...form, participant_ids: ids })}
+                excludeIds={form.deputy_id ? [parseInt(form.deputy_id, 10)] : []}
+                disabled={loading}
+                departments={departments.map((d) => ({ id: d.id, name: d.name }))}
               />
             </div>
-            <div className="flex items-center gap-2 sm:col-span-2">
-              <input
-                type="checkbox"
-                id="modal_is_public"
-                checked={form.is_public}
-                onChange={(e) => setForm({ ...form, is_public: e.target.checked })}
-                className="rounded"
-              />
-              <label htmlFor="modal_is_public" className="text-sm text-gray-700">
-                Veřejná událost
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Opakování
               </label>
+              <select
+                value={form.recurrence}
+                onChange={(e) =>
+                  setForm({ ...form, recurrence: e.target.value as (typeof RECURRENCE_OPTIONS)[number]["value"] })
+                }
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                disabled={requiresDeputy(form.event_type)}
+                title={requiresDeputy(form.event_type) ? "U Dovolená/Osobní není opakování k dispozici." : undefined}
+              >
+                {RECURRENCE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {form.recurrence !== "none" && !requiresDeputy(form.event_type) && (
+              <div className="sm:col-span-2">
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Opakovat do (včetně) *
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={form.recurrence_end}
+                  onChange={(e) => setForm({ ...form, recurrence_end: e.target.value })}
+                  className="w-full max-w-xs rounded-lg border border-gray-300 px-3 py-2"
+                />
+              </div>
+            )}
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Připomínka
+              </label>
+              <select
+                value={form.remind_before_minutes}
+                onChange={(e) => setForm({ ...form, remind_before_minutes: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              >
+                {REMINDER_MINUTE_OPTIONS.map((o) => (
+                  <option key={o.value || "none"} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {form.remind_before_minutes !== "" && (
+              <div className="flex flex-col gap-2 sm:col-span-2">
+                <span className="text-sm font-medium text-gray-700">Upozornit přes</span>
+                <div className="flex flex-wrap gap-4">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.reminder_notify_in_app}
+                      onChange={(e) => setForm({ ...form, reminder_notify_in_app: e.target.checked })}
+                      className="rounded"
+                    />
+                    Notifikace v aplikaci
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={form.reminder_notify_email}
+                      onChange={(e) => setForm({ ...form, reminder_notify_email: e.target.checked })}
+                      className="rounded"
+                    />
+                    E-mail
+                  </label>
+                </div>
+              </div>
+            )}
+            <div className="flex flex-col gap-1 sm:col-span-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="modal_is_private"
+                  checked={form.is_private}
+                  onChange={(e) => setForm({ ...form, is_private: e.target.checked })}
+                  className="rounded"
+                />
+                <label htmlFor="modal_is_private" className="text-sm text-gray-700">
+                  Soukromá událost
+                </label>
+              </div>
+              <p className="pl-6 text-xs text-gray-500">
+                Nebude v globálním kalendáři, jen u vás a u zapojených osob.
+              </p>
             </div>
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-gray-700">

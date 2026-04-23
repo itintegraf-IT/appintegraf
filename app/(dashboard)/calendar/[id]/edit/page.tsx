@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { EVENT_TYPES, DEFAULT_EVENT_TYPE, requiresDeputy, isAllDayEvent } from "../../lib/event-types";
+import { REMINDER_MINUTE_OPTIONS } from "../../lib/calendar-form-options";
+import {
+  allDayYmdRangeToIsoStrings,
+  formatDateLocal,
+  formatDateTimeLocalForInput,
+} from "../../lib/week-utils";
+import { CalendarInviteeSelect } from "../../CalendarInviteeSelect";
 
 type Event = {
   id: number;
@@ -15,14 +22,19 @@ type Event = {
   event_type: string | null;
   department_id: number | null;
   deputy_id: number | null;
-  is_public: boolean | null;
+  is_private: boolean | null;
   location: string | null;
   color: string | null;
+  remind_before_minutes?: number | null;
+  reminder_notify_in_app?: boolean | null;
+  reminder_notify_email?: boolean | null;
   users_deputy?: { id: number; first_name: string; last_name: string } | null;
+  calendar_event_participants?: Array<{ user_id: number }>;
 };
 
 type Department = { id: number; name: string };
 type Deputy = { id: number; first_name: string; last_name: string };
+type Invitee = { id: number; first_name: string; last_name: string };
 
 export default function EditCalendarPage() {
   const router = useRouter();
@@ -30,10 +42,10 @@ export default function EditCalendarPage() {
   const id = params.id as string;
   const [departments, setDepartments] = useState<Department[]>([]);
   const [deputies, setDeputies] = useState<Deputy[]>([]);
+  const [invitees, setInvitees] = useState<Invitee[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
-  const [warning, setWarning] = useState("");
   const [deputyWarning, setDeputyWarning] = useState("");
   const [form, setForm] = useState({
     title: "",
@@ -43,10 +55,13 @@ export default function EditCalendarPage() {
     event_type: DEFAULT_EVENT_TYPE,
     department_id: "",
     deputy_id: "",
-    is_public: false,
+    is_private: false,
     is_all_day: false,
     location: "",
-    color: "#DC2626",
+    remind_before_minutes: "" as string,
+    reminder_notify_in_app: true,
+    reminder_notify_email: true,
+    participant_ids: [] as number[],
   });
 
   useEffect(() => {
@@ -54,28 +69,49 @@ export default function EditCalendarPage() {
       fetch(`/api/calendar/${id}`).then((r) => r.json()),
       fetch("/api/departments").then((r) => r.json()),
       fetch("/api/calendar/deputies").then((r) => r.json()),
-    ]).then(([event, depts, deputiesRes]: [Event, Department[], { deputies?: Deputy[] }]) => {
-      if (event?.id) {
-        const start = new Date(event.start_date);
-        const end = new Date(event.end_date);
-        const allDay = isAllDayEvent(start, end);
-        setForm({
-          title: event.title,
-          description: event.description ?? "",
-          start_date: start.toISOString().slice(0, 16),
-          end_date: end.toISOString().slice(0, 16),
-          event_type: event.event_type ?? DEFAULT_EVENT_TYPE,
-          department_id: event.department_id ? String(event.department_id) : "",
-          deputy_id: event.deputy_id ? String(event.deputy_id) : "",
-          is_public: event.is_public ?? false,
-          is_all_day: allDay,
-          location: event.location ?? "",
-          color: event.color ?? "#DC2626",
-        });
+      fetch("/api/calendar/invitees").then((r) => r.json()),
+    ]).then(
+      ([event, depts, deputiesRes, invRes]: [
+        Event,
+        Department[],
+        { deputies?: Deputy[] },
+        { users?: Invitee[] },
+      ]) => {
+        if (event?.id) {
+          const start = new Date(event.start_date);
+          const end = new Date(event.end_date);
+          const allDay = isAllDayEvent(start, end);
+          const pIds = (event.calendar_event_participants ?? []).map((p) => p.user_id);
+          setForm({
+            title: event.title,
+            description: event.description ?? "",
+            start_date: allDay
+              ? `${formatDateLocal(start)}T00:00`
+              : formatDateTimeLocalForInput(start),
+            end_date: allDay
+              ? `${formatDateLocal(end)}T23:59`
+              : formatDateTimeLocalForInput(end),
+            event_type: event.event_type ?? DEFAULT_EVENT_TYPE,
+            department_id: event.department_id ? String(event.department_id) : "",
+            deputy_id: event.deputy_id ? String(event.deputy_id) : "",
+            is_private: event.is_private ?? false,
+            is_all_day: allDay,
+            location: event.location ?? "",
+            remind_before_minutes:
+              event.remind_before_minutes != null && event.remind_before_minutes > 0
+                ? String(event.remind_before_minutes)
+                : "",
+            reminder_notify_in_app: event.reminder_notify_in_app !== false,
+            reminder_notify_email: event.reminder_notify_email !== false,
+            participant_ids: pIds,
+          });
+        }
+        setDepartments(Array.isArray(depts) ? depts : []);
+        setDeputies(deputiesRes?.deputies ?? []);
+        setInvitees(Array.isArray(invRes?.users) ? invRes.users : []);
       }
-      setDepartments(Array.isArray(depts) ? depts : []);
-      setDeputies(deputiesRes?.deputies ?? []);
-    }).catch(() => setError("Chyba při načítání"))
+    )
+      .catch(() => setError("Chyba při načítání"))
       .finally(() => setLoadingData(false));
   }, [id]);
 
@@ -86,13 +122,18 @@ export default function EditCalendarPage() {
         return;
       }
 
-      let startDate = form.start_date;
-      let endDate = form.end_date;
+      let startDate: string;
+      let endDate: string;
       if (form.is_all_day) {
-        const start = form.start_date.slice(0, 10);
-        const end = form.end_date.slice(0, 10);
-        startDate = `${start}T00:00`;
-        endDate = `${end}T23:59`;
+        const { start, end } = allDayYmdRangeToIsoStrings(
+          form.start_date.slice(0, 10),
+          form.end_date.slice(0, 10)
+        );
+        startDate = start;
+        endDate = end;
+      } else {
+        startDate = new Date(form.start_date).toISOString();
+        endDate = new Date(form.end_date).toISOString();
       }
 
       const query = new URLSearchParams({
@@ -119,16 +160,19 @@ export default function EditCalendarPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setWarning("");
     setLoading(true);
 
-    let startDate = form.start_date;
-    let endDate = form.end_date;
+    let startDate: string;
+    let endDate: string;
     if (form.is_all_day) {
-      const start = form.start_date.slice(0, 10);
-      const end = form.end_date.slice(0, 10);
-      startDate = `${start}T00:00`;
-      endDate = `${end}T23:59`;
+      const s = form.start_date.slice(0, 10);
+      const e = form.end_date.slice(0, 10);
+      const r = allDayYmdRangeToIsoStrings(s, e);
+      startDate = r.start;
+      endDate = r.end;
+    } else {
+      startDate = new Date(form.start_date).toISOString();
+      endDate = new Date(form.end_date).toISOString();
     }
 
     try {
@@ -136,11 +180,19 @@ export default function EditCalendarPage() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
+          title: form.title,
+          description: form.description,
           start_date: startDate,
           end_date: endDate,
+          event_type: form.event_type,
           department_id: form.department_id || null,
           deputy_id: form.deputy_id || null,
+          is_private: form.is_private,
+          location: form.location,
+          remind_before_minutes: form.remind_before_minutes || null,
+          reminder_notify_in_app: form.reminder_notify_in_app,
+          reminder_notify_email: form.reminder_notify_email,
+          participant_user_ids: form.participant_ids,
         }),
       });
 
@@ -148,19 +200,14 @@ export default function EditCalendarPage() {
 
       if (!res.ok) {
         setError(data.error ?? "Chyba při ukládání");
-        setLoading(false);
         return;
-      }
-
-      if (data.warning) {
-        setWarning(String(data.warning));
-        window.alert(String(data.warning));
       }
 
       router.push(`/calendar/${id}`);
       router.refresh();
     } catch {
       setError("Chyba při ukládání");
+    } finally {
       setLoading(false);
     }
   };
@@ -193,10 +240,6 @@ export default function EditCalendarPage() {
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
-        {warning && (
-          <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{warning}</div>
-        )}
-
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">Název *</label>
@@ -356,24 +399,74 @@ export default function EditCalendarPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Barva</label>
-            <input
-              type="color"
-              value={form.color}
-              onChange={(e) => setForm({ ...form, color: e.target.value })}
-              className="h-10 w-full cursor-pointer rounded-lg border border-gray-300"
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Další účastníci (pozvánky)</label>
+            <p className="mb-2 text-xs text-gray-500">Hledáním, oddělením nebo čipy níže. Nové tváře dostanou notifikaci.</p>
+            <CalendarInviteeSelect
+              invitees={invitees}
+              value={form.participant_ids}
+              onChange={(ids) => setForm({ ...form, participant_ids: ids })}
+              excludeIds={form.deputy_id ? [parseInt(form.deputy_id, 10)] : []}
+              disabled={loading}
+              departments={departments.map((d) => ({ id: d.id, name: d.name }))}
             />
           </div>
-          <div className="flex items-center gap-2 sm:col-span-2">
-            <input
-              type="checkbox"
-              id="is_public"
-              checked={form.is_public}
-              onChange={(e) => setForm({ ...form, is_public: e.target.checked })}
-              className="rounded"
-            />
-            <label htmlFor="is_public" className="text-sm text-gray-700">Veřejná událost</label>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Připomínka</label>
+            <select
+              value={form.remind_before_minutes}
+              onChange={(e) => setForm({ ...form, remind_before_minutes: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            >
+              {REMINDER_MINUTE_OPTIONS.map((o) => (
+                <option key={o.value || "none"} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {form.remind_before_minutes !== "" && (
+            <div className="flex flex-col gap-2 sm:col-span-2">
+              <span className="text-sm font-medium text-gray-700">Upozornit přes</span>
+              <div className="flex flex-wrap gap-4">
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.reminder_notify_in_app}
+                    onChange={(e) => setForm({ ...form, reminder_notify_in_app: e.target.checked })}
+                    className="rounded"
+                  />
+                  Notifikace v aplikaci
+                </label>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={form.reminder_notify_email}
+                    onChange={(e) => setForm({ ...form, reminder_notify_email: e.target.checked })}
+                    className="rounded"
+                  />
+                  E-mail
+                </label>
+              </div>
+            </div>
+          )}
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="is_private"
+                checked={form.is_private}
+                onChange={(e) => setForm({ ...form, is_private: e.target.checked })}
+                className="rounded"
+              />
+              <label htmlFor="is_private" className="text-sm text-gray-700">
+                Soukromá událost
+              </label>
+            </div>
+            <p className="pl-6 text-xs text-gray-500">
+              Soukromé události se nezobrazí v globálním (firemním) kalendáři, pouze u vás (záložka Můj kalendář) a
+              u zapojených osob.
+            </p>
           </div>
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">Popis</label>

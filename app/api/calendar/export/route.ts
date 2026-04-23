@@ -25,7 +25,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const scope = searchParams.get("scope") === "all" && (await isAdmin(userId)) ? "all" : "mine";
 
-  const where = scope === "all" ? {} : { created_by: userId };
+  const where =
+    scope === "all"
+      ? { is_private: { not: true } as const }
+      : { created_by: userId };
   const events = await prisma.calendar_events.findMany({
     where,
     orderBy: { start_date: "asc" },

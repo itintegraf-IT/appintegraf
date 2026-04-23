@@ -12,6 +12,11 @@ import { CreateEventModal } from "./CreateEventModal";
 import { WEEKDAY_NAMES_MONDAY, formatDateLocal } from "./lib/week-utils";
 import type { Holiday } from "./lib/holidays";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
+import { isAllDayEvent, allDayEventDisplayDates } from "./lib/event-types";
+import {
+  buildEventMetaLines,
+  type CalendarEventMetaMode,
+} from "@/lib/calendar-event-meta";
 
 type CalendarEvent = {
   id: number;
@@ -27,6 +32,7 @@ type CalendarEvent = {
   created_by: number;
   users: { first_name: string; last_name: string } | null;
   users_deputy: { first_name: string; last_name: string } | null;
+  calendar_approvals?: Array<{ users: { first_name: string; last_name: string } | null }>;
   ukoly_task_id?: number | null;
 };
 
@@ -35,9 +41,33 @@ type Props = {
   holidays?: Holiday[];
   month: string;
   userId?: number;
+  eventMetaMode?: CalendarEventMetaMode;
 };
 
-export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: Props) {
+function eventMetaForTitle(e: CalendarEvent, eventMetaMode: CalendarEventMetaMode): string {
+  if (e.ukoly_task_id != null) return e.title;
+  const extra = buildEventMetaLines(
+    {
+      users: e.users,
+      users_deputy: e.users_deputy,
+      deputy_id: e.deputy_id,
+      approval_status: e.approval_status,
+      calendar_approvals: e.calendar_approvals,
+      ukoly_task_id: e.ukoly_task_id,
+    },
+    eventMetaMode
+  );
+  if (extra.length === 0) return e.title;
+  return [e.title, ...extra].join(" — ");
+}
+
+export function MonthCalendarGrid({
+  events,
+  holidays = [],
+  month,
+  userId = 0,
+  eventMetaMode = "hidden",
+}: Props) {
   const monthDate = useMemo(() => new Date(month + "-01"), [month]);
   const today = useMemo(() => new Date().toDateString(), []);
 
@@ -69,6 +99,7 @@ export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: 
   }, [days]);
 
   const eventsForDay = (day: Date) => {
+    const dayKey = formatDateLocal(day);
     const dayStart = new Date(day);
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(day);
@@ -77,6 +108,9 @@ export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: 
     return events.filter((e) => {
       const start = new Date(e.start_date);
       const end = new Date(e.end_date);
+      if (isAllDayEvent(start, end)) {
+        return allDayEventDisplayDates(start, end).includes(dayKey);
+      }
       return start <= dayEnd && end >= dayStart;
     });
   };
@@ -155,6 +189,7 @@ export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: 
                     ))}
                     <div className="mt-1 space-y-0.5">
                       {dayEvents.slice(0, 3).map((e) => {
+                        const line = e.color ?? "#DC2626";
                         const pendingApproval =
                           e.approval_status === "pending" && e.deputy_id;
                         const deputyApproved =
@@ -165,10 +200,12 @@ export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: 
                             key={`${calendarGridItemKey(e)}-${day.toDateString()}`}
                             href={calendarGridItemHref(e)}
                             onClick={(ev) => ev.stopPropagation()}
-                            className="block truncate rounded px-1 py-0.5 text-[10px] font-medium hover:opacity-90"
+                            title={eventMetaForTitle(e, eventMetaMode)}
+                            className="block w-full min-h-[1.4rem] truncate border-l-4 pl-0.5 pr-0.5 py-0.5 text-left text-[10px] font-medium leading-tight hover:opacity-90"
                             style={{
-                              backgroundColor: `${e.color ?? "#DC2626"}24`,
-                              color: e.color ?? "#DC2626",
+                              borderLeftColor: line,
+                              backgroundColor: `${line}20`,
+                              color: line,
                             }}
                           >
                             {e.title}

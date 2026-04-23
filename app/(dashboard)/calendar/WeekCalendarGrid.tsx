@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { parseDateLocal, formatDateLocal } from "./lib/week-utils";
 import type { Holiday } from "./lib/holidays";
-import { isAllDayEvent, requiresDeputy } from "./lib/event-types";
+import { isAllDayEvent, allDayEventDisplayDates, requiresDeputy } from "./lib/event-types";
 import { CreateEventModal } from "./CreateEventModal";
 import { ConfirmMoveModal } from "./ConfirmMoveModal";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
+import {
+  buildEventMetaLines,
+  type CalendarEventMetaMode,
+} from "@/lib/calendar-event-meta";
 
 type CalendarEvent = {
   id: number;
@@ -24,6 +28,7 @@ type CalendarEvent = {
   created_by: number;
   users: { first_name: string; last_name: string } | null;
   users_deputy: { first_name: string; last_name: string } | null;
+  calendar_approvals?: Array<{ users: { first_name: string; last_name: string } | null }>;
   ukoly_task_id?: number | null;
 };
 
@@ -33,7 +38,40 @@ type Props = {
   from: string;
   to: string;
   userId?: number;
+  /** Globální kalendář: vlastník, zástup; u Vedení navíc schválení vedoucím */
+  eventMetaMode?: CalendarEventMetaMode;
 };
+
+function EventMetaSubtext({
+  e,
+  mode,
+}: {
+  e: CalendarEvent;
+  mode: CalendarEventMetaMode;
+}) {
+  if (mode === "hidden") return null;
+  const lines = buildEventMetaLines(
+    {
+      users: e.users,
+      users_deputy: e.users_deputy,
+      deputy_id: e.deputy_id,
+      approval_status: e.approval_status,
+      calendar_approvals: e.calendar_approvals,
+      ukoly_task_id: e.ukoly_task_id,
+    },
+    mode
+  );
+  if (lines.length === 0) return null;
+  return (
+    <span className="mt-0.5 block w-full text-[9px] font-normal normal-case leading-tight text-gray-600">
+      {lines.map((l, i) => (
+        <span key={i} className="block truncate">
+          {l}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 const ROW_HEIGHT = 32;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -80,7 +118,36 @@ function getEventSliceForDay(
   return { top, height };
 }
 
-export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }: Props) {
+/** Jemné zabarvení sloupce (hlavička / celý den / 0–23) podle první celodenní události v daném dni. */
+function cellAllDayShadeStyle(
+  accent: string | undefined,
+  isToday: boolean,
+  isHoliday: boolean
+): CSSProperties {
+  if (accent) {
+    const base = isToday
+      ? "rgb(255, 250, 235)"
+      : isHoliday
+        ? "rgb(241, 245, 249)"
+        : "rgb(255, 255, 255)";
+    return {
+      backgroundColor: `color-mix(in srgb, ${accent} 18%, ${base})`,
+      boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${accent} 22%, transparent)`,
+    };
+  }
+  if (isToday) return { backgroundColor: "rgba(255, 250, 235, 0.5)" };
+  if (isHoliday) return { backgroundColor: "rgb(241, 245, 249)" };
+  return { backgroundColor: "rgb(249, 250, 251)" };
+}
+
+export function WeekCalendarGrid({
+  events,
+  holidays = [],
+  from,
+  to,
+  userId = 0,
+  eventMetaMode = "hidden",
+}: Props) {
   const router = useRouter();
   const weekStart = useMemo(() => {
     const d = parseDateLocal(from);
@@ -247,6 +314,24 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
     );
   }, [events]);
 
+  /** Barva pro zvýraznění sloupce (pouze běžné celodenní, ne úkoly) */
+  const allDayColumnAccent = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const d of days) {
+      const key = formatDateLocal(d);
+      for (const e of allDayEvents) {
+        if (e.ukoly_task_id != null) continue;
+        const s = new Date(e.start_date);
+        const en = new Date(e.end_date);
+        if (allDayEventDisplayDates(s, en).includes(key)) {
+          m.set(key, e.color ?? "#DC2626");
+          break;
+        }
+      }
+    }
+    return m;
+  }, [allDayEvents, days]);
+
   const holidaysForDay = (day: Date) =>
     holidays.filter((h) => h.date === formatDateLocal(day));
 
@@ -265,16 +350,20 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
             {days.map((d) => {
               const dayHolidays = holidaysForDay(d);
               const isHoliday = dayHolidays.length > 0;
+              const dayKey = formatDateLocal(d);
+              const isTod = d.toDateString() === today;
+              const accent = allDayColumnAccent.get(dayKey);
               return (
                 <div
                   key={d.toISOString()}
                   className={`flex-1 border-r border-gray-200 px-2 py-2 text-center text-sm font-medium last:border-r-0 ${
-                    d.toDateString() === today
-                      ? "bg-amber-50 text-amber-900"
+                    isTod
+                      ? "text-amber-900"
                       : isHoliday
-                        ? "bg-slate-100 text-slate-700"
-                        : "bg-gray-50 text-gray-700"
+                        ? "text-slate-700"
+                        : "text-gray-700"
                   }`}
+                  style={cellAllDayShadeStyle(accent, isTod, isHoliday)}
                   title={dayHolidays.map((h) => h.name).join(", ")}
                 >
                   {d.toLocaleDateString("cs-CZ", { weekday: "short" })} {d.getDate()}.{" "}
@@ -295,20 +384,23 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
             className="relative flex flex-1"
             style={{ minHeight: Math.max(36, ukolyRangeEvents.length * 22 + 10) }}
           >
-            {days.map((d) => (
+            {days.map((d) => {
+              const dayKey = formatDateLocal(d);
+              const isTod = d.toDateString() === today;
+              const accent = allDayColumnAccent.get(dayKey);
+              return (
               <div
                 key={d.toISOString()}
                 onClick={() => handleAllDayClick(d)}
                 onDrop={(ev) => handleDrop(ev, d)}
                 onDragOver={handleDragOver}
-                    className={`min-h-9 flex-1 cursor-pointer border-r border-gray-200 px-1 py-1 align-top last:border-r-0 transition-colors hover:bg-[var(--accent)]/45 ${
-                  d.toDateString() === today ? "bg-amber-50/50" : ""
-                }`}
+                className="flex min-h-11 flex-1 cursor-pointer flex-col gap-1 border-r border-gray-200 px-1 py-1 align-top last:border-r-0 transition-colors hover:bg-[var(--accent)]/45"
+                style={cellAllDayShadeStyle(accent, isTod, holidaysForDay(d).length > 0)}
               >
                 {holidaysForDay(d).map((h) => (
                   <div
                     key={h.date + h.name}
-                    className="mb-1 truncate rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
+                    className="w-full shrink-0 truncate rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
                     title={h.name}
                   >
                     {h.name}
@@ -319,17 +411,10 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                     if (e.ukoly_task_id != null) return false;
                     const start = new Date(e.start_date);
                     const end = new Date(e.end_date);
-                    const eventStart = new Date(start);
-                    eventStart.setHours(0, 0, 0, 0);
-                    const eventEnd = new Date(end);
-                    eventEnd.setHours(23, 59, 59, 999);
-                    const dayStart = new Date(d);
-                    dayStart.setHours(0, 0, 0, 0);
-                    const dayEnd = new Date(d);
-                    dayEnd.setHours(23, 59, 59, 999);
-                    return eventStart <= dayEnd && eventEnd >= dayStart;
+                    return allDayEventDisplayDates(start, end).includes(formatDateLocal(d));
                   })
                   .map((e) => {
+                    const barColor = e.color ?? "#DC2626";
                     const pendingApproval = e.approval_status === "pending" && e.deputy_id;
                     const deputyApproved = e.approval_status === "deputy_approved";
                     const isApproved = e.approval_status === "approved";
@@ -345,7 +430,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                             <span className="rounded bg-amber-500/80 px-1 py-0.5 text-white">
                               Čeká na schválení
                             </span>
-                            {deputyName && (
+                            {deputyName && eventMetaMode === "hidden" && (
                               <span className="ml-1 text-gray-600">→ {deputyName}</span>
                             )}
                           </span>
@@ -366,6 +451,8 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                         )}
                       </>
                     );
+                    const barClass =
+                      "w-full min-h-8 shrink-0 border-l-4 pl-2 pr-1 py-1 text-left text-xs font-medium";
                     return canDrag ? (
                       <div
                         key={calendarGridItemKey(e)}
@@ -375,31 +462,36 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                           ev.stopPropagation();
                           router.push(calendarGridItemHref(e));
                         }}
-                        className="mb-1 block cursor-grab truncate rounded px-2 py-0.5 text-xs font-medium hover:opacity-90 active:cursor-grabbing"
+                        className={`${barClass} block cursor-grab overflow-hidden rounded-sm hover:opacity-90 active:cursor-grabbing ${eventMetaMode === "hidden" ? "truncate" : ""}`}
                         style={{
-                          backgroundColor: `${e.color ?? "#DC2626"}20`,
-                          color: e.color ?? "#DC2626",
+                          borderLeftColor: barColor,
+                          backgroundColor: `${barColor}20`,
+                          color: barColor,
                         }}
                       >
                         {eventContent}
+                        <EventMetaSubtext e={e} mode={eventMetaMode} />
                       </div>
                     ) : (
                       <Link
                         key={calendarGridItemKey(e)}
                         href={calendarGridItemHref(e)}
                         onClick={(ev) => ev.stopPropagation()}
-                        className="mb-1 block truncate rounded px-2 py-0.5 text-xs font-medium hover:opacity-90"
+                        className={`${barClass} block overflow-hidden rounded-sm hover:opacity-90 ${eventMetaMode === "hidden" ? "truncate" : ""}`}
                         style={{
-                          backgroundColor: `${e.color ?? "#DC2626"}20`,
-                          color: e.color ?? "#DC2626",
+                          borderLeftColor: barColor,
+                          backgroundColor: `${barColor}20`,
+                          color: barColor,
                         }}
                       >
                         {eventContent}
+                        <EventMetaSubtext e={e} mode={eventMetaMode} />
                       </Link>
                     );
                   })}
               </div>
-            ))}
+            );
+            })}
             {ukolyRangeEvents.map((item, idx) => {
               const { e, startIdx, endIdx, startsInThisWeek, endsInThisWeek } = item;
               const lineColor = e.color ?? "#DC2626";
@@ -449,13 +541,19 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
             ))}
           </div>
           <div className="flex flex-1">
-            {days.map((d) => (
+            {days.map((d) => {
+              const dayKey = formatDateLocal(d);
+              const isTod = d.toDateString() === today;
+              const accent = allDayColumnAccent.get(dayKey);
+              return (
               <div
                 key={d.toISOString()}
-                className={`relative flex-1 overflow-hidden border-r border-gray-200 last:border-r-0 ${
-                  d.toDateString() === today ? "bg-amber-50/30" : ""
-                }`}
-                style={{ minHeight: totalHeight, height: totalHeight }}
+                className="relative z-0 flex-1 overflow-hidden border-r border-gray-200 last:border-r-0"
+                style={{
+                  minHeight: totalHeight,
+                  height: totalHeight,
+                  ...cellAllDayShadeStyle(accent, isTod, holidaysForDay(d).length > 0),
+                }}
                 onDrop={(ev) => {
                   ev.preventDefault();
                   const rect = ev.currentTarget.getBoundingClientRect();
@@ -470,7 +568,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                   <div
                     key={h}
                     onClick={() => handleCellClick(d, h)}
-                    className="cursor-pointer border-b border-gray-100 transition-colors hover:bg-[var(--accent)]/45"
+                    className="relative z-[1] cursor-pointer border-b border-gray-100 transition-colors hover:bg-[var(--accent)]/45"
                     style={{ height: ROW_HEIGHT }}
                   />
                 ))}
@@ -518,7 +616,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                             </span>
                           )}
                         </span>
-                        {pendingApproval && deputyName && (
+                        {pendingApproval && deputyName && eventMetaMode === "hidden" && (
                           <span className="block truncate text-[9px] opacity-80">
                             → {deputyName}
                           </span>
@@ -531,6 +629,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                             })}
                           </span>
                         )}
+                        <EventMetaSubtext e={e} mode={eventMetaMode} />
                       </>
                     );
                     const timedStyle = {
@@ -549,7 +648,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                           ev.stopPropagation();
                           router.push(calendarGridItemHref(e));
                         }}
-                        className="absolute left-1 right-1 cursor-grab overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90 active:cursor-grabbing"
+                        className="absolute left-1 right-1 z-10 cursor-grab overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90 active:cursor-grabbing"
                         style={timedStyle}
                       >
                         {timedEventContent}
@@ -559,7 +658,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                         key={`${calendarGridItemKey(e)}-${d.toDateString()}`}
                         href={calendarGridItemHref(e)}
                         onClick={(ev) => ev.stopPropagation()}
-                        className="absolute left-1 right-1 overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90"
+                        className="absolute left-1 right-1 z-10 overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90"
                         style={timedStyle}
                       >
                         {timedEventContent}
@@ -568,7 +667,8 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                   })
                   .filter(Boolean)}
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       </div>

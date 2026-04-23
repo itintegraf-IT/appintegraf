@@ -2,6 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
+import { findCreatorCalendarOverlap, formatOverlapErrorCs } from "@/lib/calendar-time-overlap";
+
+const OUT_OF_OFFICE_TYPES = [
+  "dovolena",
+  "osobni",
+  "schuzka_mimo_firmu",
+  "sluzebni_cesta",
+  "lekar",
+  "nemoc",
+] as const;
+
+function formatDateTimeCs(d: Date): string {
+  return d.toLocaleString("cs-CZ", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 /**
  * PATCH /api/calendar/[id]/move
@@ -59,6 +79,35 @@ export async function PATCH(
   if (all_day) {
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
+  }
+
+  const selfOverlap = await findCreatorCalendarOverlap(prisma, userId, start, end, { excludeEventId: id });
+  if (selfOverlap) {
+    return NextResponse.json({ error: formatOverlapErrorCs(selfOverlap, formatDateTimeCs) }, { status: 409 });
+  }
+
+  if (event.deputy_id) {
+    const depOverlap = await prisma.calendar_events.findFirst({
+      where: {
+        id: { not: id },
+        created_by: event.deputy_id,
+        event_type: { in: [...OUT_OF_OFFICE_TYPES] },
+        start_date: { lte: end },
+        end_date: { gte: start },
+        OR: [{ approval_status: { not: "rejected" } }, { approval_status: null }],
+      },
+      select: { title: true, start_date: true, end_date: true },
+    });
+    if (depOverlap) {
+      return NextResponse.json(
+        {
+          error: `Zástup má kolidující událost mimo firmu (${depOverlap.title}, ${formatDateTimeCs(
+            depOverlap.start_date
+          )}–${formatDateTimeCs(depOverlap.end_date)}). Vyberte jiný termín nebo jiného zástupa v úpravě události.`,
+        },
+        { status: 409 }
+      );
+    }
   }
 
   const needsApprovalReset =

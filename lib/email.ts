@@ -106,6 +106,182 @@ export async function sendCalendarApprovalEmail(
   }
 }
 
+export type SendCalendarReminderEmailParams = {
+  toEmail: string;
+  toName: string;
+  eventTitle: string;
+  eventId: number;
+  startsAt: Date;
+};
+
+/**
+ * Připomínka blížící se události (kalendář).
+ */
+export async function sendCalendarReminderEmail(
+  params: SendCalendarReminderEmailParams
+): Promise<{ success: boolean; error?: string }> {
+  const settings = await getEmailSettings();
+  if (!settings.enabled) {
+    return { success: true };
+  }
+
+  if (!settings.user || !settings.password || !settings.from) {
+    return {
+      success: false,
+      error: "E-mail není nakonfigurován (chybí SMTP údaje nebo odesílatel)",
+    };
+  }
+
+  const link = `${getBaseUrl()}/calendar/${params.eventId}`;
+  const when = params.startsAt.toLocaleString("cs-CZ", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
+  <p>Dobrý den, ${params.toName},</p>
+  <p>Připomínáme blížící se událost v kalendáři: <strong>${params.eventTitle}</strong></p>
+  <p><strong>Začátek:</strong> ${when}</p>
+  <p><a href="${link}" style="display: inline-block; padding: 10px 20px; background: #dc2626; color: white; text-decoration: none; border-radius: 6px;">Otevřít událost</a></p>
+  <p style="color: #666; font-size: 12px;">Pokud tlačítko nefunguje, zkopírujte odkaz: ${link}</p>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+  <p style="color: #999; font-size: 11px;">Tento e-mail byl odeslán automaticky z aplikace INTEGRAF.</p>
+</body>
+</html>
+  `.trim();
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: settings.host,
+      port: settings.port,
+      secure: settings.secure,
+      auth: { user: settings.user, pass: settings.password },
+      tls:
+        settings.host.includes("office365") || settings.host.includes("outlook")
+          ? { ciphers: "SSLv3", rejectUnauthorized: false }
+          : undefined,
+    });
+    await transporter.sendMail({
+      from: settings.fromName
+        ? `"${settings.fromName}" <${settings.from}>`
+        : settings.from,
+      to: params.toEmail,
+      subject: `Připomínka: ${params.eventTitle} – INTEGRAF`,
+      text: `Blížící se událost: ${params.eventTitle} (${when})\n${link}`,
+      html,
+    });
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("sendCalendarReminderEmail error:", msg);
+    return { success: false, error: msg };
+  }
+}
+
+export type SendCalendarInviteEmailParams = {
+  toEmail: string;
+  toName: string;
+  /** Kdo zve (tvůrce) */
+  creatorName: string;
+  eventTitle: string;
+  eventId: number;
+  /** Např. text o opakující se události */
+  extraHint?: string;
+};
+
+function escHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * E-mail s pozvánkou k události (účastník kalendáře).
+ * Používá stejné SMTP nastavení jako ostatní transakční maily.
+ */
+export async function sendCalendarInviteEmail(
+  params: SendCalendarInviteEmailParams
+): Promise<{ success: boolean; error?: string }> {
+  const settings = await getEmailSettings();
+  if (!settings.enabled) {
+    return { success: true };
+  }
+
+  if (!settings.user || !settings.password || !settings.from) {
+    return {
+      success: false,
+      error: "E-mail není nakonfigurován (chybí SMTP údaje nebo odesílatel)",
+    };
+  }
+
+  const link = `${getBaseUrl()}/calendar/${params.eventId}`;
+  const hintBlock = params.extraHint
+    ? `<p style="color: #4b5563; font-size: 14px;">${escHtml(String(params.extraHint))}</p>`
+    : "";
+  const toNameH = escHtml(params.toName);
+  const creatorH = escHtml(params.creatorName);
+  const titleH = escHtml(params.eventTitle);
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
+  <p>Dobrý den, ${toNameH},</p>
+  <p><strong>${creatorH}</strong> vás pozval/a k účasti na události v kalendáři.</p>
+  <p><strong>Událost:</strong> ${titleH}</p>
+  ${hintBlock}
+  <p><a href="${link}" style="display: inline-block; padding: 10px 20px; background: #dc2626; color: white; text-decoration: none; border-radius: 6px;">Otevřít událost</a></p>
+  <p style="color: #666; font-size: 12px;">Pokud tlačítko nefunguje, zkopírujte odkaz: ${link}</p>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+  <p style="color: #999; font-size: 11px;">Tento e-mail byl odeslán automaticky z aplikace INTEGRAF.</p>
+</body>
+</html>
+  `.trim();
+
+  const textHint = params.extraHint ? `\n\n${params.extraHint}` : "";
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host: settings.host,
+      port: settings.port,
+      secure: settings.secure,
+      auth: {
+        user: settings.user,
+        pass: settings.password,
+      },
+      tls:
+        settings.host.includes("office365") || settings.host.includes("outlook")
+          ? { ciphers: "SSLv3", rejectUnauthorized: false }
+          : undefined,
+    });
+
+    await transporter.sendMail({
+      from: settings.fromName
+        ? `"${settings.fromName}" <${settings.from}>`
+        : settings.from,
+      to: params.toEmail,
+      subject: `Pozvánka: ${params.eventTitle} – INTEGRAF`,
+      text: `Dobrý den, ${params.toName},\n\n${params.creatorName} vás pozval/a k účasti na události: ${params.eventTitle}.${textHint}\n\nOdkaz: ${link}`,
+      html,
+    });
+
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("sendCalendarInviteEmail error:", msg);
+    return { success: false, error: msg };
+  }
+}
+
 export type SendEquipmentRequestResultEmailParams = {
   toEmail: string;
   toName: string;

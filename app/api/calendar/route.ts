@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { createCalendarEventUnit } from "@/lib/calendar-create-one";
+import { expandRecurrence, type RecurrenceKind } from "@/lib/calendar-recurrence";
+import { requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
 import { sendCalendarApprovalEmail } from "@/lib/email";
+import { findCreatorCalendarOverlap, formatOverlapErrorCs } from "@/lib/calendar-time-overlap";
+import {
+  normalizeParticipantUserIds,
+  replaceEventParticipants,
+  notifyCalendarInvitees,
+} from "@/lib/calendar-participant-sync";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
@@ -42,7 +51,7 @@ export async function GET(req: NextRequest) {
   }
 
   const events = await prisma.calendar_events.findMany({
-    where,
+    where: { ...where, is_private: { not: true } },
     orderBy: { start_date: "asc" },
     take: 100,
     include: {
@@ -52,6 +61,9 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ events });
 }
+
+const RECURRENCE_VALUES = new Set<string>(["none", "daily", "weekly", "monthly"]);
+const REMINDER_MINUTES_ALLOW = new Set([15, 30, 60, 120, 1440]);
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -69,9 +81,14 @@ export async function POST(req: NextRequest) {
       event_type = "jine",
       department_id = null,
       deputy_id = null,
-      is_public = false,
+      is_private = false,
       location = "",
-      color = "#DC2626",
+      recurrence: recurrenceRaw = "none",
+      recurrence_end = null,
+      remind_before_minutes: remindRaw = null,
+      reminder_notify_in_app: naRaw = true,
+      reminder_notify_email: neRaw = true,
+      participant_user_ids: participantUserIdsRaw = null,
     } = body;
 
     if (!title || !start_date || !end_date) {
@@ -80,6 +97,45 @@ export async function POST(req: NextRequest) {
 
     const userId = parseInt(session.user.id, 10);
     const eventType = String(event_type).trim() || "jine";
+    const recurrence: RecurrenceKind = RECURRENCE_VALUES.has(String(recurrenceRaw))
+      ? (String(recurrenceRaw) as RecurrenceKind)
+      : "none";
+
+    if (recurrence !== "none" && requiresDeputy(eventType)) {
+      return NextResponse.json(
+        {
+          error:
+            "Opakování není u typů Dovolená a Osobní k dispozici. Zadejte jednotlivé žádosti, nebo zvolte jiný typ události.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (recurrence !== "none") {
+      if (!recurrence_end || typeof recurrence_end !== "string" || !/^\d{4}-\d{2}-\d{2}/.test(recurrence_end)) {
+        return NextResponse.json(
+          { error: "U opakování vyplňte „Opakovat do“ (datum posledního výskytu)." },
+          { status: 400 }
+        );
+      }
+    }
+
+    let remindBefore: number | null = null;
+    if (remindRaw !== null && remindRaw !== undefined && String(remindRaw).trim() !== "") {
+      const n = parseInt(String(remindRaw), 10);
+      if (Number.isFinite(n) && REMINDER_MINUTES_ALLOW.has(n)) {
+        remindBefore = n;
+      }
+    }
+    const reminderInApp = naRaw !== false;
+    const reminderEmail = neRaw !== false;
+    if (remindBefore !== null && !reminderInApp && !reminderEmail) {
+      return NextResponse.json(
+        { error: "U připomínky zvolte alespoň notifikace v aplikaci nebo e-mail." },
+        { status: 400 }
+      );
+    }
+
     let deputyIdNum: number | null = null;
 
     if (eventType === "dovolena" || eventType === "osobni") {
@@ -124,48 +180,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Datum konce musí být po datu začátku" }, { status: 400 });
     }
 
-    const ownOverlaps = await prisma.calendar_events.findMany({
-      where: {
-        created_by: userId,
-        start_date: { lte: end },
-        end_date: { gte: start },
-      },
-      orderBy: { start_date: "asc" },
-      take: 3,
-      select: {
-        id: true,
-        title: true,
-        start_date: true,
-        end_date: true,
-      },
-    });
+    const until = new Date(
+      recurrence !== "none" && recurrence_end ? String(recurrence_end).slice(0, 10) : start_date
+    );
+    const slots = expandRecurrence(start, end, recurrence, until);
+    if (slots.length === 0) {
+      return NextResponse.json(
+        { error: "Neplatné období opakování (zkontrolujte datum „Opakovat do“)." },
+        { status: 400 }
+      );
+    }
 
-    if (deputyIdNum !== null) {
-      const deputyOutOfOfficeOverlap = await prisma.calendar_events.findFirst({
-        where: {
-          created_by: deputyIdNum,
-          event_type: { in: OUT_OF_OFFICE_TYPES },
-          start_date: { lte: end },
-          end_date: { gte: start },
-          OR: [{ approval_status: { not: "rejected" } }, { approval_status: null }],
-        },
-        orderBy: { start_date: "asc" },
-        select: {
-          title: true,
-          start_date: true,
-          end_date: true,
-        },
-      });
-
-      if (deputyOutOfOfficeOverlap) {
+    for (const slot of slots) {
+      const selfOverlap = await findCreatorCalendarOverlap(prisma, userId, slot.start, slot.end, {});
+      if (selfOverlap) {
         return NextResponse.json(
-          {
-            error: `Zvolený zástup má kolidující událost mimo firmu (${deputyOutOfOfficeOverlap.title}, ${formatDateTimeCs(
-              deputyOutOfOfficeOverlap.start_date
-            )}–${formatDateTimeCs(deputyOutOfOfficeOverlap.end_date)}). Vyberte jiného zástupa nebo jiný termín.`,
-          },
+          { error: formatOverlapErrorCs(selfOverlap, formatDateTimeCs) },
           { status: 409 }
         );
+      }
+      if (deputyIdNum !== null) {
+        const depOverlap = await prisma.calendar_events.findFirst({
+          where: {
+            created_by: deputyIdNum,
+            event_type: { in: OUT_OF_OFFICE_TYPES },
+            start_date: { lte: slot.end },
+            end_date: { gte: slot.start },
+            OR: [{ approval_status: { not: "rejected" } }, { approval_status: null }],
+          },
+          orderBy: { start_date: "asc" },
+          select: { title: true, start_date: true, end_date: true },
+        });
+        if (depOverlap) {
+          return NextResponse.json(
+            {
+              error: `Zvolený zástup má kolidující událost mimo firmu (${depOverlap.title}, ${formatDateTimeCs(
+                depOverlap.start_date
+              )}–${formatDateTimeCs(depOverlap.end_date)}). Vyberte jiného zástupa nebo jiný termín.`,
+            },
+            { status: 409 }
+          );
+        }
       }
     }
 
@@ -179,69 +234,81 @@ export async function POST(req: NextRequest) {
       ? parseInt(department_id, 10)
       : creator?.department_id ?? null;
 
-    const event = await prisma.calendar_events.create({
-      data: {
-        title: String(title).trim(),
-        description: description ? String(description).trim() : null,
-        start_date: start,
-        end_date: end,
-        event_type: eventType,
-        created_by: userId,
-        department_id: resolvedDeptId,
-        deputy_id: deputyIdNum,
-        requires_approval: deputyIdNum !== null,
-        approval_status: deputyIdNum !== null ? "pending" : null,
-        is_public: !!is_public,
-        location: location ? String(location).trim() : null,
-        color: color ? String(color).trim() : "#DC2626",
-      },
+    const titleTrim = String(title).trim();
+    const descTrim = description ? String(description).trim() : "";
+    const locTrim = location ? String(location).trim() : "";
+
+    const participantUserIds = normalizeParticipantUserIds(participantUserIdsRaw, {
+      creatorId: userId,
+      deputyId: deputyIdNum,
+    });
+
+    const ids = await prisma.$transaction(async (tx) => {
+      const created: number[] = [];
+      for (const slot of slots) {
+        const { id: newId } = await createCalendarEventUnit(tx, {
+          title: titleTrim,
+          description: descTrim,
+          start: slot.start,
+          end: slot.end,
+          eventType,
+          userId,
+          resolvedDeptId,
+          deputyIdNum,
+          is_private: !!is_private,
+          location: locTrim,
+          remindBefore,
+          remindInApp: reminderInApp,
+          remindEmail: reminderEmail,
+          creatorName,
+        });
+        created.push(newId);
+        if (participantUserIds.length > 0) {
+          await replaceEventParticipants(tx, newId, participantUserIds);
+        }
+      }
+      return created;
     });
 
     if (deputyIdNum !== null) {
-      await prisma.calendar_approvals.create({
-        data: {
-          event_id: event.id,
-          approver_id: deputyIdNum,
-          approval_type: "deputy",
-          approval_order: 1,
-          status: "pending",
-        },
-      });
-      const notifMessage = `${creatorName} vytvořil/a událost „${String(title).trim()}“ (${eventType === "dovolena" ? "Dovolená" : "Osobní"}), která vyžaduje vaše schválení.`;
-      await prisma.notifications.create({
-        data: {
-          user_id: deputyIdNum,
-          title: "Událost čeká na schválení",
-          message: notifMessage,
-          type: "calendar_approval",
-          link: `/calendar/${event.id}`,
-        },
-      });
+      const notifMessage = `${creatorName} vytvořil/a událost „${titleTrim}“ (${eventType === "dovolena" ? "Dovolená" : "Osobní"}), která vyžaduje vaše schválení.`;
       const deputy = await prisma.users.findUnique({
         where: { id: deputyIdNum },
         select: { email: true, first_name: true, last_name: true },
       });
       if (deputy?.email) {
-        await sendCalendarApprovalEmail({
-          toEmail: deputy.email,
-          toName: `${deputy.first_name} ${deputy.last_name}`.trim() || "Schvalovateli",
-          subject: "Událost čeká na schválení – INTEGRAF",
-          message: notifMessage,
-          eventTitle: String(title).trim(),
-          eventId: event.id,
-        });
+        for (const eid of ids) {
+          await sendCalendarApprovalEmail({
+            toEmail: deputy.email,
+            toName: `${deputy.first_name} ${deputy.last_name}`.trim() || "Schvalovateli",
+            subject: "Událost čeká na schválení – INTEGRAF",
+            message: notifMessage,
+            eventTitle: titleTrim,
+            eventId: eid,
+          });
+        }
       }
     }
 
-    let warning: string | null = null;
-    if (ownOverlaps.length > 0) {
-      const first = ownOverlaps[0];
-      warning = `Pozor: máte kolizi s ${ownOverlaps.length} událostí/událostmi (např. „${first.title}“ ${formatDateTimeCs(
-        first.start_date
-      )}–${formatDateTimeCs(first.end_date)}).`;
+    if (participantUserIds.length > 0) {
+      await notifyCalendarInvitees(prisma, {
+        userIds: participantUserIds,
+        eventId: ids[0]!,
+        eventTitle: titleTrim,
+        creatorName,
+        extraHint:
+          ids.length > 1
+            ? `(Více termínů u opakující se události: celkem ${ids.length}.)`
+            : undefined,
+      });
     }
 
-    return NextResponse.json({ success: true, id: event.id, warning });
+    return NextResponse.json({
+      success: true,
+      id: ids[0],
+      ids,
+      count: ids.length,
+    });
   } catch (e) {
     console.error("Calendar POST error:", e);
     return NextResponse.json({ error: "Chyba při vytváření události" }, { status: 500 });
