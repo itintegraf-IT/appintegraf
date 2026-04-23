@@ -117,7 +117,7 @@ export async function POST(
     select: { email: true, first_name: true, last_name: true },
   });
   const ownerEmail = owner?.email?.trim();
-  if (ownerEmail) {
+  if (owner && ownerEmail) {
     const ownerName = `${owner.first_name} ${owner.last_name}`.trim() || "Pořadatel";
     const emailResult = await sendCalendarInviteResponseEmail({
       toEmail: ownerEmail,
