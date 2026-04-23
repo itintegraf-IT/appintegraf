@@ -10,9 +10,11 @@ import {
   formatDateLocal,
   formatDateTimeLocalForInput,
 } from "./lib/week-utils";
+import { CalendarInviteeSelect } from "./CalendarInviteeSelect";
 
 type Department = { id: number; name: string; code: string | null };
 type Deputy = { id: number; first_name: string; last_name: string };
+type Invitee = { id: number; first_name: string; last_name: string };
 
 type Props = {
   open: boolean;
@@ -32,9 +34,9 @@ export function CreateEventModal({
   const router = useRouter();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [deputies, setDeputies] = useState<Deputy[]>([]);
+  const [invitees, setInvitees] = useState<Invitee[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [warning, setWarning] = useState("");
   const [deputyWarning, setDeputyWarning] = useState("");
 
   const [form, setForm] = useState({
@@ -57,6 +59,7 @@ export function CreateEventModal({
     remind_before_minutes: "" as string,
     reminder_notify_in_app: true,
     reminder_notify_email: true,
+    participant_ids: [] as number[],
   });
 
   useEffect(() => {
@@ -77,7 +80,6 @@ export function CreateEventModal({
         recurrence_end: formatDateLocal(re),
       }));
       setError("");
-      setWarning("");
       setDeputyWarning("");
     }
   }, [open, initialStart, initialEnd, allDay]);
@@ -94,6 +96,13 @@ export function CreateEventModal({
       .then((r) => r.json())
       .then((data) => setDeputies(data.deputies ?? []))
       .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/calendar/invitees")
+      .then((r) => r.json())
+      .then((data) => (Array.isArray(data.users) ? setInvitees(data.users) : setInvitees([])))
+      .catch(() => setInvitees([]));
   }, []);
 
   useEffect(() => {
@@ -138,7 +147,6 @@ export function CreateEventModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setWarning("");
     setLoading(true);
 
     let startDate: string;
@@ -173,6 +181,7 @@ export function CreateEventModal({
           remind_before_minutes: form.remind_before_minutes || null,
           reminder_notify_in_app: form.reminder_notify_in_app,
           reminder_notify_email: form.reminder_notify_email,
+          participant_user_ids: form.participant_ids,
         }),
       });
 
@@ -180,19 +189,14 @@ export function CreateEventModal({
 
       if (!res.ok) {
         setError(data.error ?? "Chyba při ukládání");
-        setLoading(false);
         return;
-      }
-
-      if (data.warning) {
-        setWarning(String(data.warning));
-        window.alert(String(data.warning));
       }
 
       onClose();
       router.refresh();
     } catch {
       setError("Chyba při ukládání");
+    } finally {
       setLoading(false);
     }
   };
@@ -225,12 +229,6 @@ export function CreateEventModal({
               {error}
             </div>
           )}
-          {warning && (
-            <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-              {warning}
-            </div>
-          )}
-
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-gray-700">
@@ -409,6 +407,18 @@ export function CreateEventModal({
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">Další účastníci</label>
+              <p className="mb-2 text-xs text-gray-500">Hledáním nebo hromadně podle oddělení.</p>
+              <CalendarInviteeSelect
+                invitees={invitees}
+                value={form.participant_ids}
+                onChange={(ids) => setForm({ ...form, participant_ids: ids })}
+                excludeIds={form.deputy_id ? [parseInt(form.deputy_id, 10)] : []}
+                disabled={loading}
+                departments={departments.map((d) => ({ id: d.id, name: d.name }))}
               />
             </div>
             <div>

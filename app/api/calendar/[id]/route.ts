@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getColorForEventType } from "@/lib/calendar-event-colors";
+import { findCreatorCalendarOverlap, formatOverlapErrorCs } from "@/lib/calendar-time-overlap";
+import {
+  normalizeParticipantUserIds,
+  replaceEventParticipants,
+  getParticipantUserIds,
+  notifyCalendarInvitees,
+} from "@/lib/calendar-participant-sync";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
@@ -42,6 +49,9 @@ export async function GET(
       users: { select: { first_name: true, last_name: true } },
       departments: { select: { id: true, name: true } },
       users_deputy: { select: { id: true, first_name: true, last_name: true } },
+      calendar_event_participants: {
+        include: { users: { select: { id: true, first_name: true, last_name: true } } },
+      },
     },
   });
 
@@ -85,6 +95,7 @@ export async function PUT(
       remind_before_minutes: remindRaw = null,
       reminder_notify_in_app: naRaw = true,
       reminder_notify_email: neRaw = true,
+      participant_user_ids: participantUserIdsRaw = null,
     } = body;
 
     if (!title || !start_date || !end_date) {
@@ -156,22 +167,14 @@ export async function PUT(
       return NextResponse.json({ error: "Událost nenalezena" }, { status: 404 });
     }
 
-    const ownOverlaps = await prisma.calendar_events.findMany({
-      where: {
-        id: { not: id },
-        created_by: userId,
-        start_date: { lte: end },
-        end_date: { gte: start },
-      },
-      orderBy: { start_date: "asc" },
-      take: 3,
-      select: {
-        id: true,
-        title: true,
-        start_date: true,
-        end_date: true,
-      },
-    });
+    if (existing.created_by !== userId) {
+      return NextResponse.json({ error: "Můžete upravovat pouze své vlastní události" }, { status: 403 });
+    }
+
+    const selfOverlap = await findCreatorCalendarOverlap(prisma, userId, start, end, { excludeEventId: id });
+    if (selfOverlap) {
+      return NextResponse.json({ error: formatOverlapErrorCs(selfOverlap, formatDateTimeCs) }, { status: 409 });
+    }
 
     if (deputyIdNum !== null) {
       const deputyOutOfOfficeOverlap = await prisma.calendar_events.findFirst({
@@ -209,38 +212,54 @@ export async function PUT(
     const remindChanged = (existing.remind_before_minutes ?? null) !== remindBefore;
     const clearReminderSent = startChanged || endChanged || remindChanged;
 
-    await prisma.calendar_events.update({
-      where: { id },
-      data: {
-        title: String(title).trim(),
-        description: description ? String(description).trim() : null,
-        start_date: start,
-        end_date: end,
-        event_type: eventType,
-        department_id: department_id ? parseInt(department_id, 10) : null,
-        deputy_id: deputyIdNum,
-        requires_approval: deputyIdNum !== null,
-        approval_status: deputyIdNum !== null ? "pending" : null,
-        is_private: !!is_private,
-        is_public: !is_private,
-        location: location ? String(location).trim() : null,
-        color: colorHex,
-        remind_before_minutes: remindBefore,
-        reminder_notify_in_app: reminderInApp,
-        reminder_notify_email: reminderEmail,
-        ...(clearReminderSent ? { reminder_notified_at: null } : {}),
-      },
+    const oldParticipantIds = await getParticipantUserIds(prisma, id);
+    const participantUserIds = normalizeParticipantUserIds(participantUserIdsRaw, {
+      creatorId: userId,
+      deputyId: deputyIdNum,
+    });
+    const newOnes = participantUserIds.filter((uid) => !oldParticipantIds.includes(uid));
+
+    await prisma.$transaction(async (tx) => {
+      await tx.calendar_events.update({
+        where: { id },
+        data: {
+          title: String(title).trim(),
+          description: description ? String(description).trim() : null,
+          start_date: start,
+          end_date: end,
+          event_type: eventType,
+          department_id: department_id ? parseInt(department_id, 10) : null,
+          deputy_id: deputyIdNum,
+          requires_approval: deputyIdNum !== null,
+          approval_status: deputyIdNum !== null ? "pending" : null,
+          is_private: !!is_private,
+          is_public: !is_private,
+          location: location ? String(location).trim() : null,
+          color: colorHex,
+          remind_before_minutes: remindBefore,
+          reminder_notify_in_app: reminderInApp,
+          reminder_notify_email: reminderEmail,
+          ...(clearReminderSent ? { reminder_notified_at: null } : {}),
+        },
+      });
+      await replaceEventParticipants(tx, id, participantUserIds);
     });
 
-    let warning: string | null = null;
-    if (ownOverlaps.length > 0) {
-      const first = ownOverlaps[0];
-      warning = `Pozor: máte kolizi s ${ownOverlaps.length} událostí/událostmi (např. „${first.title}“ ${formatDateTimeCs(
-        first.start_date
-      )}–${formatDateTimeCs(first.end_date)}).`;
+    const creator = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { first_name: true, last_name: true },
+    });
+    const creatorName = creator ? `${creator.first_name} ${creator.last_name}`.trim() : "Uživatel";
+    if (newOnes.length > 0) {
+      await notifyCalendarInvitees(prisma, {
+        userIds: newOnes,
+        eventId: id,
+        eventTitle: String(title).trim(),
+        creatorName,
+      });
     }
 
-    return NextResponse.json({ success: true, warning });
+    return NextResponse.json({ success: true });
   } catch (e) {
     console.error("Calendar PUT error:", e);
     return NextResponse.json({ error: "Chyba při ukládání události" }, { status: 500 });

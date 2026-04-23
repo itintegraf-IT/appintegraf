@@ -131,6 +131,11 @@ export default async function CalendarPage({
     const orConditions: Array<Record<string, unknown>> = [
       { created_by: userId },
       { deputy_id: userId },
+      {
+        calendar_event_participants: {
+          some: { user_id: userId },
+        },
+      },
     ];
     if (managerDeptIds.length > 0) {
       orConditions.push({
@@ -208,6 +213,9 @@ export default async function CalendarPage({
       take: 1,
       include: { users: { select: { first_name: true, last_name: true } } },
     },
+    calendar_event_participants: {
+      include: { users: { select: { first_name: true, last_name: true } } },
+    },
   };
 
   const listScope: CalendarScope | null =
@@ -238,18 +246,11 @@ export default async function CalendarPage({
     where = { ...where, is_private: { not: true } };
   }
 
-  const listInclude = {
-    ...baseInclude,
-    calendar_event_participants: {
-      include: { users: { select: { first_name: true, last_name: true } } },
-    },
-  };
-
   const events = await prisma.calendar_events.findMany({
     where,
     orderBy: { start_date: "asc" },
     take: 200,
-    include: showList || isListView ? listInclude : baseInclude,
+    include: baseInclude,
   });
 
   let taskSearchRows:
