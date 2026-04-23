@@ -600,7 +600,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                           ev.stopPropagation();
                           router.push(calendarGridItemHref(e));
                         }}
-                        className="absolute left-1 right-1 cursor-grab overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90 active:cursor-grabbing"
+                        className="absolute left-1 right-1 z-10 cursor-grab overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90 active:cursor-grabbing"
                         style={timedStyle}
                       >
                         {timedEventContent}
