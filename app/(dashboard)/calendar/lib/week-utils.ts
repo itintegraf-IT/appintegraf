@@ -11,6 +11,33 @@ export function formatDateLocal(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+/**
+ * Pro `<input type="datetime-local" />` — vždy místní kalendář a čas.
+ * (toISOString() je v UTC a v CEST posune o jeden den oproti očekávání uživatele.)
+ */
+export function formatDateTimeLocalForInput(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  const h = String(d.getHours()).padStart(2, "0");
+  const min = String(d.getMinutes()).padStart(2, "0");
+  return `${y}-${m}-${day}T${h}:${min}`;
+}
+
+/**
+ * Celodenní událost podle místních kalendářních dní (YYYY-MM-DD) → ISO do DB.
+ */
+export function allDayYmdRangeToIsoStrings(
+  startYmd: string,
+  endYmd: string
+): { start: string; end: string } {
+  const [ys, ms, ds] = startYmd.split("-").map(Number);
+  const [ye, me, de] = endYmd.split("-").map(Number);
+  const start = new Date(ys, ms - 1, ds, 0, 0, 0, 0);
+  const end = new Date(ye, me - 1, de, 23, 59, 59, 999);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 /** Parsuje řetězec YYYY-MM-DD jako lokální datum (ne UTC). */
 export function parseDateLocal(str: string): Date {
   const [y, m, d] = str.split("-").map(Number);

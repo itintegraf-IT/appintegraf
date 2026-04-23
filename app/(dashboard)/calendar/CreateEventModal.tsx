@@ -5,6 +5,11 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, X } from "lucide-react";
 import { EVENT_TYPES, DEFAULT_EVENT_TYPE, requiresDeputy } from "./lib/event-types";
 import { RECURRENCE_OPTIONS, REMINDER_MINUTE_OPTIONS } from "./lib/calendar-form-options";
+import {
+  allDayYmdRangeToIsoStrings,
+  formatDateLocal,
+  formatDateTimeLocalForInput,
+} from "./lib/week-utils";
 
 type Department = { id: number; name: string; code: string | null };
 type Deputy = { id: number; first_name: string; last_name: string };
@@ -35,8 +40,8 @@ export function CreateEventModal({
   const [form, setForm] = useState({
     title: "",
     description: "",
-    start_date: initialStart.toISOString().slice(0, 16),
-    end_date: initialEnd.toISOString().slice(0, 16),
+    start_date: formatDateTimeLocalForInput(initialStart),
+    end_date: formatDateTimeLocalForInput(initialEnd),
     event_type: DEFAULT_EVENT_TYPE,
     department_id: "",
     deputy_id: "",
@@ -47,7 +52,7 @@ export function CreateEventModal({
     recurrence_end: (() => {
       const d = new Date(initialStart);
       d.setMonth(d.getMonth() + 3);
-      return d.toISOString().slice(0, 10);
+      return formatDateLocal(d);
     })(),
     remind_before_minutes: "" as string,
     reminder_notify_in_app: true,
@@ -66,10 +71,10 @@ export function CreateEventModal({
       re.setMonth(re.getMonth() + 3);
       setForm((f) => ({
         ...f,
-        start_date: start.toISOString().slice(0, 16),
-        end_date: end.toISOString().slice(0, 16),
+        start_date: formatDateTimeLocalForInput(start),
+        end_date: formatDateTimeLocalForInput(end),
         is_all_day: allDay,
-        recurrence_end: re.toISOString().slice(0, 10),
+        recurrence_end: formatDateLocal(re),
       }));
       setError("");
       setWarning("");
@@ -101,10 +106,15 @@ export function CreateEventModal({
       let startDate = form.start_date;
       let endDate = form.end_date;
       if (form.is_all_day) {
-        const start = form.start_date.slice(0, 10);
-        const end = form.end_date.slice(0, 10);
-        startDate = `${start}T00:00`;
-        endDate = `${end}T23:59`;
+        const { start, end } = allDayYmdRangeToIsoStrings(
+          form.start_date.slice(0, 10),
+          form.end_date.slice(0, 10)
+        );
+        startDate = start;
+        endDate = end;
+      } else {
+        startDate = new Date(form.start_date).toISOString();
+        endDate = new Date(form.end_date).toISOString();
       }
 
       const query = new URLSearchParams({
@@ -131,13 +141,17 @@ export function CreateEventModal({
     setWarning("");
     setLoading(true);
 
-    let startDate = form.start_date;
-    let endDate = form.end_date;
+    let startDate: string;
+    let endDate: string;
     if (form.is_all_day) {
-      const start = form.start_date.slice(0, 10);
-      const end = form.end_date.length >= 10 ? form.end_date.slice(0, 10) : start;
-      startDate = `${start}T00:00`;
-      endDate = `${end}T23:59`;
+      const s = form.start_date.slice(0, 10);
+      const e = form.end_date.length >= 10 ? form.end_date.slice(0, 10) : s;
+      const r = allDayYmdRangeToIsoStrings(s, e);
+      startDate = r.start;
+      endDate = r.end;
+    } else {
+      startDate = new Date(form.start_date).toISOString();
+      endDate = new Date(form.end_date).toISOString();
     }
 
     try {

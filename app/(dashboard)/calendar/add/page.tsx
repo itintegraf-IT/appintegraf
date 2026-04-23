@@ -6,6 +6,11 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { EVENT_TYPES, DEFAULT_EVENT_TYPE, requiresDeputy } from "../lib/event-types";
 import { RECURRENCE_OPTIONS, REMINDER_MINUTE_OPTIONS } from "../lib/calendar-form-options";
+import {
+  allDayYmdRangeToIsoStrings,
+  formatDateLocal,
+  formatDateTimeLocalForInput,
+} from "../lib/week-utils";
 
 type Department = { id: number; name: string; code: string | null };
 type Deputy = { id: number; first_name: string; last_name: string };
@@ -31,8 +36,8 @@ export default function AddCalendarPage() {
   const [form, setForm] = useState({
     title: "",
     description: "",
-    start_date: defaultStart.toISOString().slice(0, 16),
-    end_date: defaultEnd.toISOString().slice(0, 16),
+    start_date: formatDateTimeLocalForInput(defaultStart),
+    end_date: formatDateTimeLocalForInput(defaultEnd),
     event_type: DEFAULT_EVENT_TYPE,
     department_id: "",
     deputy_id: "",
@@ -40,7 +45,7 @@ export default function AddCalendarPage() {
     is_all_day: false,
     location: "",
     recurrence: "none" as (typeof RECURRENCE_OPTIONS)[number]["value"],
-    recurrence_end: reDefault.toISOString().slice(0, 10),
+    recurrence_end: formatDateLocal(reDefault),
     remind_before_minutes: "" as string,
     reminder_notify_in_app: true,
     reminder_notify_email: true,
@@ -67,13 +72,18 @@ export default function AddCalendarPage() {
         return;
       }
 
-      let startDate = form.start_date;
-      let endDate = form.end_date;
+      let startDate: string;
+      let endDate: string;
       if (form.is_all_day) {
-        const start = form.start_date.slice(0, 10);
-        const end = form.end_date.slice(0, 10);
-        startDate = `${start}T00:00`;
-        endDate = `${end}T23:59`;
+        const { start, end } = allDayYmdRangeToIsoStrings(
+          form.start_date.slice(0, 10),
+          form.end_date.slice(0, 10)
+        );
+        startDate = start;
+        endDate = end;
+      } else {
+        startDate = new Date(form.start_date).toISOString();
+        endDate = new Date(form.end_date).toISOString();
       }
 
       const query = new URLSearchParams({
@@ -100,13 +110,17 @@ export default function AddCalendarPage() {
     setWarning("");
     setLoading(true);
 
-    let startDate = form.start_date;
-    let endDate = form.end_date;
+    let startDate: string;
+    let endDate: string;
     if (form.is_all_day) {
-      const start = form.start_date.slice(0, 10);
-      const end = form.end_date.slice(0, 10);
-      startDate = `${start}T00:00`;
-      endDate = `${end}T23:59`;
+      const s = form.start_date.slice(0, 10);
+      const e = form.end_date.slice(0, 10);
+      const r = allDayYmdRangeToIsoStrings(s, e);
+      startDate = r.start;
+      endDate = r.end;
+    } else {
+      startDate = new Date(form.start_date).toISOString();
+      endDate = new Date(form.end_date).toISOString();
     }
 
     try {

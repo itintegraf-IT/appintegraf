@@ -155,6 +155,7 @@ URL parametr `q` (vyhledávací řetězec), `display` (`calendar` = zobrazit v m
 Týdenní mřížka:
 - **Hlavička** – sloupce pro jednotlivé dny (po 16. 3., út 17. 3., …)
 - **Řádek „Celý den“** – pro celodenní události
+- **Zvýraznění dne** – má-li den běžnou celodenní událost (ne úkol), je **podbarvený celý sloupec** (hlavička toho dne, bunka „Celý den“ i mřížka 0–23) jemným mixem barvy události (`allDayColumnAccent`, `cellAllDayShadeStyle`)
 - **Hodinové řádky** – 0–23
 - **Události** – barevné bloky (`color` v DB, při vytvoření/úpravě dle typu) s odkazem na detail; vícedenní události ve všech dnech
 - **Štítky stavu** – Čeká na schválení (žlutý), Čeká na vedoucího (modrý), Schváleno (červený)
@@ -167,12 +168,14 @@ Měsíční mřížka:
 - **6 týdnů** (pondělí–neděle)
 - **Dny mimo měsíc** – šedé pozadí
 - **Dnešní den** – červené zvýraznění
-- **Události** – max. 3 na den, odkaz na detail; indikátory schválení
+- **Události** – max. 3 na den, odkaz na detail; indikátory schválení. Celodenní (`isAllDayEvent`) se přiřazují ke dni přes **`allDayEventDisplayDates`**, ne čistě přes časový průnik (tím se předejde dvojímu zobrazení u `[UTC, UTC+1d)` a podobně)
 - **Kliknutí na den** – modal pro novou celodenní událost
 
 ### Celodenní události a `isAllDayEvent` (lib/event-types.ts)
 
-Server často vrací začátek/konec jako `Date` z ISO řetězců s UTC půlnocí; v českém prohlížeči může začátek vypadat jako **01:00 nebo 02:00**, přesto jde o celý den. Funkce **`isAllDayEvent(start, end)`** proto kromě „lokální 00:00 a konec téhož dne (23:59+)“ rozpozná i **UTC 00:00:00** s koncem téhož kalendářního dne v UTC, příp. bloky s délkou cca 20–26 h a stejným UTC dnem, aby se tyto záznamy vykreslily v řádku **Celý den** a neskončily v mřížce s falešným ranním časem.
+Server často vrací začátek/konec jako `Date` z ISO řetězců s UTC půlnocí; v českém prohlížeči může začátek vypadat jako **01:00 nebo 02:00**, přesto jde o celý den. Funkce **`isAllDayEvent(start, end)`** proto kromě „lokální 00:00 a konec téhož dne (23:59+)“ rozpozná i **konec v další půlnoči (UTC)**, tj. interval `[Y-M-D 00:00:00Z, (Y-M-D+1) 00:00:00Z)` o délce celého dne (časté v DB/JSON), dále **UTC 00:00:00** s koncem téhož kalendářního dne v UTC (23:59) a bloky 20–26 h ve stejném UTC dni — aby se záznamy vykreslily v řádku **Celý den** a ne v hodinové mřížce. Pro řádek „Celý den“ určuje, které sloupce se mají obarvit, **`allDayEventDisplayDates`**, aby exkluzivní konec o půlnoči nerozšířil zobrazení do dvou dnů. Když začátek i konec spadají do **jednoho kalendářního dne v UTC** (např. 00:00Z–23:59Z), bere se jeden **lokální** den podle půlne v UTC ve stejném UTC dni — jinak by konec v CEST mohl mít jiné lokální datum než začátek a vznikly by dva sloupce.
+
+V **formulářích** (modal / přidat / upravit) se pro `datetime-local` a výchozí stav **nepoužívá** `toISOString().slice(…)` (to je v UTC a v CEST posune o den). Použijí se **`formatDateTimeLocalForInput`**, **`formatDateLocal`**; u celodenního uložení se do API posílají **`allDayYmdRangeToIsoStrings`**, tj. skutečná lokální 00:00 až 23:59:59.999 přes `toISOString()`.
 
 ---
 

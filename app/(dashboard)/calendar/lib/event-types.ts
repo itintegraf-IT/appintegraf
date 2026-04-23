@@ -1,3 +1,5 @@
+import { formatDateLocal } from "./week-utils";
+
 /**
  * Typy událostí kalendáře.
  * Hodnota = klíč v DB, label = zobrazení pro uživatele.
@@ -40,12 +42,21 @@ function formatDateUTC(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+function isUTCMidnight(d: Date): boolean {
+  return d.getUTCHours() === 0 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0;
+}
+
+function isLocalMidnight(d: Date): boolean {
+  return d.getHours() === 0 && d.getMinutes() === 0 && d.getSeconds() === 0 && d.getMilliseconds() === 0;
+}
+
 /**
  * Zda je událost celodenní.
  * - Lokální 00:00 a konec téhož dne (23:59+) – klasické uložení z formuláře.
+ * - Nebo půlnoč až půlnoč o den dál (lokálně i UTC) – běžná exkluzivní konvence konec = začátek následujícího dne.
  * - UTC půlnoč (00:00:00Z) a konec téhož kalendářního dne v UTC (23:59) – běžné po `Date` z DB/JSON
  *   (v CEST pak začátek vypadá jako 01:00 nebo 02:00, ale není to časový slot).
- * - Příp. délka ~n×24 h a začátek v UTC 00:00 (více celých dní).
+ * - Příp. délka ~n×24 h a začátek v UTC 00:00 (více celých dní = [UTC, UTC+n)).
  */
 export function isAllDayEvent(start: Date, end: Date): boolean {
   const diffMs = end.getTime() - start.getTime();
@@ -55,12 +66,15 @@ export function isAllDayEvent(start: Date, end: Date): boolean {
   const sm = start.getMinutes();
   const eh = end.getHours();
   const em = end.getMinutes();
-  if (
-    sh === 0 &&
-    sm === 0 &&
-    ((eh === 23 && em >= 59) || diffMs >= 23 * 60 * 60 * 1000)
-  ) {
+  if (sh === 0 && sm === 0 && ((eh === 23 && em >= 59) || diffMs >= 23 * 60 * 60 * 1000)) {
     return true;
+  }
+
+  if (isUTCMidnight(start) && isUTCMidnight(end) && end.getTime() > start.getTime()) {
+    const n = diffMs / 86400000;
+    if (n >= 1 && Math.abs(n - Math.round(n)) < 1e-6) {
+      return true;
+    }
   }
 
   const utcH = start.getUTCHours();
@@ -81,4 +95,65 @@ export function isAllDayEvent(start: Date, end: Date): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * Lokální kalendářní dny (YYYY-MM-DD), ve kterých se má událost zobrazit v řádku „Celý den“
+ * (aby se u [0:00, následující den 0:00) nezdvojil sloupec).
+ */
+export function allDayEventDisplayDates(start: Date, end: Date): string[] {
+  if (!isAllDayEvent(start, end)) return [];
+
+  if (isUTCMidnight(start) && isUTCMidnight(end) && end.getTime() > start.getTime()) {
+    const diffMs = end.getTime() - start.getTime();
+    const n = Math.round(diffMs / 86400000);
+    if (n >= 1) {
+      return Array.from({ length: n }, (_, k) => {
+        const t = new Date(
+          Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate() + k, 12, 0, 0, 0)
+        );
+        return formatDateLocal(t);
+      });
+    }
+  }
+
+  if (isLocalMidnight(start) && isLocalMidnight(end) && end.getTime() > start.getTime()) {
+    const out: string[] = [];
+    const cur = new Date(start);
+    while (cur < end) {
+      out.push(formatDateLocal(cur));
+      cur.setDate(cur.getDate() + 1);
+      cur.setHours(0, 0, 0, 0);
+    }
+    return out;
+  }
+
+  if (formatDateLocal(start) === formatDateLocal(end)) {
+    return [formatDateLocal(start)];
+  }
+
+  /** Jeden kalendářní den v UTC (časté 00:00Z…23:59Z) i když lokální datum začátku a konce není shodné (konec poskočí na „druhý“ místní den v CEST) */
+  if (formatDateUTC(start) === formatDateUTC(end)) {
+    const t = new Date(
+      Date.UTC(
+        start.getUTCFullYear(),
+        start.getUTCMonth(),
+        start.getUTCDate(),
+        12,
+        0,
+        0,
+        0
+      )
+    );
+    return [formatDateLocal(t)];
+  }
+
+  const out: string[] = [];
+  const cur = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+  while (cur <= endDay) {
+    out.push(formatDateLocal(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
 }

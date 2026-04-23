@@ -6,6 +6,11 @@ import { useRouter, useParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { EVENT_TYPES, DEFAULT_EVENT_TYPE, requiresDeputy, isAllDayEvent } from "../../lib/event-types";
 import { REMINDER_MINUTE_OPTIONS } from "../../lib/calendar-form-options";
+import {
+  allDayYmdRangeToIsoStrings,
+  formatDateLocal,
+  formatDateTimeLocalForInput,
+} from "../../lib/week-utils";
 
 type Event = {
   id: number;
@@ -68,8 +73,12 @@ export default function EditCalendarPage() {
         setForm({
           title: event.title,
           description: event.description ?? "",
-          start_date: start.toISOString().slice(0, 16),
-          end_date: end.toISOString().slice(0, 16),
+          start_date: allDay
+            ? `${formatDateLocal(start)}T00:00`
+            : formatDateTimeLocalForInput(start),
+          end_date: allDay
+            ? `${formatDateLocal(end)}T23:59`
+            : formatDateTimeLocalForInput(end),
           event_type: event.event_type ?? DEFAULT_EVENT_TYPE,
           department_id: event.department_id ? String(event.department_id) : "",
           deputy_id: event.deputy_id ? String(event.deputy_id) : "",
@@ -97,13 +106,18 @@ export default function EditCalendarPage() {
         return;
       }
 
-      let startDate = form.start_date;
-      let endDate = form.end_date;
+      let startDate: string;
+      let endDate: string;
       if (form.is_all_day) {
-        const start = form.start_date.slice(0, 10);
-        const end = form.end_date.slice(0, 10);
-        startDate = `${start}T00:00`;
-        endDate = `${end}T23:59`;
+        const { start, end } = allDayYmdRangeToIsoStrings(
+          form.start_date.slice(0, 10),
+          form.end_date.slice(0, 10)
+        );
+        startDate = start;
+        endDate = end;
+      } else {
+        startDate = new Date(form.start_date).toISOString();
+        endDate = new Date(form.end_date).toISOString();
       }
 
       const query = new URLSearchParams({
@@ -133,13 +147,17 @@ export default function EditCalendarPage() {
     setWarning("");
     setLoading(true);
 
-    let startDate = form.start_date;
-    let endDate = form.end_date;
+    let startDate: string;
+    let endDate: string;
     if (form.is_all_day) {
-      const start = form.start_date.slice(0, 10);
-      const end = form.end_date.slice(0, 10);
-      startDate = `${start}T00:00`;
-      endDate = `${end}T23:59`;
+      const s = form.start_date.slice(0, 10);
+      const e = form.end_date.slice(0, 10);
+      const r = allDayYmdRangeToIsoStrings(s, e);
+      startDate = r.start;
+      endDate = r.end;
+    } else {
+      startDate = new Date(form.start_date).toISOString();
+      endDate = new Date(form.end_date).toISOString();
     }
 
     try {
