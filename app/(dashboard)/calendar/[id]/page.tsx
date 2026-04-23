@@ -137,9 +137,9 @@ export default async function CalendarEventPage({
                     {p.users
                       ? `${p.users.first_name} ${p.users.last_name}`
                       : `Uživatel #${p.user_id}`}
-                    {p.status === "pending" ? (
-                      <span className="ml-1 text-xs text-amber-700">(pozvánka)</span>
-                    ) : null}
+                    {p.status === "pending" ? <span className="ml-1 text-xs text-amber-700">(pozvánka)</span> : null}
+                    {p.status === "accepted" ? <span className="ml-1 text-xs text-green-700">(potvrzeno)</span> : null}
+                    {p.status === "rejected" ? <span className="ml-1 text-xs text-red-700">(zamítnuto)</span> : null}
                   </li>
                 ))}
               </ul>

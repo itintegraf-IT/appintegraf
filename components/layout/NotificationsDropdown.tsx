@@ -18,6 +18,10 @@ export function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [actionLoading, setActionLoading] = useState<Record<number, "approve" | "reject">>({});
+  const [rejectOpenFor, setRejectOpenFor] = useState<number | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const fetchNotifications = () => {
@@ -39,6 +43,36 @@ export function NotificationsDropdown() {
   const markAsRead = async (id: number) => {
     await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
     fetchNotifications();
+  };
+
+  const respondToInvite = async (id: number, action: "approve" | "reject", reason?: string) => {
+    setActionLoading((prev) => ({ ...prev, [id]: action }));
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/notifications/${id}/invite-response`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action,
+          reason: action === "reject" ? (reason ?? "").trim() : undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || "Nepodařilo se zpracovat pozvánku");
+      }
+      setRejectOpenFor(null);
+      setRejectReason("");
+      fetchNotifications();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Nepodařilo se zpracovat pozvánku");
+    } finally {
+      setActionLoading((prev) => {
+        const copy = { ...prev };
+        delete copy[id];
+        return copy;
+      });
+    }
   };
 
   useEffect(() => {
@@ -94,25 +128,97 @@ export function NotificationsDropdown() {
           ) : (
             <div className="py-1">
               {notifications.map((n) => (
-                <Link
+                <div
                   key={n.id}
-                  href={n.link ?? "#"}
-                  onClick={() => {
-                    if (!n.read_at) markAsRead(n.id);
-                    setOpen(false);
-                  }}
-                  className={`block px-4 py-3 text-left text-sm hover:bg-[var(--accent)] ${
+                  className={`px-4 py-3 text-left text-sm ${
                     !n.read_at ? "bg-[var(--accent)]/30" : ""
                   }`}
                   style={{ color: "var(--foreground)" }}
                 >
-                  <p className="font-medium">{n.title}</p>
-                  {n.message && (
-                    <p className="mt-0.5 line-clamp-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
-                      {n.message}
-                    </p>
+                  <Link
+                    href={n.link ?? "#"}
+                    onClick={() => {
+                      if (!n.read_at) markAsRead(n.id);
+                      setOpen(false);
+                    }}
+                    className="block hover:opacity-90"
+                  >
+                    <p className="font-medium">{n.title}</p>
+                    {n.message && (
+                      <p className="mt-0.5 line-clamp-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
+                        {n.message}
+                      </p>
+                    )}
+                  </Link>
+                  {n.type === "calendar_invite" && !n.read_at && (
+                    <div className="mt-2">
+                      {rejectOpenFor === n.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={rejectReason}
+                            onChange={(e) => setRejectReason(e.target.value)}
+                            placeholder="Důvod zamítnutí pozvánky"
+                            rows={3}
+                            className="w-full rounded border px-2 py-1 text-xs"
+                            style={{
+                              borderColor: "var(--border)",
+                              background: "var(--background)",
+                              color: "var(--foreground)",
+                            }}
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => respondToInvite(n.id, "reject", rejectReason)}
+                              disabled={actionLoading[n.id] === "reject"}
+                              className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-60"
+                            >
+                              {actionLoading[n.id] === "reject" ? "Odesílám…" : "Potvrdit zamítnutí"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRejectOpenFor(null);
+                                setRejectReason("");
+                                setActionError(null);
+                              }}
+                              className="rounded border px-2 py-1 text-xs"
+                              style={{ borderColor: "var(--border)" }}
+                            >
+                              Zrušit
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => respondToInvite(n.id, "approve")}
+                            disabled={!!actionLoading[n.id]}
+                            className="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-60"
+                          >
+                            {actionLoading[n.id] === "approve" ? "Schvaluji…" : "Schválit"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRejectOpenFor(n.id);
+                              setActionError(null);
+                              setRejectReason("");
+                            }}
+                            disabled={!!actionLoading[n.id]}
+                            className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-60"
+                          >
+                            Zamítnout
+                          </button>
+                        </div>
+                      )}
+                      {actionError && rejectOpenFor === n.id && (
+                        <p className="mt-1 text-xs text-red-600">{actionError}</p>
+                      )}
+                    </div>
                   )}
-                </Link>
+                </div>
               ))}
             </div>
           )}
