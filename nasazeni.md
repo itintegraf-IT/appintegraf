@@ -69,10 +69,19 @@ Po změnách v `schema.prisma` mohou v `prisma/migrations/*.sql` ležet skripty,
 | [`prisma/migrations/20260327_file_uploads_record_id.sql`](prisma/migrations/20260327_file_uploads_record_id.sql) | `file_uploads.record_id` |
 | [`prisma/migrations/20260328_users_personal_contact.sql`](prisma/migrations/20260328_users_personal_contact.sql) | Sloupce `users.personal_phone`, `users.personal_email` (kontakty) |
 | [`prisma/migrations/20260408_add_ukoly_module.sql`](prisma/migrations/20260408_add_ukoly_module.sql) | Tabulky modulu Úkoly (`ukoly`, `ukoly_departments`) |
+| [`prisma/migrations/20260423_calendar_is_private.sql`](prisma/migrations/20260423_calendar_is_private.sql) | Sloupec `calendar_events.is_private` (soukromé události mimo globální kalendář) |
 
 ```bash
 mysql -u root -p appintegraf < prisma/migrations/20260328_users_personal_contact.sql
 ```
+
+**Kalendář (leden 2026+):** po nasazení kódu se sloupcem `is_private` musí být SQL na produkci aplikované **jednou** (dokud neběží plně Prisma migrate). Z kořene projektu:
+
+```bash
+./scripts/deploy-server.sh --apply-sql 20260423_calendar_is_private.sql
+```
+
+…nebo ruční `mysql` na soubor `prisma/migrations/20260423_calendar_is_private.sql`. Pokud sloupec už existuje, `ALTER` skončí chybou „Duplicate column“ — migrace je hotová, opakovat ne.
 
 ## Přenos dat plánování (vývoj → produkce)
 
