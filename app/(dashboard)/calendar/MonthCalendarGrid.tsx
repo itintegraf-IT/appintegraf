@@ -61,6 +61,22 @@ function eventMetaForTitle(e: CalendarEvent, eventMetaMode: CalendarEventMetaMod
   return [e.title, ...extra].join(" — ");
 }
 
+function eventMetaPrimaryLine(e: CalendarEvent, eventMetaMode: CalendarEventMetaMode): string | null {
+  if (eventMetaMode === "hidden" || e.ukoly_task_id != null) return null;
+  const extra = buildEventMetaLines(
+    {
+      users: e.users,
+      users_deputy: e.users_deputy,
+      deputy_id: e.deputy_id,
+      approval_status: e.approval_status,
+      calendar_approvals: e.calendar_approvals,
+      ukoly_task_id: e.ukoly_task_id,
+    },
+    eventMetaMode
+  );
+  return extra[0] ?? null;
+}
+
 export function MonthCalendarGrid({
   events,
   holidays = [],
@@ -190,6 +206,7 @@ export function MonthCalendarGrid({
                     <div className="mt-1 space-y-0.5">
                       {dayEvents.slice(0, 3).map((e) => {
                         const line = e.color ?? "#DC2626";
+                        const primaryMeta = eventMetaPrimaryLine(e, eventMetaMode);
                         const pendingApproval =
                           e.approval_status === "pending" && e.deputy_id;
                         const deputyApproved =
@@ -208,7 +225,12 @@ export function MonthCalendarGrid({
                               color: line,
                             }}
                           >
-                            {e.title}
+                            <span className="block truncate">{e.title}</span>
+                            {primaryMeta && (
+                              <span className="block truncate text-[9px] font-normal leading-tight opacity-80">
+                                {primaryMeta}
+                              </span>
+                            )}
                             {pendingApproval && (
                               <span className="ml-0.5 rounded bg-amber-500/80 px-0.5 text-white">
                                 !
