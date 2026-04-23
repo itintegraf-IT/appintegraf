@@ -170,6 +170,10 @@ Měsíční mřížka:
 - **Události** – max. 3 na den, odkaz na detail; indikátory schválení
 - **Kliknutí na den** – modal pro novou celodenní událost
 
+### Celodenní události a `isAllDayEvent` (lib/event-types.ts)
+
+Server často vrací začátek/konec jako `Date` z ISO řetězců s UTC půlnocí; v českém prohlížeči může začátek vypadat jako **01:00 nebo 02:00**, přesto jde o celý den. Funkce **`isAllDayEvent(start, end)`** proto kromě „lokální 00:00 a konec téhož dne (23:59+)“ rozpozná i **UTC 00:00:00** s koncem téhož kalendářního dne v UTC, příp. bloky s délkou cca 20–26 h a stejným UTC dnem, aby se tyto záznamy vykreslily v řádku **Celý den** a neskončily v mřížce s falešným ranním časem.
+
 ---
 
 ## API endpointy
