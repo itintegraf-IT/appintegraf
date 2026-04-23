@@ -67,12 +67,14 @@ export default async function CalendarEventPage({
           {(isDeputy || isManager) && (
             <ApproveRejectButtons eventId={id} eventTitle={event.title} />
           )}
-          <Link
-            href={`/calendar/${id}/edit`}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-          >
-            Upravit
-          </Link>
+          {event.created_by === userId && (
+            <Link
+              href={`/calendar/${id}/edit`}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+            >
+              Upravit
+            </Link>
+          )}
           {event.created_by === userId && (
             <DeleteEventButton eventId={id} eventTitle={event.title} />
           )}

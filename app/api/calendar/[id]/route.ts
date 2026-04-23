@@ -43,6 +43,8 @@ export async function GET(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
+  const userId = parseInt(session.user.id, 10);
+
   const event = await prisma.calendar_events.findUnique({
     where: { id },
     include: {
@@ -57,6 +59,10 @@ export async function GET(
 
   if (!event) {
     return NextResponse.json({ error: "Událost nenalezena" }, { status: 404 });
+  }
+
+  if (event.created_by !== userId) {
+    return NextResponse.json({ error: "Můžete upravovat pouze své vlastní události" }, { status: 403 });
   }
 
   return NextResponse.json(event);
