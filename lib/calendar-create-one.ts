@@ -10,7 +10,7 @@ type CreateUnitArgs = {
   userId: number;
   resolvedDeptId: number | null;
   deputyIdNum: number | null;
-  is_public: boolean;
+  is_private: boolean;
   location: string;
   remindBefore: number | null;
   remindInApp: boolean;
@@ -39,7 +39,8 @@ export async function createCalendarEventUnit(
       deputy_id: a.deputyIdNum,
       requires_approval: a.deputyIdNum !== null,
       approval_status: a.deputyIdNum !== null ? "pending" : null,
-      is_public: a.is_public,
+      is_private: a.is_private,
+      is_public: !a.is_private,
       location: a.location || null,
       color,
       remind_before_minutes: a.remindBefore,

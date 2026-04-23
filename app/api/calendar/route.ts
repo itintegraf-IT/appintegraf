@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   }
 
   const events = await prisma.calendar_events.findMany({
-    where,
+    where: { ...where, is_private: { not: true } },
     orderBy: { start_date: "asc" },
     take: 100,
     include: {
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       event_type = "jine",
       department_id = null,
       deputy_id = null,
-      is_public = false,
+      is_private = false,
       location = "",
       recurrence: recurrenceRaw = "none",
       recurrence_end = null,
@@ -253,7 +253,7 @@ export async function POST(req: NextRequest) {
           userId,
           resolvedDeptId,
           deputyIdNum,
-          is_public: !!is_public,
+          is_private: !!is_private,
           location: locTrim,
           remindBefore,
           remindInApp: reminderInApp,

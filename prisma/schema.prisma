@@ -75,7 +75,8 @@ model calendar_events {
   event_type                  String?                       @default("event") @db.VarChar(50)
   created_by                  Int
   department_id               Int?
-  is_public                   Boolean?                      @default(false)
+  is_public                   Boolean?                      @default(false) /// legacy; nově: !is_private
+  is_private                  Boolean?                      @default(false) /// není v globálním (firemním) kalendáři
   requires_approval           Boolean?                      @default(false)
   approval_status             String?                       @default("pending") @db.VarChar(20)
   color                       String?                       @default("#DC2626") @db.VarChar(7)

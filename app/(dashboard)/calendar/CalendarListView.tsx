@@ -6,6 +6,10 @@ import { ChevronLeft, ChevronRight, ExternalLink, User, Globe } from "lucide-rea
 import { isAllDayEvent } from "./lib/event-types";
 import { formatDateLocal } from "./lib/week-utils";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
+import {
+  getPeopleColumnText,
+  type CalendarEventMetaMode,
+} from "@/lib/calendar-event-meta";
 
 type EventRow = {
   id: number;
@@ -15,8 +19,11 @@ type EventRow = {
   end_date: Date;
   location: string | null;
   color: string | null;
+  deputy_id: number | null;
+  approval_status: string | null;
   users: { first_name: string; last_name: string } | null;
   users_deputy: { first_name: string; last_name: string } | null;
+  calendar_approvals?: Array<{ users: { first_name: string; last_name: string } | null }>;
   ukoly_task_id?: number | null;
   calendar_event_participants?: Array<{
     users: { first_name: string; last_name: string } | null;
@@ -28,6 +35,7 @@ type Props = {
   from: string;
   to: string;
   viewType: "list_mine" | "list_all";
+  eventMetaMode: CalendarEventMetaMode;
 };
 
 function formatDate(d: Date) {
@@ -51,25 +59,7 @@ function formatRange(from: string, to: string) {
   return `${fromDate.toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" })} – ${toDate.toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
-function getPeopleNames(event: EventRow): string {
-  const names: string[] = [];
-  if (event.users) {
-    names.push(`${event.users.first_name} ${event.users.last_name}`);
-  }
-  if (event.users_deputy) {
-    names.push(`${event.users_deputy.first_name} ${event.users_deputy.last_name} (zástup)`);
-  }
-  const participants = event.calendar_event_participants ?? [];
-  for (const p of participants) {
-    if (p.users) {
-      const n = `${p.users.first_name} ${p.users.last_name}`;
-      if (!names.includes(n)) names.push(n);
-    }
-  }
-  return names.join(", ") || "—";
-}
-
-export function CalendarListView({ events, from, to, viewType }: Props) {
+export function CalendarListView({ events, from, to, viewType, eventMetaMode }: Props) {
   const searchParams = useSearchParams();
 
   const fromDate = new Date(from);
@@ -186,8 +176,21 @@ export function CalendarListView({ events, from, to, viewType }: Props) {
                         </p>
                       )}
                     </td>
-                    <td className="max-w-[180px] px-4 py-3 text-sm text-gray-600">
-                      <span className="line-clamp-2">{getPeopleNames(e)}</span>
+                    <td className="max-w-[220px] px-4 py-3 text-sm text-gray-600">
+                      <span className="line-clamp-3">
+                        {getPeopleColumnText(
+                          {
+                            users: e.users,
+                            users_deputy: e.users_deputy,
+                            deputy_id: e.deputy_id,
+                            approval_status: e.approval_status,
+                            calendar_approvals: e.calendar_approvals,
+                            ukoly_task_id: e.ukoly_task_id,
+                            calendar_event_participants: e.calendar_event_participants,
+                          },
+                          eventMetaMode
+                        )}
+                      </span>
                     </td>
                     <td className="max-w-[120px] px-4 py-3 text-sm text-gray-600">
                       <span className="block truncate">{e.location ?? "—"}</span>

@@ -41,7 +41,7 @@ export default function AddCalendarPage() {
     event_type: DEFAULT_EVENT_TYPE,
     department_id: "",
     deputy_id: "",
-    is_public: false,
+    is_private: false,
     is_all_day: false,
     location: "",
     recurrence: "none" as (typeof RECURRENCE_OPTIONS)[number]["value"],
@@ -135,7 +135,7 @@ export default function AddCalendarPage() {
           event_type: form.event_type,
           department_id: form.department_id || null,
           deputy_id: form.deputy_id || null,
-          is_public: form.is_public,
+          is_private: form.is_private,
           location: form.location,
           recurrence: form.recurrence,
           recurrence_end: form.recurrence === "none" ? null : form.recurrence_end,
@@ -423,15 +423,23 @@ export default function AddCalendarPage() {
               </div>
             </div>
           )}
-          <div className="flex items-center gap-2 sm:col-span-2">
-            <input
-              type="checkbox"
-              id="is_public"
-              checked={form.is_public}
-              onChange={(e) => setForm({ ...form, is_public: e.target.checked })}
-              className="rounded"
-            />
-            <label htmlFor="is_public" className="text-sm text-gray-700">Veřejná událost</label>
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="is_private"
+                checked={form.is_private}
+                onChange={(e) => setForm({ ...form, is_private: e.target.checked })}
+                className="rounded"
+              />
+              <label htmlFor="is_private" className="text-sm text-gray-700">
+                Soukromá událost
+              </label>
+            </div>
+            <p className="pl-6 text-xs text-gray-500">
+              Soukromé události se nezobrazí v globálním (firemním) kalendáři, pouze u vás (záložka Můj kalendář) a
+              u osob zapojených (zástup, schvalování atd.).
+            </p>
           </div>
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">Popis</label>

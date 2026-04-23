@@ -9,6 +9,10 @@ import { isAllDayEvent, allDayEventDisplayDates, requiresDeputy } from "./lib/ev
 import { CreateEventModal } from "./CreateEventModal";
 import { ConfirmMoveModal } from "./ConfirmMoveModal";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
+import {
+  buildEventMetaLines,
+  type CalendarEventMetaMode,
+} from "@/lib/calendar-event-meta";
 
 type CalendarEvent = {
   id: number;
@@ -24,6 +28,7 @@ type CalendarEvent = {
   created_by: number;
   users: { first_name: string; last_name: string } | null;
   users_deputy: { first_name: string; last_name: string } | null;
+  calendar_approvals?: Array<{ users: { first_name: string; last_name: string } | null }>;
   ukoly_task_id?: number | null;
 };
 
@@ -33,7 +38,40 @@ type Props = {
   from: string;
   to: string;
   userId?: number;
+  /** Globální kalendář: vlastník, zástup; u Vedení navíc schválení vedoucím */
+  eventMetaMode?: CalendarEventMetaMode;
 };
+
+function EventMetaSubtext({
+  e,
+  mode,
+}: {
+  e: CalendarEvent;
+  mode: CalendarEventMetaMode;
+}) {
+  if (mode === "hidden") return null;
+  const lines = buildEventMetaLines(
+    {
+      users: e.users,
+      users_deputy: e.users_deputy,
+      deputy_id: e.deputy_id,
+      approval_status: e.approval_status,
+      calendar_approvals: e.calendar_approvals,
+      ukoly_task_id: e.ukoly_task_id,
+    },
+    mode
+  );
+  if (lines.length === 0) return null;
+  return (
+    <span className="mt-0.5 block w-full text-[9px] font-normal normal-case leading-tight text-gray-600">
+      {lines.map((l, i) => (
+        <span key={i} className="block truncate">
+          {l}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 const ROW_HEIGHT = 32;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
@@ -102,7 +140,14 @@ function cellAllDayShadeStyle(
   return { backgroundColor: "rgb(249, 250, 251)" };
 }
 
-export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }: Props) {
+export function WeekCalendarGrid({
+  events,
+  holidays = [],
+  from,
+  to,
+  userId = 0,
+  eventMetaMode = "hidden",
+}: Props) {
   const router = useRouter();
   const weekStart = useMemo(() => {
     const d = parseDateLocal(from);
@@ -385,7 +430,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                             <span className="rounded bg-amber-500/80 px-1 py-0.5 text-white">
                               Čeká na schválení
                             </span>
-                            {deputyName && (
+                            {deputyName && eventMetaMode === "hidden" && (
                               <span className="ml-1 text-gray-600">→ {deputyName}</span>
                             )}
                           </span>
@@ -417,7 +462,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                           ev.stopPropagation();
                           router.push(calendarGridItemHref(e));
                         }}
-                        className={`${barClass} block cursor-grab truncate rounded-sm hover:opacity-90 active:cursor-grabbing`}
+                        className={`${barClass} block cursor-grab overflow-hidden rounded-sm hover:opacity-90 active:cursor-grabbing ${eventMetaMode === "hidden" ? "truncate" : ""}`}
                         style={{
                           borderLeftColor: barColor,
                           backgroundColor: `${barColor}20`,
@@ -425,13 +470,14 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                         }}
                       >
                         {eventContent}
+                        <EventMetaSubtext e={e} mode={eventMetaMode} />
                       </div>
                     ) : (
                       <Link
                         key={calendarGridItemKey(e)}
                         href={calendarGridItemHref(e)}
                         onClick={(ev) => ev.stopPropagation()}
-                        className={`${barClass} block truncate rounded-sm hover:opacity-90`}
+                        className={`${barClass} block overflow-hidden rounded-sm hover:opacity-90 ${eventMetaMode === "hidden" ? "truncate" : ""}`}
                         style={{
                           borderLeftColor: barColor,
                           backgroundColor: `${barColor}20`,
@@ -439,6 +485,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                         }}
                       >
                         {eventContent}
+                        <EventMetaSubtext e={e} mode={eventMetaMode} />
                       </Link>
                     );
                   })}
@@ -569,7 +616,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                             </span>
                           )}
                         </span>
-                        {pendingApproval && deputyName && (
+                        {pendingApproval && deputyName && eventMetaMode === "hidden" && (
                           <span className="block truncate text-[9px] opacity-80">
                             → {deputyName}
                           </span>
@@ -582,6 +629,7 @@ export function WeekCalendarGrid({ events, holidays = [], from, to, userId = 0 }
                             })}
                           </span>
                         )}
+                        <EventMetaSubtext e={e} mode={eventMetaMode} />
                       </>
                     );
                     const timedStyle = {

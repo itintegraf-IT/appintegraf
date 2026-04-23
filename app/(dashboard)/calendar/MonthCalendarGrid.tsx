@@ -13,6 +13,10 @@ import { WEEKDAY_NAMES_MONDAY, formatDateLocal } from "./lib/week-utils";
 import type { Holiday } from "./lib/holidays";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import { isAllDayEvent, allDayEventDisplayDates } from "./lib/event-types";
+import {
+  buildEventMetaLines,
+  type CalendarEventMetaMode,
+} from "@/lib/calendar-event-meta";
 
 type CalendarEvent = {
   id: number;
@@ -28,6 +32,7 @@ type CalendarEvent = {
   created_by: number;
   users: { first_name: string; last_name: string } | null;
   users_deputy: { first_name: string; last_name: string } | null;
+  calendar_approvals?: Array<{ users: { first_name: string; last_name: string } | null }>;
   ukoly_task_id?: number | null;
 };
 
@@ -36,9 +41,33 @@ type Props = {
   holidays?: Holiday[];
   month: string;
   userId?: number;
+  eventMetaMode?: CalendarEventMetaMode;
 };
 
-export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: Props) {
+function eventMetaForTitle(e: CalendarEvent, eventMetaMode: CalendarEventMetaMode): string {
+  if (e.ukoly_task_id != null) return e.title;
+  const extra = buildEventMetaLines(
+    {
+      users: e.users,
+      users_deputy: e.users_deputy,
+      deputy_id: e.deputy_id,
+      approval_status: e.approval_status,
+      calendar_approvals: e.calendar_approvals,
+      ukoly_task_id: e.ukoly_task_id,
+    },
+    eventMetaMode
+  );
+  if (extra.length === 0) return e.title;
+  return [e.title, ...extra].join(" — ");
+}
+
+export function MonthCalendarGrid({
+  events,
+  holidays = [],
+  month,
+  userId = 0,
+  eventMetaMode = "hidden",
+}: Props) {
   const monthDate = useMemo(() => new Date(month + "-01"), [month]);
   const today = useMemo(() => new Date().toDateString(), []);
 
@@ -171,6 +200,7 @@ export function MonthCalendarGrid({ events, holidays = [], month, userId = 0 }: 
                             key={`${calendarGridItemKey(e)}-${day.toDateString()}`}
                             href={calendarGridItemHref(e)}
                             onClick={(ev) => ev.stopPropagation()}
+                            title={eventMetaForTitle(e, eventMetaMode)}
                             className="block w-full min-h-[1.4rem] truncate border-l-4 pl-0.5 pr-0.5 py-0.5 text-left text-[10px] font-medium leading-tight hover:opacity-90"
                             style={{
                               borderLeftColor: line,

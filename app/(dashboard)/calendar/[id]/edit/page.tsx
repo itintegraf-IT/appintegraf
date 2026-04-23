@@ -21,7 +21,7 @@ type Event = {
   event_type: string | null;
   department_id: number | null;
   deputy_id: number | null;
-  is_public: boolean | null;
+  is_private: boolean | null;
   location: string | null;
   color: string | null;
   remind_before_minutes?: number | null;
@@ -52,7 +52,7 @@ export default function EditCalendarPage() {
     event_type: DEFAULT_EVENT_TYPE,
     department_id: "",
     deputy_id: "",
-    is_public: false,
+    is_private: false,
     is_all_day: false,
     location: "",
     remind_before_minutes: "" as string,
@@ -82,7 +82,7 @@ export default function EditCalendarPage() {
           event_type: event.event_type ?? DEFAULT_EVENT_TYPE,
           department_id: event.department_id ? String(event.department_id) : "",
           deputy_id: event.deputy_id ? String(event.deputy_id) : "",
-          is_public: event.is_public ?? false,
+          is_private: event.is_private ?? false,
           is_all_day: allDay,
           location: event.location ?? "",
           remind_before_minutes:
@@ -172,7 +172,7 @@ export default function EditCalendarPage() {
           event_type: form.event_type,
           department_id: form.department_id || null,
           deputy_id: form.deputy_id || null,
-          is_public: form.is_public,
+          is_private: form.is_private,
           location: form.location,
           remind_before_minutes: form.remind_before_minutes || null,
           reminder_notify_in_app: form.reminder_notify_in_app,
@@ -431,15 +431,23 @@ export default function EditCalendarPage() {
               </div>
             </div>
           )}
-          <div className="flex items-center gap-2 sm:col-span-2">
-            <input
-              type="checkbox"
-              id="is_public"
-              checked={form.is_public}
-              onChange={(e) => setForm({ ...form, is_public: e.target.checked })}
-              className="rounded"
-            />
-            <label htmlFor="is_public" className="text-sm text-gray-700">Veřejná událost</label>
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="is_private"
+                checked={form.is_private}
+                onChange={(e) => setForm({ ...form, is_private: e.target.checked })}
+                className="rounded"
+              />
+              <label htmlFor="is_private" className="text-sm text-gray-700">
+                Soukromá událost
+              </label>
+            </div>
+            <p className="pl-6 text-xs text-gray-500">
+              Soukromé události se nezobrazí v globálním (firemním) kalendáři, pouze u vás (záložka Můj kalendář) a
+              u zapojených osob.
+            </p>
           </div>
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">Popis</label>
