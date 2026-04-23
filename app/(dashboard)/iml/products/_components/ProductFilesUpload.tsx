@@ -76,9 +76,19 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
         method: "POST",
         body: formData,
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setPdfError(data.error ?? "Chyba při nahrávání");
+        if (res.status === 413) {
+          setPdfError(
+            "Požadavek byl odmítnut (413) – typicky malý `client_max_body_size` u nginx. Nastavte alespoň 60M u location pro aplikaci a znovu načtěte konfiguraci."
+          );
+          return;
+        }
+        setPdfError(
+          typeof data.error === "string" && data.error.length > 0
+            ? data.error
+            : "Chyba při nahrávání"
+        );
         return;
       }
       onPdfChange?.();

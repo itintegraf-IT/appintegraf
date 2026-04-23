@@ -131,14 +131,10 @@ export async function POST(
       );
     }
 
-    const type = (file.type || "").toLowerCase();
-    if (type && type !== "application/pdf") {
-      return NextResponse.json({ error: "Povolený formát: PDF" }, { status: 400 });
-    }
-
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Magic bytes: PDF začíná "%PDF-" (25 50 44 46 2D).
+    // Magic bytes: PDF začíná "%PDF-" (25 50 44 46 2D). Tohle je zdroj pravdy;
+    // MIME typ různé prohlížeče/OS často hlásí špatně (např. application/octet-stream).
     if (
       buffer.length < 5 ||
       buffer[0] !== 0x25 ||
@@ -210,13 +206,37 @@ export async function POST(
     return NextResponse.json({ success: true, file: result });
   } catch (e) {
     const err = e as Error & { code?: string; meta?: { code?: string } };
+    const msg = String(err.message ?? "");
     console.error(
       "IML product PDF upload error:",
-      err.message,
+      msg,
       "code:",
       err.code ?? err.meta?.code
     );
-    return NextResponse.json({ error: "Chyba při nahrávání PDF" }, { status: 500 });
+
+    // MySQL: příliš velký paket vůči max_allowed_packet (typicky na serveru nižší než lokálně).
+    if (
+      /packet too large|max_allowed_packet|got a packet bigger than|ER_NET_PACKET_TOO_LARGE/i.test(
+        msg
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Databáze odmítla soubor (příliš velký paket). Na serveru MySQL/MariaDB zvyšte `max_allowed_packet` (např. 64M) a restartujte DB. Alternativně zmenšete PDF.",
+          detail: "mysql_max_allowed_packet",
+        },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error: "Chyba při nahrávání PDF",
+        detail: process.env.NODE_ENV === "development" ? msg.slice(0, 200) : undefined,
+      },
+      { status: 500 }
+    );
   }
 }
 

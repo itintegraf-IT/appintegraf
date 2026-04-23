@@ -496,6 +496,12 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 - [x] `next.config.ts` – `bodySizeLimit` a `proxyClientMaxBodySize` zvýšeny z `20mb` na `60mb` (rezerva nad 50 MB PDF)
 - [x] UI upload (`ProductFilesUpload.tsx`, `ProductFilesUploadPlaceholder.tsx`) – hint změněn na „max 50 MB"
 
+**Nasazení na test: PDF se nenahraje, obrázek ano**
+
+- **Nginx (reverse proxy):** `client_max_body_size` výchozí bývá 1m → velké PDF vrátí **413** dřív, než request doputuje do Node. V `server` / `location` pro aplikaci nastavit např. `client_max_body_size 60M;` a `nginx -s reload`. Obrázky do 5 MB často projdou, PDF ne – typický symptóm.
+- **MySQL / MariaDB:** ukládáme BLOB do `iml_product_files.pdf_data` – když je `max_allowed_packet` (server i klient) menší než soubor, INSERT selže. Na serveru v `mysqld.cnf` / `my.cnf` např. `max_allowed_packet=64M`, restart DB. API nyní vrátí srozumitelnou chybu, pokud text chyby obsahuje „packet too large“.
+- Aplikace musí běžet s buildem, který obsahuje zvýšený limit v `next.config.ts` (po `git pull` na serveru `npm run build` + restart PM2).
+
 ### 3.5 Nové stavy
 
 - [ ] `lib/iml-constants.ts` – `IML_ITEM_STATUSES = ["aktivní","archivní","testovací","zablokovaná","rozpracováno grafikem","chyba"]`
