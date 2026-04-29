@@ -1,13 +1,26 @@
 appintegraf
 
-- globálně
+- Přihlašování správa uživatelů
 	- dvoufaktor autentifikace (google authentificator)
-	- zapomenuté heslo uživatele obnova uživatelem. Uživatel dá žádost, systém vygeneruje odkaz pošle na mail. Odkaz 	  vede na stránku kde půjde heslo změnit. (bezpečnost? dvoufaktor?)
+	- zapomenuté heslo uživatele obnova uživatelem. Uživatel dá žádost, systém vygeneruje odkaz pošle na mail. Odkaz 	  vede na stránku kde půjde heslo změnit. (bezpečnost? dvoufaktor?) Zachovat možnost aby heslo řešil i admin 	    	  (uživatel s právy) 
+dále při vytváření uživatele. Možnost vytvořit uživatele bez hesla a odeslat aktivační link na mail a tam vyzvat k vytvoření hesla? 
 
+Dashboard
+
+Kdo co vidí v dasshboardu je to podle rolí nebo oddělení?? Asi by ne všichni měli třeba vidět majetek?? Nebo co vlastně vidí
 
 - kalendář 
-	- kontroly při zadávání události, zda už na stejný termín něco nemám (minimálně upozornit na kolizi)
-	- Při zadávání události která vyžaduje schvalovací proces zkontrolovat, zda schvalovatel (zastupující) nemá v 	 	  kalendáři kolidující událost (dovolená, služebka atd ...) nesmí být mimo firmu oba účastníci
+	- schvalovací wofkflow i na událost lékař stejně jako dovolená a osobní
+	- HOTOVO Zadám celodenní jednání, v kalendáři se to zobrazí ale od 02:00 do dalšího dne 02.00 viz datum 25/4/26
+	- HOTOVO V globálním kalendáři chybí u jednotlivých akcí, nebo dovolených kdo to je a kdo zastupuje, případně kdo schválil
+	  HOTOVO nyní je to v pořádku u schvalovaných akcí ale u veřejných akcí v kalendáři by vždy mělo být vidět jméno (čí ta akce je)
+	- Seznam osobní a globální kdo si vzal zástup a kdo to schválil měla by vidět skupina vedení
+	- Jaké je schvalovací workflow, kdo za koho a kdo schvaluje koho a jak je to když tady někdo není. Aby bylo 	  nemožné si dát sám sobě zástup a podobně
+	- Když zadávám jakoukoliv událost datum začátku - tak aby přeskočil automaticky i datum konce
+	- HOHOVO Když je kolize datumů tak by nemělo jít naplánovat, navíc při plánování nejdou přizvat další osoby (pozvánky)
+	- HOTOVO Při výběru typů událostí chybí větší výběr Schůzka Náchod, Praha (kanceláře), home office
+	- Při zadávání služební cesty zadat popis proč a kam jedu aby ten kdo schvaluje to viděl a nemuse se ptát
+
 
 - Kontakty
 	- Přidat generování kartičky formát vizitky 
@@ -15,9 +28,20 @@ appintegraf
 						2) QR kód (jpg, png)
 						3) Pod kódem i číselný kód
 	- generovat PDF pro tisk 
+	- přidat kartu kde bude seznam oddělení (podobně jako v tel seznamu) a na kartě bude mail(hromadný) a budou 	  vidět všichni uživatelé. A pak asi i v kontaktech aby se tento hromadný mail uživateli přiřadil jako 	  	  sekundární.
 
 - Telefonní seznam
 	- opravit tiskové sestavy které se při migraci do .next.js rozsypali (grafika, layout stránky)
-	- skupinoivé maily aliasy - členové
+	- Přidat kartu "Skupinové maily" - navázat databázi skupinových mailů a tento mail možnost přiřadit uživateli
+	  zobrazit na kartě stejně jako oddělení (mail a seznam lidí)
+-IML
 
-	
+	-v objednávce položka cena jako nepovinné pole!!!
+
+- Úkoly	
+	- Nezobrazují se mnou zadané úkoly v osobním kalendáři
+
+- majetek
+	- požadavek na techniku - není možnost odpovědět žadateli
+
+- NOVÝ MODUL PŘEDPISY (kouknout do IGIS)

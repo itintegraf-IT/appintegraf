@@ -27,11 +27,25 @@ export function getEventTypeLabel(value: string | null): string {
   return found?.label ?? value;
 }
 
-/** Typy, u kterých je zástup povinný */
-export const DEPUTY_REQUIRED_TYPES = ["dovolena", "osobni"] as const;
+/**
+ * Typy, u kterých je zástup povinný a běží schvalovací workflow (zástup → příp. vedoucí).
+ * Dříve jen Dovolená / Osobní; dále Schůzka Praha, Služební cesta, Lékař.
+ */
+export const DEPUTY_REQUIRED_TYPES = [
+  "dovolena",
+  "osobni",
+  "schuzka_praha",
+  "sluzebni_cesta",
+  "lekar",
+] as const;
 
 export function requiresDeputy(eventType: string | null): boolean {
   return eventType !== null && DEPUTY_REQUIRED_TYPES.includes(eventType as (typeof DEPUTY_REQUIRED_TYPES)[number]);
+}
+
+/** U služební cesty musí být v popisu uvedeno kam a proč (schvalovatel). */
+export function requiresBusinessTripDescription(eventType: string | null): boolean {
+  return eventType === "sluzebni_cesta";
 }
 
 /** YYYY-MM-DD v UTC (pro porovnání „stejný kalendářní den v UTC“) */

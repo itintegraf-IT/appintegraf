@@ -24,6 +24,8 @@ type Contact = {
   department_name: string | null;
 };
 
+type DepartmentMember = { first_name: string; last_name: string };
+
 type Department = {
   id: number;
   name: string;
@@ -31,6 +33,7 @@ type Department = {
   landline: string | null;
   landline2: string | null;
   email: string | null;
+  members?: DepartmentMember[];
 };
 
 export default function PublicPhoneListPage() {
@@ -171,6 +174,14 @@ export default function PublicPhoneListPage() {
                       </div>
                     )}
                   </div>
+                  {d.members && d.members.length > 0 && (
+                    <p className="mt-3 border-t border-gray-100 pt-2 text-xs leading-relaxed text-gray-500">
+                      <span className="text-gray-400">Členové: </span>
+                      {d.members
+                        .map((m) => `${m.first_name} ${m.last_name}`)
+                        .join(" · ")}
+                    </p>
+                  )}
                 </div>
               ))}
             </div>
@@ -186,6 +197,9 @@ export default function PublicPhoneListPage() {
                   </th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
                     E-mail
+                  </th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                    Členové
                   </th>
                 </tr>
               </thead>
@@ -210,6 +224,13 @@ export default function PublicPhoneListPage() {
                       ) : (
                         "-"
                       )}
+                    </td>
+                    <td className="max-w-md px-4 py-3 text-xs leading-relaxed text-gray-500">
+                      {d.members && d.members.length > 0
+                        ? d.members
+                            .map((m) => `${m.first_name} ${m.last_name}`)
+                            .join(" · ")
+                        : "—"}
                     </td>
                   </tr>
                 ))}

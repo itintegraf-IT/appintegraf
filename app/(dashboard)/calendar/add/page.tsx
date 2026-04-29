@@ -4,7 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
-import { EVENT_TYPES, DEFAULT_EVENT_TYPE, requiresDeputy } from "../lib/event-types";
+import {
+  EVENT_TYPES,
+  DEFAULT_EVENT_TYPE,
+  requiresBusinessTripDescription,
+  requiresDeputy,
+} from "../lib/event-types";
 import { RECURRENCE_OPTIONS, REMINDER_MINUTE_OPTIONS } from "../lib/calendar-form-options";
 import {
   allDayYmdRangeToIsoStrings,
@@ -117,6 +122,10 @@ export default function AddCalendarPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (requiresBusinessTripDescription(form.event_type) && !form.description.trim()) {
+      setError("U služební cesty vyplňte popis (kde a proč jedete) – je povinný pro schvalovatele.");
+      return;
+    }
     setLoading(true);
 
     let startDate: string;
@@ -377,7 +386,11 @@ export default function AddCalendarPage() {
               }
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
               disabled={requiresDeputy(form.event_type)}
-              title={requiresDeputy(form.event_type) ? "U Dovolená/Osobní není opakování k dispozici." : undefined}
+              title={
+                requiresDeputy(form.event_type)
+                  ? "U typů se schvalováním (povinný zástup) není opakování k dispozici."
+                  : undefined
+              }
             >
               {RECURRENCE_OPTIONS.map((o) => (
                 <option key={o.value} value={o.value}>
@@ -456,11 +469,24 @@ export default function AddCalendarPage() {
             </p>
           </div>
           <div className="sm:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-gray-700">Popis</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Popis{requiresBusinessTripDescription(form.event_type) ? " *" : ""}
+            </label>
+            {requiresBusinessTripDescription(form.event_type) && (
+              <p className="mb-1 text-xs text-gray-600">
+                U služební cesty uveďte kam jedete a proč – schvalovatel to uvidí v detailu události.
+              </p>
+            )}
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={4}
+              required={requiresBusinessTripDescription(form.event_type)}
+              placeholder={
+                requiresBusinessTripDescription(form.event_type)
+                  ? "Např. cíl cesty, účast na schůzce u zákazníka, důvod…"
+                  : undefined
+              }
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>

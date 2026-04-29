@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { getEventTypeLabel } from "@/app/(dashboard)/calendar/lib/event-types";
 import { getColorForEventType } from "@/lib/calendar-event-colors";
 
 type CreateUnitArgs = {
@@ -60,7 +61,7 @@ export async function createCalendarEventUnit(
         status: "pending",
       },
     });
-    const notifMessage = `${a.creatorName} vytvořil/a událost „${a.title}“ (${a.eventType === "dovolena" ? "Dovolená" : "Osobní"}), která vyžaduje vaše schválení.`;
+    const notifMessage = `${a.creatorName} vytvořil/a událost „${a.title}“ (${getEventTypeLabel(a.eventType)}), která vyžaduje vaše schválení.`;
     await db.notifications.create({
       data: {
         user_id: a.deputyIdNum,
