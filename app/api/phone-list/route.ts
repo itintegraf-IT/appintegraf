@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { attachMembersToDepartments } from "@/lib/phone-list-members";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -42,7 +43,9 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ tab: "departments", departments });
+    const departmentsWithMembers = await attachMembersToDepartments(departments);
+
+    return NextResponse.json({ tab: "departments", departments: departmentsWithMembers });
   }
 
   const contactAnd: Record<string, unknown>[] = [

@@ -99,20 +99,20 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     title: "Kalendář",
     path: "/calendar",
     intro:
-      "Plánování událostí, absencí a schvalování vybraných typů událostí (Dovolená, Osobní) přes zástup a vedoucího.",
+      "Plánování událostí, absencí a schvalování vybraných typů událostí (např. Dovolená, Osobní, Schůzka Praha, Služební cesta, Lékař) přes zástup a vedoucího.",
     features: [
       "Týdenní, měsíční a seznamové zobrazení.",
       "Osobní a globální pohled.",
       "Vyhledávání podle textu i osob.",
       "Vytvoření, úprava, smazání a přesun události (drag & drop).",
-      "Dvoufázové schvalování u typů Dovolená a Osobní (zástup → vedoucí).",
+      "Dvoufázové schvalování u typů s povinným zástupem (zástup → vedoucí).",
       "Export kalendáře do .ics (Outlook/Google).",
     ],
     quickSteps: [
       "Otevřete Kalendář a zvolte pohled (Týden / Měsíc / Seznam).",
       "Přepněte Globální nebo Osobní kalendář.",
       "Novou událost vytvořte kliknutím do mřížky nebo tlačítkem pro přidání události.",
-      "U typu Dovolená/Osobní vždy vyberte zástup.",
+      "U typu se schvalováním vždy vyberte zástup.",
       "Sledujte stavy schválení v dashboardu a notifikacích.",
       "Pro napojení do Outlook/Google použijte export .ics.",
     ],

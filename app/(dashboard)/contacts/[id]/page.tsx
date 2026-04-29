@@ -22,10 +22,32 @@ export default async function ContactViewPage({
 
   const contact = await prisma.users.findFirst({
     where: { id, is_active: true },
-    include: { roles: { select: { name: true } } },
+    include: {
+      roles: { select: { name: true } },
+      user_secondary_departments: {
+        orderBy: { id: "asc" },
+        select: { departments: { select: { name: true } } },
+      },
+    },
   });
 
   if (!contact) notFound();
+
+  const primaryDept = contact.department_id
+    ? await prisma.departments.findUnique({
+        where: { id: contact.department_id },
+        select: { name: true },
+      })
+    : null;
+
+  const fromEvidence: string[] = [];
+  if (primaryDept?.name) fromEvidence.push(primaryDept.name);
+  for (const s of contact.user_secondary_departments) {
+    const n = s.departments?.name;
+    if (n && !fromEvidence.includes(n)) fromEvidence.push(n);
+  }
+  const departmentDisplay =
+    fromEvidence.length > 0 ? fromEvidence.join(", ") : contact.department_name || null;
 
   const showVizitka = await canViewContactVizitka(userId, id);
   const showPersonal = canWrite || userId === id;
@@ -136,12 +158,20 @@ export default async function ContactViewPage({
                     </div>
                   </div>
                 )}
-                {contact.department_name && (
+                {departmentDisplay && (
                   <div className="flex items-center gap-3">
                     <Building2 className="h-5 w-5 text-gray-400" />
                     <div>
                       <p className="text-xs text-gray-500">Oddělení</p>
-                      <span>{contact.department_name}</span>
+                      <span>{departmentDisplay}</span>
+                      {fromEvidence.length > 0 &&
+                        contact.department_name &&
+                        contact.department_name.trim() !== "" &&
+                        contact.department_name !== departmentDisplay && (
+                          <p className="mt-1 text-xs text-gray-500">
+                            Text v poli legacy: {contact.department_name}
+                          </p>
+                        )}
                     </div>
                   </div>
                 )}

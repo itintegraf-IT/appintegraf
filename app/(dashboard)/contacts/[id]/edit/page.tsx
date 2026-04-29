@@ -19,7 +19,7 @@ export default async function EditContactPage({
   const id = parseInt((await params).id, 10);
   if (isNaN(id)) notFound();
 
-  const contact = await prisma.users.findFirst({
+  const row = await prisma.users.findFirst({
     where: { id, is_active: true },
     select: {
       id: true,
@@ -32,13 +32,33 @@ export default async function EditContactPage({
       landline2: true,
       position: true,
       department_name: true,
+      department_id: true,
+      user_secondary_departments: {
+        select: { department_id: true },
+        orderBy: { id: "asc" },
+      },
       display_in_list: true,
       personal_phone: true,
       personal_email: true,
     },
   });
 
-  if (!contact) notFound();
+  if (!row) notFound();
+
+  let department_id = row.department_id;
+  if (!department_id && row.department_name) {
+    const dept = await prisma.departments.findFirst({
+      where: { name: row.department_name },
+      select: { id: true },
+    });
+    if (dept) department_id = dept.id;
+  }
+
+  const secondary_department_ids = row.user_secondary_departments
+    .map((s) => s.department_id)
+    .slice(0, 2);
+  const { user_secondary_departments: _u, ...rest } = row;
+  const contact = { ...rest, department_id, secondary_department_ids };
 
   return (
     <>

@@ -9,11 +9,13 @@ import {
   getParticipantUserIds,
   notifyCalendarInvitees,
 } from "@/lib/calendar-participant-sync";
+import { requiresBusinessTripDescription, requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
   "osobni",
   "schuzka_mimo_firmu",
+  "schuzka_praha",
   "sluzebni_cesta",
   "lekar",
   "nemoc",
@@ -126,9 +128,12 @@ export async function PUT(
     }
     let deputyIdNum: number | null = null;
 
-    if (eventType === "dovolena" || eventType === "osobni") {
+    if (requiresDeputy(eventType)) {
       if (!deputy_id) {
-        return NextResponse.json({ error: "U typu Dovolená a Osobní je zástup povinný" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Pro zvolený typ události je zástup povinný (schvalování)." },
+          { status: 400 }
+        );
       }
       const parsed = parseInt(deputy_id, 10);
       if (isNaN(parsed)) {
@@ -160,6 +165,17 @@ export async function PUT(
       if (!deputy) {
         return NextResponse.json({ error: "Uživatel nemůže být zástupem" }, { status: 400 });
       }
+    }
+
+    const descTrim = description ? String(description).trim() : "";
+    if (requiresBusinessTripDescription(eventType) && !descTrim) {
+      return NextResponse.json(
+        {
+          error:
+            "U služební cesty vyplňte popis (kde a proč jedete) – je povinný pro schvalovatele.",
+        },
+        { status: 400 }
+      );
     }
 
     const start = new Date(start_date);
@@ -230,7 +246,7 @@ export async function PUT(
         where: { id },
         data: {
           title: String(title).trim(),
-          description: description ? String(description).trim() : null,
+          description: descTrim || null,
           start_date: start,
           end_date: end,
           event_type: eventType,
