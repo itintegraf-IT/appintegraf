@@ -52,6 +52,7 @@ export async function GET(
         select: { department_id: true },
         orderBy: { id: "asc" },
       },
+      user_shared_mails: { select: { shared_mail_id: true } },
     },
   });
 
@@ -103,11 +104,14 @@ export async function GET(
     (user.user_secondary_departments ?? []) as Array<{ department_id: number }>
   ).map((sd) => sd.department_id);
 
-  const { user_roles: _, user_secondary_departments: __, ...rest } = user;
+  const shared_mail_ids = (user.user_shared_mails ?? []).map((m) => m.shared_mail_id);
+
+  const { user_roles: _, user_secondary_departments: __, user_shared_mails: _us, ...rest } = user;
   return NextResponse.json({
     ...rest,
     department_id,
     secondary_department_ids,
+    shared_mail_ids,
     role_id: roleId,
     module_access,
   });
@@ -238,6 +242,21 @@ export async function PUT(
         await prisma.user_secondary_departments.create({
           data: { user_id: id, department_id: deptId },
         });
+      }
+    }
+
+    if (bodyData.shared_mail_ids !== undefined) {
+      const shared_mail_ids = Array.isArray(bodyData.shared_mail_ids)
+        ? (bodyData.shared_mail_ids as unknown[]).map((x) => parseInt(String(x), 10)).filter((n) => !isNaN(n) && n > 0)
+        : [];
+      const found = await prisma.shared_mails.findMany({
+        where: { id: { in: shared_mail_ids } },
+        select: { id: true },
+      });
+      const validIds = found.map((f) => f.id);
+      await prisma.user_shared_mails.deleteMany({ where: { user_id: id } });
+      for (const sid of validIds) {
+        await prisma.user_shared_mails.create({ data: { user_id: id, shared_mail_id: sid } });
       }
     }
 

@@ -210,6 +210,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const shared_mail_ids = Array.isArray(body.shared_mail_ids)
+      ? (body.shared_mail_ids as unknown[]).map((x) => parseInt(String(x), 10)).filter((n) => !isNaN(n) && n > 0)
+      : [];
+    if (shared_mail_ids.length) {
+      const found = await prisma.shared_mails.findMany({
+        where: { id: { in: shared_mail_ids } },
+        select: { id: true },
+      });
+      for (const sm of found) {
+        await prisma.user_shared_mails.create({
+          data: { user_id: user.id, shared_mail_id: sm.id },
+        });
+      }
+    }
+
     const isAdminRole = roleRow.name?.toLowerCase() === "admin";
     const moduleAccessJson = isAdminRole
       ? JSON.stringify({ all: true })

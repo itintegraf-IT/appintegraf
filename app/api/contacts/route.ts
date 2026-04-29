@@ -8,6 +8,7 @@ import {
   replaceUserSecondaryDepartments,
   resolveContactDepartmentIds,
 } from "@/lib/contacts-user-departments";
+import { phoneListUserSelect, toPhoneListContact } from "@/lib/phone-list-user-select";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -41,6 +42,20 @@ export async function GET(req: NextRequest) {
         { landline: { contains: search } },
         { landline2: { contains: search } },
         { qr_code: { contains: search } },
+        {
+          user_shared_mails: {
+            some: {
+              shared_mails: {
+                AND: [
+                  { OR: [{ is_active: true }, { is_active: null }] },
+                  {
+                    OR: [{ email: { contains: search } }, { label: { contains: search } }],
+                  },
+                ],
+              },
+            },
+          },
+        },
       ],
     });
   }
@@ -54,29 +69,37 @@ export async function GET(req: NextRequest) {
       ? [{ first_name: dir === "desc" ? "desc" : "asc" }, { last_name: "asc" }]
       : [{ last_name: dir === "desc" ? "desc" : "asc" }, { first_name: "asc" }];
 
-  const [contacts, total] = await Promise.all([
+  const [rawContacts, total] = await Promise.all([
     prisma.users.findMany({
       where,
       orderBy,
       skip: perPage ? skip : 0,
       take: perPage ?? undefined,
       select: {
-        id: true,
-        first_name: true,
-        last_name: true,
-        email: true,
-        phone: true,
-        landline: true,
-        landline2: true,
-        position: true,
-        department_name: true,
-        qr_code: true,
+        ...phoneListUserSelect,
         role_id: true,
         roles: { select: { name: true } },
       },
     }),
     prisma.users.count({ where }),
   ]);
+
+  const primaryIds = [
+    ...new Set(rawContacts.map((u) => u.department_id).filter((id): id is number => id != null && id > 0)),
+  ];
+  const primaryDepts =
+    primaryIds.length > 0
+      ? await prisma.departments.findMany({
+          where: { id: { in: primaryIds } },
+          select: { id: true, email: true },
+        })
+      : [];
+  const primaryById: Record<number, { email: string | null }> = {};
+  for (const d of primaryDepts) {
+    primaryById[d.id] = { email: d.email };
+  }
+
+  const contacts = rawContacts.map((u) => toPhoneListContact(u, primaryById));
 
   const totalPages = perPage ? Math.max(1, Math.ceil(total / perPage)) : 1;
 
