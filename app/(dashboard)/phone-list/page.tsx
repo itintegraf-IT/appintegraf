@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { PhoneListClient } from "./PhoneListClient";
+import { PhoneListClient } from "@/components/phone-list/PhoneListClient";
 
 export default async function PhoneListPage({
   searchParams,
