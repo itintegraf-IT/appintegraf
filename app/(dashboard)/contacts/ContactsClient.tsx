@@ -19,6 +19,8 @@ import {
   Download,
   Upload,
 } from "lucide-react";
+import { ContactSearchAutocomplete } from "@/components/contacts/ContactSearchAutocomplete";
+import type { EmailSourceLabel, MergedEmailRow } from "@/lib/merge-user-emails";
 
 type Contact = {
   id: number;
@@ -32,7 +34,44 @@ type Contact = {
   department_name: string | null;
   qr_code: string | null;
   roles: { name: string } | null;
+  role_id?: number | null;
+  merged_emails?: MergedEmailRow[];
 };
+
+function MergedEmailsCell({ c }: { c: Contact }) {
+  const lines: MergedEmailRow[] =
+    c.merged_emails && c.merged_emails.length
+      ? c.merged_emails
+      : [{ address: c.email, sources: ["osobní" as EmailSourceLabel], sharedLabel: null }];
+
+  return (
+    <div className="min-w-0 max-w-sm space-y-1.5">
+      {lines.map((row) => (
+        <div key={row.address}>
+          <a
+            href={`mailto:${row.address}`}
+            className={
+              row.sources.includes("společná schránka") && !row.sources.includes("osobní")
+                ? "text-gray-700 hover:underline break-all"
+                : "text-red-600 hover:underline break-all"
+            }
+          >
+            {row.address}
+          </a>
+          <p
+            className={
+              row.sources.includes("společná schránka") && !row.sources.includes("osobní")
+                ? "text-[10px] text-gray-500"
+                : "text-[10px] text-gray-500"
+            }
+          >
+            {row.sources.join(" · ")}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type Props = {
   initialSearch: string;
@@ -102,13 +141,17 @@ export function ContactsClient({
     fetchDepartments();
   }, []);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
+  const applySearchToUrl = (q: string) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("search", search);
+    params.set("search", q);
     params.set("department", department);
     params.set("page", "1");
     router.push(`/contacts?${params}`);
+  };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    applySearchToUrl(search);
   };
 
   const handleDelete = async (id: number, name: string) => {
@@ -170,15 +213,17 @@ export function ContactsClient({
       <form onSubmit={handleSearch} className="mb-6 rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1 block text-sm font-medium text-gray-700" htmlFor="contacts-search">
               <Search className="mr-1 inline h-4 w-4" /> Vyhledat
             </label>
-            <input
-              type="text"
+            <ContactSearchAutocomplete
+              inputId="contacts-search"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Jméno, email, telefon..."
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              onChange={setSearch}
+              onSuggestionApplied={applySearchToUrl}
+              placeholder="Jméno, příjmení, e-mail…"
+              className="w-full"
+              inputClassName="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
           <div>
@@ -265,8 +310,8 @@ export function ContactsClient({
                           {c.position && <div className="text-xs text-gray-500">{c.position}</div>}
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <a href={`mailto:${c.email}`} className="text-red-600 hover:underline">{c.email}</a>
+                      <td className="px-4 py-3 align-top">
+                        <MergedEmailsCell c={c} />
                       </td>
                       <td className="px-4 py-3">
                         {c.phone ? <a href={`tel:${c.phone}`} className="text-red-600 hover:underline">{c.phone}</a> : "-"}
@@ -312,9 +357,9 @@ export function ContactsClient({
                   <h3 className="font-semibold text-red-600">{c.first_name} {c.last_name}</h3>
                   {c.position && <p className="text-sm text-gray-500">{c.position}</p>}
                   <div className="mt-3 space-y-1 text-sm">
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-gray-400" />
-                      <a href={`mailto:${c.email}`} className="text-red-600 hover:underline">{c.email}</a>
+                    <div className="flex items-start gap-2">
+                      <Mail className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+                      <MergedEmailsCell c={c} />
                     </div>
                     {c.phone && (
                       <div className="flex items-center gap-2">

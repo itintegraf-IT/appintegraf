@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { canViewContactVizitka, hasModuleAccess } from "@/lib/auth-utils";
 import { buildOutlookContactSignatureHtml, getContactSignatureAssetBaseUrl } from "@/lib/contact-signature-html";
 import { prisma } from "@/lib/db";
+import { mergeUserEmails } from "@/lib/merge-user-emails";
 import { ArrowLeft, Mail, Phone, Building2, Pencil, QrCode } from "lucide-react";
 import { ContactDetailTabs } from "../ContactDetailTabs";
 import { ContactVizitkaTab } from "../ContactVizitkaTab";
@@ -26,7 +27,11 @@ export default async function ContactViewPage({
       roles: { select: { name: true } },
       user_secondary_departments: {
         orderBy: { id: "asc" },
-        select: { departments: { select: { name: true } } },
+        select: { departments: { select: { name: true, email: true } } },
+      },
+      user_shared_mails: {
+        where: { shared_mails: { OR: [{ is_active: true }, { is_active: null }] } },
+        include: { shared_mails: { select: { email: true, label: true, is_active: true } } },
       },
     },
   });
@@ -36,7 +41,7 @@ export default async function ContactViewPage({
   const primaryDept = contact.department_id
     ? await prisma.departments.findUnique({
         where: { id: contact.department_id },
-        select: { name: true },
+        select: { name: true, email: true },
       })
     : null;
 
@@ -66,6 +71,19 @@ export default async function ContactViewPage({
     : "";
 
   const name = `${contact.first_name} ${contact.last_name}`;
+
+  const deptEmails: (string | null)[] = [];
+  if (primaryDept?.email) deptEmails.push(primaryDept.email);
+  for (const s of contact.user_secondary_departments) {
+    const e = s.departments?.email;
+    if (e) deptEmails.push(e);
+  }
+  const sharedList: { email: string; label: string }[] = [];
+  for (const usm of contact.user_shared_mails) {
+    const sm = usm.shared_mails;
+    if (sm && sm.is_active !== false) sharedList.push({ email: sm.email, label: sm.label });
+  }
+  const mergedEmails = mergeUserEmails(contact.email, deptEmails, sharedList);
 
   return (
     <>
@@ -120,13 +138,38 @@ export default async function ContactViewPage({
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="flex items-center gap-3">
-                  <Mail className="h-5 w-5 text-gray-400" />
+                <div className="flex items-start gap-3 sm:col-span-2">
+                  <Mail className="mt-0.5 h-5 w-5 shrink-0 text-gray-400" />
                   <div>
-                    <p className="text-xs text-gray-500">E-mail</p>
-                    <a href={`mailto:${contact.email}`} className="text-red-600 hover:underline">
-                      {contact.email}
-                    </a>
+                    <p className="text-xs text-gray-500">E-mail (osobní, oddělení, společné)</p>
+                    <ul className="mt-1 space-y-2">
+                      {mergedEmails.map((row) => (
+                        <li key={row.address}>
+                          <a
+                            href={`mailto:${row.address}`}
+                            className={
+                              row.sources.includes("společná schránka") && !row.sources.includes("osobní")
+                                ? "text-gray-700 hover:underline"
+                                : "text-red-600 hover:underline"
+                            }
+                          >
+                            {row.address}
+                          </a>
+                          <p
+                            className={
+                              row.sources.includes("společná schránka") && !row.sources.includes("osobní")
+                                ? "text-xs text-gray-500"
+                                : "text-xs text-gray-500"
+                            }
+                          >
+                            {row.sources.join(" · ")}
+                            {row.sharedLabel && row.sources.includes("společná schránka")
+                              ? ` — ${row.sharedLabel}`
+                              : null}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                 </div>
                 {contact.phone && (

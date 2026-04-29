@@ -47,6 +47,7 @@ export default async function AdminUserEditPage({
         select: { department_id: true },
         orderBy: { id: "asc" },
       },
+      user_shared_mails: { select: { shared_mail_id: true } },
     },
   });
 
@@ -93,11 +94,14 @@ export default async function AdminUserEditPage({
     (row.user_secondary_departments ?? []) as Array<{ department_id: number }>
   ).map((sd) => sd.department_id);
 
-  const { user_roles: _ur, user_secondary_departments: _usd, ...rest } = row;
+  const shared_mail_ids = (row.user_shared_mails ?? []).map((m) => m.shared_mail_id);
+
+  const { user_roles: _ur, user_secondary_departments: _usd, user_shared_mails: _usm, ...rest } = row;
   const user = {
     ...rest,
     department_id,
     secondary_department_ids,
+    shared_mail_ids,
     role_id: ur?.role_id ?? row.role_id,
     module_access,
   };

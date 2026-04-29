@@ -43,6 +43,7 @@ function getPermissionOptions(moduleKey: string) {
 type Role = { id: number; name: string };
 type Department = { id: number; name: string; code?: string | null };
 type ModuleAccessMap = Record<string, string>;
+type SharedMailOption = { id: number; email: string; label: string; is_active: boolean | null };
 type User = {
   id?: number;
   username?: string;
@@ -56,6 +57,7 @@ type User = {
   department_id?: number | null;
   department_name?: string | null;
   secondary_department_ids?: number[];
+  shared_mail_ids?: number[];
   is_active?: boolean | null;
   display_in_list?: boolean | null;
   role_id?: number | null;
@@ -67,6 +69,7 @@ export function AdminUserForm({ user }: { user?: User }) {
   const isEdit = !!user?.id;
   const [roles, setRoles] = useState<Role[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [sharedMails, setSharedMails] = useState<SharedMailOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   /** Režim nastavení hesla při vytváření: aktivační e-mail (doporučeno) vs. ruční zadání. */
@@ -92,6 +95,7 @@ export function AdminUserForm({ user }: { user?: User }) {
     secondary_department_ids: (user?.secondary_department_ids ?? []) as number[],
     role_id: (user?.role_id ?? null) as number | null,
     module_access: (user?.module_access ?? {}) as ModuleAccessMap,
+    shared_mail_ids: user?.shared_mail_ids ?? [] as number[],
     is_active: user?.is_active !== false,
     display_in_list: user?.display_in_list !== false,
     password_custom: "",
@@ -124,6 +128,13 @@ export function AdminUserForm({ user }: { user?: User }) {
   }, []);
 
   useEffect(() => {
+    fetch("/api/admin/shared-mails")
+      .then((r) => r.json())
+      .then((data) => (Array.isArray(data) ? setSharedMails(data) : setSharedMails([])))
+      .catch(() => setSharedMails([]));
+  }, []);
+
+  useEffect(() => {
     if (user) {
       setForm({
         username: user.username ?? "",
@@ -138,6 +149,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         secondary_department_ids: user.secondary_department_ids ?? [],
         role_id: (user.role_id ?? null) as number | null,
         module_access: user.module_access ?? {},
+        shared_mail_ids: user.shared_mail_ids ?? [],
         is_active: user.is_active !== false,
         display_in_list: user.display_in_list !== false,
         password_custom: "",
@@ -255,6 +267,7 @@ export function AdminUserForm({ user }: { user?: User }) {
       const body: Record<string, unknown> = {
         ...form,
         module_access: form.module_access,
+        shared_mail_ids: form.shared_mail_ids,
         password_custom: form.password_custom || undefined,
       };
       if (!isEdit) {
@@ -417,6 +430,44 @@ export function AdminUserForm({ user }: { user?: User }) {
                 </option>
               ))}
           </select>
+        </div>
+        <div className="sm:col-span-2 rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-4">
+          <label className="mb-2 block text-sm font-medium text-gray-800">
+            Společné maily (sdílené schránky)
+          </label>
+          {sharedMails.length === 0 ? (
+            <p className="text-sm text-gray-500">Žádné záznamy – přidáte v Administraci → Společné maily.</p>
+          ) : (
+            <ul className="max-h-48 space-y-2 overflow-y-auto">
+              {sharedMails
+                .filter((m) => m.is_active !== false)
+                .map((m) => {
+                  const checked = form.shared_mail_ids.includes(m.id);
+                  return (
+                    <li key={m.id} className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        id={`sm-${m.id}`}
+                        checked={checked}
+                        onChange={() => {
+                          setForm((prev) => {
+                            const set = new Set(prev.shared_mail_ids);
+                            if (set.has(m.id)) set.delete(m.id);
+                            else set.add(m.id);
+                            return { ...prev, shared_mail_ids: [...set] };
+                          });
+                        }}
+                        className="mt-1 h-4 w-4 rounded border-gray-300"
+                      />
+                      <label htmlFor={`sm-${m.id}`} className="cursor-pointer text-sm text-gray-700">
+                        <span className="font-medium">{m.label}</span>{" "}
+                        <span className="text-gray-500">({m.email})</span>
+                      </label>
+                    </li>
+                  );
+                })}
+            </ul>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Role *</label>
