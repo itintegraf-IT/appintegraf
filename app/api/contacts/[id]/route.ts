@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
+import {
+  replaceUserSecondaryDepartments,
+  resolveContactDepartmentIds,
+} from "@/lib/contacts-user-departments";
 
 export async function GET(
   _req: NextRequest,
@@ -34,6 +38,11 @@ export async function GET(
       personal_email: true,
       position: true,
       department_name: true,
+      department_id: true,
+      user_secondary_departments: {
+        select: { department_id: true },
+        orderBy: { id: "asc" },
+      },
       qr_code: true,
       notes: true,
       display_in_list: true,
@@ -44,7 +53,11 @@ export async function GET(
     return NextResponse.json({ error: "Kontakt nenalezen" }, { status: 404 });
   }
 
-  return NextResponse.json(contact);
+  const { user_secondary_departments: usd, ...rest } = contact;
+  return NextResponse.json({
+    ...rest,
+    secondary_department_ids: usd.map((r) => r.department_id).slice(0, 2),
+  });
 }
 
 export async function PUT(
@@ -80,6 +93,8 @@ export async function PUT(
       personal_email,
       position,
       department_name,
+      department_id,
+      secondary_department_ids,
       display_in_list,
     } = body;
 
@@ -100,22 +115,31 @@ export async function PUT(
       );
     }
 
-    await prisma.users.update({
-      where: { id },
-      data: {
-        username: username.trim(),
-        email: email.trim(),
-        first_name: first_name.trim(),
-        last_name: last_name.trim(),
-        phone: (phone ?? "").trim() || null,
-        landline: (landline ?? "").trim() || null,
-        landline2: (landline2 ?? "").trim() || null,
-        personal_phone: (personal_phone ?? "").trim() || null,
-        personal_email: (personal_email ?? "").trim() || null,
-        position: (position ?? "").trim() || null,
-        department_name: (department_name ?? "").trim() || null,
-        display_in_list: display_in_list !== false,
-      },
+    const { department_id: primId, secondaryIds } = await resolveContactDepartmentIds(
+      department_id,
+      secondary_department_ids
+    );
+
+    await prisma.$transaction(async (tx) => {
+      await tx.users.update({
+        where: { id },
+        data: {
+          username: username.trim(),
+          email: email.trim(),
+          first_name: first_name.trim(),
+          last_name: last_name.trim(),
+          phone: (phone ?? "").trim() || null,
+          landline: (landline ?? "").trim() || null,
+          landline2: (landline2 ?? "").trim() || null,
+          personal_phone: (personal_phone ?? "").trim() || null,
+          personal_email: (personal_email ?? "").trim() || null,
+          position: (position ?? "").trim() || null,
+          department_name: (department_name ?? "").trim() || null,
+          department_id: primId,
+          display_in_list: display_in_list !== false,
+        },
+      });
+      await replaceUserSecondaryDepartments(tx, id, primId, secondaryIds);
     });
 
     return NextResponse.json({ success: true });

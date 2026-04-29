@@ -8,6 +8,7 @@ const OUT_OF_OFFICE_TYPES = [
   "dovolena",
   "osobni",
   "schuzka_mimo_firmu",
+  "schuzka_praha",
   "sluzebni_cesta",
   "lekar",
   "nemoc",

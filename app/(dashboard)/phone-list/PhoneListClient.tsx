@@ -26,6 +26,8 @@ type Contact = {
   qr_code: string | null;
 };
 
+type DepartmentMember = { first_name: string; last_name: string };
+
 type Department = {
   id: number;
   name: string;
@@ -34,6 +36,7 @@ type Department = {
   landline2: string | null;
   email: string | null;
   notes: string | null;
+  members?: DepartmentMember[];
 };
 
 type Props = {
@@ -247,6 +250,14 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
                         </div>
                       )}
                     </div>
+                    {d.members && d.members.length > 0 && (
+                      <p className="mt-3 border-t border-gray-100 pt-2 text-xs leading-relaxed text-gray-500">
+                        <span className="text-gray-400">Členové: </span>
+                        {d.members
+                          .map((m) => `${m.first_name} ${m.last_name}`)
+                          .join(" · ")}
+                      </p>
+                    )}
                   </div>
                 ))
               )}
@@ -267,6 +278,9 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
                       E-mail
+                    </th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                      Členové
                     </th>
                   </tr>
                 </thead>
@@ -301,6 +315,13 @@ export function PhoneListClient({ initialTab, initialSearch }: Props) {
                         ) : (
                           "-"
                         )}
+                      </td>
+                      <td className="max-w-md px-4 py-3 text-xs leading-relaxed text-gray-500">
+                        {d.members && d.members.length > 0
+                          ? d.members
+                              .map((m) => `${m.first_name} ${m.last_name}`)
+                              .join(" · ")
+                          : "—"}
                       </td>
                     </tr>
                   ))}

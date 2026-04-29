@@ -36,6 +36,23 @@ export function EditUkolForm({ id, initial, departments, users }: Props) {
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const [selectedDepartmentIds, setSelectedDepartmentIds] = useState<number[]>(initial.department_ids);
+  const filteredUsers = useMemo(() => {
+    if (selectedDepartmentIds.length === 0) return users;
+    const base = users.filter((u) => {
+      const ids = new Set<number>();
+      if (u.department_id) ids.add(u.department_id);
+      for (const s of u.user_secondary_departments) ids.add(s.department_id);
+      for (const idd of selectedDepartmentIds) {
+        if (ids.has(idd)) return true;
+      }
+      return false;
+    });
+    if (initial.assignee_user_id != null && !base.some((u) => u.id === initial.assignee_user_id)) {
+      const current = users.find((u) => u.id === initial.assignee_user_id);
+      if (current) return [current, ...base];
+    }
+    return base;
+  }, [users, selectedDepartmentIds, initial.assignee_user_id]);
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -91,23 +108,6 @@ export function EditUkolForm({ id, initial, departments, users }: Props) {
   }
 
   const dueLocal = initial.due_at.slice(0, 16);
-  const filteredUsers = useMemo(() => {
-    if (selectedDepartmentIds.length === 0) return users;
-    const base = users.filter((u) => {
-      const ids = new Set<number>();
-      if (u.department_id) ids.add(u.department_id);
-      for (const s of u.user_secondary_departments) ids.add(s.department_id);
-      for (const idd of selectedDepartmentIds) {
-        if (ids.has(idd)) return true;
-      }
-      return false;
-    });
-    if (initial.assignee_user_id != null && !base.some((u) => u.id === initial.assignee_user_id)) {
-      const current = users.find((u) => u.id === initial.assignee_user_id);
-      if (current) return [current, ...base];
-    }
-    return base;
-  }, [users, selectedDepartmentIds, initial.assignee_user_id]);
 
   return (
     <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">

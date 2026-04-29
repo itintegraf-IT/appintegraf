@@ -3,7 +3,11 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { createCalendarEventUnit } from "@/lib/calendar-create-one";
 import { expandRecurrence, type RecurrenceKind } from "@/lib/calendar-recurrence";
-import { requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
+import {
+  getEventTypeLabel,
+  requiresBusinessTripDescription,
+  requiresDeputy,
+} from "@/app/(dashboard)/calendar/lib/event-types";
 import { sendCalendarApprovalEmail } from "@/lib/email";
 import { findCreatorCalendarOverlap, formatOverlapErrorCs } from "@/lib/calendar-time-overlap";
 import {
@@ -16,6 +20,7 @@ const OUT_OF_OFFICE_TYPES = [
   "dovolena",
   "osobni",
   "schuzka_mimo_firmu",
+  "schuzka_praha",
   "sluzebni_cesta",
   "lekar",
   "nemoc",
@@ -105,7 +110,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Opakování není u typů Dovolená a Osobní k dispozici. Zadejte jednotlivé žádosti, nebo zvolte jiný typ události.",
+            "Opakování není u typů s povinným zástupným schvalováním k dispozici. Zadejte jednotlivé žádosti, nebo zvolte jiný typ události.",
         },
         { status: 400 }
       );
@@ -138,9 +143,12 @@ export async function POST(req: NextRequest) {
 
     let deputyIdNum: number | null = null;
 
-    if (eventType === "dovolena" || eventType === "osobni") {
+    if (requiresDeputy(eventType)) {
       if (!deputy_id) {
-        return NextResponse.json({ error: "U typu Dovolená a Osobní je zástup povinný" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Pro zvolený typ události je zástup povinný (schvalování)." },
+          { status: 400 }
+        );
       }
       const parsed = parseInt(deputy_id, 10);
       if (isNaN(parsed)) {
@@ -238,6 +246,16 @@ export async function POST(req: NextRequest) {
     const descTrim = description ? String(description).trim() : "";
     const locTrim = location ? String(location).trim() : "";
 
+    if (requiresBusinessTripDescription(eventType) && !descTrim) {
+      return NextResponse.json(
+        {
+          error:
+            "U služební cesty vyplňte popis (kde a proč jedete) – je povinný pro schvalovatele.",
+        },
+        { status: 400 }
+      );
+    }
+
     const participantUserIds = normalizeParticipantUserIds(participantUserIdsRaw, {
       creatorId: userId,
       deputyId: deputyIdNum,
@@ -271,7 +289,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (deputyIdNum !== null) {
-      const notifMessage = `${creatorName} vytvořil/a událost „${titleTrim}“ (${eventType === "dovolena" ? "Dovolená" : "Osobní"}), která vyžaduje vaše schválení.`;
+      const notifMessage = `${creatorName} vytvořil/a událost „${titleTrim}“ (${getEventTypeLabel(eventType)}), která vyžaduje vaše schválení.`;
       const deputy = await prisma.users.findUnique({
         where: { id: deputyIdNum },
         select: { email: true, first_name: true, last_name: true },

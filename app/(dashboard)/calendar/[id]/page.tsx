@@ -3,7 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { ArrowLeft } from "lucide-react";
-import { getEventTypeLabel } from "../lib/event-types";
+import { getEventTypeLabel, requiresBusinessTripDescription } from "../lib/event-types";
 import { ApproveRejectButtons } from "../ApproveRejectButtons";
 import { DeleteEventButton } from "../DeleteEventButton";
 
@@ -67,12 +67,14 @@ export default async function CalendarEventPage({
           {(isDeputy || isManager) && (
             <ApproveRejectButtons eventId={id} eventTitle={event.title} />
           )}
-          <Link
-            href={`/calendar/${id}/edit`}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-          >
-            Upravit
-          </Link>
+          {event.created_by === userId && (
+            <Link
+              href={`/calendar/${id}/edit`}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+            >
+              Upravit
+            </Link>
+          )}
           {event.created_by === userId && (
             <DeleteEventButton eventId={id} eventTitle={event.title} />
           )}
@@ -177,11 +179,23 @@ export default async function CalendarEventPage({
               <p className="font-medium">{event.location}</p>
             </div>
           )}
-          {event.description && (
-            <div className="sm:col-span-2">
-              <p className="text-sm text-gray-500">Popis</p>
-              <p className="whitespace-pre-wrap">{event.description}</p>
+          {requiresBusinessTripDescription(event.event_type) ? (
+            <div className="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-sm">
+              <p className="text-sm font-semibold text-slate-800">Účel cesty</p>
+              <p className="mt-2 text-sm text-slate-600">
+                Kam jedete a proč – informace pro schvalovatele.
+              </p>
+              <p className="mt-3 whitespace-pre-wrap text-base text-gray-900">
+                {event.description?.trim() ? event.description : "—"}
+              </p>
             </div>
+          ) : (
+            event.description && (
+              <div className="sm:col-span-2">
+                <p className="text-sm text-gray-500">Popis</p>
+                <p className="whitespace-pre-wrap">{event.description}</p>
+              </div>
+            )
           )}
         </div>
       </div>

@@ -4,6 +4,10 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import bcrypt from "bcryptjs";
 import { notifyContactsEditorsNewContact } from "@/lib/contacts-notify";
+import {
+  replaceUserSecondaryDepartments,
+  resolveContactDepartmentIds,
+} from "@/lib/contacts-user-departments";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -110,6 +114,8 @@ export async function POST(req: NextRequest) {
       personal_email = "",
       position = "",
       department_name = "",
+      department_id,
+      secondary_department_ids,
       role_id = 1,
       display_in_list = true,
       password_custom = "heslo123",
@@ -132,6 +138,11 @@ export async function POST(req: NextRequest) {
     const qrCode = String(Math.floor(Math.random() * 1e12)).padStart(12, "0");
     const passwordHash = await bcrypt.hash(password_custom || "heslo123", 10);
 
+    const { department_id: primId, secondaryIds } = await resolveContactDepartmentIds(
+      department_id,
+      secondary_department_ids
+    );
+
     const user = await prisma.users.create({
       data: {
         username: username.trim(),
@@ -146,12 +157,15 @@ export async function POST(req: NextRequest) {
         personal_email: personal_email.trim() || null,
         position: position.trim() || null,
         department_name: department_name.trim() || null,
+        department_id: primId,
         role_id: role_id || null,
         display_in_list: !!display_in_list,
         qr_code: qrCode,
         is_active: true,
       },
     });
+
+    await replaceUserSecondaryDepartments(prisma, user.id, primId, secondaryIds);
 
     try {
       await prisma.user_roles.create({

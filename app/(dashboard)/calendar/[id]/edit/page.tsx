@@ -4,7 +4,13 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft } from "lucide-react";
-import { EVENT_TYPES, DEFAULT_EVENT_TYPE, requiresDeputy, isAllDayEvent } from "../../lib/event-types";
+import {
+  EVENT_TYPES,
+  DEFAULT_EVENT_TYPE,
+  requiresBusinessTripDescription,
+  requiresDeputy,
+  isAllDayEvent,
+} from "../../lib/event-types";
 import { REMINDER_MINUTE_OPTIONS } from "../../lib/calendar-form-options";
 import {
   allDayYmdRangeToIsoStrings,
@@ -160,6 +166,10 @@ export default function EditCalendarPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (requiresBusinessTripDescription(form.event_type) && !form.description.trim()) {
+      setError("U služební cesty vyplňte popis (kde a proč jedete) – je povinný pro schvalovatele.");
+      return;
+    }
     setLoading(true);
 
     let startDate: string;
@@ -469,11 +479,24 @@ export default function EditCalendarPage() {
             </p>
           </div>
           <div className="sm:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-gray-700">Popis</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">
+              Popis{requiresBusinessTripDescription(form.event_type) ? " *" : ""}
+            </label>
+            {requiresBusinessTripDescription(form.event_type) && (
+              <p className="mb-1 text-xs text-gray-600">
+                U služební cesty uveďte kam jedete a proč – schvalovatel to uvidí v detailu události.
+              </p>
+            )}
             <textarea
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={4}
+              required={requiresBusinessTripDescription(form.event_type)}
+              placeholder={
+                requiresBusinessTripDescription(form.event_type)
+                  ? "Např. cíl cesty, účast na schůzce u zákazníka, důvod…"
+                  : undefined
+              }
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
+
+type DeptOption = { id: number; name: string; code: string | null };
 
 type ContactData = {
   id?: number;
@@ -18,6 +20,8 @@ type ContactData = {
   personal_email?: string | null;
   position?: string | null;
   department_name?: string | null;
+  department_id?: number | null;
+  secondary_department_ids?: number[];
   display_in_list?: boolean | null;
 };
 
@@ -27,6 +31,7 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [tab, setTab] = useState<"main" | "personal">("main");
+  const [departments, setDepartments] = useState<DeptOption[]>([]);
   const [form, setForm] = useState({
     username: contact?.username ?? "",
     email: contact?.email ?? "",
@@ -39,8 +44,19 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
     personal_email: contact?.personal_email ?? "",
     position: contact?.position ?? "",
     department_name: contact?.department_name ?? "",
+    department_id: contact?.department_id ?? null,
+    secondary_department_ids: (contact?.secondary_department_ids ?? []).slice(0, 2),
     display_in_list: contact?.display_in_list !== false,
   });
+
+  useEffect(() => {
+    fetch("/api/departments")
+      .then((r) => r.json())
+      .then((data: DeptOption[]) => {
+        if (Array.isArray(data)) setDepartments(data);
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +64,12 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
     setLoading(true);
 
     try {
-      const body: Record<string, unknown> = { ...form };
+      const body: Record<string, unknown> = {
+        ...form,
+        secondary_department_ids: form.secondary_department_ids.filter(
+          (x): x is number => typeof x === "number" && x > 0
+        ),
+      };
       const url = isEdit ? `/api/contacts/${contact!.id}` : "/api/contacts";
       const method = isEdit ? "PUT" : "POST";
       const res = await fetch(url, {
@@ -145,7 +166,7 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
-          <div>
+          <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">Pozice</label>
             <input
               type="text"
@@ -154,16 +175,105 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Oddělení</label>
-            <input
-              type="text"
-              value={form.department_name}
-              onChange={(e) => setForm({ ...form, department_name: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            />
+          <div className="sm:col-span-2 rounded-lg border border-gray-100 bg-gray-50/80 p-4">
+            <p className="mb-3 text-sm font-medium text-gray-800">Oddělení (evidence)</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Hlavní oddělení</label>
+                <select
+                  value={form.department_id ?? ""}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      department_id: e.target.value ? parseInt(e.target.value, 10) : null,
+                    })
+                  }
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+                >
+                  <option value="">— Nevybráno</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Další oddělení 1</label>
+                <select
+                  value={form.secondary_department_ids[0] ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setForm((prev) => {
+                      const next = [...prev.secondary_department_ids];
+                      if (v) next[0] = v;
+                      else next.splice(0, 1);
+                      return { ...prev, secondary_department_ids: next };
+                    });
+                  }}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+                >
+                  <option value="">— Nevybráno</option>
+                  {departments
+                    .filter(
+                      (d) =>
+                        d.id === form.secondary_department_ids[0] ||
+                        (d.id !== form.department_id && d.id !== form.secondary_department_ids[1])
+                    )
+                    .map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">Další oddělení 2</label>
+                <select
+                  value={form.secondary_department_ids[1] ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value ? parseInt(e.target.value, 10) : null;
+                    setForm((prev) => {
+                      const next = [...prev.secondary_department_ids];
+                      if (v) next[1] = v;
+                      else next.splice(1, 1);
+                      return { ...prev, secondary_department_ids: next };
+                    });
+                  }}
+                  className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+                >
+                  <option value="">— Nevybráno</option>
+                  {departments
+                    .filter(
+                      (d) =>
+                        d.id === form.secondary_department_ids[1] ||
+                        (d.id !== form.department_id && d.id !== form.secondary_department_ids[0])
+                    )
+                    .map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-4">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Text oddělení (volitelně, legacy)
+              </label>
+              <input
+                type="text"
+                value={form.department_name}
+                onChange={(e) => setForm({ ...form, department_name: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2"
+                placeholder="Dočasné pole – po srovnání dat můžete nechat prázdné"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Oddělení z evidence výše řídí telefonní seznam a vazby v systému; tento text se ukládá nezávisle.
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:col-span-2">
             <input
               type="checkbox"
               id="display_in_list"
