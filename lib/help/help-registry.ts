@@ -106,6 +106,9 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       "Vyhledávání podle textu i osob.",
       "Vytvoření, úprava, smazání a přesun události (drag & drop).",
       "Dvoufázové schvalování u typů s povinným zástupem (zástup → vedoucí).",
+      "Pozvánky na další účastníky (seznam pozvaných osob v detailu).",
+      "Kontrola kolize zástupu mimo firmu při plánování/úpravě.",
+      "Připomínky v aplikaci a e-mailem před začátkem události.",
       "Export kalendáře do .ics (Outlook/Google).",
     ],
     quickSteps: [
@@ -113,12 +116,15 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       "Přepněte Globální nebo Osobní kalendář.",
       "Novou událost vytvořte kliknutím do mřížky nebo tlačítkem pro přidání události.",
       "U typu se schvalováním vždy vyberte zástup.",
+      "Volitelně přidejte další účastníky do pole pozvánek.",
+      "U služební cesty vyplňte popis kam/ proč (povinné pro schválení).",
       "Sledujte stavy schválení v dashboardu a notifikacích.",
       "Pro napojení do Outlook/Google použijte export .ics.",
     ],
     tips: [
       "Seznamové pohledy ukazují období po 14 dnech a hodí se na rychlou kontrolu.",
       "Po přesunu dovolené/osobní události se schvalování obnoví od začátku.",
+      "Pokud systém hlásí kolizi zástupu, zvolte jiného zástupa nebo změňte termín.",
     ],
     docs: [
       { label: "Detailní manuál (uživatel)", href: "/help/kalendar-navod-uzivatel" },
@@ -221,12 +227,13 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     icon: BriefcaseBusiness,
     title: "Personalistika",
     path: "/personalistika",
-    intro: "Správa dotazníků uchazečů a evidence pracovních pozic.",
+    intro: "Správa dotazníků uchazečů, pracovních pozic a evidence brigádníků.",
     features: [
       "Evidence uchazečů a jejich stavů.",
       "Detail uchazeče včetně rozšířených dat dotazníku.",
       "Správa příloh (CV, PDF dokumenty).",
       "Správa pracovních pozic (přidání, aktivace/deaktivace, smazání).",
+      "Evidence brigádníků (jméno, telefon, e-mail, stav, poznámka).",
     ],
     quickSteps: [
       "Otevřete Personalistika.",
@@ -235,10 +242,12 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       "Nahrajte nebo smažte přílohy podle potřeby.",
       "Uložte změny.",
       "V záložce Pracovní pozice spravujte seznam pozic.",
+      "V záložce Brigádníci přidávejte a upravujte krátkodobé pracovníky.",
     ],
     tips: [
       "Pro náborovou schůzku nastavte status na Pozván.",
       "U přijatých kandidátů doplňte poznámky pro snadnější onboarding.",
+      "U brigádníků využijte stav (Student, Důchodce, OSVČ…) pro rychlou orientaci v evidenci.",
     ],
   },
 

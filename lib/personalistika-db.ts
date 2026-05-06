@@ -55,6 +55,36 @@ export type CandidatePositionRow = {
   updated_at: Date;
 };
 
+export const PART_TIMER_STATUSES = [
+  "student",
+  "duchodce",
+  "nezamestnany",
+  "zamestnany",
+  "osvc",
+  "materska_rodicovska",
+  "jine",
+] as const;
+export type PartTimerStatus = (typeof PART_TIMER_STATUSES)[number];
+
+export type PartTimerRow = {
+  id: number;
+  first_name: string;
+  last_name: string;
+  phone: string | null;
+  email: string | null;
+  status: PartTimerStatus;
+  notes: string | null;
+  created_at: Date;
+  updated_at: Date;
+};
+
+export function normalizePartTimerStatus(input: unknown): PartTimerStatus {
+  const val = String(input ?? "").trim().toLowerCase();
+  return (PART_TIMER_STATUSES as readonly string[]).includes(val)
+    ? (val as PartTimerStatus)
+    : "jine";
+}
+
 export async function ensurePersonalistikaTables(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
@@ -112,6 +142,23 @@ export async function ensurePersonalistikaTables(): Promise<void> {
       await addColumnIfMissing("hr_candidate_applications", "attachment_original_name", "attachment_original_name VARCHAR(255) NULL");
       await addColumnIfMissing("hr_candidate_applications", "attachment_mime", "attachment_mime VARCHAR(100) NULL");
       await addColumnIfMissing("hr_candidate_applications", "attachment_size", "attachment_size INT NULL");
+
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS hr_part_timers (
+          id INT NOT NULL AUTO_INCREMENT,
+          first_name VARCHAR(100) NOT NULL,
+          last_name VARCHAR(100) NOT NULL,
+          phone VARCHAR(40) NULL,
+          email VARCHAR(150) NULL,
+          status VARCHAR(30) NOT NULL DEFAULT 'jine',
+          notes TEXT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          KEY idx_hr_part_timers_status (status),
+          KEY idx_hr_part_timers_name (last_name, first_name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
     })();
   }
   await initPromise;
