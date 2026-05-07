@@ -8,6 +8,7 @@ import {
   validateProductColorsInput,
   type IncomingProductColor,
 } from "@/lib/iml-product-colors";
+import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 
 export async function GET(
   _req: NextRequest,
@@ -28,31 +29,35 @@ export async function GET(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
-  const product = await prisma.iml_products.findUnique({
-    where: { id },
-    include: {
-      iml_customers: { select: { id: true, name: true } },
-      iml_foils: { select: { id: true, code: true, name: true } },
-      iml_product_colors: {
-        include: {
-          iml_pantone_colors: {
-            select: { id: true, code: true, name: true, hex: true, is_active: true },
+  const [product, hasFileTablePdf] = await Promise.all([
+    prisma.iml_products.findUnique({
+      where: { id },
+      include: {
+        iml_customers: { select: { id: true, name: true } },
+        iml_foils: { select: { id: true, code: true, name: true } },
+        iml_product_colors: {
+          include: {
+            iml_pantone_colors: {
+              select: { id: true, code: true, name: true, hex: true, is_active: true },
+            },
           },
+          orderBy: [{ sort_order: "asc" }, { id: "asc" }],
         },
-        orderBy: [{ sort_order: "asc" }, { id: "asc" }],
       },
-    },
-  });
+    }),
+    imlProductHasPdfInFilesTable(id),
+  ]);
 
   if (!product) {
     return NextResponse.json({ error: "Produkt nenalezen" }, { status: 404 });
   }
 
   const { image_data, pdf_data, ...rest } = product;
+  const hasPdf = (!!pdf_data && pdf_data.length > 0) || hasFileTablePdf;
   return NextResponse.json({
     ...rest,
     has_image: !!image_data && image_data.length > 0,
-    has_pdf: !!pdf_data && pdf_data.length > 0,
+    has_pdf: hasPdf,
   });
 }
 

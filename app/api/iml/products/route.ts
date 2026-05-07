@@ -98,11 +98,20 @@ export async function GET(req: NextRequest) {
     const rows = await prisma.$queryRaw<
       Array<{ id: number; has_image: number; has_pdf: number }>
     >`
-      SELECT id,
-             CASE WHEN image_data IS NOT NULL AND OCTET_LENGTH(image_data) > 0 THEN 1 ELSE 0 END AS has_image,
-             CASE WHEN pdf_data   IS NOT NULL AND OCTET_LENGTH(pdf_data)   > 0 THEN 1 ELSE 0 END AS has_pdf
-      FROM iml_products
-      WHERE id IN (${Prisma.join(ids)})
+      SELECT p.id,
+             CASE WHEN p.image_data IS NOT NULL AND OCTET_LENGTH(p.image_data) > 0 THEN 1 ELSE 0 END AS has_image,
+             CASE
+               WHEN (p.pdf_data IS NOT NULL AND OCTET_LENGTH(p.pdf_data) > 0) THEN 1
+               WHEN EXISTS (
+                 SELECT 1 FROM iml_product_files f
+                 WHERE f.product_id = p.id
+                   AND f.pdf_data IS NOT NULL
+                   AND OCTET_LENGTH(f.pdf_data) > 0
+               ) THEN 1
+               ELSE 0
+             END AS has_pdf
+      FROM iml_products p
+      WHERE p.id IN (${Prisma.join(ids)})
     `;
     flagsById = new Map(
       rows.map((r) => [

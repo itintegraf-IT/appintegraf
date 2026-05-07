@@ -17,6 +17,7 @@ import ProductDetailView, {
 import ProductImagePreview from "../_components/ProductImagePreview";
 import ProductPdfHistory from "../_components/ProductPdfHistory";
 import { consumptionKg } from "@/lib/iml-color-consumption";
+import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 
 export default async function ImlProductDetailPage({
   params,
@@ -35,7 +36,7 @@ export default async function ImlProductDetailPage({
   const id = parseInt((await params).id, 10);
   if (isNaN(id)) notFound();
 
-  const [product, customFields] = await Promise.all([
+  const [product, customFields, hasFileTablePdf] = await Promise.all([
     prisma.iml_products.findUnique({
       where: { id },
       include: {
@@ -55,6 +56,7 @@ export default async function ImlProductDetailPage({
       where: { entity: "products", is_active: true },
       orderBy: { sort_order: "asc" },
     }),
+    imlProductHasPdfInFilesTable(id),
   ]);
 
   if (!product) notFound();
@@ -69,7 +71,8 @@ export default async function ImlProductDetailPage({
   const fmtNum = (v: unknown) => (v != null ? String(v) : "-");
 
   const hasImage = !!(product.image_data && product.image_data.length > 0);
-  const hasPdf = !!(product.pdf_data && product.pdf_data.length > 0);
+  const hasLegacyPdf = !!(product.pdf_data && product.pdf_data.length > 0);
+  const hasPdf = hasLegacyPdf || hasFileTablePdf;
 
   const sections: ProductDetailSection[] = [
     {
