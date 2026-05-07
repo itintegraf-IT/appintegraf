@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Image, FileText, Trash2, Upload } from "lucide-react";
 
 type Props = {
@@ -12,10 +12,16 @@ type Props = {
 };
 
 export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange, onPdfChange }: Props) {
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [imageError, setImageError] = useState("");
   const [pdfError, setPdfError] = useState("");
+
+  const pickImage = () => imageInputRef.current?.click();
+  const pickPdf = () => pdfInputRef.current?.click();
+  const fileInputClass = "sr-only";
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -144,31 +150,49 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
                   <Trash2 className="h-4 w-4" />
                   Smazat
                 </button>
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50">
+                <button
+                  type="button"
+                  onClick={pickImage}
+                  disabled={imageLoading}
+                  aria-label="Nahrát jiný obrázek"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Upload className="h-4 w-4" />
                   Nahradit
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={handleImageUpload}
-                    disabled={imageLoading}
-                    className="hidden"
-                  />
-                </label>
+                </button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  onChange={handleImageUpload}
+                  disabled={imageLoading}
+                  className={fileInputClass}
+                  tabIndex={-1}
+                />
               </div>
             </div>
           ) : (
-            <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 transition-colors hover:border-gray-400 hover:bg-gray-100">
-              <Image className="mb-2 h-10 w-10 text-gray-400" />
-              <span className="text-sm text-gray-600">Klikněte pro nahrání obrázku</span>
+            <>
+              <button
+                type="button"
+                onClick={pickImage}
+                disabled={imageLoading}
+                aria-label="Vybrat obrázek k nahrání"
+                className="flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-left transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Image className="mb-2 h-10 w-10 text-gray-400" />
+                <span className="text-sm text-gray-600">Klikněte pro nahrání obrázku</span>
+              </button>
               <input
+                ref={imageInputRef}
                 type="file"
                 accept="image/jpeg,image/png,image/webp,image/gif"
                 onChange={handleImageUpload}
                 disabled={imageLoading}
-                className="hidden"
+                className={fileInputClass}
+                tabIndex={-1}
               />
-            </label>
+            </>
           )}
           {imageError && <p className="mt-1 text-sm text-red-600">{imageError}</p>}
         </div>
@@ -198,31 +222,49 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
                   <Trash2 className="h-4 w-4" />
                   Smazat
                 </button>
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50">
+                <button
+                  type="button"
+                  onClick={pickPdf}
+                  disabled={pdfLoading}
+                  aria-label="Nahrát jiné PDF"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Upload className="h-4 w-4" />
                   Nahradit
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handlePdfUpload}
-                    disabled={pdfLoading}
-                    className="hidden"
-                  />
-                </label>
+                </button>
+                <input
+                  ref={pdfInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handlePdfUpload}
+                  disabled={pdfLoading}
+                  className={fileInputClass}
+                  tabIndex={-1}
+                />
               </div>
             </div>
           ) : (
-            <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 transition-colors hover:border-gray-400 hover:bg-gray-100">
-              <FileText className="mb-2 h-10 w-10 text-gray-400" />
-              <span className="text-sm text-gray-600">Klikněte pro nahrání PDF</span>
+            <>
+              <button
+                type="button"
+                onClick={pickPdf}
+                disabled={pdfLoading}
+                aria-label="Vybrat PDF k nahrání"
+                className="flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-left transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <FileText className="mb-2 h-10 w-10 text-gray-400" />
+                <span className="text-sm text-gray-600">Klikněte pro nahrání PDF</span>
+              </button>
               <input
+                ref={pdfInputRef}
                 type="file"
                 accept="application/pdf"
                 onChange={handlePdfUpload}
                 disabled={pdfLoading}
-                className="hidden"
+                className={fileInputClass}
+                tabIndex={-1}
               />
-            </label>
+            </>
           )}
           {pdfError && <p className="mt-1 text-sm text-red-600">{pdfError}</p>}
         </div>

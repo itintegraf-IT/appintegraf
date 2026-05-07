@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search")?.trim() ?? "";
   const customerId = searchParams.get("customer_id");
-  const status = searchParams.get("status");
+  const status = searchParams.get("item_status") ?? searchParams.get("status");
 
   const where: Record<string, unknown> = {};
   if (search) {

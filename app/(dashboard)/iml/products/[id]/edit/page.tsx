@@ -221,48 +221,50 @@ export default function ImlProductEditPage() {
         </Link>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
-        )}
-
+      <div className="space-y-6">
         <ProductFilesUpload
           productId={parseInt(id, 10)}
           hasImage={hasImage}
           hasPdf={hasPdf}
         />
 
-        <ProductFormSections
-          form={form}
-          setField={setField}
-          customers={customers}
-          foils={foils}
-          colors={colors}
-          onColorsChange={setColors}
-        />
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          )}
 
-        <CustomFieldsFormSection
-          entity="products"
-          values={customData}
-          onChange={setCustomData}
-        />
+          <ProductFormSections
+            form={form}
+            setField={setField}
+            customers={customers}
+            foils={foils}
+            colors={colors}
+            onColorsChange={setColors}
+          />
 
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
-          >
-            {loading ? "Ukládám…" : "Uložit"}
-          </button>
-          <Link
-            href={`/iml/products/${id}`}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-          >
-            Zrušit
-          </Link>
-        </div>
-      </form>
+          <CustomFieldsFormSection
+            entity="products"
+            values={customData}
+            onChange={setCustomData}
+          />
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {loading ? "Ukládám…" : "Uložit"}
+            </button>
+            <Link
+              href={`/iml/products/${id}`}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+            >
+              Zrušit
+            </Link>
+          </div>
+        </form>
+      </div>
     </>
   );
 }

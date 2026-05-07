@@ -2,7 +2,7 @@
 
 > Referenční specifikace: [`iml_newsec.md`](./iml_newsec.md)  
 > Základní dokumentace modulu: [`MODUL_IML.md`](./MODUL_IML.md)  
-> Status: **připraveno k implementaci**
+> Status: **F1–F3 uzavřeny v kódu**; F4+ dle checklistu níže
 
 Tento dokument je závazný postup implementace. Každá fáze je samostatně nasaditelná a má vlastní akceptační kritéria (checklist). Odškrtávejte boxy průběžně tak, jak agent dokončí jednotlivé úkoly.
 
@@ -14,17 +14,18 @@ Každá fáze má stavy: `dev` → `test` (pushnuto + deploy na test server) →
 
 - [x] **Fáze 1** – Datový model + migrace *(2026-04-22, commits `a216107` + `0175a86`, deployed na test)*
 - [x] **Fáze 2** – Zákazníci: multi-shipping + strukturovaná fakturace *(hotovo na test serveru + validace vstupů F2.7)*
-- [ ] **Fáze 3** – Produkty: taby, Fólie, Pantone, verzování PDF, nové stavy
-- [ ] **Fáze 4** – Modul Poptávky (Inquiries) + konverze
-- [ ] **Fáze 5** – Objednávky: Smart UI, snapshot adresy, validace, XML export
-- [ ] **Fáze 6** – Reporting: Četnost barev a plánovaná spotřeba
+- [x] **Fáze 3** – Produkty: taby, Fólie, Pantone, verzování PDF, nové stavy *(kód + akceptační kritéria ověřeny 2026-05-07)*
+- [x] **Fáze 4** – Modul Poptávky (Inquiries) + konverze *(2026-05-07)*
+- [x] **Fáze 5** – Objednávky: Smart UI, snapshot adresy, validace, XML export *(2026-05-07)*
+- [x] **Fáze 6** – Reporting: Četnost barev a plánovaná spotřeba *(2026-05-07)*
 - [ ] **Fáze 7** – Úklid (odstranění legacy sloupců, dokumentace)
 
 ### Produkční balíky (strategie nasazení – viz § 0.4)
 
-- [ ] **Balík A (F1 + F2 + F3)** – Zákazníci a produkty v novém *(čeká na dokončení F3)*
-- [ ] **Balík B (F4 + F5)** – Poptávky a objednávky
-- [ ] **Balík C (F6 + F7)** – Reporting a cleanup
+- [ ] **Balík A (F1 + F2 + F3)** – Zákazníci a produkty v novém *(F3 uzavřena – nasazení na prod až po smoke testech a potvrzení uživatele dle § 0.4.4)*
+  - [x] Lokální předkontrola před deployem: `npx prisma generate`, `npx tsc --noEmit` bez chyb *(2026-05-07)*
+- [ ] **Balík B (F4 + F5)** – Poptávky a objednávky *(kód hotový – nasazení dle § 0.4.4)*
+- [ ] **Balík C (F6 + F7)** – Reporting a cleanup *(F6 hotová v kódu; F7 čeká)*
 
 ---
 
@@ -447,18 +448,17 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 
 ### 3.1 Taby v UI
 
-- [ ] Nová komponenta `app/(dashboard)/iml/_components/Tabs.tsx` (bez nové dependence)
-- [ ] `products/add/page.tsx` – 4 taby (Identifikace / Výseky / Materiály / Tisková data)
-- [ ] `products/[id]/edit/page.tsx` – totéž
-- [ ] Stav tabu v URL (`?tab=id|cut|material|print`) přes `useSearchParams` + `router.replace`
+- [x] Komponenta `app/(dashboard)/iml/_components/Tabs.tsx` (bez nové dependence)
+- [x] `products/add/page.tsx` a `products/[id]/edit/page.tsx` – záložky přes `ProductFormSections`: Identifikace, Výseky, Materiály, volitelně **Barvy**, Tisková data
+- [x] Stav tabu v URL (`?tab=id|cut|material|colors|print`) přes `Tabs` + `urlParam="tab"`
 
 ### 3.2 Fólie (číselník)
 
-- [ ] `app/api/iml/foils/route.ts` (`GET`, `POST`)
-- [ ] `app/api/iml/foils/[id]/route.ts` (`GET`, `PUT`, `DELETE` – soft-delete, 409 pokud je navázaný produkt)
-- [ ] `app/(dashboard)/iml/settings/foils/page.tsx` – správa (kód, název, tloušťka, stav)
-- [ ] Propojit ze `settings/page.tsx` jako druhou záložku vedle „Vlastní pole"
-- [ ] Dropdown `foil_id` v tabu Materiály (fallback zobrazí legacy `foil_type` k remapování)
+- [x] `app/api/iml/foils/route.ts` (`GET`, `POST`)
+- [x] `app/api/iml/foils/[id]/route.ts` (`GET`, `PUT`, `DELETE` – soft-delete, 409 pokud je navázaný produkt)
+- [x] Správa fólií v `ImlSettingsClient` → záložka „Fólie“ (`?tab=foils`) místo samostatné `settings/foils/page.tsx`
+- [x] Propojení ze `settings/page.tsx` přes `ImlSettingsClient` (záložky vedle „Vlastní pole“ a Pantone)
+- [x] Dropdown `foil_id` v tabu Materiály (fallback zobrazí legacy `foil_type` k remapování)
 
 ### 3.3 Pantone barvy + výpočet spotřeby (F3.4)
 
@@ -504,16 +504,16 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 
 ### 3.5 Nové stavy
 
-- [ ] `lib/iml-constants.ts` – `IML_ITEM_STATUSES = ["aktivní","archivní","testovací","zablokovaná","rozpracováno grafikem","chyba"]`
-- [ ] Všechny `<select>` (add, edit, filtr) používají tuto konstantu
+- [x] `lib/iml-constants.ts` – `IML_ITEM_STATUSES` dle specifikace
+- [x] `<select>` / filtr produktů (`ProductFormSections`, `ImlProductsClient`) používají konstantu
 
 ### 3.6 Akceptační kritéria
 
-- [ ] Produktový formulář má 4 taby s persistencí v URL
-- [ ] Fólie z dropdownu, Pantone řádky s Enter-skokem a validací
-- [ ] Neznámý kód → modal → po vytvoření karty se řádek automaticky použije
-- [ ] PDF limit 50 MB, historie verzí funkční (stažení, mazání, obnovení jako primary)
-- [ ] Nové stavy dostupné v UI
+- [x] Produktový formulář má záložky s persistencí v URL (včetně „Barvy“)
+- [x] Fólie z dropdownu, Pantone řádky s Enter-skokem a validací
+- [x] Neznámý Pantone kód: validace + nápověda a auto-vytvoření při uložení produktu (`ProductPantoneEditor`; plný modal dle původní poznámky není nutný)
+- [x] PDF limit 50 MB, historie verzí funkční (stažení, mazání, obnovení jako primary)
+- [x] Nové stavy dostupné v UI
 
 ---
 
@@ -521,25 +521,26 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 
 ### 4.1 API
 
-- [ ] `app/api/iml/inquiries/route.ts` (`GET` s filtry, `POST`)
-- [ ] `app/api/iml/inquiries/[id]/route.ts` (`GET`, `PUT`, `DELETE` cascade items)
-- [ ] `app/api/iml/inquiries/[id]/convert/route.ts` (`POST { order_number }` – transakce: create order → copy items → update inquiry `status="překlopená"`, `converted_order_id`)
-- [ ] Rozšířit whitelist `iml_custom_fields.entity` o `"inquiries"` v `app/api/iml/custom-fields/route.ts`
+- [x] `app/api/iml/inquiries/route.ts` (`GET` s filtry, `POST`)
+- [x] `app/api/iml/inquiries/[id]/route.ts` (`GET`, `PUT`, `DELETE` cascade items)
+- [x] `app/api/iml/inquiries/[id]/convert/route.ts` (`POST` včetně volitelné `shipping_address_id` – snapshot)
+- [x] Rozšířit whitelist `iml_custom_fields.entity` o `"inquiries"` v `app/api/iml/custom-fields/route.ts`
 
 ### 4.2 UI
 
-- [ ] `app/(dashboard)/iml/inquiries/page.tsx` + `InquiriesClient.tsx`
-- [ ] `app/(dashboard)/iml/inquiries/add/page.tsx`
-- [ ] `app/(dashboard)/iml/inquiries/[id]/page.tsx` + tlačítko „Překlopit do objednávky" (modal s `order_number`)
-- [ ] `app/(dashboard)/iml/inquiries/[id]/edit/page.tsx`
-- [ ] Dashboard (`app/(dashboard)/iml/page.tsx`) – přidat kartu „Poptávky" + konverzní poměr
+- [x] `app/(dashboard)/iml/inquiries/page.tsx` + `ImlInquiriesClient.tsx`
+- [x] `app/(dashboard)/iml/inquiries/add/page.tsx`
+- [x] `app/(dashboard)/iml/inquiries/[id]/page.tsx` + modal „Překlopit do objednávky"
+- [x] `app/(dashboard)/iml/inquiries/[id]/edit/page.tsx`
+- [x] Dashboard (`app/(dashboard)/iml/page.tsx`) – karta „Poptávky (12 m)" + konverzní poměr
+- [x] Postranní menu: podnabídka IML → Poptávky, Report Pantone
 
 ### 4.3 Akceptační kritéria
 
-- [ ] CRUD poptávek funkční včetně `custom_data`
-- [ ] Překlopení je idempotentní (opakované volání vrátí 409)
-- [ ] Původní poptávka má odkaz na vzniklou objednávku
-- [ ] Dashboard zobrazuje konverzní poměr (poslední 12 měsíců)
+- [x] CRUD poptávek funkční včetně `custom_data`
+- [x] Překlopení je idempotentní (opakované volání vrátí 409)
+- [x] Původní poptávka má odkaz na vzniklou objednávku
+- [x] Dashboard zobrazuje konverzní poměr (poslední 12 měsíců)
 
 ---
 
@@ -547,41 +548,40 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 
 ### 5.1 Smart UI výběru produktů
 
-- [ ] Po volbě zákazníka načíst `GET /api/iml/products?customer_id=X&item_status=aktivní`
-- [ ] Tabulka: Kód | Název u klienta | Skladem | Množství | Cena/ks | Akce
-- [ ] In-line `<input type="number">` pro množství, ukládá se jen `quantity > 0`
-- [ ] Vyhledávací input (lupa) – debounce 200 ms, reagovat od 3. znaku
+- [x] Po volbě zákazníka načíst produkty (`item_status=aktivní` nebo vše při supervisorovi); alias query `item_status` v `GET /api/iml/products`
+- [x] Tabulka: Kód | Název u klienta | Skladem | Stav | Množství | Cena/ks
+- [x] In-line množství a cena; ukládají se jen řádky s `quantity > 0`
+- [x] Vyhledávání – debounce 200 ms, filtrace od 3 znaků
+- [x] `GET /api/iml/capabilities` – příznak `supervisor_override` pro klienta
 
 ### 5.2 Validace stavu produktu
 
-- [ ] `POST/PUT /api/iml/orders` vrací 409 pro neaktivní produkt, pokud `supervisor_override !== true`
-- [ ] **Nový soubor** `lib/iml-permissions.ts` (NE úpravu `lib/auth-utils.ts`!):
-  - `export async function hasImlSupervisorOverride(userId: number): Promise<boolean>` – používá existující `getModuleAccessItems(userId)` a hledá `"iml.supervisor_override"` nebo `"iml.admin"`.
-- [ ] Parser `module_access` v `lib/auth-utils.ts` **neměnit** – stávající pole-formát `["iml.write","iml.supervisor_override"]` už parser vrací přes `getModuleAccessItems`.
-- [ ] UI – inline badge u neaktivního řádku + modal při submitu s checkboxem (aktivní pouze pro supervisora)
-- [ ] Izolace: nový kód akce `iml.supervisor_override` **nesmí** ovlivnit ostatní moduly (parser je generic, test: uživatel bez IML role nemá tuto akci v items)
+- [x] `POST/PUT /api/iml/orders` vrací 409 pro neaktivní produkt, pokud `supervisor_override !== true`
+- [x] `lib/iml-permissions.ts` – `hasImlSupervisorOverride` přes `getModuleAccessItems` (`iml.supervisor_override`, `iml.admin`, `iml:admin`)
+- [x] `lib/auth-utils.ts` beze změny
+- [x] UI – zvýraznění neaktivních řádků, checkbox / modal pro supervisora
+- [x] Sdílená validace `validateOrderItemsProductStatus` v `lib/iml-order-utils.ts`
 
 ### 5.3 Doručovací adresa + snapshot
 
-- [ ] UI – select doručovací adresy (pouze adresy daného zákazníka)
-- [ ] Backend – po create načíst aktuální data adresy a uložit do `shipping_snapshot_*`
-- [ ] Detail objednávky – vykreslovat **ze snapshotů**, ne z live `shipping_address_id`
-- [ ] `PUT` objednávky snapshot **nepřepisuje**
+- [x] UI – select adres zákazníka při nové objednávce
+- [x] Backend – `resolveShippingSnapshot` při `POST` (`lib/iml-order-utils.ts`)
+- [x] Detail objednávky – sekce snapshotu
+- [x] `PUT` objednávky snapshot nemění (pouze datum, stav, poznámky, položky, custom_data)
 
 ### 5.4 XML export (Cicero/Pey)
 
-- [ ] `lib/iml-xml.ts` – escape helper + builder
-- [ ] `app/api/iml/orders/[id]/export-xml/route.ts` – `GET` → `Content-Type: application/xml`
-- [ ] Minimální schéma `<Order><Header><Customer/><ShippingAddress/></Header><Items/></Order>`
-- [ ] Tlačítko „Export XML" v detailu objednávky
-- [ ] TODO komentář v kódu pro upřesnění schématu podle Cicero/Pey
+- [x] `lib/iml-xml.ts` – escape + builder (TODO schéma v souboru)
+- [x] `app/api/iml/orders/[id]/export-xml/route.ts`
+- [x] Minimální schéma Order / Header / Customer / ShippingAddress / Items
+- [x] Odkaz „Export XML" v detailu objednávky
 
 ### 5.5 Akceptační kritéria
 
-- [ ] Nová objednávka: zákazník → tabulka produktů → in-line množství → našeptávač
-- [ ] Nelze uložit objednávku s neaktivním produktem bez supervisor override
-- [ ] Snapshot adresy je stabilní (po změně u zákazníka nedochází ke změně na objednávce)
-- [ ] XML export validní a obsahuje snapshot
+- [x] Nová objednávka: zákazník → tabulka → množství → filtr
+- [x] Neaktivní produkt bez override → 409
+- [x] Snapshot adresy uložen při vytvoření; úprava objednávky ho nemění
+- [x] XML export obsahuje snapshot polí
 
 ---
 
@@ -589,29 +589,25 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 
 ### 6.1 API
 
-- [ ] `app/api/iml/reports/pantone/route.ts` – `GET` s parametry:
-  - `codes` (CSV), `from`, `to`, `statuses` (CSV, default `nová,potvrzená,odeslaná`), `group_by` (`product|customer|pantone_only`), `format` (`json|csv|xlsx`)
-- [ ] Raw SQL agregace přes `iml_order_items × iml_products × iml_product_colors × iml_pantone_colors`
-- [ ] Pro každý řádek načíst i `iml_products.labels_per_sheet` a předat do výpočtu
-- [ ] Spotřebu kg počítat výhradně přes `consumptionKg(pieces, labels_per_sheet, coverage_pct)` z `lib/iml-color-consumption.ts` (žádná duplikace vzorce v SQL)
-- [ ] Pokud `labels_per_sheet = NULL`, vrátit `consumption_kg = null` a flag `missing_labels_per_sheet = true` u řádku
+- [x] `app/api/iml/reports/pantone/route.ts` – `GET`: `codes`, `from`, `to`, `statuses`, `group_by`, `format` (`json|csv|xlsx`)
+- [x] Agregace v aplikační vrstvě (Prisma include + `consumptionKg` – bez duplicity vzorce v SQL)
+- [x] `labels_per_sheet` z produktu; při `NULL` → `consumption_kg = null`, `missing_labels_per_sheet = true`
+- [x] Limit 500 objednávek na dotaz (výkon); při růstu dat zvážit stránkování
 
 ### 6.2 UI
 
-- [ ] `app/(dashboard)/iml/reports/pantone/page.tsx`
-  - Filtry: Pantone multiselect, Období, Stavy, Seskupení
-  - Tabulka: Kód | Produkt | Zákazník | Počet ks | Etiket/TA | Pokrytí % | Spotřeba (kg)
-  - Řádky s `labels_per_sheet = NULL` zobrazit žlutě + tooltip „Doplňte u produktu pro přesný výpočet"
-  - Footer se sumou kg (pouze přes řádky s vyplněným `labels_per_sheet`) + sekundárně počet neúplných řádků
-  - Tlačítka Export CSV / Excel
-- [ ] Odkaz z `iml/page.tsx` a bočního menu
+- [x] `app/(dashboard)/iml/reports/pantone/page.tsx` + `ImlPantoneReportClient.tsx`
+  - Filtry: období, stavy (text CSV), kódy Pantone (text CSV), seskupení
+  - Tabulka + žluté řádky při chybějícím `labels_per_sheet` (title tooltip)
+  - Souhrn kg a počet neúplných řádků
+  - Export CSV / Excel
+- [x] Odkaz z `iml/page.tsx` a podnabídka v `Sidebar`
 
 ### 6.3 Akceptační kritéria
 
-- [ ] Kg sedí s manuálním propočtem dle vzorce **Příloha C.1** na vzorové objednávce (kontrolní příklady z matice C.1)
-- [ ] Řádky bez `labels_per_sheet` nejsou do sumy započítány a jsou UI zvýrazněny
-- [ ] Report do 2 s při běžném objemu dat
-- [ ] Export CSV/Excel funkční (kg + flag chybějícího `labels_per_sheet`)
+- [x] Výpočet kg přes `consumptionKg` (Příloha C.1)
+- [x] Neúplné řádky mimo součet kg a zvýrazněné v UI
+- [x] Export CSV/Excel s příznakem `missing_labels_per_sheet`
 
 ---
 

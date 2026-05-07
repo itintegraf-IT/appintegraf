@@ -106,6 +106,7 @@ export default function ImlProductAddPage() {
       }
 
       setCreatedProductId(data.id);
+      setLoading(false);
     } catch {
       setError("Chyba při ukládání");
       setLoading(false);
@@ -128,14 +129,12 @@ export default function ImlProductAddPage() {
         </Link>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
-        )}
-
-        {createdProductId ? (
+      {createdProductId ? (
+        <div className="space-y-6">
           <div className="rounded-xl border border-green-200 bg-green-50 p-4">
-            <p className="mb-4 font-medium text-green-800">Produkt byl vytvořen. Níže můžete nahrát obrázek a PDF.</p>
+            <p className="mb-4 font-medium text-green-800">
+              Produkt byl vytvořen. Níže můžete nahrát obrázek a PDF.
+            </p>
             <ProductFilesUpload
               productId={createdProductId}
               hasImage={false}
@@ -162,43 +161,47 @@ export default function ImlProductAddPage() {
               </Link>
             </div>
           </div>
-        ) : (
-          <>
-            <ProductFilesUploadPlaceholder />
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {error && (
+            <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          )}
 
-            <ProductFormSections
-              form={form}
-              setField={setField}
-              customers={customers}
-              foils={foils}
-              colors={colors}
-              onColorsChange={setColors}
-            />
+          <ProductFilesUploadPlaceholder />
 
-            <CustomFieldsFormSection
-              entity="products"
-              values={customData}
-              onChange={setCustomData}
-            />
+          <ProductFormSections
+            form={form}
+            setField={setField}
+            customers={customers}
+            foils={foils}
+            colors={colors}
+            onColorsChange={setColors}
+          />
 
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                disabled={loading}
-                className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {loading ? "Ukládám…" : "Uložit"}
-              </button>
-              <Link
-                href="/iml/products"
-                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-              >
-                Zrušit
-              </Link>
-            </div>
-          </>
-        )}
-      </form>
+          <CustomFieldsFormSection
+            entity="products"
+            values={customData}
+            onChange={setCustomData}
+          />
+
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={loading}
+              className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {loading ? "Ukládám…" : "Uložit"}
+            </button>
+            <Link
+              href="/iml/products"
+              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+            >
+              Zrušit
+            </Link>
+          </div>
+        </form>
+      )}
     </>
   );
 }

@@ -1,24 +1,38 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
 
 type Customer = { id: number; name: string };
-type Product = { id: number; ig_code: string | null; ig_short_name: string | null; client_name: string | null };
-type OrderItem = { id: number; product_id: number; quantity: number; unit_price: number | null; iml_products: Product };
+type Product = {
+  id: number;
+  ig_code: string | null;
+  ig_short_name: string | null;
+  client_code: string | null;
+  client_name: string | null;
+  stock_quantity: number | null;
+  item_status: string | null;
+};
 
 export default function ImlOrderEditPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [supervisor, setSupervisor] = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [supervisorAck, setSupervisorAck] = useState(false);
+  const [showSupervisorModal, setShowSupervisorModal] = useState(false);
+
   const [form, setForm] = useState({
     customer_id: "",
     order_number: "",
@@ -26,19 +40,30 @@ export default function ImlOrderEditPage() {
     status: "nová",
     notes: "",
   });
-  const [items, setItems] = useState<{ product_id: string; product_name: string; quantity: string; unit_price: string }[]>([]);
+  const [qtyByProduct, setQtyByProduct] = useState<Record<number, string>>({});
+  const [priceByProduct, setPriceByProduct] = useState<Record<number, string>>({});
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 200);
+    return () => clearTimeout(t);
+  }, [search]);
 
   useEffect(() => {
     Promise.all([
       fetch("/api/iml/customers").then((r) => r.json()),
-      fetch("/api/iml/products").then((r) => r.json()),
+      fetch("/api/iml/capabilities").then((r) => r.json()),
       fetch(`/api/iml/orders/${id}`).then((r) => r.json()),
-    ]).then(([custData, prodData, orderData]) => {
-      setCustomers(custData.customers ?? []);
-      setProducts(prodData.products ?? []);
-      const o = orderData;
-      if (o?.id) {
+    ])
+      .then(([custData, capData, orderData]) => {
+        setCustomers(custData.customers ?? []);
+        setSupervisor(!!capData.supervisor_override);
+        const o = orderData;
+        if (!o?.id) {
+          setError("Objednávka nenalezena");
+          setLoadingData(false);
+          return;
+        }
         setForm({
           customer_id: String(o.customer_id ?? ""),
           order_number: o.order_number ?? "",
@@ -46,14 +71,14 @@ export default function ImlOrderEditPage() {
           status: o.status ?? "nová",
           notes: o.notes ?? "",
         });
-        setItems(
-          (o.iml_order_items ?? []).map((it: OrderItem) => ({
-            product_id: String(it.product_id),
-            product_name: it.iml_products?.client_name ?? it.iml_products?.ig_short_name ?? "",
-            quantity: String(it.quantity),
-            unit_price: it.unit_price != null ? String(it.unit_price) : "",
-          }))
-        );
+        const qmap: Record<number, string> = {};
+        const pmap: Record<number, string> = {};
+        for (const it of o.iml_order_items ?? []) {
+          qmap[it.product_id] = String(it.quantity);
+          if (it.unit_price != null) pmap[it.product_id] = String(it.unit_price);
+        }
+        setQtyByProduct(qmap);
+        setPriceByProduct(pmap);
         if (o.custom_data && typeof o.custom_data === "object") {
           const cd = o.custom_data as Record<string, unknown>;
           const init: Record<string, string | number | boolean> = {};
@@ -62,66 +87,114 @@ export default function ImlOrderEditPage() {
           }
           setCustomData(init);
         }
-      }
-    }).catch(() => setError("Chyba při načítání"))
-      .finally(() => setLoadingData(false));
+        const cid = String(o.customer_id ?? "");
+        if (cid) {
+          fetch(`/api/iml/products?customer_id=${cid}`)
+            .then((r) => r.json())
+            .then((d) => setProducts(d.products ?? []))
+            .catch(() => setProducts([]));
+        }
+        setLoadingData(false);
+      })
+      .catch(() => {
+        setError("Chyba při načítání");
+        setLoadingData(false);
+      });
   }, [id]);
 
-  const addItem = () => {
-    setItems([...items, { product_id: "", product_name: "", quantity: "1", unit_price: "" }]);
+  const filteredProducts = useMemo(() => {
+    const q = debouncedSearch.trim().toLowerCase();
+    if (q.length < 3) return products;
+    return products.filter(
+      (p) =>
+        (p.ig_code?.toLowerCase().includes(q) ?? false) ||
+        (p.ig_short_name?.toLowerCase().includes(q) ?? false) ||
+        (p.client_name?.toLowerCase().includes(q) ?? false) ||
+        (p.client_code?.toLowerCase().includes(q) ?? false)
+    );
+  }, [products, debouncedSearch]);
+
+  const setQty = (productId: number, v: string) => {
+    setQtyByProduct((prev) => ({ ...prev, [productId]: v }));
   };
 
-  const removeItem = (i: number) => {
-    setItems(items.filter((_, idx) => idx !== i));
+  const setPrice = (productId: number, v: string) => {
+    setPriceByProduct((prev) => ({ ...prev, [productId]: v }));
   };
 
-  const updateItem = (i: number, field: string, value: string) => {
-    const next = [...items];
-    next[i] = { ...next[i], [field]: value };
-    if (field === "product_id") {
-      const prod = products.find((p) => p.id === parseInt(value, 10));
-      next[i].product_name = prod ? (prod.client_name ?? prod.ig_short_name ?? prod.ig_code ?? "") : "";
+  const buildItems = () =>
+    products
+      .map((p) => {
+        const q = parseInt(qtyByProduct[p.id] ?? "0", 10);
+        if (!q || q <= 0) return null;
+        const up = priceByProduct[p.id];
+        const unitPrice = up && up.trim() !== "" ? parseFloat(up) : null;
+        return { product_id: p.id, quantity: q, unit_price: unitPrice };
+      })
+      .filter(Boolean) as { product_id: number; quantity: number; unit_price: number | null }[];
+
+  const submitPut = async (withSupervisorOverride: boolean) => {
+    const orderItems = buildItems();
+    if (orderItems.length === 0) {
+      setError("Zadejte množství u alespoň jednoho produktu.");
+      return;
     }
-    setItems(next);
+
+    const res = await fetch(`/api/iml/orders/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        order_date: form.order_date,
+        status: form.status,
+        notes: form.notes || null,
+        items: orderItems,
+        custom_data: Object.keys(customData).length > 0 ? customData : null,
+        supervisor_override: withSupervisorOverride,
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 409 && data.field === "items") {
+      if (supervisor) {
+        setShowSupervisorModal(true);
+        setLoading(false);
+        return;
+      }
+      setError(data.error ?? "Nelze uložit kvůli stavu produktu.");
+      setLoading(false);
+      return;
+    }
+    if (!res.ok) {
+      setError(data.error ?? "Chyba při ukládání");
+      setLoading(false);
+      return;
+    }
+
+    router.push(`/iml/orders/${id}`);
+    router.refresh();
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
-      const orderItems = items
-        .filter((it) => it.product_id && parseInt(it.quantity, 10) > 0)
-        .map((it) => ({
-          product_id: parseInt(it.product_id, 10),
-          quantity: parseInt(it.quantity, 10),
-          unit_price: it.unit_price ? parseFloat(it.unit_price) : null,
-        }));
-
-      const res = await fetch(`/api/iml/orders/${id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          order_date: form.order_date,
-          items: orderItems,
-          custom_data: Object.keys(customData).length > 0 ? customData : null,
-        }),
-      });
-
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        setError(data.error ?? "Chyba při ukládání");
-        setLoading(false);
-        return;
-      }
-
-      router.push(`/iml/orders/${id}`);
-      router.refresh();
+      await submitPut(supervisorAck);
     } catch {
       setError("Chyba při ukládání");
+      setLoading(false);
+    }
+  };
+
+  const confirmSupervisorModal = async () => {
+    setSupervisorAck(true);
+    setShowSupervisorModal(false);
+    setLoading(true);
+    try {
+      await submitPut(true);
+    } catch {
+      setError("Chyba při ukládání");
+    } finally {
       setLoading(false);
     }
   };
@@ -155,30 +228,28 @@ export default function ImlOrderEditPage() {
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
 
+        <div className="mb-4 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
+          Doručovací adresa na objednávce je uložena jako snapshot z okamžiku vytvoření – při úpravě se
+          nemění. Zobrazí se v detailu objednávky.
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Zákazník *</label>
-            <select
-              required
-              value={form.customer_id}
-              onChange={(e) => setForm({ ...form, customer_id: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            >
-              <option value="">— Vyberte —</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Číslo objednávky *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Zákazník</label>
             <input
               type="text"
-              required
-              value={form.order_number}
-              onChange={(e) => setForm({ ...form, order_number: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
               readOnly
+              value={customers.find((c) => c.id === parseInt(form.customer_id, 10))?.name ?? ""}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-gray-700"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Číslo objednávky</label>
+            <input
+              type="text"
+              readOnly
+              value={form.order_number}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-gray-700"
             />
           </div>
           <div>
@@ -216,6 +287,19 @@ export default function ImlOrderEditPage() {
           </div>
         </div>
 
+        {supervisor && (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-900">
+            <label className="flex cursor-pointer items-center gap-2">
+              <input
+                type="checkbox"
+                checked={supervisorAck}
+                onChange={(e) => setSupervisorAck(e.target.checked)}
+              />
+              Povolit řádky s produkty mimo stav „aktivní“ (supervisor)
+            </label>
+          </div>
+        )}
+
         <div className="mt-6">
           <CustomFieldsFormSection
             entity="orders"
@@ -225,64 +309,76 @@ export default function ImlOrderEditPage() {
         </div>
 
         <div className="mt-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-700">Položky objednávky</h3>
-            <button
-              type="button"
-              onClick={addItem}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50"
-            >
-              <Plus className="h-4 w-4" />
-              Přidat položku
-            </button>
+          <h3 className="mb-3 text-sm font-semibold text-gray-700">Produkty</h3>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Search className="h-4 w-4 text-gray-400" />
+            <input
+              type="search"
+              placeholder="Filtrovat od 3 znaků…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="min-w-[240px] flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
           </div>
-          {items.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4 text-center text-sm text-gray-500">
-              Přidejte alespoň jednu položku
-            </p>
-          ) : (
-            <div className="space-y-2">
-              {items.map((it, i) => (
-                <div key={i} className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3">
-                  <select
-                    value={it.product_id}
-                    onChange={(e) => updateItem(i, "product_id", e.target.value)}
-                    className="min-w-[200px] rounded-lg border border-gray-300 px-3 py-2"
-                  >
-                    <option value="">— Produkt —</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.ig_code ?? p.id} – {p.client_name ?? p.ig_short_name ?? "-"}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min="1"
-                    value={it.quantity}
-                    onChange={(e) => updateItem(i, "quantity", e.target.value)}
-                    placeholder="Množství"
-                    className="w-24 rounded-lg border border-gray-300 px-3 py-2"
-                  />
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={it.unit_price}
-                    onChange={(e) => updateItem(i, "unit_price", e.target.value)}
-                    placeholder="Cena/ks"
-                    className="w-24 rounded-lg border border-gray-300 px-3 py-2"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeItem(i)}
-                    className="rounded p-2 text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+          <div className="overflow-x-auto rounded-lg border border-gray-200">
+            <table className="w-full text-sm">
+              <thead className="border-b border-gray-200 bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700">Kód IG</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700">Název u klienta</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-700">Skladem</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-700">Stav</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-700">Množství</th>
+                  <th className="px-3 py-2 text-right font-semibold text-gray-700">Cena/ks</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredProducts.map((p) => {
+                  const st = p.item_status?.trim() || "";
+                  const inactive = st !== "" && st !== "aktivní";
+                  return (
+                    <tr
+                      key={p.id}
+                      className={`border-b border-gray-100 ${inactive ? "bg-amber-50/50" : ""}`}
+                    >
+                      <td className="px-3 py-2 font-mono">{p.ig_code ?? "—"}</td>
+                      <td className="px-3 py-2">{p.client_name ?? p.ig_short_name ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">
+                        {p.stock_quantity != null ? p.stock_quantity : "—"}
+                      </td>
+                      <td className="px-3 py-2">
+                        {inactive ? (
+                          <span className="rounded bg-amber-200 px-1.5 py-0.5 text-xs">
+                            {p.item_status}
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">{p.item_status ?? "—"}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <input
+                          type="number"
+                          min="0"
+                          value={qtyByProduct[p.id] ?? ""}
+                          onChange={(e) => setQty(p.id, e.target.value)}
+                          className="w-24 rounded border border-gray-300 px-2 py-1 text-right"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={priceByProduct[p.id] ?? ""}
+                          onChange={(e) => setPrice(p.id, e.target.value)}
+                          className="w-24 rounded border border-gray-300 px-2 py-1 text-right"
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="mt-6 flex gap-2">
@@ -301,6 +397,36 @@ export default function ImlOrderEditPage() {
           </Link>
         </div>
       </form>
+
+      {showSupervisorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-w-md rounded-xl border border-gray-200 bg-white p-6 shadow-lg">
+            <h3 className="text-lg font-semibold text-gray-900">Neaktivní produkt</h3>
+            <p className="mt-2 text-sm text-gray-600">
+              Jako supervisor můžete pokračovat v uložení objednávky.
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSupervisorModal(false);
+                  setLoading(false);
+                }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              >
+                Zrušit
+              </button>
+              <button
+                type="button"
+                onClick={confirmSupervisorModal}
+                className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
+              >
+                Potvrdit jako supervisor
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

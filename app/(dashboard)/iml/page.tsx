@@ -3,7 +3,17 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Package, Users, ShoppingCart, FileText, BarChart3, Clock, Settings, Upload } from "lucide-react";
+import {
+  Package,
+  Users,
+  ShoppingCart,
+  FileText,
+  BarChart3,
+  Clock,
+  Settings,
+  Upload,
+  FileQuestion,
+} from "lucide-react";
 import { subMonths } from "date-fns";
 
 export default async function ImlPage() {
@@ -30,6 +40,8 @@ export default async function ImlPage() {
     topCustomersByOrders,
     productsByStatus,
     ordersLast12Months,
+    inquiriesLast12Months,
+    inquiriesConvertedLast12,
   ] = await Promise.all([
     prisma.iml_customers.count(),
     prisma.iml_products.count({ where: { is_active: true } }),
@@ -62,7 +74,21 @@ export default async function ImlPage() {
       _count: { id: true },
       _sum: { total: true },
     }),
+    prisma.iml_inquiries.count({
+      where: { inquiry_date: { gte: twelveMonthsAgo } },
+    }),
+    prisma.iml_inquiries.count({
+      where: {
+        inquiry_date: { gte: twelveMonthsAgo },
+        converted_order_id: { not: null },
+      },
+    }),
   ]);
+
+  const inquiryConversionPct =
+    inquiriesLast12Months > 0
+      ? Math.round((inquiriesConvertedLast12 / inquiriesLast12Months) * 1000) / 10
+      : null;
 
   type OrderStatusRow = { status: string | null; _count: { id: number } };
   type TopCustomerRow = { customer_id: number; _count: { id: number } };
@@ -93,6 +119,23 @@ export default async function ImlPage() {
     { href: "/iml/customers", icon: Users, value: customersCount, label: "Zákazníci" },
     { href: "/iml/products", icon: Package, value: productsCount, label: "Produkty" },
     { href: "/iml/orders", icon: ShoppingCart, value: ordersCount, label: "Objednávky" },
+    {
+      href: "/iml/inquiries",
+      icon: FileQuestion,
+      value: inquiriesLast12Months,
+      label: "Poptávky (12 m)",
+      hint:
+        inquiryConversionPct != null
+          ? `Konverze: ${inquiryConversionPct} % (${inquiriesConvertedLast12}/${inquiriesLast12Months})`
+          : "Konverze: —",
+    },
+    {
+      href: "/iml/reports/pantone",
+      icon: BarChart3,
+      value: "",
+      label: "Report Pantone",
+      hint: "Spotřeba barev z objednávek",
+    },
     { href: "/iml/imports", icon: Upload, value: "3", label: "Importy" },
   ];
   if (canWrite) {

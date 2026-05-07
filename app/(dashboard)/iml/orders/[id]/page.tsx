@@ -64,7 +64,13 @@ export default async function ImlOrderDetailPage({
             {order.iml_customers?.name} • {new Date(order.order_date).toLocaleDateString("cs-CZ")}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`/api/iml/orders/${order.id}/export-xml`}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+          >
+            Export XML
+          </a>
           {canWrite && (
             <Link
               href={`/iml/orders/${order.id}/edit`}
@@ -111,6 +117,53 @@ export default async function ImlOrderDetailPage({
           )}
         </div>
       </div>
+
+      {(order.shipping_snapshot_recipient ||
+        order.shipping_snapshot_street ||
+        order.shipping_snapshot_city ||
+        order.shipping_snapshot_postal_code ||
+        order.shipping_snapshot_country ||
+        order.shipping_snapshot_label) && (
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h3 className="mb-3 text-sm font-semibold text-gray-700">
+            Doručovací adresa (snapshot v době vytvoření)
+          </h3>
+          <div className="grid gap-2 text-sm sm:grid-cols-2">
+            {order.shipping_snapshot_label && (
+              <div>
+                <span className="text-gray-500">Označení: </span>
+                {order.shipping_snapshot_label}
+              </div>
+            )}
+            {order.shipping_snapshot_recipient && (
+              <div>
+                <span className="text-gray-500">Příjemce: </span>
+                {order.shipping_snapshot_recipient}
+              </div>
+            )}
+            {order.shipping_snapshot_street && (
+              <div className="sm:col-span-2">
+                <span className="text-gray-500">Ulice: </span>
+                {order.shipping_snapshot_street}
+              </div>
+            )}
+            {(order.shipping_snapshot_postal_code || order.shipping_snapshot_city) && (
+              <div className="sm:col-span-2">
+                <span className="text-gray-500">PSČ / město: </span>
+                {[order.shipping_snapshot_postal_code, order.shipping_snapshot_city]
+                  .filter(Boolean)
+                  .join(" ")}
+              </div>
+            )}
+            {order.shipping_snapshot_country && (
+              <div>
+                <span className="text-gray-500">Země: </span>
+                {order.shipping_snapshot_country}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {hasCustomData && (
         <div className="mb-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
