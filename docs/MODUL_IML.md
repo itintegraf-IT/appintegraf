@@ -429,6 +429,8 @@ Uživatelé mohou rozšířit databázi o vlastní pole u produktů a objednáve
 
 - Ukládání do `Bytes` (Prisma) – BLOB
 - API: `/api/iml/products/[id]/image` a `/api/iml/products/[id]/pdf`
+- **Verzované PDF:** tabulka `iml_product_files` (více verzí na produkt, primární verze, historie na záložce „Tisková data“). Endpoint `/api/iml/products/[id]/pdf` čte primární verzi z této tabulky a při absenci verzí padá na legacy `iml_products.pdf_data`.
+- **Příznak „má PDF“ v UI:** `GET /api/iml/products` a `GET /api/iml/products/[id]` vrací `has_pdf: true`, pokud je neprázdný buď legacy `pdf_data`, nebo aspoň jeden řádek v `iml_product_files` s neprázdným `pdf_data` (sloupec PDF v katalogu, nástrojová lišta detailu, stav v editaci). Pomocná logika: `lib/iml-product-pdf-flag.ts`.
 - Validace MIME typu při uploadu
 
 ### 11.2 Migrace z NewIML (PHP)

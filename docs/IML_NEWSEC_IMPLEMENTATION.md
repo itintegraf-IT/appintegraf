@@ -37,7 +37,7 @@ Framework: **Next.js App Router + TypeScript + Prisma (MySQL) + NextAuth**.
 
 Databáze (`prisma/schema.prisma`):
 - `iml_customers` – plochý model, adresy jako `Text`.
-- `iml_products` – `image_data`, `pdf_data` jako `LongBlob` přímo v řádku.
+- `iml_products` – `image_data`, `pdf_data` jako `LongBlob` přímo v řádku (legacy PDF; nové verze navíc v `iml_product_files`).
 - `iml_orders` + `iml_order_items`.
 - `iml_custom_fields` – dynamická pole pro `products` / `orders`.
 
@@ -495,12 +495,16 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 - [x] UI tab „Tisková data" – tabulka historie verzí (`ProductPdfHistory.tsx`): verze, filename, velikost, uploader, datum + akce (stáhnout / obnovit / smazat)
 - [x] `next.config.ts` – `bodySizeLimit` a `proxyClientMaxBodySize` zvýšeny z `20mb` na `60mb` (rezerva nad 50 MB PDF)
 - [x] UI upload (`ProductFilesUpload.tsx`, `ProductFilesUploadPlaceholder.tsx`) – hint změněn na „max 50 MB"
+- [x] Příznak **`has_pdf` v API a UI** je sladěný s oběma úložišti: legacy `iml_products.pdf_data` **nebo** neprázdný blob v tabulce **`iml_product_files`** (řádkový seznam, `GET /api/iml/products/[id]` pro editaci, serverový detail produktu). Implementace: [`lib/iml-product-pdf-flag.ts`](../lib/iml-product-pdf-flag.ts), úpravy [`app/api/iml/products/route.ts`](../app/api/iml/products/route.ts), [`app/api/iml/products/[id]/route.ts`](../app/api/iml/products/[id]/route.ts), [`app/(dashboard)/iml/products/[id]/page.tsx`](../app/(dashboard)/iml/products/[id]/page.tsx) *(2026-05-07, `ded63a5` na `test`)*
 
 **Nasazení na test: PDF se nenahraje, obrázek ano**
 
 - **Nginx (reverse proxy):** `client_max_body_size` výchozí bývá 1m → velké PDF vrátí **413** dřív, než request doputuje do Node. V `server` / `location` pro aplikaci nastavit např. `client_max_body_size 60M;` a `nginx -s reload`. Obrázky do 5 MB často projdou, PDF ne – typický symptóm.
 - **MySQL / MariaDB:** ukládáme BLOB do `iml_product_files.pdf_data` – když je `max_allowed_packet` (server i klient) menší než soubor, INSERT selže. Na serveru v `mysqld.cnf` / `my.cnf` např. `max_allowed_packet=64M`, restart DB. API nyní vrátí srozumitelnou chybu, pokud text chyby obsahuje „packet too large“.
 - Aplikace musí běžet s buildem, který obsahuje zvýšený limit v `next.config.ts` (po `git pull` na serveru `npm run build` + restart PM2).
+
+**Symptom: PDF je v DB (`iml_product_files`) a v audit logu, ale v katalogu je šedá ikona a v editaci chybí „Zobrazit PDF“**  
+Dříve API počítalo `has_pdf` jen z `iml_products.pdf_data`. Nové nahrávání plní primárně `iml_product_files` – po opravě výše musí ikona a editace odpovídat verzovanému PDF stejně jako záložka „Tisková data“ (historie verzí).
 
 ### 3.5 Nové stavy
 
@@ -513,6 +517,7 @@ Soubor `scripts/iml-newsec-phase1-migrate.mjs` (idempotentní, s `--dry-run`):
 - [x] Fólie z dropdownu, Pantone řádky s Enter-skokem a validací
 - [x] Neznámý Pantone kód: validace + nápověda a auto-vytvoření při uložení produktu (`ProductPantoneEditor`; plný modal dle původní poznámky není nutný)
 - [x] PDF limit 50 MB, historie verzí funkční (stažení, mazání, obnovení jako primary)
+- [x] Sloupec PDF v katalogu a stav uploadu v editaci odpovídají verzovanému souboru v `iml_product_files`, nejen legacy `pdf_data`
 - [x] Nové stavy dostupné v UI
 
 ---
