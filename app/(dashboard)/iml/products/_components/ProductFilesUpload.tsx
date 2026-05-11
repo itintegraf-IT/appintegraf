@@ -2,6 +2,11 @@
 
 import { useState, useRef } from "react";
 import { Image, FileText, Trash2, Upload } from "lucide-react";
+import { ProductPdfThumbnail } from "./ProductPdfThumbnail";
+import { pdfFileToJpegPreviewBlob } from "@/lib/iml-product-preview-from-pdf";
+
+const PREVIEW_FILE_ACCEPT =
+  "image/jpeg,image/png,image/webp,image/gif,application/pdf,.pdf";
 
 type Props = {
   productId: number;
@@ -29,8 +34,21 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
     setImageError("");
     setImageLoading(true);
     try {
+      const isPdf =
+        file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      let fileToUpload: File = file;
+      if (isPdf) {
+        try {
+          const blob = await pdfFileToJpegPreviewBlob(file);
+          fileToUpload = new File([blob], "nahled-z-pdf.jpg", { type: "image/jpeg" });
+        } catch (convErr) {
+          setImageError(convErr instanceof Error ? convErr.message : "PDF nelze převést na náhled.");
+          return;
+        }
+      }
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileToUpload);
       const res = await fetch(`/api/iml/products/${productId}/image`, {
         method: "POST",
         body: formData,
@@ -51,7 +69,7 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
   };
 
   const handleImageDelete = async () => {
-    if (!confirm("Opravdu smazat obrázek?")) return;
+    if (!confirm("Opravdu smazat náhled (obrázek)?")) return;
     setImageError("");
     setImageLoading(true);
     try {
@@ -132,7 +150,14 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
       <h3 className="mb-4 text-sm font-semibold text-gray-700">Obrázek a PDF</h3>
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
-          <p className="mb-2 text-sm text-gray-600">Náhled (JPG, PNG, WebP, GIF, max 5 MB)</p>
+          <p className="mb-2 text-sm text-gray-600">
+            Náhled – obrázek (JPG, PNG, WebP, GIF) nebo PDF (1. stránka → uloží se jako JPEG, max. 5 MB)
+            {!hasImage && hasPdf && (
+              <span className="mt-0.5 block text-xs font-normal text-gray-500">
+                Dokud nenahrajete vlastní náhled výše, zobrazí se první stránka tiskových dat (PDF vpravo).
+              </span>
+            )}
+          </p>
           {hasImage ? (
             <div className="flex items-center gap-2">
               <img
@@ -154,7 +179,7 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
                   type="button"
                   onClick={pickImage}
                   disabled={imageLoading}
-                  aria-label="Nahrát jiný obrázek"
+                  aria-label="Nahrát jiný náhled (obrázek nebo PDF)"
                   className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Upload className="h-4 w-4" />
@@ -163,7 +188,32 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
                 <input
                   ref={imageInputRef}
                   type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  accept={PREVIEW_FILE_ACCEPT}
+                  onChange={handleImageUpload}
+                  disabled={imageLoading}
+                  className={fileInputClass}
+                  tabIndex={-1}
+                />
+              </div>
+            </div>
+          ) : hasPdf ? (
+            <div className="flex items-center gap-2">
+              <ProductPdfThumbnail productId={productId} maxHeight={96} className="shrink-0" />
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={pickImage}
+                  disabled={imageLoading}
+                  aria-label="Nahrát náhled z obrázku nebo PDF (1. stránka)"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Upload className="h-4 w-4" />
+                  Nahrát náhled
+                </button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept={PREVIEW_FILE_ACCEPT}
                   onChange={handleImageUpload}
                   disabled={imageLoading}
                   className={fileInputClass}
@@ -177,16 +227,16 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
                 type="button"
                 onClick={pickImage}
                 disabled={imageLoading}
-                aria-label="Vybrat obrázek k nahrání"
+                aria-label="Vybrat náhled – obrázek nebo PDF"
                 className="flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-left transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <Image className="mb-2 h-10 w-10 text-gray-400" />
-                <span className="text-sm text-gray-600">Klikněte pro nahrání obrázku</span>
+                <span className="text-sm text-gray-600">Klikněte pro nahrání náhledu (obrázek nebo PDF)</span>
               </button>
               <input
                 ref={imageInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept={PREVIEW_FILE_ACCEPT}
                 onChange={handleImageUpload}
                 disabled={imageLoading}
                 className={fileInputClass}
@@ -201,8 +251,12 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
           <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max 50 MB)</p>
           {hasPdf ? (
             <div className="flex items-center gap-2">
-              <div className="flex h-24 w-24 items-center justify-center rounded-lg border bg-gray-100">
-                <FileText className="h-10 w-10 text-gray-500" />
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-gray-100">
+                {hasImage ? (
+                  <ProductPdfThumbnail productId={productId} maxHeight={96} className="max-h-24 max-w-24" />
+                ) : (
+                  <FileText className="h-10 w-10 text-gray-500" />
+                )}
               </div>
               <div className="flex flex-col gap-1">
                 <a

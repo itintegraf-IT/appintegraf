@@ -20,7 +20,7 @@ import { logImlAudit } from "@/lib/iml-audit";
  * záznamy přenést – fallback je pojistka pro případ, kdy uživatel
  * mezitím něco nahrál a migrace se nerozběhla.
  */
-export const MAX_PDF_SIZE = 50 * 1024 * 1024; // 50 MB (spec 3.4)
+const MAX_PDF_SIZE = 50 * 1024 * 1024; // 50 MB (spec 3.4)
 
 export async function GET(
   req: NextRequest,

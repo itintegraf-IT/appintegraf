@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   /** Next 16: výchozí build = Turbopack; prázdný objekt + webpack níže = explicitní souhlas s oběma. */
   turbopack: {},
-  serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
+  serverExternalPackages: ["pdf-parse"],
   /** Pomalejší Windows / první kompilace chunků ve vývoji s `next dev --webpack`. */
   webpack: (config, { dev, isServer }) => {
     if (dev && !isServer && config.output) {

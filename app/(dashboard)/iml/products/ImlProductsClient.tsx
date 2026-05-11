@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Eye, Pencil, Trash2, FileText, ImageOff } from "lucide-react";
 import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
+import { ProductPdfThumbnail } from "./_components/ProductPdfThumbnail";
 
 type Product = {
   id: number;
@@ -179,6 +180,13 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
                         className="h-10 w-10 rounded border border-gray-200 bg-white object-contain"
                         loading="lazy"
                       />
+                    ) : p.has_pdf ? (
+                      <div
+                        className="h-10 w-10 overflow-hidden rounded border border-gray-200 bg-white"
+                        title="Náhled z PDF"
+                      >
+                        <ProductPdfThumbnail productId={p.id} maxHeight={40} className="[&_canvas]:max-h-10 [&_canvas]:max-w-10 [&_canvas]:object-contain" />
+                      </div>
                     ) : (
                       <div
                         className="flex h-10 w-10 items-center justify-center rounded border border-dashed border-gray-200 bg-gray-50 text-gray-300"
