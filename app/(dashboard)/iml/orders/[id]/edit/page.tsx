@@ -16,6 +16,22 @@ type Product = {
   stock_quantity: number | null;
   item_status: string | null;
 };
+type SelectedOrderItem = {
+  product_id: number;
+  quantity: string;
+  unit_price: string;
+};
+type OrderItemResp = {
+  product_id: number;
+  quantity: number;
+  unit_price: number | null;
+  iml_products?: {
+    id: number;
+    ig_code: string | null;
+    ig_short_name: string | null;
+    client_name: string | null;
+  } | null;
+};
 
 export default function ImlOrderEditPage() {
   const router = useRouter();
@@ -40,8 +56,12 @@ export default function ImlOrderEditPage() {
     status: "nová",
     notes: "",
   });
-  const [qtyByProduct, setQtyByProduct] = useState<Record<number, string>>({});
-  const [priceByProduct, setPriceByProduct] = useState<Record<number, string>>({});
+  const [selectedItems, setSelectedItems] = useState<SelectedOrderItem[]>([]);
+  const [picker, setPicker] = useState<{ product_id: string; quantity: string; unit_price: string }>({
+    product_id: "",
+    quantity: "1",
+    unit_price: "",
+  });
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
 
   useEffect(() => {
@@ -71,14 +91,30 @@ export default function ImlOrderEditPage() {
           status: o.status ?? "nová",
           notes: o.notes ?? "",
         });
-        const qmap: Record<number, string> = {};
-        const pmap: Record<number, string> = {};
-        for (const it of o.iml_order_items ?? []) {
-          qmap[it.product_id] = String(it.quantity);
-          if (it.unit_price != null) pmap[it.product_id] = String(it.unit_price);
-        }
-        setQtyByProduct(qmap);
-        setPriceByProduct(pmap);
+        const orderItems = Array.isArray(o.iml_order_items) ? (o.iml_order_items as OrderItemResp[]) : [];
+        setSelectedItems(
+          orderItems.map((it) => ({
+            product_id: it.product_id,
+            quantity: String(it.quantity),
+            unit_price: it.unit_price != null ? String(it.unit_price) : "",
+          }))
+        );
+
+        const fromOrder = orderItems
+          .map((it) => {
+            if (!it.iml_products) return null;
+            return {
+              id: it.iml_products.id,
+              ig_code: it.iml_products.ig_code,
+              ig_short_name: it.iml_products.ig_short_name,
+              client_code: null,
+              client_name: it.iml_products.client_name,
+              stock_quantity: null,
+              item_status: null,
+            } as Product;
+          })
+          .filter(Boolean) as Product[];
+        setProducts(fromOrder);
         if (o.custom_data && typeof o.custom_data === "object") {
           const cd = o.custom_data as Record<string, unknown>;
           const init: Record<string, string | number | boolean> = {};
@@ -91,7 +127,15 @@ export default function ImlOrderEditPage() {
         if (cid) {
           fetch(`/api/iml/products?customer_id=${cid}`)
             .then((r) => r.json())
-            .then((d) => setProducts(d.products ?? []))
+            .then((d) => {
+              const fetched = (d.products ?? []) as Product[];
+              setProducts((prev) => {
+                const merged = new Map<number, Product>();
+                for (const p of fetched) merged.set(p.id, p);
+                for (const p of prev) if (!merged.has(p.id)) merged.set(p.id, p);
+                return Array.from(merged.values());
+              });
+            })
             .catch(() => setProducts([]));
         }
         setLoadingData(false);
@@ -114,22 +158,67 @@ export default function ImlOrderEditPage() {
     );
   }, [products, debouncedSearch]);
 
-  const setQty = (productId: number, v: string) => {
-    setQtyByProduct((prev) => ({ ...prev, [productId]: v }));
+  const productById = useMemo(() => {
+    const m = new Map<number, Product>();
+    for (const p of products) m.set(p.id, p);
+    return m;
+  }, [products]);
+
+  const selectedProductIds = useMemo(
+    () => new Set(selectedItems.map((row) => row.product_id)),
+    [selectedItems]
+  );
+
+  const pickerProducts = useMemo(
+    () => filteredProducts.filter((p) => !selectedProductIds.has(p.id)),
+    [filteredProducts, selectedProductIds]
+  );
+
+  const addSelectedItem = () => {
+    const pid = parseInt(picker.product_id, 10);
+    if (!pid) {
+      setError("Vyberte produkt.");
+      return;
+    }
+    if (selectedItems.some((row) => row.product_id === pid)) {
+      setError("Produkt už je v položkách objednávky.");
+      return;
+    }
+    setSelectedItems((prev) => [
+      ...prev,
+      {
+        product_id: pid,
+        quantity: picker.quantity.trim() || "1",
+        unit_price: picker.unit_price.trim(),
+      },
+    ]);
+    setPicker({ product_id: "", quantity: "1", unit_price: "" });
   };
 
-  const setPrice = (productId: number, v: string) => {
-    setPriceByProduct((prev) => ({ ...prev, [productId]: v }));
+  const setItemField = (
+    index: number,
+    key: "quantity" | "unit_price",
+    value: string
+  ) => {
+    setSelectedItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [key]: value };
+      return next;
+    });
+  };
+
+  const removeItem = (index: number) => {
+    setSelectedItems((prev) => prev.filter((_, i) => i !== index));
   };
 
   const buildItems = () =>
-    products
-      .map((p) => {
-        const q = parseInt(qtyByProduct[p.id] ?? "0", 10);
+    selectedItems
+      .map((row) => {
+        const q = parseInt(row.quantity, 10);
         if (!q || q <= 0) return null;
-        const up = priceByProduct[p.id];
-        const unitPrice = up && up.trim() !== "" ? parseFloat(up) : null;
-        return { product_id: p.id, quantity: q, unit_price: unitPrice };
+        const up = row.unit_price.trim();
+        const unitPrice = up !== "" ? parseFloat(up) : null;
+        return { product_id: row.product_id, quantity: q, unit_price: unitPrice };
       })
       .filter(Boolean) as { product_id: number; quantity: number; unit_price: number | null }[];
 
@@ -320,6 +409,52 @@ export default function ImlOrderEditPage() {
               className="min-w-[240px] flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
+          <div className="mb-3 grid gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 md:grid-cols-4">
+            <div className="md:col-span-2">
+              <label className="mb-1 block text-xs font-medium text-gray-700">Produkt</label>
+              <select
+                value={picker.product_id}
+                onChange={(e) => setPicker((prev) => ({ ...prev, product_id: e.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              >
+                <option value="">— Vyberte produkt —</option>
+                {pickerProducts.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {(p.ig_code ?? `#${p.id}`) + " — " + (p.client_name ?? p.ig_short_name ?? "Bez názvu")}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Množství</label>
+              <input
+                type="number"
+                min="1"
+                value={picker.quantity}
+                onChange={(e) => setPicker((prev) => ({ ...prev, quantity: e.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-right"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-gray-700">Cena/ks</label>
+              <input
+                type="number"
+                step="0.01"
+                value={picker.unit_price}
+                onChange={(e) => setPicker((prev) => ({ ...prev, unit_price: e.target.value }))}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-right"
+              />
+            </div>
+            <div className="md:col-span-4">
+              <button
+                type="button"
+                onClick={addSelectedItem}
+                className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              >
+                Přidat položku
+              </button>
+            </div>
+          </div>
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full text-sm">
               <thead className="border-b border-gray-200 bg-gray-50">
@@ -333,12 +468,14 @@ export default function ImlOrderEditPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredProducts.map((p) => {
+                {selectedItems.map((row, index) => {
+                  const p = productById.get(row.product_id);
+                  if (!p) return null;
                   const st = p.item_status?.trim() || "";
                   const inactive = st !== "" && st !== "aktivní";
                   return (
                     <tr
-                      key={p.id}
+                      key={`${row.product_id}-${index}`}
                       className={`border-b border-gray-100 ${inactive ? "bg-amber-50/50" : ""}`}
                     >
                       <td className="px-3 py-2 font-mono">{p.ig_code ?? "—"}</td>
@@ -358,9 +495,9 @@ export default function ImlOrderEditPage() {
                       <td className="px-3 py-2 text-right">
                         <input
                           type="number"
-                          min="0"
-                          value={qtyByProduct[p.id] ?? ""}
-                          onChange={(e) => setQty(p.id, e.target.value)}
+                          min="1"
+                          value={row.quantity}
+                          onChange={(e) => setItemField(index, "quantity", e.target.value)}
                           className="w-24 rounded border border-gray-300 px-2 py-1 text-right"
                         />
                       </td>
@@ -368,14 +505,28 @@ export default function ImlOrderEditPage() {
                         <input
                           type="number"
                           step="0.01"
-                          value={priceByProduct[p.id] ?? ""}
-                          onChange={(e) => setPrice(p.id, e.target.value)}
+                          value={row.unit_price}
+                          onChange={(e) => setItemField(index, "unit_price", e.target.value)}
                           className="w-24 rounded border border-gray-300 px-2 py-1 text-right"
                         />
+                        <button
+                          type="button"
+                          onClick={() => removeItem(index)}
+                          className="ml-2 rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+                        >
+                          Odebrat
+                        </button>
                       </td>
                     </tr>
                   );
                 })}
+                {selectedItems.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-4 text-center text-sm text-gray-500">
+                      Zatím nejsou přidané žádné položky.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

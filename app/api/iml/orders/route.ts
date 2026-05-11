@@ -94,14 +94,21 @@ export async function POST(req: NextRequest) {
     }
 
     const orderItemsRaw = Array.isArray(items) ? items : [];
-    const normalizedItems: { product_id: number; quantity: number; unit_price: number | null }[] = [];
+    const itemsByProduct = new Map<number, { product_id: number; quantity: number; unit_price: number | null }>();
     for (const it of orderItemsRaw) {
       const productId = parseInt(it.product_id, 10);
       const quantity = parseInt(it.quantity, 10) || 0;
       if (!productId || quantity <= 0) continue;
       const unitPrice = it.unit_price != null ? parseFloat(String(it.unit_price)) : null;
-      normalizedItems.push({ product_id: productId, quantity, unit_price: unitPrice });
+      const existing = itemsByProduct.get(productId);
+      if (existing) {
+        existing.quantity += quantity;
+        if (unitPrice != null) existing.unit_price = unitPrice;
+      } else {
+        itemsByProduct.set(productId, { product_id: productId, quantity, unit_price: unitPrice });
+      }
     }
+    const normalizedItems = Array.from(itemsByProduct.values());
 
     const allowNonActive =
       bodySupervisorOverride === true && (await hasImlSupervisorOverride(userId));
