@@ -2,7 +2,7 @@
 
 > Referenční specifikace: [`iml_newsec.md`](./iml_newsec.md)  
 > Základní dokumentace modulu: [`MODUL_IML.md`](./MODUL_IML.md)  
-> Status: **F1–F3 uzavřeny v kódu**; F4+ dle checklistu níže
+> Status: **F1–F6 uzavřeny v kódu** (synchro dokumentu s repozitářem 2026-05). **Fáze 7** (úklid legacy sloupců) a **odškrtnutí produkčních balíků** A/B/C čekají na provozní rozhodnutí a nasazení dle §0.4.
 
 Tento dokument je závazný postup implementace. Každá fáze je samostatně nasaditelná a má vlastní akceptační kritéria (checklist). Odškrtávejte boxy průběžně tak, jak agent dokončí jednotlivé úkoly.
 
@@ -22,10 +22,12 @@ Každá fáze má stavy: `dev` → `test` (pushnuto + deploy na test server) →
 
 ### Produkční balíky (strategie nasazení – viz § 0.4)
 
-- [ ] **Balík A (F1 + F2 + F3)** – Zákazníci a produkty v novém *(F3 uzavřena – nasazení na prod až po smoke testech a potvrzení uživatele dle § 0.4.4)*
+- [ ] **Balík A (F1 + F2 + F3)** – Zákazníci a produkty v novém *(kód na `test` – nasazení na prod až po smoke testech a potvrzení uživatele dle § 0.4.4)*
   - [x] Lokální předkontrola před deployem: `npx prisma generate`, `npx tsc --noEmit` bez chyb *(2026-05-07)*
-- [ ] **Balík B (F4 + F5)** – Poptávky a objednávky *(kód hotový – nasazení dle § 0.4.4)*
-- [ ] **Balík C (F6 + F7)** – Reporting a cleanup *(F6 hotová v kódu; F7 čeká)*
+- [ ] **Balík B (F4 + F5)** – Poptávky a objednávky *(kód na `test` – nasazení na prod dle § 0.4.4)*
+- [ ] **Balík C (F6 + F7)** – Reporting a cleanup *(F6 v kódu na `test`; F7 úklid DB čeká; odškrtnutí balíku = dokončené prod nasazení dle §0.4)*
+
+> **Poznámka:** Neodškrtnutý balík neznamená chybějící implementaci v Gitu, nýbrž **neprovedený / nepotvrzený** deploy na produkci oproti checklistu §0.4.
 
 ---
 
@@ -55,15 +57,17 @@ Utility: `lib/iml-audit.ts`, `lib/iml-export.ts`, `lib/auth-utils.ts`, `lib/db.t
 
 ### 0.2 Konvence (závazné pro všechny fáze)
 
-- [ ] Auth gate na všech route handlerech (`auth()` + `hasModuleAccess`)
-- [ ] Audit přes `logImlAudit` u každého create/update/delete
-- [ ] Validace vstupu ve stylu `parseProductBody` (helpery `str/int/num`)
-- [ ] TailwindCSS, primární červený button (`bg-red-600`), karty `rounded-xl border bg-white shadow-sm`
-- [ ] Explicitní MySQL datové typy v Prisma (`@db.VarChar(N)`, `@db.DateTime(0)`, `@db.Decimal(p,s)`)
-- [ ] Jedna migrace / fáze, název `iml_newsec_phaseN_<krátký_popis>`
-- [ ] `prisma generate` po každé úpravě schématu
-- [ ] Legacy sloupce **nemazat** v první iteraci, úklid až ve Fázi 7
-- [ ] Žádné `any`, preferovat typy z `@prisma/client`
+> **Synchro s kódem (2026-05):** U všech handlerů v [`app/api/iml/`](../app/api/iml/) je `auth()` a `hasModuleAccess` pro modul `iml`. U mutací ukládajících do IML tabulek se používá `logImlAudit` z [`lib/iml-audit.ts`](../lib/iml-audit.ts) (`action` v DB = `<create|update|delete>:<table_name>`; BLOB se do auditu nedávají).
+
+- [x] Auth gate na route handlerech `app/api/iml/**` (`auth()` + `hasModuleAccess`)
+- [x] Audit přes `logImlAudit` u zápisových IML mutací (create/update/delete), kde persist mění data
+- [x] Validace vstupu helpery ve stylu `parseProductBody` (`str` / `int` / …) u produktů, zákazníků, objednávek, poptávek a souvisejících API
+- [x] TailwindCSS, primární červený button (`bg-red-600`), karty `rounded-xl border bg-white shadow-sm` (IML UI F1–F6)
+- [x] Explicitní MySQL datové typy v Prisma u IML modelů (`@db.*`) dle migrací F1–F6
+- [x] Jedna migrace / fáze IML, názvy `iml_newsec_phaseN_*` u zveřejněných fází
+- [x] `prisma generate` ve workflow (`postinstall` + po změně schématu)
+- [x] Legacy sloupce **nemazat** před Fází 7 (v kódu stále čitelné / použitelné tam, kde je potřeba fallback)
+- [ ] Žádné `any`, preferovat typy z `@prisma/client` *(kontinuální pravidlo pro nové úpravy; globální lint projektu může stále hlásit starší výjimky mimo IML)*
 
 ---
 
@@ -107,16 +111,16 @@ Každá nová IML tabulka s odkazem na uživatele musí:
 
 ### 0.3.4 Pravidla pro supervisor override (Fáze 5)
 
-- [ ] Implementace **NE** přes novou `admin` úroveň v `module_access` (to by dalo superuživatelská práva i na Pantone/Fólie mimo záměr).
-- [ ] Implementace přes pole-formát: nový kód `iml.supervisor_override` v `module_access`.
-- [ ] Helper `hasImlSupervisorOverride(userId)` = zjednodušený wrapper nad existujícím `getModuleAccessItems(userId)` hledající `"iml.supervisor_override"` nebo `"iml.admin"`.
-- [ ] Parser `lib/auth-utils.ts` **neměnit** – stávající pole-formát už podporuje volné kódy akcí.
+- [x] Implementace **NE** přes novou `admin` úroveň v `module_access` (to by dalo superuživatelská práva i na Pantone/Fólie mimo záměr). *(ověřeno: použití zvláštního kódu akce, ne rozšíření `iml:admin` jako blanket.)*
+- [x] Implementace přes pole-formát: kód `iml.supervisor_override` v `module_access` *(viz Fáze 5 checklist + [`lib/iml-permissions.ts`](../lib/iml-permissions.ts))*
+- [x] Helper `hasImlSupervisorOverride(userId)` nad `getModuleAccessItems` (`iml.supervisor_override`, `iml.admin`, `iml:admin`) – [`lib/iml-permissions.ts`](../lib/iml-permissions.ts)
+- [x] Parser `lib/auth-utils.ts` **beze změny** logiky – volné kódy akcí v poli zůstávají podporované
 
 ### 0.3.5 Pravidla pro `audit_log`
 
-- [ ] Akce formátovat jako `create:iml_<tabulka>`, `update:iml_<tabulka>`, `delete:iml_<tabulka>`, `convert:iml_inquiries` (pro překlopení poptávky).
-- [ ] `record_id` vždy `Int` (všechny nové modely mají `Int @id @default(autoincrement())`).
-- [ ] Blob data (pdf/image) **nikdy** nedávat do `old_values` / `new_values` – `sanitizeForAudit` v `lib/iml-audit.ts` to již řeší, novým sloupcům tuto logiku potvrdit testem.
+- [x] Akce v audit logu ve tvaru `<akce>:<table_name>` (např. `update:iml_products`) – viz [`logImlAudit`](../lib/iml-audit.ts), pole `action` se ukládá jako zřetězení `action`, `':'` a `tableName`. Překlopení poptávky loguje změny na `iml_inquiries` / `iml_orders` běžnými update/create.
+- [x] `record_id` vždy `Int` u IML entit s numerickým id
+- [x] Blob data (pdf/image) **nikdy** v `old_values` / `new_values` – `sanitizeForAudit` v [`lib/iml-audit.ts`](../lib/iml-audit.ts)
 
 ### 0.3.6 Pravidla pro migrace
 
@@ -613,6 +617,32 @@ Dříve API počítalo `has_pdf` jen z `iml_products.pdf_data`. Nové nahráván
 - [x] Výpočet kg přes `consumptionKg` (Příloha C.1)
 - [x] Neúplné řádky mimo součet kg a zvýrazněné v UI
 - [x] Export CSV/Excel s příznakem `missing_labels_per_sheet`
+
+---
+
+## Připomínky uživatelů (rozšíření mimo uzavřené fáze F1–F6)
+
+Níže záznam požadavků z praxe pro budoucí iterace IML. **Nejsou** součástí uzavřených checklistů fází 1–6; při plánování dalšího vývoje je zařadit jako samostatné úkoly (API + UI + oprávnění dle potřeby).
+
+### 2. Evidence a zobrazení objednávek
+
+- **Problém:** Potřeba vidět klíčové informace (zejména barevnost / Pantone) přímo v přehledu objednávek pro rychlé rozhodování a prioritizaci.
+- **Návrh řešení:** Upravit řádek v evidenci objednávek tak, aby obsahoval náhled, zkrácené jméno zákazníka, data přijetí a expedice, stav, počet kusů, typ produktu a konkrétní barevnost (např. Pantone kódy).
+
+### 3. Uživatelské role a přístupová práva
+
+- **Problém:** Různí pracovníci (technolog, expedice, nákupčí barev) potřebují k datům různý přístup.
+- **Návrh řešení:** Definovat specifické uživatelské role (Administrátor, Editor, Prohlížeč) a k těmto rolím přiřadit konkrétní uživatele. Oprávnění se budou nastavovat postupně podle toho, co která role reálně potřebuje k práci. Pro otestování systému budou vytvořeny profily pro další kolegyně (Míša, Anežka), aby se k systému vyjádřily z pohledu uživatele.
+
+### 4. Generování a tisk štítků
+
+- **Problém:** Potřeba generovat tiskové sestavy pro štítky a paletovky přímo ze systému.
+- **Návrh řešení:** Pokud budou v systému všechna potřebná data, přidá se k detailu objednávky ikona tiskárny („button“), která umožní vytisknout podrobnosti objednávky nebo vygenerovat štítky podle definovaných vzorů (mustrů).
+
+### 5. Exporty dat
+
+- **Problém:** Různá oddělení potřebují různé výstupy (např. technolog potřebuje jen kód, název a množství).
+- **Návrh řešení:** Vytvořit variabilní exportní nástroj (Excel, CSV, XML), kde si uživatel bude moci „odškrtnout“, která pole (zákazník, produkt, množství, poznámka) chce do konkrétního souboru exportovat.
 
 ---
 
