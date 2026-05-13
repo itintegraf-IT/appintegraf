@@ -1117,11 +1117,12 @@ model iml_orders {
   id           Int      @id @default(autoincrement())
   customer_id  Int
   order_number String   @unique @db.VarChar(50)
-  order_date   DateTime @db.DateTime(0)
-  status       String   @default("nová") @db.VarChar(50)
-  total        Decimal? @db.Decimal(10, 2)
-  notes        String?  @db.Text
-  custom_data  Json?    @db.Json
+  order_date          DateTime  @db.DateTime(0)
+  expected_ship_date DateTime? @db.DateTime(0)
+  status              String    @default("nová") @db.VarChar(50)
+  total               Decimal?  @db.Decimal(10, 2)
+  notes               String?   @db.Text
+  custom_data         Json?     @db.Json
 
   inquiry_id          Int? @unique
   shipping_address_id Int?

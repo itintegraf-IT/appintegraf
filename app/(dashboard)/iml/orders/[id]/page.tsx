@@ -65,6 +65,12 @@ export default async function ImlOrderDetailPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/iml/orders/${order.id}/print`}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+          >
+            Tisk / štítky
+          </Link>
           <a
             href={`/api/iml/orders/${order.id}/export-xml`}
             className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
@@ -98,8 +104,16 @@ export default async function ImlOrderDetailPage({
             </Link>
           </div>
           <div>
-            <p className="text-sm text-gray-500">Datum</p>
+            <p className="text-sm text-gray-500">Datum přijetí</p>
             <p className="font-medium">{new Date(order.order_date).toLocaleDateString("cs-CZ")}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Plánovaná expedice</p>
+            <p className="font-medium">
+              {order.expected_ship_date
+                ? new Date(order.expected_ship_date).toLocaleDateString("cs-CZ")
+                : "—"}
+            </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Stav</p>

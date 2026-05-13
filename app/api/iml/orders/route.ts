@@ -1,14 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { hasImlSupervisorOverride } from "@/lib/iml-permissions";
+import { buildOrderListMeta } from "@/lib/iml-orders-list-meta";
 import {
   parseOrderCustomData,
   resolveShippingSnapshot,
   validateOrderItemsProductStatus,
 } from "@/lib/iml-order-utils";
+
+function parseOptionalDate(v: unknown): Date | null {
+  if (v == null || v === "") return null;
+  const d = new Date(String(v));
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -36,12 +44,56 @@ export async function GET(req: NextRequest) {
     include: {
       iml_customers: { select: { id: true, name: true } },
       iml_order_items: {
-        include: { iml_products: { select: { id: true, ig_code: true, ig_short_name: true, client_name: true } } },
+        orderBy: { id: "asc" },
+        include: {
+          iml_products: {
+            select: {
+              id: true,
+              ig_code: true,
+              ig_short_name: true,
+              client_name: true,
+              product_format: true,
+              label_shape_code: true,
+              iml_product_colors: {
+                orderBy: { sort_order: "asc" },
+                take: 16,
+                select: {
+                  iml_pantone_colors: { select: { code: true, hex: true } },
+                },
+              },
+            },
+          },
+        },
       },
     },
   });
 
-  return NextResponse.json({ orders });
+  const productIds = new Set<number>();
+  for (const o of orders) {
+    for (const it of o.iml_order_items) {
+      if (it.iml_products?.id) productIds.add(it.iml_products.id);
+    }
+  }
+  const ids = [...productIds];
+  let flagsById = new Map<number, { has_image: boolean }>();
+  if (ids.length > 0) {
+    const rows = await prisma.$queryRaw<Array<{ id: number; has_image: number }>>`
+      SELECT p.id,
+             CASE WHEN p.image_data IS NOT NULL AND OCTET_LENGTH(p.image_data) > 0 THEN 1 ELSE 0 END AS has_image
+      FROM iml_products p
+      WHERE p.id IN (${Prisma.join(ids)})
+    `;
+    flagsById = new Map(
+      rows.map((r) => [Number(r.id), { has_image: Number(r.has_image) === 1 }])
+    );
+  }
+
+  return NextResponse.json({
+    orders: orders.map((o) => ({
+      ...o,
+      list_meta: buildOrderListMeta(o, flagsById),
+    })),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -61,6 +113,7 @@ export async function POST(req: NextRequest) {
       customer_id,
       order_number,
       order_date,
+      expected_ship_date: bodyExpectedShip,
       status = "nová",
       notes,
       items,
@@ -75,6 +128,7 @@ export async function POST(req: NextRequest) {
 
     const customerId = parseInt(customer_id, 10);
     const orderDate = new Date(order_date);
+    const expectedShipDate = parseOptionalDate(bodyExpectedShip);
     const shippingAddrRaw = shipping_address_id;
     const shippingAddrId =
       shippingAddrRaw != null && shippingAddrRaw !== ""
@@ -132,6 +186,7 @@ export async function POST(req: NextRequest) {
           customer_id: customerId,
           order_number: String(order_number).trim(),
           order_date: orderDate,
+          expected_ship_date: expectedShipDate,
           status: String(status).trim() || "nová",
           notes: notes ? String(notes).trim() : null,
           total: null,

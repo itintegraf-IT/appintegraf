@@ -53,6 +53,7 @@ export default function ImlOrderEditPage() {
     customer_id: "",
     order_number: "",
     order_date: "",
+    expected_ship_date: "",
     status: "nová",
     notes: "",
   });
@@ -88,6 +89,9 @@ export default function ImlOrderEditPage() {
           customer_id: String(o.customer_id ?? ""),
           order_number: o.order_number ?? "",
           order_date: o.order_date ? new Date(o.order_date).toISOString().slice(0, 10) : "",
+          expected_ship_date: o.expected_ship_date
+            ? new Date(o.expected_ship_date).toISOString().slice(0, 10)
+            : "",
           status: o.status ?? "nová",
           notes: o.notes ?? "",
         });
@@ -234,6 +238,7 @@ export default function ImlOrderEditPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         order_date: form.order_date,
+        expected_ship_date: form.expected_ship_date.trim() || null,
         status: form.status,
         notes: form.notes || null,
         items: orderItems,
@@ -342,12 +347,21 @@ export default function ImlOrderEditPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Datum *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Datum přijetí *</label>
             <input
               type="date"
               required
               value={form.order_date}
               onChange={(e) => setForm({ ...form, order_date: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Plánovaná expedice</label>
+            <input
+              type="date"
+              value={form.expected_ship_date}
+              onChange={(e) => setForm({ ...form, expected_ship_date: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>

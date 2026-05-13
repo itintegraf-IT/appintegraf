@@ -13,7 +13,8 @@ Modul IML slouží ke správě zákazníků, katalogu produktů a objednávek v 
 | Dashboard IML | `/iml` | Přehled, statistiky, reporty, poslední objednávky |
 | Zákazníci | `/iml/customers` | Evidence zákazníků, CRUD, export, import |
 | Produkty | `/iml/products` | Katalog produktů, obrázky, PDF, export, import |
-| Objednávky | `/iml/orders` | Evidence objednávek, položky, export, import |
+| Objednávky | `/iml/orders` | Evidence objednávek (Pantone, náhled, expedice), položky, export CSV/Excel, **export podle zvolených polí** (POST), import |
+| Tisk objednávky | `/iml/orders/[id]/print` | HTML sestava pro tisk / uložení PDF (štítek / paletovka MVP) |
 | Nastavení | `/iml/settings` | Vlastní pole, správa rozšíření databáze |
 
 ### 1.2 Rychlý start
@@ -21,6 +22,20 @@ Modul IML slouží ke správě zákazníků, katalogu produktů a objednávek v 
 1. **Oprávnění** – v administraci uživatelů přiřaďte modul IML a úroveň (read/write/admin).
 2. **Vlastní pole** – v Nastavení IML definujte vlastní pole pro produkty nebo objednávky.
 3. **Import** – CSV/Excel lze importovat na stránkách zákazníků, produktů a objednávek.
+
+#### 1.2.1 Profily uživatelů (Prohlížeč / Editor / Administrátor modulu)
+
+Oprávnění se ukládají do `roles.module_access` nebo `user_roles.module_access` ve formě **JSON objektu** nebo **pole řetězců** (viz `lib/auth-utils.ts`, funkce `hasModuleAccess`). Modul se jmenuje `iml`.
+
+| Profil | Účel | Příklad `module_access` (objekt) | Příklad (pole akcí) |
+|--------|------|-----------------------------------|----------------------|
+| **Prohlížeč** | Čtení seznamů a detailů, exporty kde API dovolí `read` | `{ "iml": "read" }` | `["iml"]`, `["iml.view"]` |
+| **Editor** | CRUD zákazníků, produktů, poptávek, objednávek | `{ "iml": "write" }` | `["iml.write"]` (nebo kombinace `iml.add` / `iml.edit` dle role) |
+| **Administrátor modulu IML** | Totéž co editor + obvykle správa nastavení (Pantone, vlastní pole), dle matice v implementačním plánu | `{ "iml": "admin" }` | doplňkově např. `iml.supervisor_override` pro výjimky u neaktivních produktů v objednávce |
+
+Globální role uživatele **Admin** (jméno role) má přístup ke všem modulům bez ohledu na `module_access`.
+
+**Tip pro testovací účty (např. kolegyně s omezeným přístupem):** v administraci rolí vytvořte roli „IML prohlížeč“ s `{ "iml": "read" }` a přiřaďte ji uživateli; pro plnou editaci použijte `{ "iml": "write" }`.
 
 ### 1.3 Shrnutí modulu
 
@@ -168,16 +183,17 @@ model iml_products {
 
 ```prisma
 model iml_orders {
-  id           Int       @id @default(autoincrement())
-  customer_id  Int
-  order_number String    @unique @db.VarChar(50)
-  order_date   DateTime  @db.DateTime(0)
-  status       String    @default("nová") @db.VarChar(50)
-  total        Decimal?  @db.Decimal(10, 2)
-  notes        String?   @db.Text
-  custom_data  Json?     @db.Json
-  created_at   DateTime  @default(now()) @db.DateTime(0)
-  updated_at   DateTime  @updatedAt @db.DateTime(0)
+  id                  Int       @id @default(autoincrement())
+  customer_id         Int
+  order_number        String    @unique @db.VarChar(50)
+  order_date          DateTime  @db.DateTime(0)
+  expected_ship_date  DateTime? @db.DateTime(0)
+  status              String    @default("nová") @db.VarChar(50)
+  total               Decimal?  @db.Decimal(10, 2)
+  notes               String?   @db.Text
+  custom_data         Json?     @db.Json
+  created_at          DateTime  @default(now()) @db.DateTime(0)
+  updated_at          DateTime  @updatedAt @db.DateTime(0)
 
   iml_customers   iml_customers   @relation(fields: [customer_id], references: [id], onDelete: Restrict)
   iml_order_items iml_order_items[]

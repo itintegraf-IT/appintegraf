@@ -69,16 +69,33 @@ export async function PUT(
 
   try {
     const body = await req.json();
-    const { order_date, status, notes, items, custom_data, supervisor_override: bodySupervisorOverride } =
-      body;
+    const {
+      order_date,
+      expected_ship_date: bodyExpectedShip,
+      status,
+      notes,
+      items,
+      custom_data,
+      supervisor_override: bodySupervisorOverride,
+    } = body;
 
     const orderDate = order_date ? new Date(order_date) : existing.order_date;
+    const newExpectedShip =
+      bodyExpectedShip !== undefined
+        ? bodyExpectedShip === null || bodyExpectedShip === ""
+          ? null
+          : (() => {
+              const d = new Date(String(bodyExpectedShip));
+              return Number.isNaN(d.getTime()) ? null : d;
+            })()
+        : existing.expected_ship_date;
     const newStatus = status != null ? String(status).trim() : existing.status;
     const newNotes = notes != null ? (notes ? String(notes).trim() : null) : existing.notes;
     const parsedCustom = custom_data !== undefined ? parseOrderCustomData(custom_data) : undefined;
 
     const updateData: Prisma.iml_ordersUpdateInput = {
       order_date: orderDate,
+      expected_ship_date: newExpectedShip,
       status: newStatus,
       notes: newNotes,
     };
