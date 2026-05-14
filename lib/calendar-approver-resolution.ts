@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import { CALENDAR_OUT_OF_OFFICE_TYPES } from "@/lib/calendar-out-of-office";
+import { CALENDAR_OUT_OF_OFFICE_TYPE_LIST } from "@/lib/calendar-out-of-office";
 
 export type CalendarApproverTier = "primary" | "secondary" | "tertiary" | "manager";
 
@@ -36,7 +36,7 @@ export async function isUserAbsentInRange(
     where: {
       ...(excludeEventId ? { id: { not: excludeEventId } } : {}),
       created_by: userId,
-      event_type: { in: [...CALENDAR_OUT_OF_OFFICE_TYPES] },
+      event_type: { in: CALENDAR_OUT_OF_OFFICE_TYPE_LIST },
       start_date: { lte: end },
       end_date: { gte: start },
       OR: [{ approval_status: { not: "rejected" } }, { approval_status: null }],

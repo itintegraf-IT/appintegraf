@@ -10,3 +10,6 @@ export const CALENDAR_OUT_OF_OFFICE_TYPES = [
 ] as const;
 
 export type CalendarOutOfOfficeType = (typeof CALENDAR_OUT_OF_OFFICE_TYPES)[number];
+
+/** Mutabilní kopie pro Prisma `in: [...]`. */
+export const CALENDAR_OUT_OF_OFFICE_TYPE_LIST: string[] = [...CALENDAR_OUT_OF_OFFICE_TYPES];
