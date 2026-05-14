@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { FileUp, Loader2 } from "lucide-react";
 
 type Position = { id: number; name: string; is_active: number };
 type LanguageKey = "lang_en" | "lang_de" | "lang_fr" | "lang_ru" | "lang_pl";
@@ -50,6 +51,7 @@ type Props = {
   submitEndpoint: string;
   onSuccess?: (message: string) => void;
   showHeader?: boolean;
+  enableCvExtract?: boolean;
 };
 
 export function PersonalistikaQuestionnaireForm({
@@ -58,7 +60,11 @@ export function PersonalistikaQuestionnaireForm({
   submitEndpoint,
   onSuccess,
   showHeader = false,
+  enableCvExtract = false,
 }: Props) {
+  const cvPdfInputRef = useRef<HTMLInputElement>(null);
+  const [extractLoading, setExtractLoading] = useState(false);
+  const [extractInfo, setExtractInfo] = useState<string | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -75,6 +81,89 @@ export function PersonalistikaQuestionnaireForm({
 
   const setLanguageLevel = (key: LanguageKey, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const applyExtractedCv = (ex: Record<string, unknown>) => {
+    setForm((prev) => ({
+      ...prev,
+      ...(ex.title ? { title: String(ex.title) } : {}),
+      ...(ex.first_name ? { first_name: String(ex.first_name) } : {}),
+      ...(ex.last_name ? { last_name: String(ex.last_name) } : {}),
+      ...(ex.date_of_birth ? { date_of_birth: String(ex.date_of_birth).slice(0, 10) } : {}),
+      ...(ex.citizenship ? { citizenship: String(ex.citizenship) } : {}),
+      ...(ex.address_street ? { address_street: String(ex.address_street) } : {}),
+      ...(ex.address_number ? { address_number: String(ex.address_number) } : {}),
+      ...(ex.address_city ? { address_city: String(ex.address_city) } : {}),
+      ...(ex.address_zip ? { address_zip: String(ex.address_zip) } : {}),
+      ...(ex.email ? { email: String(ex.email) } : {}),
+      ...(ex.phone ? { phone: String(ex.phone) } : {}),
+      ...(ex.position_id != null ? { position_id: String(ex.position_id) } : {}),
+      ...(ex.education_level ? { education_level: String(ex.education_level) } : {}),
+      ...(ex.education_details ? { education_details: String(ex.education_details) } : {}),
+      ...(ex.courses ? { courses: String(ex.courses) } : {}),
+      ...(ex.lang_en ? { lang_en: String(ex.lang_en) } : {}),
+      ...(ex.lang_de ? { lang_de: String(ex.lang_de) } : {}),
+      ...(ex.lang_fr ? { lang_fr: String(ex.lang_fr) } : {}),
+      ...(ex.lang_ru ? { lang_ru: String(ex.lang_ru) } : {}),
+      ...(ex.lang_pl ? { lang_pl: String(ex.lang_pl) } : {}),
+      ...(ex.lang_other ? { lang_other: String(ex.lang_other) } : {}),
+      ...(ex.employer_name ? { employer_name: String(ex.employer_name) } : {}),
+      ...(ex.employer_address ? { employer_address: String(ex.employer_address) } : {}),
+      ...(ex.position_description ? { position_description: String(ex.position_description) } : {}),
+      ...(ex.work_type ? { work_type: String(ex.work_type) } : {}),
+      ...(ex.possible_start ? { possible_start: String(ex.possible_start) } : {}),
+      ...(ex.additional_notes ? { additional_notes: String(ex.additional_notes) } : {}),
+      ...(ex.notes ? { notes: String(ex.notes) } : {}),
+    }));
+  };
+
+  const handleExtractFromCv = async () => {
+    const file = cvPdfInputRef.current?.files?.[0];
+    if (!file) {
+      setError("Vyberte soubor PDF životopisu.");
+      return;
+    }
+    setError("");
+    setExtractInfo(null);
+    setExtractLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/personalistika/applications/extract-from-cv", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const hint = typeof data.hint === "string" ? ` ${data.hint}` : "";
+        throw new Error(
+          (typeof data.error === "string" ? data.error : "Vytěžení CV selhalo.") + hint
+        );
+      }
+      applyExtractedCv((data.extracted ?? {}) as Record<string, unknown>);
+      const meta = data.meta as {
+        model?: string;
+        provider?: string;
+        pageCount?: number;
+        textLength?: number;
+        usedFallback?: boolean;
+      } | undefined;
+      const parts = [
+        "Pole formuláře byla doplněna návrhem z AI – zkontrolujte je před uložením (včetně souhlasu GDPR).",
+        meta?.usedFallback
+          ? `Použita záložní služba (${meta?.provider ?? "Gemini"}), protože primární Groq neodpověděl.`
+          : null,
+        meta?.provider && meta?.model ? `Poskytovatel: ${meta.provider}, model: ${meta.model}.` : null,
+        meta?.pageCount != null ? `Stran PDF: ${meta.pageCount}.` : null,
+        meta?.textLength != null ? `Délka textu: ${meta.textLength} znaků.` : null,
+      ].filter(Boolean);
+      setExtractInfo(parts.join(" "));
+      if (cvPdfInputRef.current) cvPdfInputRef.current.value = "";
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Chyba při vytěžování CV.");
+    } finally {
+      setExtractLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -124,6 +213,23 @@ export function PersonalistikaQuestionnaireForm({
       )}
       {error && <FormAlert type="error" message={error} />}
       {success && <FormAlert type="success" message={success} />}
+      {extractInfo && (
+        <div className="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">{extractInfo}</div>
+      )}
+
+      {enableCvExtract && (
+        <div className="mb-6 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-4">
+          <h2 className="text-base font-medium text-gray-900">Návrh z CV (AI / Groq)</h2>
+          <p className="mt-1 text-sm text-gray-600">
+            Nahrajte textové PDF životopisu. Údaje se doplní jako návrh (Groq, při výpadku automaticky Gemini).
+          </p>
+          <CvExtractRow
+            cvPdfInputRef={cvPdfInputRef}
+            extractLoading={extractLoading}
+            onExtract={handleExtractFromCv}
+          />
+        </div>
+      )}
 
       {mode === "public" && (
         <input
@@ -430,6 +536,36 @@ function NotesFields({
     <div className="mt-3 grid gap-3">
       <textarea rows={4} value={form.additional_notes} onChange={(e) => setForm((p) => ({ ...p, additional_notes: e.target.value }))} className="rounded-lg border border-gray-300 px-3 py-2" />
       <textarea rows={3} value={form.notes} onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))} placeholder="Interní poznámka k podání (volitelné)" className="rounded-lg border border-gray-300 px-3 py-2" />
+    </div>
+  );
+}
+
+function CvExtractRow({
+  cvPdfInputRef,
+  extractLoading,
+  onExtract,
+}: {
+  cvPdfInputRef: React.RefObject<HTMLInputElement | null>;
+  extractLoading: boolean;
+  onExtract: () => void;
+}) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-3">
+      <input
+        ref={cvPdfInputRef}
+        type="file"
+        accept="application/pdf,.pdf"
+        className="block max-w-md text-sm"
+      />
+      <button
+        type="button"
+        onClick={onExtract}
+        disabled={extractLoading}
+        className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
+      >
+        {extractLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+        {extractLoading ? "Vytěžuji…" : "Doplnit z CV"}
+      </button>
     </div>
   );
 }
