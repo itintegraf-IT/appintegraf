@@ -110,13 +110,14 @@ Tento dokument shrnuje hotové moduly systému INTEGRAF v jednotném formátu pr
 ## 5) Personalistika
 
 **Cesta:** `/personalistika`  
-**Účel:** Správa dotazníků uchazečů a pracovních pozic.
+**Účel:** Správa dotazníků uchazečů, pracovních pozic a evidence brigádníků.
 
 ### Co modul umí
 - Evidence uchazečů a jejich stavů.
 - Detail uchazeče včetně rozšířených dat dotazníku.
 - Správa příloh (napr. CV, PDF dokumenty).
 - Správa pracovních pozic (přidání, aktivace/deaktivace, smazání).
+- Evidence brigádníků (jméno, telefon, e-mail, stav: Student / Důchodce / Nezaměstnaný / Zaměstnaný / OSVČ / Mateřská-rodičovská / Jiné, poznámka).
 
 ### Rychlý návod
 1. Otevřete `Personalistika`.
@@ -125,10 +126,12 @@ Tento dokument shrnuje hotové moduly systému INTEGRAF v jednotném formátu pr
 4. Nahrajte nebo smažte přílohy podle potřeby.
 5. Uložte změny.
 6. V záložce `Pracovní pozice` spravujte seznam pozic.
+7. V záložce `Brigádníci` přidávejte krátkodobé pracovníky tlačítkem `Přidat brigádníka`, vyhledávejte je podle jména, telefonu nebo e-mailu a upravujte/mazejte přímo v tabulce.
 
 ### Praktické tipy
 - Pro náborovou schůzku nastavte status na `Pozván`.
 - U přijatých kandidátů doplňte poznámky, aby byly dostupné pro onboarding.
+- U brigádníků udržujte správně stav (např. `Student`, `Důchodce`, `OSVČ`) — pomáhá to rychle orientaci v evidenci a později i pro podklady mzdové účetní.
 
 ---
 
