@@ -179,3 +179,59 @@ export function normalizeCandidateSource(input: string | null | undefined): Cand
   if (val === "internal") return "internal";
   return "web";
 }
+
+export const EDUCATION_LEVELS = [
+  { value: "Zakladni skola", label: "Základní škola" },
+  { value: "Stredni odborne", label: "Střední odborné" },
+  { value: "Maturita", label: "Maturita" },
+  { value: "Vyssi odborne", label: "Vyšší odborné" },
+  { value: "Vysokoskolske", label: "Vysokoškolské" },
+] as const;
+
+export const WORK_TYPES = [
+  { value: "zamestnani", label: "Zaměstnání" },
+  { value: "brigada", label: "Brigáda/Domácí práce" },
+  { value: "praxe", label: "Praxe" },
+] as const;
+
+export type CandidateApplicationDetails = {
+  title?: string;
+  date_of_birth?: string;
+  citizenship?: string;
+  correspondence_address?: {
+    street?: string;
+    number?: string;
+    city?: string;
+    zip?: string;
+  };
+  education_level?: string;
+  education_details?: string;
+  courses?: string;
+  languages?: {
+    en?: string;
+    de?: string;
+    fr?: string;
+    ru?: string;
+    pl?: string;
+    other?: string;
+  };
+  employment?: {
+    employer_name?: string;
+    employer_address?: string;
+    position_description?: string;
+  };
+  work_type?: string;
+  possible_start?: string;
+  additional_notes?: string;
+};
+
+export function parseDetailsJson(raw: unknown): CandidateApplicationDetails | null {
+  if (!raw) return null;
+  if (typeof raw === "object" && raw !== null) return raw as CandidateApplicationDetails;
+  if (typeof raw !== "string") return null;
+  try {
+    return JSON.parse(raw) as CandidateApplicationDetails;
+  } catch {
+    return null;
+  }
+}
