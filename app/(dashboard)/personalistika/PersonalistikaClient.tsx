@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BriefcaseBusiness, Save, Plus, Trash2, Pencil, X } from "lucide-react";
+import { PersonalistikaQuestionnaireForm } from "@/components/personalistika/PersonalistikaQuestionnaireForm";
 
 type Application = {
   id: number;
@@ -127,12 +128,55 @@ const STATUS_LABELS: Record<Application["status"], string> = {
   accepted: "Přijat",
 };
 
+const WORK_TYPE_LABELS: Record<string, string> = {
+  zamestnani: "Zaměstnání",
+  brigada: "Brigáda",
+  praxe: "Praxe",
+};
+
+type ApplicationFilters = {
+  q: string;
+  status: string;
+  positionId: string;
+  workType: string;
+  educationLevel: string;
+  city: string;
+  datePreset: string;
+  dateFrom: string;
+};
+
+const EMPTY_FILTERS: ApplicationFilters = {
+  q: "",
+  status: "all",
+  positionId: "all",
+  workType: "all",
+  educationLevel: "all",
+  city: "all",
+  datePreset: "all",
+  dateFrom: "",
+};
+
+type FilterOptions = {
+  positions: Position[];
+  cities: string[];
+  educationLevels: { value: string; label: string }[];
+  workTypes: { value: string; label: string }[];
+  datePresets: { value: string; label: string }[];
+};
+
 export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
-  const [tab, setTab] = useState<"applications" | "positions" | "part_timers">("applications");
+  const [tab, setTab] = useState<"applications" | "questionnaire" | "positions" | "part_timers">("applications");
   const [applications, setApplications] = useState<Application[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("all");
+  const [draftFilters, setDraftFilters] = useState<ApplicationFilters>(EMPTY_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<ApplicationFilters>(EMPTY_FILTERS);
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    positions: [],
+    cities: [],
+    educationLevels: [],
+    workTypes: [],
+    datePresets: [],
+  });
   const [selected, setSelected] = useState<Application | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -146,13 +190,31 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
   const [editingPartTimerId, setEditingPartTimerId] = useState<number | "new" | null>(null);
   const [partTimerForm, setPartTimerForm] = useState<PartTimerForm>(EMPTY_PART_TIMER);
 
-  const loadApplications = async () => {
+  const loadApplications = useCallback(async (filters: ApplicationFilters = appliedFilters) => {
     const params = new URLSearchParams();
-    if (query) params.set("q", query);
-    if (status !== "all") params.set("status", status);
+    if (filters.q) params.set("q", filters.q);
+    if (filters.status !== "all") params.set("status", filters.status);
+    if (filters.positionId !== "all") params.set("position_id", filters.positionId);
+    if (filters.workType !== "all") params.set("work_type", filters.workType);
+    if (filters.educationLevel !== "all") params.set("education_level", filters.educationLevel);
+    if (filters.city !== "all") params.set("city", filters.city);
+    if (filters.datePreset !== "all") params.set("date_preset", filters.datePreset);
+    if (filters.datePreset === "custom" && filters.dateFrom) params.set("date_from", filters.dateFrom);
     const res = await fetch(`/api/personalistika/applications?${params}`);
     const data = await res.json().catch(() => ({}));
     setApplications(data.applications ?? []);
+  }, [appliedFilters]);
+
+  const loadFilterOptions = async () => {
+    const res = await fetch("/api/personalistika/applications/filter-options");
+    const data = await res.json().catch(() => ({}));
+    setFilterOptions({
+      positions: data.positions ?? [],
+      cities: data.cities ?? [],
+      educationLevels: data.educationLevels ?? [],
+      workTypes: data.workTypes ?? [],
+      datePresets: data.datePresets ?? [],
+    });
   };
 
   const loadPositions = async () => {
@@ -170,11 +232,12 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
   };
 
   useEffect(() => {
-    loadApplications();
-  }, [query, status]);
+    loadApplications(appliedFilters);
+  }, [appliedFilters, loadApplications]);
 
   useEffect(() => {
     loadPositions();
+    loadFilterOptions();
   }, []);
 
   useEffect(() => {
@@ -388,49 +451,35 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
       {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {success && <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">{success}</div>}
 
-      <div className="mb-4 flex rounded-lg border border-gray-200 bg-white p-1 w-fit">
-        <button
-          onClick={() => setTab("applications")}
-          className={`rounded-md px-4 py-2 text-sm ${tab === "applications" ? "bg-gray-100 font-medium" : ""}`}
-        >
-          Dotazníky
-        </button>
-        <button
-          onClick={() => setTab("positions")}
-          className={`rounded-md px-4 py-2 text-sm ${tab === "positions" ? "bg-gray-100 font-medium" : ""}`}
-        >
-          Pracovní pozice
-        </button>
-        <button
-          onClick={() => setTab("part_timers")}
-          className={`rounded-md px-4 py-2 text-sm ${tab === "part_timers" ? "bg-gray-100 font-medium" : ""}`}
-        >
-          Brigádníci
-        </button>
+      <div className="mb-4 flex flex-wrap rounded-lg border border-gray-200 bg-white p-1 w-fit gap-1">
+        <button type="button" onClick={() => setTab("applications")} className={`rounded-md px-4 py-2 text-sm ${tab === "applications" ? "bg-gray-100 font-medium" : ""}`}>Dotazníky</button>
+        {canWrite && (
+          <button type="button" onClick={() => setTab("questionnaire")} className={`rounded-md px-4 py-2 text-sm ${tab === "questionnaire" ? "bg-gray-100 font-medium" : ""}`}>Vyplnit dotazník</button>
+        )}
+        <button type="button" onClick={() => setTab("positions")} className={`rounded-md px-4 py-2 text-sm ${tab === "positions" ? "bg-gray-100 font-medium" : ""}`}>Pracovní pozice</button>
+        <button type="button" onClick={() => setTab("part_timers")} className={`rounded-md px-4 py-2 text-sm ${tab === "part_timers" ? "bg-gray-100 font-medium" : ""}`}>Brigádníci</button>
       </div>
 
-      {tab === "applications" ? (
+      {tab === "questionnaire" && canWrite ? (
+        <PersonalistikaQuestionnaireForm
+          mode="internal"
+          submitEndpoint="/api/personalistika/applications"
+          onSuccess={(message) => {
+            setSuccess(message);
+            setTab("applications");
+            loadApplications(appliedFilters);
+          }}
+        />
+      ) : tab === "applications" ? (
         <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="flex flex-wrap items-center gap-2 border-b border-gray-200 p-4">
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Hledat uchazeče..."
-                className="rounded-lg border border-gray-300 px-3 py-2"
-              />
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-2"
-              >
-                {statusOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <ApplicationFilterPanel
+              draftFilters={draftFilters}
+              setDraftFilters={setDraftFilters}
+              setAppliedFilters={setAppliedFilters}
+              filterOptions={filterOptions}
+              statusOptions={statusOptions}
+            />
 
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -438,6 +487,8 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Uchazeč</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Pozice</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Město</th>
+                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Typ práce</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kontakt</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stav</th>
                   </tr>
@@ -445,7 +496,7 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
                 <tbody>
                   {applications.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                         Zatím žádné záznamy
                       </td>
                     </tr>
@@ -460,6 +511,8 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
                       >
                         <td className="px-4 py-3 font-medium text-gray-900">{a.last_name} {a.first_name}</td>
                         <td className="px-4 py-3">{a.position_name ?? "-"}</td>
+                        <td className="px-4 py-3 text-sm">{a.details?.correspondence_address?.city ?? "-"}</td>
+                        <td className="px-4 py-3 text-sm">{WORK_TYPE_LABELS[a.details?.work_type ?? ""] ?? a.details?.work_type ?? "-"}</td>
                         <td className="px-4 py-3 text-sm">{a.email}</td>
                         <td className="px-4 py-3">{STATUS_LABELS[a.status]}</td>
                       </tr>
@@ -888,5 +941,147 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
         </div>
       )}
     </>
+  );
+}
+
+function ApplicationFilterPanel({
+  draftFilters,
+  setDraftFilters,
+  setAppliedFilters,
+  filterOptions,
+  statusOptions,
+}: {
+  draftFilters: ApplicationFilters;
+  setDraftFilters: React.Dispatch<React.SetStateAction<ApplicationFilters>>;
+  setAppliedFilters: React.Dispatch<React.SetStateAction<ApplicationFilters>>;
+  filterOptions: FilterOptions;
+  statusOptions: { value: string; label: string }[];
+}) {
+  const todayLabel = new Date().toLocaleDateString("cs-CZ");
+  const selectCls = "w-full rounded-lg border border-gray-300 px-2 py-2 text-sm";
+  const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500";
+
+  return (
+    <div className="border-b border-gray-200 p-4">
+      <p className="mb-3 text-sm font-medium text-gray-700">
+        Přehled dotazníků uchazečů ke dni {todayLabel}
+      </p>
+      <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <div>
+          <label className={labelCls}>Uchazeč</label>
+          <input
+            value={draftFilters.q}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, q: e.target.value }))}
+            placeholder="Jméno, e-mail…"
+            className={selectCls}
+          />
+        </div>
+        <FilterSelect
+          label="Pozice"
+          value={draftFilters.positionId}
+          onChange={(v) => setDraftFilters((f) => ({ ...f, positionId: v }))}
+          options={[
+            { value: "all", label: "Všechny" },
+            ...filterOptions.positions.map((p) => ({ value: String(p.id), label: p.name })),
+          ]}
+        />
+        <FilterSelect
+          label="Poměr"
+          value={draftFilters.workType}
+          onChange={(v) => setDraftFilters((f) => ({ ...f, workType: v }))}
+          options={filterOptions.workTypes.length ? filterOptions.workTypes : [{ value: "all", label: "Vše" }]}
+        />
+        <FilterSelect
+          label="Vzdělání"
+          value={draftFilters.educationLevel}
+          onChange={(v) => setDraftFilters((f) => ({ ...f, educationLevel: v }))}
+          options={filterOptions.educationLevels.length ? filterOptions.educationLevels : [{ value: "all", label: "Vše" }]}
+        />
+        <FilterSelect
+          label="Město"
+          value={draftFilters.city}
+          onChange={(v) => setDraftFilters((f) => ({ ...f, city: v }))}
+          options={[
+            { value: "all", label: "Vše" },
+            ...filterOptions.cities
+              .filter((c) => c !== "all")
+              .map((c) => ({ value: c, label: c })),
+          ]}
+        />
+        <FilterSelect
+          label="Období od"
+          value={draftFilters.datePreset}
+          onChange={(v) => setDraftFilters((f) => ({ ...f, datePreset: v }))}
+          options={filterOptions.datePresets.length ? filterOptions.datePresets : [{ value: "all", label: "Vše" }]}
+        />
+      </div>
+      {draftFilters.datePreset === "custom" && (
+        <div className="mt-3 max-w-xs">
+          <label className={labelCls}>Konkrétní datum</label>
+          <input
+            type="date"
+            value={draftFilters.dateFrom}
+            onChange={(e) => setDraftFilters((f) => ({ ...f, dateFrom: e.target.value }))}
+            className={selectCls}
+          />
+        </div>
+      )}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <FilterSelect
+          label="Stav"
+          value={draftFilters.status}
+          onChange={(v) => setDraftFilters((f) => ({ ...f, status: v }))}
+          options={statusOptions}
+          compact
+        />
+        <div className="flex gap-2 pt-4">
+          <button
+            type="button"
+            onClick={() => setAppliedFilters({ ...draftFilters })}
+            className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700"
+          >
+            Filtruj
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setDraftFilters(EMPTY_FILTERS);
+              setAppliedFilters(EMPTY_FILTERS);
+            }}
+            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Vymazat
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FilterSelect({
+  label,
+  value,
+  onChange,
+  options,
+  compact,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: { value: string; label: string }[];
+  compact?: boolean;
+}) {
+  const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500";
+  return (
+    <div className={compact ? "min-w-[140px]" : ""}>
+      <label className={labelCls}>{label}</label>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm">
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
   );
 }
