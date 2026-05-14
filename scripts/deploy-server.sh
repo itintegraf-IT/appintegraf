@@ -11,10 +11,8 @@
 # Po stažení kódu ověří: aktuální větev = požadovaná, HEAD == origin/<větev>, čistý working tree.
 #
 # Přepínače:
-#   --branch JMÉNO        větev, kterou pullnout a zbuildit
-#                         výchozí: main (lze přepsat env DEPLOY_BRANCH)
-#   --pm2-name JMÉNO      PM2 proces k restartu
-#                         výchozí: appintegraf (lze přepsat env PM2_APP_NAME)
+#   --branch VĚTEV        větev k pull/build (výchozí: main, env DEPLOY_BRANCH)
+#   --pm2-name JMÉNO      PM2 proces (výchozí: appintegraf, env PM2_APP_NAME)
 #   --planovani-upgrade   spustí npm run db:planovani-upgrade (SQL změny plánování)
 #   --apply-sql SOUBOR    spustí konkrétní SQL soubor z prisma/migrations/ přes mysql klienta
 #                         (lze uvést víckrát). Vyžaduje .env s DATABASE_URL.
@@ -27,7 +25,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-BRANCH="${DEPLOY_BRANCH:-main}"
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 PM2_NAME="${PM2_APP_NAME:-appintegraf}"
 SKIP_MIGRATE=0
 SKIP_BUILD=0
@@ -35,14 +33,14 @@ DO_PLANOVANI=0
 SQL_FILES=()
 
 usage() {
-  sed -n '1,30p' "$0" | tail -n +2
+  sed -n '1,22p' "$0" | tail -n +2
   exit 0
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --branch)
-      BRANCH="${2:?chybí název větve}"
+      DEPLOY_BRANCH="${2:?chybí název větve}"
       shift 2
       ;;
     --planovani-upgrade) DO_PLANOVANI=1; shift ;;
@@ -69,28 +67,29 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-echo "==> Nasazení: větev=$BRANCH | PM2 proces=$PM2_NAME | adresář=$ROOT"
+echo "==> Nasazení: větev=$DEPLOY_BRANCH | PM2 proces=$PM2_NAME | adresář=$ROOT"
 
 echo "==> Git: package-lock.json – zahodit lokální změny (po npm install na serveru často přepsán)"
 git restore package-lock.json 2>/dev/null || true
 
-echo "==> Git: fetch + pull (jen fast-forward, větev: $BRANCH)"
-git fetch origin "$BRANCH"
-git pull --ff-only origin "$BRANCH"
+echo "==> Git: fetch + pull (jen fast-forward, větev: $DEPLOY_BRANCH)"
+git fetch origin "$DEPLOY_BRANCH"
+git checkout "$DEPLOY_BRANCH"
+git pull --ff-only "origin/$DEPLOY_BRANCH"
 
-echo "==> Git: ověření (musí odpovídat origin/$BRANCH, žádné lokální změny)"
+echo "==> Git: ověření (musí odpovídat origin/$DEPLOY_BRANCH, žádné lokální změny)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
-if [[ "$branch" != "$BRANCH" ]]; then
-  echo "CHYBA: očekávána větev $BRANCH, aktuální: $branch" >&2
+if [[ "$branch" != "$DEPLOY_BRANCH" ]]; then
+  echo "CHYBA: očekávána větev $DEPLOY_BRANCH, aktuální: $branch" >&2
   exit 1
 fi
 
 head_sha="$(git rev-parse HEAD)"
-origin_sha="$(git rev-parse "origin/$BRANCH")"
+origin_sha="$(git rev-parse "origin/$DEPLOY_BRANCH")"
 if [[ "$head_sha" != "$origin_sha" ]]; then
-  echo "CHYBA: HEAD se neshoduje s origin/$BRANCH." >&2
-  echo "  HEAD:              $head_sha" >&2
-  echo "  origin/$BRANCH:    $origin_sha" >&2
+  echo "CHYBA: HEAD se neshoduje s origin/$DEPLOY_BRANCH." >&2
+  echo "  HEAD:                  $head_sha" >&2
+  echo "  origin/$DEPLOY_BRANCH: $origin_sha" >&2
   exit 1
 fi
 
@@ -128,7 +127,6 @@ fi
 if [[ "${#SQL_FILES[@]}" -gt 0 ]]; then
   echo "==> SQL migrace (--apply-sql)"
   if [[ -z "${DATABASE_URL:-}" ]]; then
-    # Načti z .env, pokud není v prostředí
     set -a; . ./.env; set +a
   fi
   if [[ -z "${DATABASE_URL:-}" ]]; then
@@ -136,8 +134,6 @@ if [[ "${#SQL_FILES[@]}" -gt 0 ]]; then
     exit 1
   fi
 
-  # Rozparsuj DATABASE_URL ve tvaru mysql://user:pass@host:port/dbname
-  # (bash regex; hesla s URL-encoded znaky prosím dekódovat ručně v .env, kdyby bylo potřeba)
   if [[ "$DATABASE_URL" =~ ^mysql://([^:]+):([^@]+)@([^:/]+)(:([0-9]+))?/([^?]+) ]]; then
     DB_USER="${BASH_REMATCH[1]}"
     DB_PASS="${BASH_REMATCH[2]}"
@@ -150,7 +146,6 @@ if [[ "${#SQL_FILES[@]}" -gt 0 ]]; then
   fi
 
   for f in "${SQL_FILES[@]}"; do
-    # Přijmi buď plnou cestu, nebo jen jméno souboru uvnitř prisma/migrations/
     if [[ -f "$f" ]]; then
       sql_path="$f"
     elif [[ -f "prisma/migrations/$f" ]]; then
