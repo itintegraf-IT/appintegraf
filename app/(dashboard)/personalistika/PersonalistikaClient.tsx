@@ -464,6 +464,7 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
         <PersonalistikaQuestionnaireForm
           mode="internal"
           submitEndpoint="/api/personalistika/applications"
+          enableCvExtract
           onSuccess={(message) => {
             setSuccess(message);
             setTab("applications");
