@@ -2,9 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 
-import { CALENDAR_OUT_OF_OFFICE_TYPES } from "@/lib/calendar-out-of-office";
-
-const OUT_OF_OFFICE_TYPES = CALENDAR_OUT_OF_OFFICE_TYPES;
+import { CALENDAR_OUT_OF_OFFICE_TYPE_LIST } from "@/lib/calendar-out-of-office";
 
 function formatDateTimeCs(d: Date): string {
   return d.toLocaleString("cs-CZ", {
@@ -50,7 +48,7 @@ export async function GET(req: NextRequest) {
     where: {
       ...(excludeEventId && !isNaN(excludeEventId) ? { id: { not: excludeEventId } } : {}),
       created_by: deputyId,
-      event_type: { in: OUT_OF_OFFICE_TYPES },
+      event_type: { in: CALENDAR_OUT_OF_OFFICE_TYPE_LIST },
       start_date: { lte: end },
       end_date: { gte: start },
       OR: [{ approval_status: { not: "rejected" } }, { approval_status: null }],
