@@ -21,7 +21,7 @@ export function NotificationsDropdown() {
   const ref = useRef<HTMLDivElement>(null);
 
   const fetchNotifications = () => {
-    fetch("/api/notifications")
+    fetch("/api/notifications?unread=true")
       .then((r) => r.json())
       .then((data) => {
         setNotifications(data.notifications ?? []);
@@ -39,6 +39,13 @@ export function NotificationsDropdown() {
   const markAsRead = async (id: number) => {
     await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
     fetchNotifications();
+  };
+
+  const handleNotificationClick = (id: number) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+    void markAsRead(id);
+    setOpen(false);
   };
 
   useEffect(() => {
@@ -97,18 +104,16 @@ export function NotificationsDropdown() {
                 <Link
                   key={n.id}
                   href={n.link ?? "#"}
-                  onClick={() => {
-                    if (!n.read_at) markAsRead(n.id);
-                    setOpen(false);
-                  }}
-                  className={`block px-4 py-3 text-left text-sm hover:bg-[var(--accent)] ${
-                    !n.read_at ? "bg-[var(--accent)]/30" : ""
-                  }`}
+                  onClick={() => handleNotificationClick(n.id)}
+                  className="block border-l-[3px] border-blue-500 bg-blue-50/80 px-4 py-3 text-left text-sm hover:bg-blue-100/80 dark:bg-blue-950/50 dark:hover:bg-blue-950/70"
                   style={{ color: "var(--foreground)" }}
                 >
-                  <p className="font-medium">{n.title}</p>
+                  <p className="flex items-center gap-2 font-medium">
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" aria-hidden />
+                    {n.title}
+                  </p>
                   {n.message && (
-                    <p className="mt-0.5 line-clamp-2 text-xs" style={{ color: "var(--muted-foreground)" }}>
+                    <p className="mt-0.5 line-clamp-2 pl-4 text-xs" style={{ color: "var(--muted-foreground)" }}>
                       {n.message}
                     </p>
                   )}

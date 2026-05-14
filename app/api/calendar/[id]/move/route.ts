@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
+import { dismissNotificationsUpdate } from "@/lib/notifications-dismiss";
 import { findCreatorCalendarOverlap, formatOverlapErrorCs } from "@/lib/calendar-time-overlap";
 
 const OUT_OF_OFFICE_TYPES = [
@@ -121,7 +122,11 @@ export async function PATCH(
     : "Uživatel";
 
   if (needsApprovalReset && event.deputy_id) {
+    const calendarLink = `/calendar/${id}`;
     await prisma.$transaction([
+      dismissNotificationsUpdate(calendarLink, {
+        types: ["calendar_approval", "calendar_approved"],
+      }),
       prisma.calendar_events.update({
         where: { id },
         data: {

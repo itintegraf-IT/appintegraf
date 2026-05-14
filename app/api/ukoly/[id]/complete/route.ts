@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { userCanCompleteUkol } from "@/lib/ukoly-access";
 import { notifyUkolDone } from "@/lib/ukoly-notify";
+import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
 
 export async function POST(
   _req: NextRequest,
@@ -51,6 +52,8 @@ export async function POST(
     where: { id },
     data: { status: "done" },
   });
+
+  await dismissNotificationsForLink(`/ukoly/${id}`);
 
   await notifyUkolDone({
     ukolId: id,

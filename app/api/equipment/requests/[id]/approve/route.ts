@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { sendEquipmentRequestResultEmail } from "@/lib/email";
+import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
 
 async function isInDepartment(userId: number, departmentName: string): Promise<boolean> {
   const dept = await prisma.departments.findFirst({
@@ -85,6 +86,9 @@ export async function PATCH(
 
   const newStatus = action === "approve" ? "schv_leno" : "zam_tnuto";
   const adminResponseText = admin_response ? String(admin_response).trim() : null;
+  const equipmentLink = `/equipment?tab=requests&id=${id}`;
+
+  await dismissNotificationsForLink(equipmentLink);
 
   await prisma.equipment_requests.update({
     where: { id },
