@@ -44,6 +44,31 @@ const EDUCATION_VALUES = new Set(EDUCATION_LEVELS.map((e) => e.value));
 const WORK_TYPE_VALUES = new Set(WORK_TYPES.map((w) => w.value));
 const LANG_LEVELS = new Set(["neumim", "zaklad", "stredni", "pokrocily"]);
 
+const KNOWN_CV_JSON_KEYS = new Set([
+  "title", "first_name", "last_name", "date_of_birth", "citizenship",
+  "address_street", "address_number", "address_city", "address_zip",
+  "email", "phone", "position_id", "education_level", "education_details", "courses",
+  "lang_en", "lang_de", "lang_fr", "lang_ru", "lang_pl", "lang_other",
+  "employer_name", "employer_address", "position_description", "work_type",
+  "possible_start", "additional_notes", "notes",
+]);
+
+const LANG_FIELD_LABELS: Record<string, string> = {
+  lang_en: "Angličtina",
+  lang_de: "Němčina",
+  lang_fr: "Francouzština",
+  lang_ru: "Ruština",
+  lang_pl: "Polština",
+};
+
+function joinAdditionalNotes(...parts: Array<string | null | undefined>): string | null {
+  const merged = parts
+    .map((p) => (p ?? "").trim())
+    .filter(Boolean)
+    .join("\n");
+  return merged || null;
+}
+
 function truncateForLlm(text: string): string {
   if (text.length <= MAX_TEXT) return text;
   const half = Math.floor(MAX_TEXT / 2) - 100;
@@ -106,8 +131,9 @@ Pravidla:
 - education_details: stručný souhrn škol a oborů.
 - courses: kurzy, rekvalifikace, certifikace.
 - position_description: poslední / hlavní pracovní zkušenosti.
-- notes: stručná poznámka pro personalistu (co je nejasné).
-- Nevymýšlej údaje – neznámé = null.
+- additional_notes: SEM patří veškeré další informace z CV, které nemají vlastní pole (řidičský průkaz, hobby, reference, dovednosti, nejasné údaje, cokoli navíc). Slučuj sem i nejisté nebo nezařaditelné údaje.
+- notes: nepoužívej – vše přesuň do additional_notes.
+- Nevymýšlej údaje – neznámé = null (kromě additional_notes, kam dej i nezařaditelný text z CV).
 
 Text životopisu:
 ---
@@ -159,6 +185,50 @@ function normalizeDraft(
   const wt = str(parsed.work_type);
   const work_type = wt && (WORK_TYPE_VALUES as Set<string>).has(wt) ? wt : null;
 
+  const overflowNotes: string[] = [];
+
+  if (edu && !education_level) {
+    overflowNotes.push(`Vzdělání (nezařazeno): ${edu}`);
+  }
+  if (wt && !work_type) {
+    overflowNotes.push(`Typ práce (nezařazeno): ${wt}`);
+  }
+
+  const rawPositionId = parsed.position_id;
+  if (
+    rawPositionId != null &&
+    rawPositionId !== "" &&
+    position_id == null
+  ) {
+    overflowNotes.push(`Zájem o pozici (nezařazeno): ${String(rawPositionId)}`);
+  }
+
+  for (const [key, label] of Object.entries(LANG_FIELD_LABELS)) {
+    const raw = str(parsed[key]);
+    const normalized = normalizeLang(parsed[key]);
+    if (raw && !normalized) {
+      overflowNotes.push(`${label} (nezařazeno): ${raw}`);
+    }
+  }
+
+  for (const [key, value] of Object.entries(parsed)) {
+    if (KNOWN_CV_JSON_KEYS.has(key)) continue;
+    const text = str(value);
+    if (text) overflowNotes.push(`${key}: ${text}`);
+  }
+
+  const lang_en = normalizeLang(parsed.lang_en);
+  const lang_de = normalizeLang(parsed.lang_de);
+  const lang_fr = normalizeLang(parsed.lang_fr);
+  const lang_ru = normalizeLang(parsed.lang_ru);
+  const lang_pl = normalizeLang(parsed.lang_pl);
+
+  const additional_notes = joinAdditionalNotes(
+    str(parsed.additional_notes),
+    str(parsed.notes),
+    overflowNotes.length ? overflowNotes.join("\n") : null
+  );
+
   return {
     title: str(parsed.title),
     first_name: str(parsed.first_name),
@@ -175,19 +245,19 @@ function normalizeDraft(
     education_level,
     education_details: str(parsed.education_details),
     courses: str(parsed.courses),
-    lang_en: normalizeLang(parsed.lang_en),
-    lang_de: normalizeLang(parsed.lang_de),
-    lang_fr: normalizeLang(parsed.lang_fr),
-    lang_ru: normalizeLang(parsed.lang_ru),
-    lang_pl: normalizeLang(parsed.lang_pl),
+    lang_en,
+    lang_de,
+    lang_fr,
+    lang_ru,
+    lang_pl,
     lang_other: str(parsed.lang_other),
     employer_name: str(parsed.employer_name),
     employer_address: str(parsed.employer_address),
     position_description: str(parsed.position_description),
     work_type,
     possible_start: str(parsed.possible_start),
-    additional_notes: str(parsed.additional_notes),
-    notes: str(parsed.notes),
+    additional_notes,
+    notes: null,
   };
 }
 
