@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
-import { canViewContactVizitka, hasModuleAccess } from "@/lib/auth-utils";
+import { canViewContactVizitka, hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { buildOutlookContactSignatureHtml, getContactSignatureAssetBaseUrl } from "@/lib/contact-signature-html";
 import { prisma } from "@/lib/db";
 import { mergeUserEmails } from "@/lib/merge-user-emails";
@@ -55,7 +55,8 @@ export default async function ContactViewPage({
     fromEvidence.length > 0 ? fromEvidence.join(", ") : contact.department_name || null;
 
   const showVizitka = await canViewContactVizitka(userId, id);
-  const showPersonal = canWrite || userId === id;
+  const admin = await isAdmin(userId);
+  const showPersonal = canWrite || userId === id || admin;
   const assetBaseUrl = await getContactSignatureAssetBaseUrl();
   const signatureHtml = showVizitka
     ? buildOutlookContactSignatureHtml(

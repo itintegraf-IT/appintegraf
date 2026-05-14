@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/db";
 import { attachMembersToDepartments } from "@/lib/phone-list-members";
-import { phoneListUserSelect, toPhoneListContact } from "@/lib/phone-list-user-select";
+import {
+  phoneListUserSelect,
+  phoneListUserSelectWithPersonal,
+  stripPersonalFromContact,
+  toPhoneListContact,
+  type UserWithInclude,
+} from "@/lib/phone-list-user-select";
 
 async function fetchSharedMails(search: string | undefined) {
   const list = await prisma.shared_mails.findMany({
@@ -86,47 +92,76 @@ function buildDepartmentWhere(search: string | undefined) {
   return { AND: and };
 }
 
-function buildUserWhere(search: string | undefined) {
+function buildUserWhere(search: string | undefined, includePersonal: boolean) {
   const and: Record<string, unknown>[] = [
     { OR: [{ is_active: true }, { is_active: null }] },
     { OR: [{ display_in_list: true }, { display_in_list: null }] },
   ];
   if (search) {
-    and.push({
-      OR: [
-        { first_name: { contains: search } },
-        { last_name: { contains: search } },
-        { email: { contains: search } },
-        { phone: { contains: search } },
-        { landline: { contains: search } },
-        {
-          user_shared_mails: {
-            some: {
-              shared_mails: {
-                AND: [
-                  { OR: [{ is_active: true }, { is_active: null }] },
-                  {
-                    OR: [{ email: { contains: search } }, { label: { contains: search } }],
-                  },
-                ],
-              },
+    const or: Record<string, unknown>[] = [
+      { first_name: { contains: search } },
+      { last_name: { contains: search } },
+      { email: { contains: search } },
+      { phone: { contains: search } },
+      { landline: { contains: search } },
+      {
+        user_shared_mails: {
+          some: {
+            shared_mails: {
+              AND: [
+                { OR: [{ is_active: true }, { is_active: null }] },
+                {
+                  OR: [{ email: { contains: search } }, { label: { contains: search } }],
+                },
+              ],
             },
           },
         },
-      ],
-    });
+      },
+    ];
+    if (includePersonal) {
+      or.push({ personal_phone: { contains: search } }, { personal_email: { contains: search } });
+    }
+    and.push({ OR: or });
   }
   return { AND: and };
 }
 
-export async function getPhoneListPayload(tab: string, search: string) {
+function finalizeContacts(
+  rawUsers: UserWithInclude[],
+  primaryById: Record<number, { email: string | null }>,
+  includePersonal: boolean
+) {
+  const contacts = rawUsers.map((u) => toPhoneListContact(u, primaryById));
+  return includePersonal ? contacts : contacts.map((c) => stripPersonalFromContact(c));
+}
+
+async function fetchPhoneListUsers(
+  where: ReturnType<typeof buildUserWhere>,
+  includePersonal: boolean
+): Promise<UserWithInclude[]> {
+  if (includePersonal) {
+    return prisma.users.findMany({
+      where,
+      orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
+      select: phoneListUserSelectWithPersonal,
+    });
+  }
+  return prisma.users.findMany({
+    where,
+    orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
+    select: phoneListUserSelect,
+  });
+}
+
+export async function getPhoneListPayload(
+  tab: string,
+  search: string,
+  includePersonal = false
+) {
   if (search) {
     const [rawUsers, departments, sharedMails] = await Promise.all([
-      prisma.users.findMany({
-        where: buildUserWhere(search),
-        orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
-        select: phoneListUserSelect,
-      }),
+      fetchPhoneListUsers(buildUserWhere(search, includePersonal), includePersonal),
       prisma.departments.findMany({
         where: buildDepartmentWhere(search),
         orderBy: { name: "asc" },
@@ -158,8 +193,8 @@ export async function getPhoneListPayload(tab: string, search: string) {
       primaryById[d.id] = { email: d.email };
     }
 
-    const contacts = rawUsers.map((u) => toPhoneListContact(u, primaryById));
-    const contactsByDepartment: Record<string, typeof contacts> = {};
+    const contacts = finalizeContacts(rawUsers, primaryById, includePersonal);
+    const contactsByDepartment: Record<string, (typeof contacts)[number][]> = {};
     for (const c of contacts) {
       const dept = c.department_name || "Bez oddělení";
       if (!contactsByDepartment[dept]) contactsByDepartment[dept] = [];
@@ -204,11 +239,7 @@ export async function getPhoneListPayload(tab: string, search: string) {
     return { tab: "shared-mails" as const, search: "", sharedMails, unified: false as const };
   }
 
-  const rawUsers = await prisma.users.findMany({
-    where: buildUserWhere(undefined),
-    orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
-    select: phoneListUserSelect,
-  });
+  const rawUsers = await fetchPhoneListUsers(buildUserWhere(undefined, includePersonal), includePersonal);
 
   const primaryIds = [
     ...new Set(rawUsers.map((u) => u.department_id).filter((id): id is number => id != null && id > 0)),
@@ -225,8 +256,8 @@ export async function getPhoneListPayload(tab: string, search: string) {
     primaryById[d.id] = { email: d.email };
   }
 
-  const contacts = rawUsers.map((u) => toPhoneListContact(u, primaryById));
-  const contactsByDepartment: Record<string, typeof contacts> = {};
+  const contacts = finalizeContacts(rawUsers, primaryById, includePersonal);
+  const contactsByDepartment: Record<string, (typeof contacts)[number][]> = {};
   for (const c of contacts) {
     const dept = c.department_name || "Bez oddělení";
     if (!contactsByDepartment[dept]) contactsByDepartment[dept] = [];

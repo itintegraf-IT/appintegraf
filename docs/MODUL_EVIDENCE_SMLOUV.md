@@ -16,6 +16,29 @@ Základní posloupnost ze zadání:
 
 **návrh → schválení → podpis → archivace**
 
+### Schéma schvalovacího workflow (aktuální implementace)
+
+```mermaid
+flowchart TD
+  A[draft / returned] -->|POST /api/contracts/:id/submit| B[in_approval]
+  B -->|POST /api/contracts/:id/approve action=approve<br/>existuje další krok| B
+  B -->|POST /api/contracts/:id/approve action=approve<br/>poslední krok| C[approval_completed]
+  B -->|POST /api/contracts/:id/approve action=reject<br/>comment povinný| D[rejected]
+  C -->|POST /api/contracts/:id/transition action=begin_signature| E[signature_pending]
+  E -->|POST /api/contracts/:id/transition action=sign| F[signed]
+  F -->|POST /api/contracts/:id/transition action=archive| G[archived]
+```
+
+Poznámky k implementaci:
+
+- `submit` povolen jen ve stavech `draft` a `returned` (autor smlouvy nebo admin).
+- V `in_approval` má vždy akci pouze aktuální `pending` schvalovatel (`contract_approvals` s nejnižším otevřeným pořadím).
+- `approve`:
+  - pokud existuje další krok šablony (`contract_workflow_steps`), vytvoří se další `pending` schválení a stav hlavičky zůstává `in_approval`,
+  - pokud další krok není, hlavička přejde do `approval_completed`.
+- `reject` vždy převádí hlavičku na `rejected` a vyžaduje důvod (`comment`).
+- Na přechody podpisu/archivace slouží endpoint `POST /api/contracts/[id]/transition` (kroky `begin_signature`, `sign`, `archive`).
+
 ### Stavy na hlavičce smlouvy (návrh)
 
 | Stav (příklad) | Popis |
