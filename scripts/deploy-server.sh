@@ -6,9 +6,10 @@
 #
 # Vyžaduje: .env s DATABASE_URL, Node 20.x, PM2, oprávnění k git pull.
 #
-# Po stažení kódu ověří: větev main, HEAD == origin/main, čistý working tree.
+# Po stažení kódu ověří: větev odpovídá originu, čistý working tree.
 #
 # Přepínače:
+#   --branch VĚTEV        výchozí: main (na test serveru: test)
 #   --planovani-upgrade   spustí npm run db:planovani-upgrade (SQL změny plánování)
 #   --apply-sql SOUBOR    spustí konkrétní SQL soubor z prisma/migrations/ přes mysql klienta
 #                         (lze uvést víckrát). Vyžaduje .env s DATABASE_URL.
@@ -22,6 +23,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 PM2_NAME="${PM2_APP_NAME:-appintegraf}"
 SKIP_MIGRATE=0
 SKIP_BUILD=0
@@ -46,6 +48,10 @@ while [[ $# -gt 0 ]]; do
       PM2_NAME="${2:?}"
       shift 2
       ;;
+    --branch)
+      DEPLOY_BRANCH="${2:?}"
+      shift 2
+      ;;
     -h|--help) usage ;;
     *)
       echo "Neznámý argument: $1 (zkuste --help)" >&2
@@ -59,26 +65,29 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+echo "==> Nasazení: větev=$DEPLOY_BRANCH | PM2 proces=$PM2_NAME | adresář=$ROOT"
+
 echo "==> Git: package-lock.json – zahodit lokální změny (po npm install na serveru často přepsán)"
 git restore package-lock.json 2>/dev/null || true
 
-echo "==> Git: fetch + pull (jen fast-forward)"
-git fetch origin main
-git pull --ff-only origin main
+echo "==> Git: fetch + pull (jen fast-forward, větev: $DEPLOY_BRANCH)"
+git fetch origin "$DEPLOY_BRANCH"
+git checkout "$DEPLOY_BRANCH"
+git pull --ff-only "origin/$DEPLOY_BRANCH"
 
-echo "==> Git: ověření (musí odpovídat origin/main, žádné lokální změny)"
+echo "==> Git: ověření (musí odpovídat origin/$DEPLOY_BRANCH, žádné lokální změny)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
-if [[ "$branch" != "main" ]]; then
-  echo "CHYBA: očekávána větev main, aktuální: $branch" >&2
+if [[ "$branch" != "$DEPLOY_BRANCH" ]]; then
+  echo "CHYBA: očekávána větev $DEPLOY_BRANCH, aktuální: $branch" >&2
   exit 1
 fi
 
 head_sha="$(git rev-parse HEAD)"
-origin_sha="$(git rev-parse origin/main)"
+origin_sha="$(git rev-parse "origin/$DEPLOY_BRANCH")"
 if [[ "$head_sha" != "$origin_sha" ]]; then
-  echo "CHYBA: HEAD se neshoduje s origin/main." >&2
-  echo "  HEAD:         $head_sha" >&2
-  echo "  origin/main:  $origin_sha" >&2
+  echo "CHYBA: HEAD se neshoduje s origin/$DEPLOY_BRANCH." >&2
+  echo "  HEAD:                $head_sha" >&2
+  echo "  origin/$DEPLOY_BRANCH: $origin_sha" >&2
   exit 1
 fi
 
