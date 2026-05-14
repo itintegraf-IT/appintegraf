@@ -112,8 +112,14 @@ export function PersonalistikaQuestionnaireForm({
       ...(ex.position_description ? { position_description: String(ex.position_description) } : {}),
       ...(ex.work_type ? { work_type: String(ex.work_type) } : {}),
       ...(ex.possible_start ? { possible_start: String(ex.possible_start) } : {}),
-      ...(ex.additional_notes ? { additional_notes: String(ex.additional_notes) } : {}),
-      ...(ex.notes ? { notes: String(ex.notes) } : {}),
+      ...(ex.additional_notes || ex.notes
+        ? {
+            additional_notes: [ex.additional_notes, ex.notes]
+              .filter((v) => v != null && String(v).trim())
+              .map(String)
+              .join("\n"),
+          }
+        : {}),
     }));
   };
 
