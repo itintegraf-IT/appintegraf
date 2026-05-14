@@ -6,6 +6,7 @@ import {
   formatApproverAssignmentNote,
   resolveDepartmentCalendarApprover,
 } from "@/lib/calendar-approver-resolution";
+import { dismissNotificationsUpdate } from "@/lib/notifications-dismiss";
 
 /**
  * POST /api/calendar/[id]/approve
@@ -76,6 +77,7 @@ export async function POST(
       event.approval_status === "deputy_approved"
   );
   const isFinalApprover = !!pendingFinalApproval;
+  const calendarLink = `/calendar/${id}`;
 
   // --- ZÁSTUP: approval_status === "pending" ---
   if (isDeputy && event.approval_status === "pending") {
@@ -90,6 +92,7 @@ export async function POST(
           ? `${event.description}\n\n${approvalNote}`
           : approvalNote;
         await prisma.$transaction([
+          dismissNotificationsUpdate(calendarLink),
           prisma.calendar_events.update({
             where: { id },
             data: {
@@ -160,6 +163,10 @@ export async function POST(
         : `${approvalNote}\n${assignmentNote}`;
 
       await prisma.$transaction([
+        dismissNotificationsUpdate(calendarLink, {
+          userId,
+          types: ["calendar_approval"],
+        }),
         prisma.calendar_events.update({
           where: { id },
           data: {
@@ -218,6 +225,7 @@ export async function POST(
       }
     } else {
       await prisma.$transaction([
+        dismissNotificationsUpdate(calendarLink),
         prisma.calendar_events.update({
           where: { id },
           data: { approval_status: "rejected", updated_at: new Date() },
@@ -236,7 +244,7 @@ export async function POST(
             title: "Událost zamítnuta",
             message: `${deputyName} zamítl/a vaši událost „${event.title}“. Důvod: ${comment}`,
             type: "calendar_rejected",
-            link: `/calendar/${id}`,
+            link: calendarLink,
           },
         }),
       ]);
@@ -266,6 +274,7 @@ export async function POST(
         : approvalNote;
 
       await prisma.$transaction([
+        dismissNotificationsUpdate(calendarLink),
         prisma.calendar_events.update({
           where: { id },
           data: {
@@ -289,12 +298,13 @@ export async function POST(
             title: "Událost definitivně schválena",
             message: `${approverName} schválil/a vaši událost „${event.title}“.`,
             type: "calendar_approved",
-            link: `/calendar/${id}`,
+            link: calendarLink,
           },
         }),
       ]);
     } else {
       await prisma.$transaction([
+        dismissNotificationsUpdate(calendarLink),
         prisma.calendar_events.update({
           where: { id },
           data: { approval_status: "rejected", updated_at: new Date() },
@@ -313,7 +323,7 @@ export async function POST(
             title: "Událost zamítnuta",
             message: `${approverName} zamítl/a vaši událost „${event.title}“. Důvod: ${comment}`,
             type: "calendar_rejected",
-            link: `/calendar/${id}`,
+            link: calendarLink,
           },
         }),
       ]);

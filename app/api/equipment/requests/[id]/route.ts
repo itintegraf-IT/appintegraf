@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
 
 async function isInDepartment(userId: number, departmentName: string): Promise<boolean> {
   const dept = await prisma.departments.findFirst({
@@ -128,6 +129,8 @@ export async function PATCH(
     return NextResponse.json({ error: "Požadavek již byl zpracován" }, { status: 400 });
   }
 
+  const equipmentLink = `/equipment?tab=requests&id=${id}`;
+
   await prisma.equipment_requests.update({
     where: { id },
     data: {
@@ -141,13 +144,15 @@ export async function PATCH(
     },
   });
 
+  await dismissNotificationsForLink(equipmentLink);
+
   await prisma.notifications.create({
     data: {
       user_id: approvalTo,
       title: "Požadavek na techniku čeká na schválení",
       message: `IT odeslal požadavek #${id} ke schválení.`,
       type: "equipment_approval",
-      link: `/equipment?tab=requests&id=${id}`,
+      link: equipmentLink,
     },
   });
 

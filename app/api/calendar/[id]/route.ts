@@ -10,6 +10,7 @@ import {
   notifyCalendarInvitees,
 } from "@/lib/calendar-participant-sync";
 import { requiresBusinessTripDescription, requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
+import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
@@ -333,6 +334,7 @@ export async function DELETE(
   );
 
   if (approverIds.length > 0) {
+    await dismissNotificationsForLink(`/calendar/${id}`);
     await prisma.notifications.createMany({
       data: approverIds.map((approverId) => ({
         user_id: approverId,
@@ -344,6 +346,7 @@ export async function DELETE(
     });
   }
 
+  await dismissNotificationsForLink(`/calendar/${id}`);
   await prisma.calendar_events.delete({ where: { id } });
 
   return NextResponse.json({ success: true });
