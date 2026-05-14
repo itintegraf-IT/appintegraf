@@ -73,7 +73,7 @@ git restore package-lock.json 2>/dev/null || true
 echo "==> Git: fetch + pull (jen fast-forward, větev: $DEPLOY_BRANCH)"
 git fetch origin "$DEPLOY_BRANCH"
 git checkout "$DEPLOY_BRANCH"
-git pull --ff-only "origin/$DEPLOY_BRANCH"
+git pull --ff-only origin "$DEPLOY_BRANCH"
 
 echo "==> Git: ověření (musí odpovídat origin/$DEPLOY_BRANCH, žádné lokální změny)"
 branch="$(git rev-parse --abbrev-ref HEAD)"
