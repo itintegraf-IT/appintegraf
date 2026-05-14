@@ -26,6 +26,8 @@ type Contact = {
   department_name: string | null;
   qr_code: string | null;
   merged_emails: MergedEmailRow[];
+  personal_phone?: string | null;
+  personal_email?: string | null;
 };
 
 type DepartmentMember = { first_name: string; last_name: string };
@@ -100,6 +102,60 @@ function EmailCell({ contact }: { contact: Contact }) {
           })()}
         </div>
       ))}
+    </div>
+  );
+}
+
+function PersonalContactLines({ contact }: { contact: Contact }) {
+  if (!contact.personal_phone && !contact.personal_email) return null;
+  return (
+    <>
+      {contact.personal_phone && (
+        <div className="flex items-center gap-2">
+          <Phone className="h-4 w-4 shrink-0 text-gray-400" />
+          <div>
+            <a href={`tel:${contact.personal_phone}`} className="text-red-600 hover:underline">
+              {contact.personal_phone}
+            </a>
+            <p className="text-[10px] leading-tight text-gray-500">soukromý</p>
+          </div>
+        </div>
+      )}
+      {contact.personal_email && (
+        <div className="flex items-start gap-2">
+          <Mail className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
+          <div>
+            <a href={`mailto:${contact.personal_email}`} className="text-red-600 hover:underline">
+              {contact.personal_email}
+            </a>
+            <p className="text-[10px] leading-tight text-gray-500">soukromý</p>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function PersonalPhoneTableCell({ contact }: { contact: Contact }) {
+  if (!contact.personal_phone) return null;
+  return (
+    <div className="mt-1">
+      <a href={`tel:${contact.personal_phone}`} className="text-red-600 hover:underline">
+        {contact.personal_phone}
+      </a>
+      <p className="text-[10px] leading-tight text-gray-500">soukromý</p>
+    </div>
+  );
+}
+
+function PersonalEmailTableCell({ contact }: { contact: Contact }) {
+  if (!contact.personal_email) return null;
+  return (
+    <div className="mt-1.5">
+      <a href={`mailto:${contact.personal_email}`} className="block break-all text-red-600 hover:underline">
+        {contact.personal_email}
+      </a>
+      <p className="text-[10px] leading-tight text-gray-500">soukromý</p>
     </div>
   );
 }
@@ -360,6 +416,7 @@ export function PhoneListClient({
                                         <Mail className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
                                         <EmailCell contact={c} />
                                       </div>
+                                      <PersonalContactLines contact={c} />
                                     </div>
                                   </div>
                                 ))}
@@ -404,10 +461,12 @@ export function PhoneListClient({
                                     ) : (
                                       "—"
                                     )}
+                                    <PersonalPhoneTableCell contact={c} />
                                   </td>
                                   <td className="px-4 py-2 align-top">{c.landline ?? "—"}</td>
                                   <td className="px-4 py-2 align-top">
                                     <EmailCell contact={c} />
+                                    <PersonalEmailTableCell contact={c} />
                                   </td>
                                   <td className="px-4 py-2 align-top">{c.department_name ?? "—"}</td>
                                 </tr>
@@ -761,6 +820,7 @@ export function PhoneListClient({
                                   <Mail className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
                                   <EmailCell contact={c} />
                                 </div>
+                                <PersonalContactLines contact={c} />
                               </div>
                             </div>
                           ))}
@@ -803,10 +863,12 @@ export function PhoneListClient({
                               ) : (
                                 "—"
                               )}
+                              <PersonalPhoneTableCell contact={c} />
                             </td>
                             <td className="px-4 py-2">{c.landline ?? "—"}</td>
                             <td className="px-4 py-2">
                               <EmailCell contact={c} />
+                              <PersonalEmailTableCell contact={c} />
                             </td>
                             <td className="px-4 py-2">{c.department_name ?? "—"}</td>
                           </tr>

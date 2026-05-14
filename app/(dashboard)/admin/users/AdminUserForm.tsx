@@ -438,7 +438,7 @@ export function AdminUserForm({ user }: { user?: User }) {
           {sharedMails.length === 0 ? (
             <p className="text-sm text-gray-500">Žádné záznamy – přidáte v Administraci → Společné maily.</p>
           ) : (
-            <ul className="max-h-48 space-y-2 overflow-y-auto">
+            <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
               {sharedMails
                 .filter((m) => m.is_active !== false)
                 .map((m) => {

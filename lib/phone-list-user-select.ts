@@ -31,7 +31,37 @@ export const phoneListUserSelect = {
   },
 } satisfies Prisma.usersSelect;
 
+const personalFieldsSelect = {
+  personal_phone: true,
+  personal_email: true,
+} satisfies Prisma.usersSelect;
+
+export const phoneListUserSelectWithPersonal = {
+  ...phoneListUserSelect,
+  ...personalFieldsSelect,
+} satisfies Prisma.usersSelect;
+
+export type UserWithPersonalInclude = Prisma.usersGetPayload<{
+  select: typeof phoneListUserSelectWithPersonal;
+}>;
+
+/** Výběr uživatele pro telefonní seznam; u admina i osobní kontakt. */
+export function getPhoneListUserSelect(includePersonal: boolean) {
+  return includePersonal ? phoneListUserSelectWithPersonal : phoneListUserSelect;
+}
+
 export type UserWithInclude = Prisma.usersGetPayload<{ select: typeof phoneListUserSelect }>;
+
+type PhoneListContact = ReturnType<typeof toPhoneListContact>;
+
+/** Odstraní osobní pole z kontaktu (obrana v hloubce pro ne-admina). */
+export function stripPersonalFromContact<T extends PhoneListContact>(c: T): T {
+  const { personal_phone: _p, personal_email: _e, ...rest } = c as T & {
+    personal_phone?: string | null;
+    personal_email?: string | null;
+  };
+  return rest as T;
+}
 
 type DeptById = Record<number, { email: string | null } | undefined>;
 

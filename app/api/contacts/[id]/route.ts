@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { hasModuleAccess } from "@/lib/auth-utils";
+import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import {
   replaceUserSecondaryDepartments,
   resolveContactDepartmentIds,
@@ -53,9 +53,17 @@ export async function GET(
     return NextResponse.json({ error: "Kontakt nenalezen" }, { status: 404 });
   }
 
-  const { user_secondary_departments: usd, ...rest } = contact;
+  const viewerId = parseInt(session.user.id, 10);
+  const canSeePersonal =
+    (await isAdmin(viewerId)) ||
+    viewerId === id ||
+    (await hasModuleAccess(viewerId, "contacts", "write"));
+
+  const { user_secondary_departments: usd, personal_phone, personal_email, ...rest } = contact;
   return NextResponse.json({
     ...rest,
+    personal_phone: canSeePersonal ? personal_phone : null,
+    personal_email: canSeePersonal ? personal_email : null,
     secondary_department_ids: usd.map((r) => r.department_id).slice(0, 2),
   });
 }
