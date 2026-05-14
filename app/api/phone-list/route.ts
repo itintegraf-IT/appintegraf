@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { isAdmin } from "@/lib/auth-utils";
 import { getPhoneListPayload } from "@/lib/phone-list-data";
 
 export async function GET(req: NextRequest) {
@@ -12,6 +13,8 @@ export async function GET(req: NextRequest) {
   const tab = searchParams.get("tab") ?? "contacts";
   const search = searchParams.get("search")?.trim() ?? "";
 
-  const payload = await getPhoneListPayload(tab, search);
+  const userId = parseInt(session.user.id, 10);
+  const includePersonal = await isAdmin(userId);
+  const payload = await getPhoneListPayload(tab, search, includePersonal);
   return NextResponse.json(payload);
 }

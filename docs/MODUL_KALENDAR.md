@@ -16,6 +16,8 @@ Modul kalendáře slouží ke správě událostí a termínů v aplikaci INTEGRA
 - **Vytvoření kliknutím** – kliknutí do mřížky otevře modal s předvyplněným datem a časem
 - **Drag & drop** – přesun vlastních událostí přetažením; u dovolené/osobní reset schválení
 - **Dvoufázové schvalování** – zástup schválí → vedoucí oddělení schválí (definitivní)
+- **Kontrola kolizí zástupu** – okamžitá kontrola kolize „mimo firmu“ při výběru zástupu
+- **Pozvánky na další účastníky** – výběr více účastníků události a notifikace pozvánkou
 - **Notifikace** – na dashboardu i v headeru (zvoneček); události ke schválení na dashboardu
 - **Barva podle typu události** – pevné barvy dle `event_type` (uživatel nevybírá); ukládá se do `color` v DB
 - **Opakování** (pouze u typů *bez* povinného zástupu) – denní / týdenní / měsíční série do zvoleného data; každý výskyt = samostatný záznam
@@ -192,6 +194,8 @@ V **formulářích** (modal / přidat / upravit) se pro `datetime-local` a vých
 | PATCH | `/api/calendar/[id]/move` | Přesunutí události. Body: `{ start_date, end_date, all_day? }` |
 | GET | `/api/calendar/export` | Export .ics. Parametr: `scope=all` | `mine` (admin může `all`) |
 | GET | `/api/calendar/deputies` | Seznam možných zástupců (z hlavního + sekundárních oddělení) |
+| GET | `/api/calendar/deputies/check` | Rychlá kontrola kolize zvoleného zástupu (`deputy_id`, termín, volitelně `exclude_event_id`) |
+| GET | `/api/calendar/invitees` | Seznam uživatelů pro pozvánky (další účastníci) |
 | GET | `/api/cron/calendar-reminders` | Připomínky: `?secret=` = `CRON_SECRET` nebo `Authorization: Bearer` |
 
 ### Vytvoření události (POST /api/calendar, body)
@@ -200,6 +204,8 @@ Barvu server **nepřijímá** – vždy nastaví `getColorForEventType(event_typ
 
 - **Opakování:** `recurrence` = `none` | `daily` | `weekly` | `monthly`. Pokud není `none`, vyplnit **`recurrence_end`** (datum YYYY-MM-DD, poslední den řady včetně). U typů **Dovolená** a **Osobní** není opakování povoleno (API vrátí 400).
 - **Připomínka:** `remind_before_minutes` = `null` nebo jedna z hodnot: `15`, `30`, `60`, `120`, `1440`. Volitelné `reminder_notify_in_app`, `reminder_notify_email` (výchozí true; pokud je připomínka zvolena, alespoň jeden kanál musí být zapnutý).
+- **Pozvánky:** `participant_user_ids` = pole ID uživatelů (bez autora a bez zástupu; API duplicitní / neplatné hodnoty odfiltruje).
+- **Služební cesta:** u `event_type = "sluzebni_cesta"` je povinný `description` (kam a proč jedete), aby schvalovatel viděl kontext.
 
 ```json
 {
@@ -258,6 +264,28 @@ Stejná pole jako u vytvoření kromě opakování (úprava jedné instance; bar
 U typů **Dovolená** a **Osobní** je pole **Zástup** povinné. Workflow:
 
 1. **pending** – zástup dostane notifikaci, schválí nebo zamítne
+
+#### Schéma schvalovacího workflow kalendáře (aktuální implementace)
+
+```mermaid
+flowchart TD
+  A[Vytvoření události<br/>requires_approval=true] --> B[approval_status = pending]
+  B -->|POST /api/calendar/:id/approve<br/>approve by deputy| C{Existuje vedoucí oddělení<br/>a není stejný jako zástup?}
+  B -->|POST /api/calendar/:id/approve<br/>reject by deputy + comment| R[approval_status = rejected]
+
+  C -->|ANO| D[approval_status = deputy_approved<br/>notifikace vedoucímu]
+  C -->|NE| E[approval_status = approved]
+
+  D -->|POST /api/calendar/:id/approve<br/>approve by manager| E
+  D -->|POST /api/calendar/:id/approve<br/>reject by manager + comment| R
+```
+
+Pravidla:
+
+- `pending` schvaluje pouze uživatel v `deputy_id`.
+- `deputy_approved` schvaluje pouze vedoucí oddělení žadatele (`departments.manager_id` přes `event.department_id` nebo `creator.department_id`).
+- `reject` vyžaduje povinný `comment`.
+- Pokud vedoucí oddělení není určen, nebo je stejný jako zástup, schválení zástupem přechází rovnou do `approved`.
 2. **deputy_approved** – zástup schválil; vedoucí oddělení žadatele dostane notifikaci
 3. **approved** – vedoucí schválil (definitivní); nebo zástup schválil a oddělení nemá vedoucího
 4. **rejected** – zamítnuto zástupem nebo vedoucím
@@ -286,7 +314,7 @@ Definice v `app/(dashboard)/calendar/lib/event-types.ts`, mapování barev v `li
 ### calendar_approvals | calendar_event_participants
 
 - **calendar_approvals** – workflow schvalování (zástup, vedoucí)
-- **calendar_event_participants** – účastníci události; využíváno při vyhledávání podle lidí a v řádkovém zobrazení (Seznam, výsledky vyhledávání)
+- **calendar_event_participants** – účastníci události; využíváno při vyhledávání podle lidí, v řádkovém zobrazení (Seznam, výsledky vyhledávání) a pro notifikace pozvánek
 
 ### Barva podle typu události
 
@@ -355,6 +383,14 @@ Definice v `app/(dashboard)/calendar/lib/event-types.ts`, mapování barev v `li
 13. **(duben 2026) Opakování** – denní/týdenní/měsíční série, `lib/calendar-recurrence.ts`, rozšíření `POST /api/calendar`
 
 14. **(duben 2026) Připomínky** – sloupce v `calendar_events`, endpoint `/api/cron/calendar-reminders`, e-mail `sendCalendarReminderEmail`
+
+15. **(duben 2026) Pozvánky účastníků** – endpoint `/api/calendar/invitees`, komponenta `CalendarInviteeSelect`, ukládání přes `calendar_event_participants`, notifikace pozvaným.
+
+16. **(duben 2026) Kontrola kolize zástupu** – endpoint `/api/calendar/deputies/check`; varování v UI při výběru zástupu, blokace kolidujících termínů.
+
+17. **(duben 2026) Služební cesta – povinný popis** – pro `sluzebni_cesta` je vyžadovaný popis „kam a proč“, viditelný pro schvalovatele.
+
+18. **(duben 2026) Osobní kalendář vedoucího** – vedoucí v osobním pohledu vidí i události čekající na jeho schválení (`deputy_approved`).
 
 ### URL parametry stránky
 

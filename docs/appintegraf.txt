@@ -5,21 +5,32 @@ appintegraf
 	- zapomenuté heslo uživatele obnova uživatelem. Uživatel dá žádost, systém vygeneruje odkaz pošle na mail. Odkaz 	  vede na stránku kde půjde heslo změnit. (bezpečnost? dvoufaktor?) Zachovat možnost aby heslo řešil i admin 	    	  (uživatel s právy) 
 dále při vytváření uživatele. Možnost vytvořit uživatele bez hesla a odeslat aktivační link na mail a tam vyzvat k vytvoření hesla? 
 
+ukotvit menu
+
 Dashboard
 
 Kdo co vidí v dasshboardu je to podle rolí nebo oddělení?? Asi by ne všichni měli třeba vidět majetek?? Nebo co vlastně vidí
 
 - kalendář 
-	- schvalovací wofkflow i na událost lékař stejně jako dovolená a osobní
+	- HOTOVO schvalovací wofkflow i na událost lékař stejně jako dovolená a osobní
 	- HOTOVO Zadám celodenní jednání, v kalendáři se to zobrazí ale od 02:00 do dalšího dne 02.00 viz datum 25/4/26
 	- HOTOVO V globálním kalendáři chybí u jednotlivých akcí, nebo dovolených kdo to je a kdo zastupuje, případně kdo schválil
-	  HOTOVO nyní je to v pořádku u schvalovaných akcí ale u veřejných akcí v kalendáři by vždy mělo být vidět jméno (čí ta akce je)
-	- Seznam osobní a globální kdo si vzal zástup a kdo to schválil měla by vidět skupina vedení
-	- Jaké je schvalovací workflow, kdo za koho a kdo schvaluje koho a jak je to když tady někdo není. Aby bylo 	  nemožné si dát sám sobě zástup a podobně
+	- HOTOVO nyní je to v pořádku u schvalovaných akcí ale u veřejných akcí v kalendáři by vždy mělo být vidět jméno (čí ta akce je)
+	- HOTOVO Seznam osobní a globální kdo si vzal zástup a kdo to schválil měla by vidět skupina vedení
+	- HOTOVO Jaké je schvalovací workflow, kdo za koho a kdo schvaluje koho a jak je to když tady někdo není. Aby bylo 	  nemožné si dát sám sobě zástup a podobně (Dodělat schvalovatele když není jeden aby byl druhý atd)
+		třístupňové schvalovací workflow. Asi vytvořit tabulku schvalovatelů 
+			-vyberu oddělení a pro něj určím schvalovatele
+				primární
+				sekundární
+				terciální
+		ošetřit aby proběhla kontrola přítomnosti (podle kalendáře) a podle toho to spadlo na schalovatele
+		není primární spadne na sekundárního, není primární ani sekundární spadne na terciálního
+		ošetřit logiku
+	
 	- Když zadávám jakoukoliv událost datum začátku - tak aby přeskočil automaticky i datum konce
 	- HOHOVO Když je kolize datumů tak by nemělo jít naplánovat, navíc při plánování nejdou přizvat další osoby (pozvánky)
 	- HOTOVO Při výběru typů událostí chybí větší výběr Schůzka Náchod, Praha (kanceláře), home office
-	- Při zadávání služební cesty zadat popis proč a kam jedu aby ten kdo schvaluje to viděl a nemuse se ptát
+	- HOTOVO Při zadávání služební cesty zadat popis proč a kam jedu aby ten kdo schvaluje to viděl a nemusel se 	  ptát
 
 
 - Kontakty
@@ -29,19 +40,53 @@ Kdo co vidí v dasshboardu je to podle rolí nebo oddělení?? Asi by ne všichn
 						3) Pod kódem i číselný kód
 	- generovat PDF pro tisk 
 	- přidat kartu kde bude seznam oddělení (podobně jako v tel seznamu) a na kartě bude mail(hromadný) a budou 	  vidět všichni uživatelé. A pak asi i v kontaktech aby se tento hromadný mail uživateli přiřadil jako 	  	  sekundární.
+	- Do administrace přidat kartu společné maily - bude databáze společných mailů. Ty budu moci přidělit 		  uživatelům každý uživatel bude moci mít přístup k X společným mailům to znamená přidat i do kontaktů a 	  telefonního seznamu. Společné maily se budou částečně krýt s 	  maily oddělení takže to pořešit)
 
 - Telefonní seznam
 	- opravit tiskové sestavy které se při migraci do .next.js rozsypali (grafika, layout stránky)
 	- Přidat kartu "Skupinové maily" - navázat databázi skupinových mailů a tento mail možnost přiřadit uživateli
 	  zobrazit na kartě stejně jako oddělení (mail a seznam lidí)
+	- rele administrator na kartě kontaktu uvidí i soukrommé kontakty
 -IML
 
-	-v objednávce položka cena jako nepovinné pole!!!
+v objednávce položka cena jako nepovinné pole!!!
+Na základě poskytnutého přepisu rozhovoru jsou hlavními body diskuse a jejich navrhovaná řešení následující:
+
+### 6. Plnění databáze a migrace dat ze starého systému (Igis)
+*   **Problém:** Stará databáze obsahuje tisíce položek, z nichž polovina je pravděpodobně nepoužívaná nebo neaktuální.
+*   **Návrh řešení:** Zvolit cestu **postupného plnění databáze**. Namísto hromadného importu starých dat se budou data do nového systému zadávat ručně v momentě, kdy přijde reálná objednávka. Tím se databáze "očistí" a budou v ní jen živá data.
+
+### 7. Validace dat
+*   **Problém:** Jak zajistit, aby nově nahraná data byla správná a bez chyb.
+*   **Návrh řešení:** Data v systému nebudou mít příznak "zvalidováno" (fajfku), dokud neprojdou první ostrou zakázkou a nebudou potvrzena odpovědnou osobou. Poté již budou považována za schválená pro další použití.
+
+### 8. Plánování tiskových archů (do budoucna)
+*   **Problém:** Potřeba efektivně seskupovat produkty se stejnými Pantone barvami nebo výseky na jeden tiskový arch.
+*   **Návrh řešení:** Systém by měl umožnit řazení produktů v objednávce podle barevnosti. Uživatel by pak mohl manuálně přiřazovat produkty ke konkrétním tiskovým archům (např. označením "Arch 1", "Arch 2"). Toto se bude podrobněji řešit až po naplnění databáze.
+
+
+
 
 - Úkoly	
 	- Nezobrazují se mnou zadané úkoly v osobním kalendáři
+	- editor aby viděl přehled úkolů napříč firmou	
+	- úkol zada nejen na oddělení ale i konkrétního člověka nebo víc lidí (všichni, nebo konkrétní uživatelé)
 
 - majetek
 	- požadavek na techniku - není možnost odpovědět žadateli
+	- vyhledávání podle zaměstnance a abecední řazení dle zaměstnance
+	- majetek seskupit do karet
 
 - NOVÝ MODUL PŘEDPISY (kouknout do IGIS)
+
+personalistika
+
+- veřejný formulář možnost vyplnění i přihlášenému uživateli v modulu
+- vyhledávání jako v igis.
+- vyhledávání podle adresy bydliště vzdálenosti od NA
+
+
+dtp@Eintegraf.cz
+data@integraf.cz
+24 horký, kosař
+
