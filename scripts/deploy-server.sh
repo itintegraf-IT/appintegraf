@@ -1,22 +1,24 @@
 #!/usr/bin/env bash
-# Nasazení na produkční Linux server (po git push).
+# Nasazení aplikace na Linux server (produkce i test) – po git push.
 # Spouštějte z kořene repozitáře na serveru, např.:
 #   chmod +x scripts/deploy-server.sh
-#   ./scripts/deploy-server.sh
+#   ./scripts/deploy-server.sh                             # produkce (main + PM2 appintegraf)
+#   DEPLOY_BRANCH=test PM2_APP_NAME=appintegraf-test ./scripts/deploy-server.sh
+#   ./scripts/deploy-server.sh --branch test --pm2-name appintegraf-test
 #
 # Vyžaduje: .env s DATABASE_URL, Node 20.x, PM2, oprávnění k git pull.
 #
-# Po stažení kódu ověří: větev odpovídá originu, čistý working tree.
+# Po stažení kódu ověří: aktuální větev = požadovaná, HEAD == origin/<větev>, čistý working tree.
 #
 # Přepínače:
-#   --branch VĚTEV        výchozí: main (na test serveru: test)
+#   --branch VĚTEV        větev k pull/build (výchozí: main, env DEPLOY_BRANCH)
+#   --pm2-name JMÉNO      PM2 proces (výchozí: appintegraf, env PM2_APP_NAME)
 #   --planovani-upgrade   spustí npm run db:planovani-upgrade (SQL změny plánování)
 #   --apply-sql SOUBOR    spustí konkrétní SQL soubor z prisma/migrations/ přes mysql klienta
 #                         (lze uvést víckrát). Vyžaduje .env s DATABASE_URL.
 #                         Příklad: --apply-sql 20260420_auth_tokens.sql
 #   --skip-migrate        přeskočí npx prisma migrate deploy
 #   --skip-build          přeskočí npm run build (jen pro nouzi)
-#   --pm2-name JMÉNO       výchozí: appintegraf (nebo env PM2_APP_NAME)
 
 set -euo pipefail
 
@@ -31,12 +33,16 @@ DO_PLANOVANI=0
 SQL_FILES=()
 
 usage() {
-  sed -n '1,28p' "$0" | tail -n +2
+  sed -n '1,22p' "$0" | tail -n +2
   exit 0
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --branch)
+      DEPLOY_BRANCH="${2:?chybí název větve}"
+      shift 2
+      ;;
     --planovani-upgrade) DO_PLANOVANI=1; shift ;;
     --apply-sql)
       SQL_FILES+=("${2:?chybí cesta k SQL souboru}")
@@ -46,10 +52,6 @@ while [[ $# -gt 0 ]]; do
     --skip-build) SKIP_BUILD=1; shift ;;
     --pm2-name)
       PM2_NAME="${2:?}"
-      shift 2
-      ;;
-    --branch)
-      DEPLOY_BRANCH="${2:?}"
       shift 2
       ;;
     -h|--help) usage ;;
@@ -86,7 +88,7 @@ head_sha="$(git rev-parse HEAD)"
 origin_sha="$(git rev-parse "origin/$DEPLOY_BRANCH")"
 if [[ "$head_sha" != "$origin_sha" ]]; then
   echo "CHYBA: HEAD se neshoduje s origin/$DEPLOY_BRANCH." >&2
-  echo "  HEAD:                $head_sha" >&2
+  echo "  HEAD:                  $head_sha" >&2
   echo "  origin/$DEPLOY_BRANCH: $origin_sha" >&2
   exit 1
 fi
@@ -125,7 +127,6 @@ fi
 if [[ "${#SQL_FILES[@]}" -gt 0 ]]; then
   echo "==> SQL migrace (--apply-sql)"
   if [[ -z "${DATABASE_URL:-}" ]]; then
-    # Načti z .env, pokud není v prostředí
     set -a; . ./.env; set +a
   fi
   if [[ -z "${DATABASE_URL:-}" ]]; then
@@ -133,8 +134,6 @@ if [[ "${#SQL_FILES[@]}" -gt 0 ]]; then
     exit 1
   fi
 
-  # Rozparsuj DATABASE_URL ve tvaru mysql://user:pass@host:port/dbname
-  # (bash regex; hesla s URL-encoded znaky prosím dekódovat ručně v .env, kdyby bylo potřeba)
   if [[ "$DATABASE_URL" =~ ^mysql://([^:]+):([^@]+)@([^:/]+)(:([0-9]+))?/([^?]+) ]]; then
     DB_USER="${BASH_REMATCH[1]}"
     DB_PASS="${BASH_REMATCH[2]}"
@@ -147,7 +146,6 @@ if [[ "${#SQL_FILES[@]}" -gt 0 ]]; then
   fi
 
   for f in "${SQL_FILES[@]}"; do
-    # Přijmi buď plnou cestu, nebo jen jméno souboru uvnitř prisma/migrations/
     if [[ -f "$f" ]]; then
       sql_path="$f"
     elif [[ -f "prisma/migrations/$f" ]]; then
