@@ -57,24 +57,20 @@ export default async function DashboardPage() {
         if (userId === 0) return [];
         const canReadCalendar = await hasModuleAccess(userId, "calendar", "read");
         if (!canReadCalendar) return [];
-        const deptRows = await prisma.departments.findMany({
-          where: { manager_id: userId },
-          select: { id: true },
-        });
-        const managerDeptIds = (deptRows as Array<{ id: number }>).map((d) => d.id);
         const events = await prisma.calendar_events.findMany({
           where: {
             OR: [
               { deputy_id: userId, approval_status: "pending" },
-              ...(managerDeptIds.length > 0
-                ? [{
-                    approval_status: "deputy_approved",
-                    OR: [
-                      { department_id: { in: managerDeptIds } },
-                      { users: { department_id: { in: managerDeptIds } } },
-                    ],
-                  }]
-                : []),
+              {
+                approval_status: "deputy_approved",
+                calendar_approvals: {
+                  some: {
+                    approver_id: userId,
+                    status: "pending",
+                    approval_type: { not: "deputy" },
+                  },
+                },
+              },
             ],
           },
           orderBy: { start_date: "asc" },

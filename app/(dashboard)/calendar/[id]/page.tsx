@@ -24,6 +24,10 @@ export default async function CalendarEventPage({
       users: { select: { first_name: true, last_name: true, department_id: true } },
       departments: { select: { name: true, manager_id: true } },
       users_deputy: { select: { first_name: true, last_name: true } },
+      calendar_approvals: {
+        include: { users: { select: { first_name: true, last_name: true } } },
+        orderBy: { approval_order: "asc" },
+      },
       calendar_event_participants: {
         include: { users: { select: { first_name: true, last_name: true } } },
       },
@@ -32,17 +36,18 @@ export default async function CalendarEventPage({
 
   if (!event) notFound();
 
-  const departmentId = event.department_id ?? event.users?.department_id ?? null;
-  let managerId: number | null = event.departments?.manager_id ?? null;
-  if (!managerId && departmentId) {
-    const dept = await prisma.departments.findUnique({
-      where: { id: departmentId },
-      select: { manager_id: true },
-    });
-    managerId = dept?.manager_id ?? null;
-  }
   const isDeputy = event.deputy_id === userId && event.approval_status === "pending";
-  const isManager = managerId === userId && event.approval_status === "deputy_approved";
+  const pendingFinalApproval = event.calendar_approvals.find(
+    (a) =>
+      a.approver_id === userId &&
+      a.status === "pending" &&
+      a.approval_type !== "deputy" &&
+      event.approval_status === "deputy_approved"
+  );
+  const isFinalApprover = !!pendingFinalApproval;
+  const assignedApprover = event.calendar_approvals.find(
+    (a) => a.status === "pending" && a.approval_type !== "deputy"
+  );
 
   const formatDate = (d: Date) =>
     new Date(d).toLocaleDateString("cs-CZ", {
@@ -64,7 +69,7 @@ export default async function CalendarEventPage({
           <p className="mt-1 text-gray-600">Detail události</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {(isDeputy || isManager) && (
+          {(isDeputy || isFinalApprover) && (
             <ApproveRejectButtons eventId={id} eventTitle={event.title} />
           )}
           {event.created_by === userId && (
@@ -167,10 +172,15 @@ export default async function CalendarEventPage({
                     : event.approval_status === "rejected"
                       ? "Zamítnuto"
                       : event.approval_status === "deputy_approved"
-                        ? "Čeká na vedoucího"
-                        : "Čeká na schválení"}
+                        ? "Čeká na schválení"
+                        : "Čeká na zástupce"}
                 </span>
               </p>
+              {event.approval_status === "deputy_approved" && assignedApprover?.users && (
+                <p className="mt-1 text-sm text-gray-600">
+                  Schvalovatel: {assignedApprover.users.first_name} {assignedApprover.users.last_name}
+                </p>
+              )}
             </div>
           )}
           {event.location && (

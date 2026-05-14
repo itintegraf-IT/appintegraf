@@ -438,7 +438,7 @@ export function WeekCalendarGrid({
                         {deputyApproved && (
                           <span className="ml-1 block text-[10px]">
                             <span className="rounded bg-blue-600 px-1 py-0.5 text-white">
-                              Čeká na vedoucího
+                              Čeká na schválení
                             </span>
                           </span>
                         )}
@@ -607,7 +607,7 @@ export function WeekCalendarGrid({
                           )}
                           {deputyApproved && (
                             <span className="ml-1 inline-block rounded bg-blue-600 px-1 text-[9px] text-white">
-                              Čeká na vedoucího
+                              Čeká na schválení
                             </span>
                           )}
                           {isApproved && (

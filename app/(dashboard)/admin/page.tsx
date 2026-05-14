@@ -74,6 +74,13 @@ export default async function AdminPage() {
           Role
         </Link>
         <Link
+          href="/admin/calendar-approvers"
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+        >
+          <Calendar className="h-4 w-4" />
+          Schvalovatelé kalendáře
+        </Link>
+        <Link
           href="/admin/shared-mails"
           className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
         >

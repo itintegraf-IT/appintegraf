@@ -122,12 +122,6 @@ export default async function CalendarPage({
 
   const buildScopeWhere = async (effectiveScope: CalendarScope): Promise<Record<string, unknown>> => {
     if (effectiveScope === "all") return {};
-    const deptRows = await prisma.departments.findMany({
-      where: { manager_id: userId },
-      select: { id: true },
-    });
-    const managerDeptIds = (deptRows as Array<{ id: number }>).map((d) => d.id);
-
     const orConditions: Array<Record<string, unknown>> = [
       { created_by: userId },
       { deputy_id: userId },
@@ -136,16 +130,17 @@ export default async function CalendarPage({
           some: { user_id: userId },
         },
       },
-    ];
-    if (managerDeptIds.length > 0) {
-      orConditions.push({
+      {
         approval_status: "deputy_approved",
-        OR: [
-          { department_id: { in: managerDeptIds } },
-          { users: { department_id: { in: managerDeptIds } } },
-        ],
-      } as Record<string, unknown>);
-    }
+        calendar_approvals: {
+          some: {
+            approver_id: userId,
+            status: "pending",
+            approval_type: { not: "deputy" },
+          },
+        },
+      },
+    ];
     return { OR: orConditions };
   };
 
@@ -209,7 +204,10 @@ export default async function CalendarPage({
     departments: { select: { name: true } },
     users_deputy: { select: { first_name: true, last_name: true } },
     calendar_approvals: {
-      where: { approval_type: "manager", status: "approved" },
+      where: {
+        status: "approved",
+        approval_type: { not: "deputy" },
+      },
       take: 1,
       include: { users: { select: { first_name: true, last_name: true } } },
     },

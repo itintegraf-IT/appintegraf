@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { sendCalendarApprovalEmail } from "@/lib/email";
+import {
+  formatApproverAssignmentNote,
+  resolveDepartmentCalendarApprover,
+} from "@/lib/calendar-approver-resolution";
 
 /**
  * POST /api/calendar/[id]/approve
- * Schválení nebo zamítnutí události (volá zástup NEBO vedoucí oddělení)
+ * Schválení nebo zamítnutí události (zástup nebo finální schvalovatel)
  * Body: { action: "approve" | "reject", comment?: string }
  */
 export async function POST(
@@ -37,6 +41,10 @@ export async function POST(
       },
       users_deputy: { select: { id: true, first_name: true, last_name: true } },
       departments: { select: { id: true, manager_id: true, name: true } },
+      calendar_approvals: {
+        where: { status: "pending" },
+        select: { id: true, approver_id: true, approval_type: true },
+      },
     },
   });
 
@@ -57,105 +65,30 @@ export async function POST(
     ? `${event.users.first_name} ${event.users.last_name}`
     : "Žadatel";
 
-  // Oddělení žadatele: z události nebo z uživatele
   const departmentId =
     event.department_id ?? event.users?.department_id ?? null;
 
-  // Vedoucí oddělení (pokud existuje)
-  let managerId: number | null = null;
-  if (departmentId && event.departments?.manager_id) {
-    managerId = event.departments.manager_id;
-  } else if (departmentId) {
-    const dept = await prisma.departments.findUnique({
-      where: { id: departmentId },
-      select: { manager_id: true },
-    });
-    managerId = dept?.manager_id ?? null;
-  }
-
   const isDeputy = event.deputy_id === userId;
-  const isManager = managerId === userId;
+  const pendingFinalApproval = event.calendar_approvals.find(
+    (a) =>
+      a.approver_id === userId &&
+      a.approval_type !== "deputy" &&
+      event.approval_status === "deputy_approved"
+  );
+  const isFinalApprover = !!pendingFinalApproval;
 
   // --- ZÁSTUP: approval_status === "pending" ---
   if (isDeputy && event.approval_status === "pending") {
-    const approvalNote = `Schváleno zástupem dne ${new Date().toLocaleDateString("cs-CZ")} (${event.users_deputy ? `${event.users_deputy.first_name} ${event.users_deputy.last_name}` : "Zástup"})`;
-    const newDescription = event.description
-      ? `${event.description}\n\n${approvalNote}`
-      : approvalNote;
+    const deputyName = event.users_deputy
+      ? `${event.users_deputy.first_name} ${event.users_deputy.last_name}`
+      : "Zástup";
+    const approvalNote = `Schváleno zástupem dne ${new Date().toLocaleDateString("cs-CZ")} (${deputyName})`;
 
     if (action === "approve") {
-      if (managerId && managerId !== userId) {
-        // Existuje vedoucí → deputy_approved, notifikace vedoucímu
-        const deputyName = event.users_deputy
-          ? `${event.users_deputy.first_name} ${event.users_deputy.last_name}`
-          : "Zástup";
-
-        await prisma.$transaction([
-          prisma.calendar_events.update({
-            where: { id },
-            data: {
-              approval_status: "deputy_approved",
-              description: newDescription,
-              updated_at: new Date(),
-            },
-          }),
-          prisma.calendar_approvals.updateMany({
-            where: { event_id: id, approver_id: userId },
-            data: {
-              status: "approved",
-              comment: "Schváleno",
-              approved_at: new Date(),
-              updated_at: new Date(),
-            },
-          }),
-          prisma.calendar_approvals.create({
-            data: {
-              event_id: id,
-              approver_id: managerId,
-              approval_type: "manager",
-              approval_order: 2,
-              status: "pending",
-            },
-          }),
-          prisma.notifications.create({
-            data: {
-              user_id: managerId,
-              title: "Událost čeká na schválení",
-              message: `${deputyName} schválil/a událost „${event.title}“ od ${creatorName}. Událost čeká na vaše schválení.`,
-              type: "calendar_approval",
-              link: `/calendar/${id}`,
-            },
-          }),
-          prisma.notifications.create({
-            data: {
-              user_id: creatorId,
-              title: "Událost schválena zástupem",
-              message: `${deputyName} schválil/a vaši událost „${event.title}“. Čeká na schválení vedoucím oddělení.`,
-              type: "calendar_approved",
-              link: `/calendar/${id}`,
-            },
-          }),
-        ]);
-        const manager = await prisma.users.findUnique({
-          where: { id: managerId },
-          select: { email: true, first_name: true, last_name: true },
-        });
-        if (manager?.email) {
-          await sendCalendarApprovalEmail({
-            toEmail: manager.email,
-            toName: `${manager.first_name} ${manager.last_name}`.trim() || "Vedoucí",
-            subject: "Událost čeká na schválení – INTEGRAF",
-            message: `${deputyName} schválil/a událost „${event.title}“ od ${creatorName}. Událost čeká na vaše schválení.`,
-            eventTitle: event.title,
-            eventId: id,
-          });
-        }
-      } else {
-        // Žádný vedoucí → rovnou approved
-        const deputyName = event.users_deputy
-          ? `${event.users_deputy.first_name} ${event.users_deputy.last_name}`
-          : "Zástup";
-
+      if (!departmentId) {
+        const newDescription = event.description
+          ? `${event.description}\n\n${approvalNote}`
+          : approvalNote;
         await prisma.$transaction([
           prisma.calendar_events.update({
             where: { id },
@@ -184,13 +117,106 @@ export async function POST(
             },
           }),
         ]);
+        return NextResponse.json({
+          success: true,
+          action,
+          message: "Událost byla schválena.",
+        });
+      }
+
+      const resolved = await resolveDepartmentCalendarApprover(
+        prisma,
+        departmentId,
+        event.start_date,
+        event.end_date,
+        id
+      );
+
+      if (!resolved || resolved.userId === userId) {
+        return NextResponse.json(
+          {
+            error:
+              "Nelze určit schvalovatele – nastavte schvalovatele oddělení nebo vedoucího v administraci.",
+          },
+          { status: 409 }
+        );
+      }
+
+      const approver = await prisma.users.findUnique({
+        where: { id: resolved.userId },
+        select: { email: true, first_name: true, last_name: true },
+      });
+      const approverName = approver
+        ? `${approver.first_name} ${approver.last_name}`.trim()
+        : "Schvalovatel";
+
+      const assignmentNote = formatApproverAssignmentNote(
+        approverName,
+        resolved.tier,
+        resolved.skippedTiers
+      );
+      const newDescription = event.description
+        ? `${event.description}\n\n${approvalNote}\n${assignmentNote}`
+        : `${approvalNote}\n${assignmentNote}`;
+
+      await prisma.$transaction([
+        prisma.calendar_events.update({
+          where: { id },
+          data: {
+            approval_status: "deputy_approved",
+            description: newDescription,
+            updated_at: new Date(),
+          },
+        }),
+        prisma.calendar_approvals.updateMany({
+          where: { event_id: id, approver_id: userId },
+          data: {
+            status: "approved",
+            comment: "Schváleno",
+            approved_at: new Date(),
+            updated_at: new Date(),
+          },
+        }),
+        prisma.calendar_approvals.create({
+          data: {
+            event_id: id,
+            approver_id: resolved.userId,
+            approval_type: resolved.tier,
+            approval_order: 2,
+            status: "pending",
+          },
+        }),
+        prisma.notifications.create({
+          data: {
+            user_id: resolved.userId,
+            title: "Událost čeká na schválení",
+            message: `${deputyName} schválil/a událost „${event.title}“ od ${creatorName}. Událost čeká na vaše schválení.`,
+            type: "calendar_approval",
+            link: `/calendar/${id}`,
+          },
+        }),
+        prisma.notifications.create({
+          data: {
+            user_id: creatorId,
+            title: "Událost schválena zástupem",
+            message: `${deputyName} schválil/a vaši událost „${event.title}“. Čeká na schválení: ${approverName}.`,
+            type: "calendar_approved",
+            link: `/calendar/${id}`,
+          },
+        }),
+      ]);
+
+      if (approver?.email) {
+        await sendCalendarApprovalEmail({
+          toEmail: approver.email,
+          toName: approverName,
+          subject: "Událost čeká na schválení – INTEGRAF",
+          message: `${deputyName} schválil/a událost „${event.title}“ od ${creatorName}. Událost čeká na vaše schválení.`,
+          eventTitle: event.title,
+          eventId: id,
+        });
       }
     } else {
-      // reject
-      const deputyName = event.users_deputy
-        ? `${event.users_deputy.first_name} ${event.users_deputy.last_name}`
-        : "Zástup";
-
       await prisma.$transaction([
         prisma.calendar_events.update({
           where: { id },
@@ -223,18 +249,18 @@ export async function POST(
     });
   }
 
-  // --- VEDOUCÍ: approval_status === "deputy_approved" ---
-  if (isManager && event.approval_status === "deputy_approved") {
-    const manager = await prisma.users.findUnique({
+  // --- FINÁLNÍ SCHVALOVATEL: approval_status === "deputy_approved" ---
+  if (isFinalApprover && event.approval_status === "deputy_approved") {
+    const approver = await prisma.users.findUnique({
       where: { id: userId },
       select: { first_name: true, last_name: true },
     });
-    const managerName = manager
-      ? `${manager.first_name} ${manager.last_name}`
-      : "Vedoucí";
+    const approverName = approver
+      ? `${approver.first_name} ${approver.last_name}`
+      : "Schvalovatel";
 
     if (action === "approve") {
-      const approvalNote = `Schváleno vedoucím dne ${new Date().toLocaleDateString("cs-CZ")} (${managerName})`;
+      const approvalNote = `Schváleno schvalovatelem dne ${new Date().toLocaleDateString("cs-CZ")} (${approverName})`;
       const newDescription = event.description
         ? `${event.description}\n\n${approvalNote}`
         : approvalNote;
@@ -249,7 +275,7 @@ export async function POST(
           },
         }),
         prisma.calendar_approvals.updateMany({
-          where: { event_id: id, approver_id: userId },
+          where: { event_id: id, approver_id: userId, status: "pending" },
           data: {
             status: "approved",
             comment: "Schváleno",
@@ -261,7 +287,7 @@ export async function POST(
           data: {
             user_id: creatorId,
             title: "Událost definitivně schválena",
-            message: `${managerName} schválil/a vaši událost „${event.title}“.`,
+            message: `${approverName} schválil/a vaši událost „${event.title}“.`,
             type: "calendar_approved",
             link: `/calendar/${id}`,
           },
@@ -274,7 +300,7 @@ export async function POST(
           data: { approval_status: "rejected", updated_at: new Date() },
         }),
         prisma.calendar_approvals.updateMany({
-          where: { event_id: id, approver_id: userId },
+          where: { event_id: id, approver_id: userId, status: "pending" },
           data: {
             status: "rejected",
             comment,
@@ -285,7 +311,7 @@ export async function POST(
           data: {
             user_id: creatorId,
             title: "Událost zamítnuta",
-            message: `${managerName} zamítl/a vaši událost „${event.title}“. Důvod: ${comment}`,
+            message: `${approverName} zamítl/a vaši událost „${event.title}“. Důvod: ${comment}`,
             type: "calendar_rejected",
             link: `/calendar/${id}`,
           },
