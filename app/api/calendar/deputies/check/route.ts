@@ -2,15 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 
-const OUT_OF_OFFICE_TYPES = [
-  "dovolena",
-  "osobni",
-  "schuzka_mimo_firmu",
-  "schuzka_praha",
-  "sluzebni_cesta",
-  "lekar",
-  "nemoc",
-];
+import { CALENDAR_OUT_OF_OFFICE_TYPES } from "@/lib/calendar-out-of-office";
+
+const OUT_OF_OFFICE_TYPES = CALENDAR_OUT_OF_OFFICE_TYPES;
 
 function formatDateTimeCs(d: Date): string {
   return d.toLocaleString("cs-CZ", {

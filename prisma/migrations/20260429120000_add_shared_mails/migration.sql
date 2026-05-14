@@ -1,3 +1,4 @@
+-- Společné maily: katalog a M:N vazba k uživatelům
 CREATE TABLE IF NOT EXISTS `shared_mails` (
   `id` int NOT NULL AUTO_INCREMENT,
   `email` varchar(100) NOT NULL,

@@ -50,6 +50,25 @@ model calendar_approvals {
   @@index([status], map: "idx_status")
 }
 
+/// Schvalovatelé kalendáře per oddělení (primární / sekundární / terciární).
+model calendar_department_approvers {
+  id                Int          @id @default(autoincrement())
+  department_id     Int          @unique(map: "uq_calendar_dept_approvers_dept")
+  primary_user_id   Int
+  secondary_user_id Int?
+  tertiary_user_id  Int?
+  created_at        DateTime     @default(now()) @db.Timestamp(0)
+  updated_at        DateTime     @default(now()) @db.Timestamp(0)
+  departments       departments  @relation(fields: [department_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "calendar_dept_approvers_dept_fk")
+  users_primary     users        @relation("calendar_approver_primary", fields: [primary_user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "calendar_dept_approvers_primary_fk")
+  users_secondary   users?       @relation("calendar_approver_secondary", fields: [secondary_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "calendar_dept_approvers_secondary_fk")
+  users_tertiary    users?       @relation("calendar_approver_tertiary", fields: [tertiary_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "calendar_dept_approvers_tertiary_fk")
+
+  @@index([primary_user_id], map: "idx_calendar_dept_approvers_primary")
+  @@index([secondary_user_id], map: "idx_calendar_dept_approvers_secondary")
+  @@index([tertiary_user_id], map: "idx_calendar_dept_approvers_tertiary")
+}
+
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model calendar_event_participants {
   id              Int             @id @default(autoincrement())
@@ -239,6 +258,7 @@ model departments {
   created_at                 DateTime                     @default(now()) @db.Timestamp(0)
   updated_at                 DateTime                     @default(now()) @db.Timestamp(0)
   calendar_events            calendar_events[]
+  calendar_department_approvers calendar_department_approvers?
   contracts                  contracts[]
   user_secondary_departments user_secondary_departments[]
   ukoly_departments          ukoly_departments[]
@@ -810,6 +830,9 @@ model users {
   updated_at                                                     DateTime                      @default(now()) @db.Timestamp(0)
   audit_log                                                      audit_log[]
   calendar_approvals                                             calendar_approvals[]
+  calendar_approver_primary                                      calendar_department_approvers[] @relation("calendar_approver_primary")
+  calendar_approver_secondary                                    calendar_department_approvers[] @relation("calendar_approver_secondary")
+  calendar_approver_tertiary                                     calendar_department_approvers[] @relation("calendar_approver_tertiary")
   calendar_event_participants                                    calendar_event_participants[]
   calendar_events                                                calendar_events[]
   calendar_events_deputy                                         calendar_events[]             @relation("calendar_events_deputy")
