@@ -4,6 +4,10 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { extractTextFromPdfBuffer } from "@/lib/contracts/extract-text-from-pdf";
 import { extractCvDraftWithLlm } from "@/lib/personalistika/llm-extract-cv-draft";
+import {
+  draftToFieldItems,
+  truncateSourceTextForUi,
+} from "@/lib/personalistika/cv-field-registry";
 import { ensurePersonalistikaTables } from "@/lib/personalistika-db";
 
 export const runtime = "nodejs";
@@ -89,8 +93,13 @@ export async function POST(req: NextRequest) {
   try {
     const { draft: extracted, modelUsed, provider, usedFallback, primaryError } =
       await extractCvDraftWithLlm(text, positions);
+    const { sourceText, sourceTextTruncated } = truncateSourceTextForUi(text);
+    const fields = draftToFieldItems(extracted);
     return NextResponse.json({
       extracted,
+      fields,
+      sourceText,
+      sourceTextTruncated,
       meta: {
         pageCount,
         textLength: text.length,
