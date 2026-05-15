@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
 import { canViewAllUkoly } from "@/lib/ukoly-access";
+import { formatDateTimeCz } from "@/lib/datetime-cz";
 import { ukolStatusBadgeClass, ukolStatusLabel } from "@/lib/ukoly-status";
 
 export const dynamic = "force-dynamic";
@@ -196,13 +197,7 @@ export default async function UkolyZadaniPage({
               rows.map((r) => (
                 <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50/80">
                   <td className="px-4 py-3 text-gray-800">
-                    {new Date(r.due_at).toLocaleString("cs-CZ", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatDateTimeCz(new Date(r.due_at))}
                     {r.urgent && (
                       <span className="ml-2 rounded bg-amber-100 px-1.5 text-xs text-amber-900">
                         urgentní
