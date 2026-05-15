@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Archive, BarChart3, List, Plus } from "lucide-react";
+import { Archive, BarChart3, List, Plus, Users } from "lucide-react";
 
 export function UkolyTabsNav({ canWrite }: { canWrite: boolean }) {
   const pathname = usePathname();
   const isList = pathname === "/ukoly";
+  const isZadani = pathname === "/ukoly/zadani";
   const isNew = pathname === "/ukoly/new";
   const isStats = pathname === "/ukoly/stats";
   const isArchive = pathname === "/ukoly/archive";
@@ -22,8 +23,14 @@ export function UkolyTabsNav({ canWrite }: { canWrite: boolean }) {
     <nav className="mb-6 flex flex-wrap gap-2 border-b border-gray-200 pb-4">
       <Link href="/ukoly" className={tabClass(isList)}>
         <List className="h-4 w-4" />
-        Přehled zadaných úkolů
+        Moje úkoly
       </Link>
+      {canWrite && (
+        <Link href="/ukoly/zadani" className={tabClass(isZadani)}>
+          <Users className="h-4 w-4" />
+          Sledování zadání
+        </Link>
+      )}
       {canWrite && (
         <Link href="/ukoly/new" className={tabClass(isNew)}>
           <Plus className="h-4 w-4" />

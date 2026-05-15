@@ -8,6 +8,7 @@ import {
   resolveDepartmentIdForContract,
 } from "@/lib/contracts/resolveApprovers";
 import { getCurrentPendingApproval, getWorkflowStepsOrdered } from "@/lib/contracts/workflow-helpers";
+import { dismissNotificationsUpdate } from "@/lib/notifications-dismiss";
 
 /**
  * POST /api/contracts/[id]/approve
@@ -64,8 +65,11 @@ export async function POST(
     );
   }
 
+  const contractLink = `/contracts/${contractId}`;
+
   if (action === "reject") {
     await prisma.$transaction([
+      dismissNotificationsUpdate(contractLink),
       prisma.contract_approvals.update({
         where: { id: pending.id },
         data: {
@@ -127,6 +131,10 @@ export async function POST(
 
   if (nextStep && nextResolved) {
     await prisma.$transaction([
+      dismissNotificationsUpdate(contractLink, {
+        userId,
+        types: ["contract_approval"],
+      }),
       prisma.contract_approvals.update({
         where: { id: pending.id },
         data: {
@@ -175,6 +183,7 @@ export async function POST(
   }
 
   await prisma.$transaction([
+    dismissNotificationsUpdate(contractLink),
     prisma.contract_approvals.update({
       where: { id: pending.id },
       data: {

@@ -1,8 +1,22 @@
 import { prisma } from "@/lib/db";
-import { hasModuleAccess } from "@/lib/auth-utils";
+import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
 
+/** Globální admin nebo `ukoly: admin` — přehled a detail všech úkolů. */
+export async function canViewAllUkoly(userId: number): Promise<boolean> {
+  if (await isAdmin(userId)) return true;
+  return hasModuleAccess(userId, "ukoly", "admin");
+}
+
 export async function userCanViewUkol(userId: number, ukolId: number): Promise<boolean> {
+  if (await canViewAllUkoly(userId)) {
+    const row = await prisma.ukoly.findFirst({
+      where: { id: ukolId },
+      select: { id: true },
+    });
+    return row != null;
+  }
+
   const deptIds = await getUserDepartmentIds(userId);
   const row = await prisma.ukoly.findFirst({
     where: {
