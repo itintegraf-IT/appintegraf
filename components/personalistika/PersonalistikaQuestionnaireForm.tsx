@@ -2,6 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import { FileUp, Loader2 } from "lucide-react";
+import {
+  CvExtractMapperModal,
+  type CvExtractApiResult,
+} from "@/components/personalistika/CvExtractMapperModal";
+import {
+  type CvFormFieldKey,
+  getCvFormFieldMeta,
+} from "@/lib/personalistika/cv-field-registry";
+import type { ExtractedCvDraft } from "@/lib/personalistika/llm-extract-cv-draft";
 
 type Position = { id: number; name: string; is_active: number };
 type LanguageKey = "lang_en" | "lang_de" | "lang_fr" | "lang_ru" | "lang_pl";
@@ -65,6 +74,9 @@ export function PersonalistikaQuestionnaireForm({
   const cvPdfInputRef = useRef<HTMLInputElement>(null);
   const [extractLoading, setExtractLoading] = useState(false);
   const [extractInfo, setExtractInfo] = useState<string | null>(null);
+  const [extractResult, setExtractResult] = useState<CvExtractApiResult | null>(null);
+  const [cvPdfFile, setCvPdfFile] = useState<File | null>(null);
+  const [mapperOpen, setMapperOpen] = useState(false);
   const [positions, setPositions] = useState<Position[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -120,7 +132,41 @@ export function PersonalistikaQuestionnaireForm({
               .join("\n"),
           }
         : {}),
+      ...(ex.notes && !ex.additional_notes ? { notes: String(ex.notes) } : {}),
     }));
+  };
+
+  const applyManualMappings = (mappings: Partial<Record<CvFormFieldKey, string>>) => {
+    setForm((prev) => {
+      const updates: Partial<Pick<FormState, CvFormFieldKey>> = {};
+      for (const [key, value] of Object.entries(mappings) as [CvFormFieldKey, string][]) {
+        if (!value.trim()) continue;
+        if (key === "date_of_birth") updates.date_of_birth = value.slice(0, 10);
+        else updates[key] = value;
+      }
+      return { ...prev, ...updates };
+    });
+  };
+
+  const buildExtractInfo = (meta?: CvExtractApiResult["meta"]) => {
+    const parts = [
+      "Údaje z CV jsou připraveny – zvolte automatické doplnění nebo ruční mapování. Před uložením vše zkontrolujte (včetně souhlasu GDPR).",
+      meta?.usedFallback
+        ? `Použita záložní služba (${meta?.provider ?? "Gemini"}), protože primární Groq neodpověděl.`
+        : null,
+      meta?.provider && meta?.model ? `Poskytovatel: ${meta.provider}, model: ${meta.model}.` : null,
+      meta?.pageCount != null ? `Stran PDF: ${meta.pageCount}.` : null,
+      meta?.textLength != null ? `Délka textu: ${meta.textLength} znaků.` : null,
+    ].filter(Boolean);
+    return parts.join(" ");
+  };
+
+  const finishCvApply = (message?: string) => {
+    setExtractResult(null);
+    setCvPdfFile(null);
+    setMapperOpen(false);
+    if (message) setExtractInfo(message);
+    if (cvPdfInputRef.current) cvPdfInputRef.current.value = "";
   };
 
   const handleExtractFromCv = async () => {
@@ -146,25 +192,16 @@ export function PersonalistikaQuestionnaireForm({
           (typeof data.error === "string" ? data.error : "Vytěžení CV selhalo.") + hint
         );
       }
-      applyExtractedCv((data.extracted ?? {}) as Record<string, unknown>);
-      const meta = data.meta as {
-        model?: string;
-        provider?: string;
-        pageCount?: number;
-        textLength?: number;
-        usedFallback?: boolean;
-      } | undefined;
-      const parts = [
-        "Pole formuláře byla doplněna návrhem z AI – zkontrolujte je před uložením (včetně souhlasu GDPR).",
-        meta?.usedFallback
-          ? `Použita záložní služba (${meta?.provider ?? "Gemini"}), protože primární Groq neodpověděl.`
-          : null,
-        meta?.provider && meta?.model ? `Poskytovatel: ${meta.provider}, model: ${meta.model}.` : null,
-        meta?.pageCount != null ? `Stran PDF: ${meta.pageCount}.` : null,
-        meta?.textLength != null ? `Délka textu: ${meta.textLength} znaků.` : null,
-      ].filter(Boolean);
-      setExtractInfo(parts.join(" "));
-      if (cvPdfInputRef.current) cvPdfInputRef.current.value = "";
+      const result: CvExtractApiResult = {
+        extracted: (data.extracted ?? {}) as ExtractedCvDraft,
+        fields: Array.isArray(data.fields) ? data.fields : [],
+        sourceText: typeof data.sourceText === "string" ? data.sourceText : "",
+        sourceTextTruncated: Boolean(data.sourceTextTruncated),
+        meta: data.meta,
+      };
+      setExtractResult(result);
+      setCvPdfFile(file);
+      setExtractInfo(buildExtractInfo(result.meta));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Chyba při vytěžování CV.");
     } finally {
@@ -234,7 +271,42 @@ export function PersonalistikaQuestionnaireForm({
             extractLoading={extractLoading}
             onExtract={handleExtractFromCv}
           />
+          {extractResult && (
+            <CvExtractPreview
+              result={extractResult}
+              onAutomatic={() => {
+                applyExtractedCv(extractResult.extracted as unknown as Record<string, unknown>);
+                finishCvApply(
+                  "Pole formuláře byla automaticky doplněna návrhem z AI – zkontrolujte je před uložením."
+                );
+              }}
+              onManual={() => setMapperOpen(true)}
+              onDismiss={() => {
+                setExtractResult(null);
+                setCvPdfFile(null);
+              }}
+            />
+          )}
         </div>
+      )}
+
+      {extractResult && cvPdfFile && (
+        <CvExtractMapperModal
+          open={mapperOpen}
+          pdfFile={cvPdfFile}
+          result={extractResult}
+          onClose={() => setMapperOpen(false)}
+          onApplyMappings={(mappings) => {
+            applyManualMappings(mappings);
+            finishCvApply("Vybraná pole byla doplněna z ručního mapování – zkontrolujte je před uložením.");
+          }}
+          onApplyAllAutomatic={(extracted) => {
+            applyExtractedCv(extracted as unknown as Record<string, unknown>);
+            finishCvApply(
+              "Pole formuláře byla automaticky doplněna návrhem z AI – zkontrolujte je před uložením."
+            );
+          }}
+        />
       )}
 
       {mode === "public" && (
@@ -546,6 +618,90 @@ function NotesFields({
   );
 }
 
+function CvExtractPreview({
+  result,
+  onAutomatic,
+  onManual,
+  onDismiss,
+}: {
+  result: CvExtractApiResult;
+  onAutomatic: () => void;
+  onManual: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="mt-4 rounded-lg border border-gray-200 bg-white p-4">
+      <p className="text-sm font-medium text-gray-900">
+        Vytěženo {result.fields.length} hodnot z CV
+      </p>
+      <p className="mt-1 text-sm text-gray-600">Zvolte způsob doplnění formuláře:</p>
+      <CvExtractActions onAutomatic={onAutomatic} onManual={onManual} onDismiss={onDismiss} />
+      <div className="mt-4 overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500">
+              <th className="px-2 py-2 font-medium">Položka</th>
+              <th className="px-2 py-2 font-medium">Hodnota</th>
+              <th className="px-2 py-2 font-medium">Navržené pole</th>
+            </tr>
+          </thead>
+          <tbody>
+            {result.fields.map((item) => (
+              <tr key={item.id} className="border-b border-gray-100">
+                <td className="px-2 py-2 text-gray-800">{item.label}</td>
+                <td className="max-w-xs truncate px-2 py-2 text-gray-600" title={item.value}>
+                  {item.value}
+                </td>
+                <td className="px-2 py-2 text-gray-700">
+                  {item.suggestedFormField
+                    ? getCvFormFieldMeta(item.suggestedFormField).label
+                    : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function CvExtractActions({
+  onAutomatic,
+  onManual,
+  onDismiss,
+}: {
+  onAutomatic: () => void;
+  onManual: () => void;
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="mt-3 flex flex-wrap gap-2">
+      <button
+        type="button"
+        onClick={onAutomatic}
+        className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+      >
+        Automaticky doplnit
+      </button>
+      <button
+        type="button"
+        onClick={onManual}
+        className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+      >
+        Ruční mapování
+      </button>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+      >
+        Zrušit návrh
+      </button>
+    </div>
+  );
+}
+
 function CvExtractRow({
   cvPdfInputRef,
   extractLoading,
@@ -570,7 +726,7 @@ function CvExtractRow({
         className="inline-flex items-center gap-2 rounded-lg bg-gray-800 px-4 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-50"
       >
         {extractLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
-        {extractLoading ? "Vytěžuji…" : "Doplnit z CV"}
+        {extractLoading ? "Vytěžuji…" : "Vytěžit z CV"}
       </button>
     </div>
   );
