@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { formatDateTimeCz, formatDateTimeLocalForInput } from "@/lib/datetime-cz";
 
 type Dept = { id: number; name: string };
 type UserOpt = {
@@ -47,7 +48,7 @@ export function NewUkolForm({ departments, users }: Props) {
 
   const nowLocal = new Date();
   const defaultDue = new Date(nowLocal.getTime() + 24 * 60 * 60 * 1000);
-  const dueDefault = defaultDue.toISOString().slice(0, 16);
+  const dueDefault = formatDateTimeLocalForInput(defaultDue);
 
   const filteredUsers = useMemo(() => {
     if (selectedDepartmentIds.length === 0) return users;
@@ -122,13 +123,7 @@ export function NewUkolForm({ departments, users }: Props) {
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <label className="mb-1 block text-sm font-medium text-gray-700">Datum zadání</label>
         <div className="text-sm text-gray-600">
-          {nowLocal.toLocaleString("cs-CZ", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}{" "}
+          {formatDateTimeCz(nowLocal)}{" "}
           <span className="text-gray-400">(nastaveno automaticky při uložení)</span>
         </div>
       </div>

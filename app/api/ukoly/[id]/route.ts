@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { userCanViewUkol, userCanEditUkol } from "@/lib/ukoly-access";
 import { notifyUkolRecipients } from "@/lib/ukoly-notify";
+import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
 
 const includeDetail = {
   users_assignee: { select: { id: true, first_name: true, last_name: true } },
@@ -111,7 +112,7 @@ export async function PUT(
     let nextDue = existing.due_at;
     let dueChanged = false;
     if (typeof body.due_at === "string" && body.due_at.trim()) {
-      const d = new Date(body.due_at);
+      const d = parseDateTimeLocalInput(body.due_at);
       if (Number.isNaN(d.getTime())) {
         return NextResponse.json({ error: "Neplatný termín" }, { status: 400 });
       }

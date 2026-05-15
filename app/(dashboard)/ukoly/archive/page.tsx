@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
+import { formatDateTimeCz } from "@/lib/datetime-cz";
 import { ukolStatusBadgeClass, ukolStatusLabel } from "@/lib/ukoly-status";
 
 export const dynamic = "force-dynamic";
@@ -116,13 +117,7 @@ export default async function UkolyArchivePage({
               rows.map((r) => (
                 <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50/80">
                   <td className="px-4 py-3 text-gray-800">
-                    {new Date(r.updated_at).toLocaleString("cs-CZ", {
-                      day: "2-digit",
-                      month: "2-digit",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatDateTimeCz(new Date(r.updated_at))}
                   </td>
                   <td className="px-4 py-3 text-gray-700">{r.order_number ?? "—"}</td>
                   <td className="max-w-xs px-4 py-3">

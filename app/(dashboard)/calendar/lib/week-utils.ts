@@ -11,18 +11,8 @@ export function formatDateLocal(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-/**
- * Pro `<input type="datetime-local" />` — vždy místní kalendář a čas.
- * (toISOString() je v UTC a v CEST posune o jeden den oproti očekávání uživatele.)
- */
-export function formatDateTimeLocalForInput(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  const h = String(d.getHours()).padStart(2, "0");
-  const min = String(d.getMinutes()).padStart(2, "0");
-  return `${y}-${m}-${day}T${h}:${min}`;
-}
+/** @see lib/datetime-cz.ts */
+export { formatDateTimeLocalForInput } from "@/lib/datetime-cz";
 
 /**
  * Celodenní událost podle místních kalendářních dní (YYYY-MM-DD) → ISO do DB.

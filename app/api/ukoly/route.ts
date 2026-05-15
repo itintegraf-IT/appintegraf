@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
 import { notifyUkolRecipients } from "@/lib/ukoly-notify";
+import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
@@ -97,7 +98,7 @@ export async function POST(req: NextRequest) {
     if (!dueRaw) {
       return NextResponse.json({ error: "Vyplňte termín splnění" }, { status: 400 });
     }
-    const due_at = new Date(dueRaw);
+    const due_at = parseDateTimeLocalInput(dueRaw);
     if (Number.isNaN(due_at.getTime())) {
       return NextResponse.json({ error: "Neplatný termín" }, { status: 400 });
     }

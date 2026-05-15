@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import { formatDateTimeLocalForInput } from "@/lib/datetime-cz";
 import { ukolStatusLabel } from "@/lib/ukoly-status";
 
 type Dept = { id: number; name: string };
@@ -107,7 +108,7 @@ export function EditUkolForm({ id, initial, departments, users }: Props) {
     );
   }
 
-  const dueLocal = initial.due_at.slice(0, 16);
+  const dueLocal = formatDateTimeLocalForInput(new Date(initial.due_at));
 
   return (
     <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">

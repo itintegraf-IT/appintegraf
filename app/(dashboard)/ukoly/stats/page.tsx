@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
+import { formatDateTimeCz } from "@/lib/datetime-cz";
 import { ukolStatusLabel } from "@/lib/ukoly-status";
 
 export const dynamic = "force-dynamic";
@@ -136,13 +137,7 @@ export default async function UkolyStatsPage() {
                       #{r.id} {r.order_number ? `· ${r.order_number}` : ""} {r.body.replace(/\s+/g, " ").trim().slice(0, 40)}
                     </span>
                     <span className="shrink-0 text-xs text-gray-500">
-                      {new Date(r.due_at).toLocaleString("cs-CZ", {
-                        day: "2-digit",
-                        month: "2-digit",
-                        year: "numeric",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
+                      {formatDateTimeCz(new Date(r.due_at))}
                     </span>
                   </div>
                 </li>

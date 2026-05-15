@@ -6,6 +6,7 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { userCanViewUkol, userCanEditUkol, userCanCompleteUkol } from "@/lib/ukoly-access";
 import { DeleteUkolButton } from "./DeleteUkolButton";
 import { EditUkolForm } from "./EditUkolForm";
+import { formatDateTimeCz } from "@/lib/datetime-cz";
 import { ukolStatusBadgeClass, ukolStatusLabel } from "@/lib/ukoly-status";
 import { CompleteUkolButton } from "./CompleteUkolButton";
 import { StartUkolButton } from "./StartUkolButton";
@@ -84,7 +85,7 @@ export default async function UkolyDetailPage({ params }: PageProps) {
             <h2 className="text-xl font-semibold text-gray-900">Detail úkolu #{ukol.id}</h2>
             <p className="mt-1 text-sm text-gray-500">
               Zadal/a: {ukol.users_creator.first_name} {ukol.users_creator.last_name} ·{" "}
-              {new Date(ukol.assigned_at).toLocaleString("cs-CZ")}
+              {formatDateTimeCz(new Date(ukol.assigned_at))}
             </p>
           </div>
           <div className="flex gap-2">
@@ -100,7 +101,7 @@ export default async function UkolyDetailPage({ params }: PageProps) {
           <div>
             <dt className="text-xs font-medium uppercase text-gray-500">Termín splnění</dt>
             <dd className="mt-1 text-gray-900">
-              {new Date(ukol.due_at).toLocaleString("cs-CZ")}
+              {formatDateTimeCz(new Date(ukol.due_at))}
               {ukol.urgent && (
                 <span className="ml-2 rounded bg-amber-100 px-2 text-xs text-amber-900">urgentní</span>
               )}
