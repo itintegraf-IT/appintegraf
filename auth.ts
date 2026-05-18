@@ -2,6 +2,31 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { verifyLoginChallenge } from "@/lib/login-challenge";
+import { verifyTotpCodeEncrypted } from "@/lib/totp";
+import { consumeBackupCode } from "@/lib/totp-backup-codes";
+import { logAuthAudit, getRequestIp } from "@/lib/auth-audit";
+
+async function loadUserForSession(userId: number) {
+  const user = await prisma.users.findFirst({
+    where: {
+      id: userId,
+      OR: [{ is_active: true }, { is_active: null }],
+    },
+  });
+  if (!user) return null;
+
+  return {
+    id: String(user.id),
+    name: `${user.first_name} ${user.last_name}`.trim(),
+    email: user.email,
+    image: null,
+    username: user.username,
+    roleId: user.role_id ?? undefined,
+    departmentId: user.department_id ?? undefined,
+    passwordVersion: user.password_version ?? 1,
+  };
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
@@ -11,8 +36,85 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       credentials: {
         username: { label: "Uživatelské jméno", type: "text" },
         password: { label: "Heslo", type: "password" },
+        loginChallenge: { label: "Challenge", type: "text" },
+        totp: { label: "TOTP", type: "text" },
+        backupCode: { label: "Záložní kód", type: "text" },
       },
       authorize: async (credentials) => {
+        const loginChallenge = credentials?.loginChallenge as string | undefined;
+        const totp = credentials?.totp as string | undefined;
+        const backupCode = credentials?.backupCode as string | undefined;
+
+        // Druhý krok přihlášení – 2FA po úspěšném pre-login
+        if (loginChallenge) {
+          const challenge = await verifyLoginChallenge(loginChallenge);
+          if (!challenge) {
+            return null;
+          }
+
+          const user = await prisma.users.findFirst({
+            where: {
+              id: challenge.userId,
+              OR: [{ is_active: true }, { is_active: null }],
+            },
+            select: {
+              id: true,
+              password_version: true,
+              totp_enabled: true,
+              totp_secret_enc: true,
+              first_name: true,
+              last_name: true,
+              email: true,
+              username: true,
+              role_id: true,
+              department_id: true,
+            },
+          });
+
+          if (
+            !user ||
+            !user.totp_enabled ||
+            !user.totp_secret_enc ||
+            user.password_version !== challenge.passwordVersion
+          ) {
+            return null;
+          }
+
+          let verified = false;
+          let usedBackup = false;
+
+          if (backupCode?.trim()) {
+            verified = await consumeBackupCode(user.id, backupCode);
+            usedBackup = verified;
+          } else if (totp?.trim()) {
+            verified = await verifyTotpCodeEncrypted(user.totp_secret_enc, totp);
+          }
+
+          if (!verified) {
+            const ip = await getRequestIp();
+            await logAuthAudit({
+              userId: user.id,
+              targetUserId: user.id,
+              action: "totp_login_failed",
+              ipAddress: ip,
+            });
+            return null;
+          }
+
+          if (usedBackup) {
+            const ip = await getRequestIp();
+            await logAuthAudit({
+              userId: user.id,
+              targetUserId: user.id,
+              action: "totp_backup_used",
+              ipAddress: ip,
+            });
+          }
+
+          return await loadUserForSession(user.id);
+        }
+
+        // První krok – username + heslo (bez 2FA nebo přímý signIn po pre-login)
         const username = credentials?.username as string;
         const password = credentials?.password as string;
 
@@ -20,7 +122,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return null;
         }
 
-        // Stejná sémantika jako kontakty / phone-list: aktivní = true nebo NULL (legacy řádky)
         const user = await prisma.users.findFirst({
           where: {
             username: username.trim(),
@@ -38,6 +139,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           (await bcrypt.compare(password, user.password_hash));
 
         if (!isValid) {
+          return null;
+        }
+
+        if (user.totp_enabled && user.totp_secret_enc) {
+          return null;
+        }
+
+        if (user.totp_enrollment_required && !user.totp_enabled) {
           return null;
         }
 
@@ -64,9 +173,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.passwordVersion = (user as { passwordVersion?: number }).passwordVersion ?? 1;
       }
 
-      // Při každém obnovení JWT ověříme, že password_version v DB odpovídá tokenu.
-      // Pokud ne (uživatel zresetoval heslo nebo admin vynutil reset), token invalidujeme
-      // vrácením null – next-auth pak uživatele odhlásí.
       if (token?.id) {
         try {
           const idNum = parseInt(token.id as string, 10);
@@ -102,6 +208,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   session: {
     strategy: "jwt",
-    maxAge: 3600, // 1 hodina (stejně jako PHP SESSION_TIMEOUT)
+    maxAge: 3600,
   },
 });

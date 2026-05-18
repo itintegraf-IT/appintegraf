@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { redirectAdminDenied } from "@/lib/navigation-errors";
 import { isAdmin } from "@/lib/auth-utils";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -22,7 +23,7 @@ export default async function AdminPage() {
 
   const userId = parseInt(session.user.id, 10);
   if (!(await isAdmin(userId))) {
-    redirect("/contacts?error=Nemáte oprávnění");
+    redirectAdminDenied();
   }
 
   const [usersCount, equipmentCount, eventsCount, presentationsCount, testsCount] =

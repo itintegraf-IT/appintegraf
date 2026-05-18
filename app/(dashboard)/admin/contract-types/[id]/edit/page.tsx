@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { redirect, notFound } from "next/navigation";
+import { redirectAdminDenied } from "@/lib/navigation-errors";
 import { isAdmin } from "@/lib/auth-utils";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
@@ -15,7 +16,7 @@ export default async function AdminContractTypeEditPage({ params }: PageProps) {
 
   const userId = parseInt(session.user.id, 10);
   if (!(await isAdmin(userId))) {
-    redirect("/contacts?error=Nemáte oprávnění");
+    redirectAdminDenied();
   }
 
   const { id: idRaw } = await params;

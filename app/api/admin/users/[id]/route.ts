@@ -42,6 +42,7 @@ export async function GET(
       is_active: true,
       display_in_list: true,
       role_id: true,
+      totp_enabled: true,
       created_at: true,
       roles: { select: { id: true, name: true } },
       user_roles: {

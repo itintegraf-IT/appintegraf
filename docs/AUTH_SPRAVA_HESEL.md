@@ -146,9 +146,44 @@ Kompletní záznam obsahuje `user_id` (kdo akci provedl), `record_id` (kterého 
 - **Notifikační e-mail** – po každé změně hesla je žadatel informován mailem (ochrana před neoprávněnou změnou).
 - **Politika hesla** – `validatePassword` se volá na klientu i na všech serverových endpointech.
 
+## 2FA (TOTP / Google Authenticator)
+
+Migrace: `prisma/migrations/20260518_totp_2fa.sql`, `20260519_totp_enrollment_required.sql`  
+Spuštění: `npm run migrate:totp-2fa`
+
+### Správa (pouze administrátor)
+
+V editaci uživatele (`AdminUserForm` → panel 2FA):
+
+1. **Zapnout 2FA** – nastaví `totp_enrollment_required`; uživatel dokončí nastavení sám při příštím přihlášení (QR kód u sebe na obrazovce).
+2. **Vypnout 2FA** – smaže secret, kódy a požadavek; zvýší `password_version` (odhlášení všech session).
+
+Stavy: aktivní (`totp_enabled`) / čeká na nastavení uživatelem (`totp_enrollment_required` bez `totp_enabled`).
+
+API: `GET /api/admin/users/{id}/totp`, `POST .../require`, `POST .../disable`.
+
+### Přihlášení a první nastavení uživatele
+
+1. `POST /api/auth/pre-login` – ověří heslo.
+2. Pokud **čeká na nastavení** → `next: totp_enroll` + `challenge`:
+   - `POST /api/auth/totp/enroll` – QR kód
+   - `POST /api/auth/totp/confirm-enrollment` – ověření kódu, aktivace, záložní kódy
+   - `signIn` s `loginChallenge` + `totp`
+3. Pokud **2FA aktivní** → `next: totp` → TOTP nebo záložní kód.
+4. Jinak běžné přihlášení.
+
+### Audit (`module: auth`)
+
+| Akce | Popis |
+|------|-------|
+| `totp_required_by_admin` | Admin zapnul povinnost 2FA |
+| `totp_enrolled_by_user` | Uživatel dokončil nastavení při přihlášení |
+| `totp_disabled_by_admin` | 2FA vypnuta |
+| `totp_login_failed` | Neplatný kód |
+| `totp_backup_used` | Přihlášení záložním kódem |
+
 ## Co zatím není
 
-- **2FA (TOTP)** – připraveno k následné fázi; vyžaduje pole `totp_secret`, `totp_enabled` v `users`, stránku pro zapnutí/vypnutí a mezikrok v přihlášení.
 - **Cron úklid expirovaných tokenů** – dnes se staré tokeny přemazávají při vytvoření nového; volitelně je možné přidat periodický `DELETE FROM user_tokens WHERE expires_at < NOW() - INTERVAL 30 DAY`.
 
 ## Spuštění migrace
@@ -162,4 +197,10 @@ Nebo jednorázově přes Prismu:
 
 ```bash
 npx prisma db push
+```
+
+Pro 2FA spusťte také:
+
+```sql
+SOURCE prisma/migrations/20260518_totp_2fa.sql;
 ```

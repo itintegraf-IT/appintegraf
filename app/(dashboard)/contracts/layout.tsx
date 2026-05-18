@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
+import { redirectWithError } from "@/lib/navigation-errors";
 
 export default async function ContractsLayout({
   children,
@@ -15,7 +16,7 @@ export default async function ContractsLayout({
   const userId = parseInt(session.user.id, 10);
   const allowed = await hasModuleAccess(userId, "contracts", "read");
   if (!allowed) {
-    redirect("/?error=Nemáte oprávnění");
+    redirectWithError("/", "NO_PERMISSION");
   }
 
   return <>{children}</>;

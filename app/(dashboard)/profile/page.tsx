@@ -15,6 +15,7 @@ type ProfileData = {
   position: string | null;
   department_name: string | null;
   last_login: string | null;
+  totp_enabled?: boolean;
   created_at: string;
 };
 
@@ -133,6 +134,11 @@ export default function ProfilePage() {
           <p className="font-medium">{profile.username}</p>
           {profile.department_name && (
             <p className="mt-1 text-sm text-gray-500">Oddělení: {profile.department_name}</p>
+          )}
+          {profile.totp_enabled && (
+            <p className="mt-2 text-sm text-emerald-700">
+              Účet má aktivní dvoufaktorové ověření (2FA).
+            </p>
           )}
         </div>
 

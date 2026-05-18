@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { redirectAdminDenied } from "@/lib/navigation-errors";
 import { isAdmin } from "@/lib/auth-utils";
 import { SharedMailForm } from "../SharedMailForm";
 import Link from "next/link";
@@ -9,7 +10,7 @@ export default async function NewSharedMailPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const userId = parseInt(session.user.id, 10);
-  if (!(await isAdmin(userId))) redirect("/contacts?error=Nemáte oprávnění");
+  if (!(await isAdmin(userId))) redirectAdminDenied();
 
   return (
     <>

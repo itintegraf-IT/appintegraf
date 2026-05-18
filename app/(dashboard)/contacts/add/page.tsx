@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
+import { redirectAdminDenied } from "@/lib/navigation-errors";
 import { ContactForm } from "../ContactForm";
 
 export default async function AddContactPage() {
@@ -8,7 +9,7 @@ export default async function AddContactPage() {
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
 
   if (!(await hasModuleAccess(userId, "contacts", "write"))) {
-    redirect("/contacts?error=Nemáte oprávnění");
+    redirectAdminDenied();
   }
 
   return (
