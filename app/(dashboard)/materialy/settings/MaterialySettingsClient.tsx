@@ -85,11 +85,16 @@ export default function MaterialySettingsClient() {
       </div>
       {error && <p className="text-sm text-red-600">{error}</p>}
       <ul className="divide-y rounded-lg border border-gray-200 bg-white">
-        {subs.map((s) => (
-          <li key={s.id} className="px-4 py-2 text-sm">
-            {s.name}
-          </li>
-        ))}
+        {subs.map((s) => {
+          const catLabel =
+            MATERIAL_CATEGORIES.find((c) => c.code === s.category_code)?.label ?? s.category_code;
+          return (
+            <li key={s.id} className="px-4 py-2 text-sm">
+              <span className="font-medium">{s.name}</span>
+              <span className="ml-2 text-xs text-gray-400">({catLabel})</span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

@@ -3,7 +3,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canReadMaterialCatalog, canWriteMaterialCatalog } from "@/lib/materialy/access";
 import { isMaterialCategoryCode } from "@/lib/materialy/categories";
-import { logMaterialyAudit } from "@/lib/materialy/audit";
+import { logMaterialyAuditSafe } from "@/lib/materialy/audit";
+import { parseMaterialOptionalDate } from "@/lib/materialy/dates";
 import { assertSubcategoryAllowed } from "@/lib/materialy/subcategory-guard";
 
 export async function GET(
@@ -128,20 +129,16 @@ export async function PUT(
         is_active: body.is_active !== undefined ? !!body.is_active : existing.is_active,
         valid_until:
           body.valid_until !== undefined
-            ? body.valid_until
-              ? new Date(String(body.valid_until))
-              : null
+            ? parseMaterialOptionalDate(body.valid_until)
             : existing.valid_until,
         certificate_valid_until:
           body.certificate_valid_until !== undefined
-            ? body.certificate_valid_until
-              ? new Date(String(body.certificate_valid_until))
-              : null
+            ? parseMaterialOptionalDate(body.certificate_valid_until)
             : existing.certificate_valid_until,
       },
     });
 
-    await logMaterialyAudit({
+    await logMaterialyAuditSafe({
       userId,
       action: "update",
       tableName: "materials",
@@ -186,7 +183,7 @@ export async function DELETE(
     data: { is_active: false },
   });
 
-  await logMaterialyAudit({
+  await logMaterialyAuditSafe({
     userId,
     action: "deactivate",
     tableName: "materials",

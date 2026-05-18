@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { canReadMaterialCatalog, canWriteMaterialCatalog } from "@/lib/materialy/access";
-import { logMaterialyAudit } from "@/lib/materialy/audit";
+import { logMaterialyAuditSafe } from "@/lib/materialy/audit";
 import {
   MATERIALY_ALLOWED_MIME,
   MATERIALY_MAX_BYTES,
@@ -116,7 +116,7 @@ export async function POST(
       include: { users: { select: { first_name: true, last_name: true } } },
     });
 
-    await logMaterialyAudit({
+    await logMaterialyAuditSafe({
       userId,
       action: "upload:material_file",
       tableName: "file_uploads",

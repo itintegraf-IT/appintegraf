@@ -1231,6 +1231,12 @@ model materials {
   is_active              Boolean                  @default(true)
   valid_until            DateTime?                @db.DateTime(0)
   certificate_valid_until DateTime?               @db.DateTime(0)
+  thickness_label        String?                  @db.VarChar(80)
+  hex_color              String?                  @db.VarChar(7)
+  cmyk_c                 Int?
+  cmyk_m                 Int?
+  cmyk_y                 Int?
+  cmyk_k                 Int?
   notes                  String?                  @db.Text
   legacy_source          String?                  @db.VarChar(30)
   legacy_id              Int?

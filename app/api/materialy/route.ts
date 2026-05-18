@@ -3,9 +3,11 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canReadMaterialCatalog, canWriteMaterialCatalog } from "@/lib/materialy/access";
 import { isMaterialCategoryCode } from "@/lib/materialy/categories";
-import { logMaterialyAudit } from "@/lib/materialy/audit";
 import { materialsTextSearchWhere } from "@/lib/materialy/text-search";
 import { assertSubcategoryAllowed } from "@/lib/materialy/subcategory-guard";
+import { parseMaterialOptionalDate } from "@/lib/materialy/dates";
+import { materialyCreateErrorMessage } from "@/lib/materialy/prisma-errors";
+import { logMaterialyAuditSafe } from "@/lib/materialy/audit";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -97,14 +99,12 @@ export async function POST(req: NextRequest) {
         cas_number: body.cas_number ? String(body.cas_number).trim() : null,
         notes: body.notes ? String(body.notes).trim() : null,
         is_active: body.is_active !== false,
-        valid_until: body.valid_until ? new Date(String(body.valid_until)) : null,
-        certificate_valid_until: body.certificate_valid_until
-          ? new Date(String(body.certificate_valid_until))
-          : null,
+        valid_until: parseMaterialOptionalDate(body.valid_until),
+        certificate_valid_until: parseMaterialOptionalDate(body.certificate_valid_until),
       },
     });
 
-    await logMaterialyAudit({
+    await logMaterialyAuditSafe({
       userId,
       action: "create",
       tableName: "materials",
@@ -115,6 +115,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ material: row });
   } catch (e) {
     console.error("materialy POST:", e);
-    return NextResponse.json({ error: "Chyba při vytváření" }, { status: 500 });
+    return NextResponse.json({ error: materialyCreateErrorMessage(e) }, { status: 500 });
   }
 }

@@ -20,3 +20,12 @@ export async function logMaterialyAudit(params: {
     },
   });
 }
+
+/** Audit nesmí zablokovat hlavní operaci (např. chybějící tabulka audit_log v některých DB). */
+export async function logMaterialyAuditSafe(params: Parameters<typeof logMaterialyAudit>[0]) {
+  try {
+    await logMaterialyAudit(params);
+  } catch (e) {
+    console.error("materialy audit log failed:", e);
+  }
+}

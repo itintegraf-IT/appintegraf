@@ -8,6 +8,7 @@ import {
   isMaterialCategoryCode,
   type MaterialCategoryCode,
 } from "@/lib/materialy/categories";
+import { MaterialyDeferredAttachmentFields } from "../_components/MaterialyAttachmentFields";
 
 type Subcat = { id: number; name: string };
 
@@ -44,9 +45,12 @@ function MaterialAddForm() {
   const [subsLoading, setSubsLoading] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingDocType, setPendingDocType] = useState("SDS");
 
   useEffect(() => {
     let cancelled = false;
+    setSubs([]);
     setSubsLoading(true);
     void (async () => {
       try {
@@ -103,12 +107,34 @@ function MaterialAddForm() {
       setLoading(false);
       return;
     }
+    if (pendingFile) {
+      const fd = new FormData();
+      fd.append("file", pendingFile);
+      fd.append("document_type", pendingDocType);
+      const up = await fetch(`/api/materialy/${created.id}/files`, { method: "POST", body: fd });
+      const upData = await up.json().catch(() => ({}));
+      if (!up.ok) {
+        setError(
+          typeof upData.error === "string"
+            ? `${upData.error} (materiál byl vytvořen, dokument nahrajte na detailu.)`
+            : "Materiál byl vytvořen, ale dokument se nepodařilo nahrát — zkuste to na detailu."
+        );
+        setLoading(false);
+        router.push(`/materialy/${created.id}`);
+        return;
+      }
+    }
     router.push(`/materialy/${created.id}`);
   };
 
   return (
     <form onSubmit={submit} className="max-w-lg space-y-4 rounded-xl border border-gray-200 bg-white p-6">
       {error && <p className="text-sm text-red-600">{error}</p>}
+      <p className="text-xs text-gray-600">
+        Podtypy se načítají podle zvolené kategorie (papír / fólie / barvy / laky se nemíchají). Úpravu nebo skrytí
+        záznamu provedete po uložení na{" "}
+        <span className="font-medium">detailu materiálu</span> nebo přes odkaz „Upravit“ v seznamu.
+      </p>
       <div>
         <label className="mb-1 block text-sm font-medium">Kategorie</label>
         <select
@@ -242,6 +268,18 @@ function MaterialAddForm() {
           />
         </div>
       </div>
+
+      <MaterialyDeferredAttachmentFields
+        docType={pendingDocType}
+        onDocTypeChange={setPendingDocType}
+        onFileChange={setPendingFile}
+      />
+      {pendingFile ? (
+        <p className="text-xs text-gray-600">
+          Vybraný soubor: <span className="font-medium">{pendingFile.name}</span>
+        </p>
+      ) : null}
+
       <button
         type="submit"
         disabled={loading}

@@ -94,6 +94,7 @@ export function MaterialEditForm({ materialId }: { materialId: number }) {
   useEffect(() => {
     if (!form) return;
     let cancelled = false;
+    setSubs([]);
     setSubsLoading(true);
     void (async () => {
       try {

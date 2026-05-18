@@ -17,10 +17,12 @@ export async function GET(req: NextRequest) {
 
   const category = req.nextUrl.searchParams.get("category");
   try {
+    const hasCategory = category != null && category !== "" && isMaterialCategoryCode(category);
     const subcategories = await prisma.material_subcategories.findMany({
       where: {
-        ...(category && isMaterialCategoryCode(category) ? { category_code: category } : {}),
+        ...(hasCategory ? { category_code: category } : {}),
         is_active: true,
+        ...(hasCategory ? { parent_id: null } : {}),
       },
       orderBy: [{ sort_order: "asc" }, { name: "asc" }],
     });
