@@ -11,6 +11,10 @@ import { ConfirmMoveModal } from "./ConfirmMoveModal";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import {
   buildEventMetaLines,
+  calendarEventGlobalAllDayTooltip,
+  calendarEventTooltipTitle,
+  getCalendarEventPrimaryLabel,
+  getCalendarGlobalAllDayCompactLabel,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
 
@@ -415,6 +419,7 @@ export function WeekCalendarGrid({
                   })
                   .map((e) => {
                     const barColor = e.color ?? "#DC2626";
+                    const isGlobalAllDay = eventMetaMode !== "hidden";
                     const pendingApproval = e.approval_status === "pending" && e.deputy_id;
                     const deputyApproved = e.approval_status === "deputy_approved";
                     const isApproved = e.approval_status === "approved";
@@ -422,15 +427,17 @@ export function WeekCalendarGrid({
                       ? `${e.users_deputy.first_name} ${e.users_deputy.last_name}`
                       : null;
                     const canDrag = e.created_by === userId && e.ukoly_task_id == null;
-                    const eventContent = (
+                    const eventContent = isGlobalAllDay ? (
+                      getCalendarGlobalAllDayCompactLabel(e)
+                    ) : (
                       <>
-                        {e.title}
+                        {getCalendarEventPrimaryLabel(e)}
                         {pendingApproval && (
                           <span className="ml-1 block text-[10px] opacity-90">
                             <span className="rounded bg-amber-500/80 px-1 py-0.5 text-white">
                               Čeká na schválení
                             </span>
-                            {deputyName && eventMetaMode === "hidden" && (
+                            {deputyName && (
                               <span className="ml-1 text-gray-600">→ {deputyName}</span>
                             )}
                           </span>
@@ -451,8 +458,12 @@ export function WeekCalendarGrid({
                         )}
                       </>
                     );
-                    const barClass =
-                      "w-full min-h-8 shrink-0 border-l-4 pl-2 pr-1 py-1 text-left text-xs font-medium";
+                    const tooltipTitle = isGlobalAllDay
+                      ? calendarEventGlobalAllDayTooltip(e, eventMetaMode)
+                      : calendarEventTooltipTitle(e, eventMetaMode);
+                    const barClass = isGlobalAllDay
+                      ? "w-full min-h-6 shrink-0 truncate border-l-4 pl-2 pr-1 py-0.5 text-left text-xs font-medium"
+                      : "w-full min-h-8 shrink-0 border-l-4 pl-2 pr-1 py-1 text-left text-xs font-medium";
                     return canDrag ? (
                       <div
                         key={calendarGridItemKey(e)}
@@ -462,7 +473,8 @@ export function WeekCalendarGrid({
                           ev.stopPropagation();
                           router.push(calendarGridItemHref(e));
                         }}
-                        className={`${barClass} block cursor-grab overflow-hidden rounded-sm hover:opacity-90 active:cursor-grabbing ${eventMetaMode === "hidden" ? "truncate" : ""}`}
+                        title={tooltipTitle}
+                        className={`${barClass} block cursor-grab overflow-hidden rounded-sm hover:opacity-90 active:cursor-grabbing`}
                         style={{
                           borderLeftColor: barColor,
                           backgroundColor: `${barColor}20`,
@@ -470,14 +482,17 @@ export function WeekCalendarGrid({
                         }}
                       >
                         {eventContent}
-                        <EventMetaSubtext e={e} mode={eventMetaMode} />
+                        {!isGlobalAllDay && (
+                          <EventMetaSubtext e={e} mode={eventMetaMode} />
+                        )}
                       </div>
                     ) : (
                       <Link
                         key={calendarGridItemKey(e)}
                         href={calendarGridItemHref(e)}
                         onClick={(ev) => ev.stopPropagation()}
-                        className={`${barClass} block overflow-hidden rounded-sm hover:opacity-90 ${eventMetaMode === "hidden" ? "truncate" : ""}`}
+                        title={tooltipTitle}
+                        className={`${barClass} block overflow-hidden rounded-sm hover:opacity-90`}
                         style={{
                           borderLeftColor: barColor,
                           backgroundColor: `${barColor}20`,
@@ -485,7 +500,9 @@ export function WeekCalendarGrid({
                         }}
                       >
                         {eventContent}
-                        <EventMetaSubtext e={e} mode={eventMetaMode} />
+                        {!isGlobalAllDay && (
+                          <EventMetaSubtext e={e} mode={eventMetaMode} />
+                        )}
                       </Link>
                     );
                   })}
@@ -599,7 +616,7 @@ export function WeekCalendarGrid({
                     const timedEventContent = (
                       <>
                         <span className="block truncate">
-                          {e.title}
+                          {getCalendarEventPrimaryLabel(e)}
                           {pendingApproval && (
                             <span className="ml-1 inline-block rounded bg-amber-500/90 px-1 text-[9px] text-white">
                               Čeká na schválení
@@ -648,6 +665,7 @@ export function WeekCalendarGrid({
                           ev.stopPropagation();
                           router.push(calendarGridItemHref(e));
                         }}
+                        title={calendarEventTooltipTitle(e, eventMetaMode)}
                         className="absolute left-1 right-1 z-10 cursor-grab overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90 active:cursor-grabbing"
                         style={timedStyle}
                       >
@@ -658,6 +676,7 @@ export function WeekCalendarGrid({
                         key={`${calendarGridItemKey(e)}-${d.toDateString()}`}
                         href={calendarGridItemHref(e)}
                         onClick={(ev) => ev.stopPropagation()}
+                        title={calendarEventTooltipTitle(e, eventMetaMode)}
                         className="absolute left-1 right-1 z-10 overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90"
                         style={timedStyle}
                       >
