@@ -474,6 +474,7 @@ model file_uploads {
   file_size         Int
   mime_type         String   @db.VarChar(100)
   module            String   @db.VarChar(50)
+  document_type     String?  @db.VarChar(30)
   /// ID záznamu v cílové tabulce (např. contracts.id pro module = contracts)
   record_id         Int?
   uploaded_by       Int
@@ -1091,7 +1092,11 @@ model iml_products {
   pieces_per_box       Int?
   pieces_per_pallet    Int?
   foil_type            String?   @db.VarChar(255)
+  foil_material_id     Int?
   color_coverage       String?   @db.VarChar(255)
+  color_material_id    Int?
+  paper_material_id    Int?
+  lacquer_material_id  Int?
   print_note           String?   @db.Text
   image_data           Bytes?    @db.LongBlob
   pdf_data             Bytes?    @db.LongBlob
@@ -1111,13 +1116,21 @@ model iml_products {
   created_at           DateTime  @default(now()) @db.DateTime(0)
   updated_at           DateTime  @updatedAt @db.DateTime(0)
 
-  iml_customers   iml_customers?    @relation(fields: [customer_id], references: [id], onDelete: SetNull)
-  iml_order_items iml_order_items[]
+  iml_customers    iml_customers? @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+  iml_order_items  iml_order_items[]
+  foil_material    materials?      @relation("ImlProductFoil", fields: [foil_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  color_material   materials?      @relation("ImlProductColor", fields: [color_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  paper_material   materials?      @relation("ImlProductPaper", fields: [paper_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  lacquer_material materials?      @relation("ImlProductLacquer", fields: [lacquer_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([customer_id])
   @@index([ig_code])
   @@index([sku])
   @@index([item_status])
+  @@index([foil_material_id], map: "idx_iml_products_foil_material")
+  @@index([color_material_id], map: "idx_iml_products_color_material")
+  @@index([paper_material_id], map: "idx_iml_products_paper_material")
+  @@index([lacquer_material_id], map: "idx_iml_products_lacquer_material")
   @@map("iml_products")
 }
 
@@ -1172,6 +1185,70 @@ model iml_custom_fields {
   @@unique([entity, field_key])
   @@index([entity])
   @@map("iml_custom_fields")
+}
+
+// ─── Modul Katalog materiálů ────────────────────────────────────────────
+
+model material_categories {
+  code                   String                   @id @db.VarChar(20)
+  label                  String                   @db.VarChar(100)
+  sort_order             Int                      @default(0)
+  material_subcategories material_subcategories[]
+  materials              materials[]
+
+  @@map("material_categories")
+}
+
+model material_subcategories {
+  id                     Int                      @id @default(autoincrement())
+  category_code          String                   @db.VarChar(20)
+  parent_id              Int?
+  name                   String                   @db.VarChar(255)
+  sort_order             Int                      @default(0)
+  is_active              Boolean                  @default(true)
+  created_at             DateTime                 @default(now()) @db.DateTime(0)
+  updated_at             DateTime                 @updatedAt @db.DateTime(0)
+  material_categories    material_categories      @relation(fields: [category_code], references: [code], onDelete: Restrict, onUpdate: NoAction)
+  parent                 material_subcategories?  @relation("MaterialSubcategoryTree", fields: [parent_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  children               material_subcategories[] @relation("MaterialSubcategoryTree")
+  materials              materials[]
+
+  @@index([category_code], map: "idx_material_subcat_category")
+  @@index([parent_id], map: "idx_material_subcat_parent")
+  @@map("material_subcategories")
+}
+
+model materials {
+  id                     Int                      @id @default(autoincrement())
+  category_code          String                   @db.VarChar(20)
+  subcategory_id         Int?
+  name                   String                   @db.VarChar(255)
+  code                   String?                  @db.VarChar(100)
+  manufacturer           String?                  @db.VarChar(255)
+  supplier               String?                  @db.VarChar(255)
+  description            String?                  @db.Text
+  cas_number               String?                  @db.VarChar(50)
+  is_active              Boolean                  @default(true)
+  valid_until            DateTime?                @db.DateTime(0)
+  certificate_valid_until DateTime?               @db.DateTime(0)
+  notes                  String?                  @db.Text
+  legacy_source          String?                  @db.VarChar(30)
+  legacy_id              Int?
+  created_at             DateTime                 @default(now()) @db.DateTime(0)
+  updated_at             DateTime                 @updatedAt @db.DateTime(0)
+  material_categories    material_categories      @relation(fields: [category_code], references: [code], onDelete: Restrict, onUpdate: NoAction)
+  material_subcategories material_subcategories?  @relation(fields: [subcategory_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  iml_products_foil      iml_products[]            @relation("ImlProductFoil")
+  iml_products_color     iml_products[]           @relation("ImlProductColor")
+  iml_products_paper     iml_products[]           @relation("ImlProductPaper")
+  iml_products_lacquer     iml_products[]           @relation("ImlProductLacquer")
+
+  @@index([category_code], map: "idx_materials_category")
+  @@index([subcategory_id], map: "idx_materials_subcategory")
+  @@index([name], map: "idx_materials_name")
+  @@index([code], map: "idx_materials_code")
+  @@index([legacy_source, legacy_id], map: "idx_materials_legacy")
+  @@map("materials")
 }
 
 // ─── Modul Výroba (IG52 migrace) ────────────────────────────────────────

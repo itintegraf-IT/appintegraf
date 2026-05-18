@@ -43,6 +43,7 @@ import {
   ChevronDown,
   ClipboardList,
   BriefcaseBusiness,
+  Layers,
 } from "lucide-react";
 import {
   Tooltip,
@@ -442,6 +443,7 @@ const navItems: NavItem[] = [
   { href: "/planovani", icon: CalendarDays, label: "Plánování výroby", module: "planovani" },
   { href: "/vyroba", icon: Factory, label: "Výroba", module: "vyroba" },
   { href: "/iml", icon: Package, label: "IML", module: "iml" },
+  { href: "/materialy", icon: Layers, label: "Katalog materiálů", module: "materialy", isActive: (p) => p.startsWith("/materialy") },
   { href: "/kiosk", icon: Tv, label: "Kiosk Monitory", module: "kiosk" },
   { href: "/phone-list", icon: Phone, label: "Telefonní seznam", module: null },
   { href: "/training", icon: GraduationCap, label: "IT Školení", module: "training" },

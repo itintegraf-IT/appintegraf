@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { ProductFilesUpload } from "../_components/ProductFilesUpload";
 import { ProductFilesUploadPlaceholder } from "../_components/ProductFilesUploadPlaceholder";
 import { CustomFieldsFormSection } from "../../_components/CustomFieldsFormSection";
+import { MaterialSelect } from "../../_components/MaterialSelect";
 
 type Customer = { id: number; name: string };
 
@@ -30,6 +31,10 @@ export default function ImlProductAddPage() {
     positions_on_sheet: "",
     pieces_per_box: "",
     pieces_per_pallet: "",
+    foil_material_id: "",
+    color_material_id: "",
+    paper_material_id: "",
+    lacquer_material_id: "",
     foil_type: "",
     color_coverage: "",
     print_note: "",
@@ -65,6 +70,10 @@ export default function ImlProductAddPage() {
         body: JSON.stringify({
           ...form,
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
+          foil_material_id: form.foil_material_id ? parseInt(form.foil_material_id, 10) : null,
+          color_material_id: form.color_material_id ? parseInt(form.color_material_id, 10) : null,
+          paper_material_id: form.paper_material_id ? parseInt(form.paper_material_id, 10) : null,
+          lacquer_material_id: form.lacquer_material_id ? parseInt(form.lacquer_material_id, 10) : null,
           positions_on_sheet: form.positions_on_sheet ? parseInt(form.positions_on_sheet, 10) : null,
           pieces_per_box: form.pieces_per_box ? parseInt(form.pieces_per_box, 10) : null,
           pieces_per_pallet: form.pieces_per_pallet ? parseInt(form.pieces_per_pallet, 10) : null,
@@ -288,24 +297,37 @@ export default function ImlProductAddPage() {
           <div>
             <h3 className="mb-3 text-sm font-semibold text-gray-700">Materiály a tisk</h3>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Druh fólie</label>
-                <input
-                  type="text"
-                  value={form.foil_type}
-                  onChange={(e) => setForm({ ...form, foil_type: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">Barevnost / pokrytí</label>
-                <input
-                  type="text"
-                  value={form.color_coverage}
-                  onChange={(e) => setForm({ ...form, color_coverage: e.target.value })}
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                />
-              </div>
+              <MaterialSelect
+                category="PAPER"
+                label="Papír"
+                value={form.paper_material_id}
+                onChange={(id) => setForm({ ...form, paper_material_id: id })}
+              />
+              <MaterialSelect
+                category="FOIL"
+                label="Druh fólie"
+                value={form.foil_material_id}
+                onChange={(id, label) =>
+                  setForm({ ...form, foil_material_id: id, foil_type: label || form.foil_type })
+                }
+              />
+              <MaterialSelect
+                category="COLOR"
+                label="Barevnost (katalog)"
+                value={form.color_material_id}
+                onChange={(id, label) =>
+                  setForm({ ...form, color_material_id: id, color_coverage: label || form.color_coverage })
+                }
+                coverageValue={form.color_coverage}
+                onCoverageChange={(v) => setForm({ ...form, color_coverage: v })}
+                coverageLabel="Poznámka / % pokrytí (volitelné)"
+              />
+              <MaterialSelect
+                category="LACQUER"
+                label="Lak"
+                value={form.lacquer_material_id}
+                onChange={(id) => setForm({ ...form, lacquer_material_id: id })}
+              />
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">EAN kód</label>
                 <input

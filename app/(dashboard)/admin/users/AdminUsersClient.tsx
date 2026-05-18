@@ -16,6 +16,7 @@ import {
   GraduationCap,
   ClipboardList,
   BriefcaseBusiness,
+  Layers,
 } from "lucide-react";
 
 const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -25,6 +26,7 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   planovani: CalendarDays,
   vyroba: Factory,
   iml: Package,
+  materialy: Layers,
   kiosk: Tv,
   training: GraduationCap,
   ukoly: ClipboardList,
@@ -38,6 +40,7 @@ const MODULE_LABELS: Record<string, string> = {
   planovani: "Plánování výroby",
   vyroba: "Výroba",
   iml: "IML",
+  materialy: "Katalog materiálů",
   kiosk: "Kiosk Monitory",
   training: "IT Školení",
   ukoly: "Úkoly",
