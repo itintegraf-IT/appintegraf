@@ -59,7 +59,11 @@ export async function GET(req: NextRequest) {
     pieces_per_box: p.pieces_per_box ?? "",
     pieces_per_pallet: p.pieces_per_pallet ?? "",
     foil_type: p.foil_type ?? "",
+    foil_material_id: p.foil_material_id ?? "",
     color_coverage: p.color_coverage ?? "",
+    color_material_id: p.color_material_id ?? "",
+    paper_material_id: p.paper_material_id ?? "",
+    lacquer_material_id: p.lacquer_material_id ?? "",
     ean_code: p.ean_code ?? "",
     item_status: p.item_status ?? "",
     approval_status: p.approval_status ?? "",
@@ -82,7 +86,8 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  const header = "id;ig_code;ig_short_name;client_code;client_name;sku;customer_name;requester;label_shape_code;product_format;die_cut_tool_code;assembly_code;positions_on_sheet;pieces_per_box;pieces_per_pallet;foil_type;color_coverage;ean_code;item_status;approval_status;has_print_sample;is_active;created_at;updated_at";
+  const header =
+    "id;ig_code;ig_short_name;client_code;client_name;sku;customer_name;requester;label_shape_code;product_format;die_cut_tool_code;assembly_code;positions_on_sheet;pieces_per_box;pieces_per_pallet;foil_type;foil_material_id;color_coverage;color_material_id;paper_material_id;lacquer_material_id;ean_code;item_status;approval_status;has_print_sample;is_active;created_at;updated_at";
   type CsvRow = (typeof rows)[number];
   const csvRows = rows.map((r: CsvRow) =>
     [
@@ -102,7 +107,11 @@ export async function GET(req: NextRequest) {
       r.pieces_per_box,
       r.pieces_per_pallet,
       escapeCsv(r.foil_type),
+      r.foil_material_id,
       escapeCsv(r.color_coverage),
+      r.color_material_id,
+      r.paper_material_id,
+      r.lacquer_material_id,
       escapeCsv(r.ean_code),
       escapeCsv(r.item_status),
       escapeCsv(r.approval_status),

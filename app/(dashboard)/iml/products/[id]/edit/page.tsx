@@ -10,7 +10,6 @@ import ProductFormSections, {
   emptyProductForm,
   type ProductFormState,
   type CustomerOption,
-  type FoilOption,
 } from "../../_components/ProductFormSections";
 import type { ProductColorRow } from "../../_components/ProductPantoneEditor";
 
@@ -34,7 +33,6 @@ export default function ImlProductEditPage() {
   const params = useParams();
   const id = params.id as string;
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
-  const [foils, setFoils] = useState<FoilOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
@@ -44,24 +42,16 @@ export default function ImlProductEditPage() {
   const [hasImage, setHasImage] = useState(false);
   const [hasPdf, setHasPdf] = useState(false);
 
-  const setField = <K extends keyof ProductFormState>(
-    k: K,
-    v: ProductFormState[K]
-  ) => setForm((f) => ({ ...f, [k]: v }));
+  const setField = <K extends keyof ProductFormState>(k: K, v: ProductFormState[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
     Promise.all([
       fetch("/api/iml/customers").then((r) => r.json()),
-      fetch("/api/iml/foils").then((r) => r.json()),
       fetch(`/api/iml/products/${id}`).then((r) => r.json()),
     ])
-      .then(([custData, foilData, prodData]: [
-        { customers?: CustomerOption[] },
-        { foils?: FoilOption[] },
-        Product
-      ]) => {
+      .then(([custData, prodData]: [{ customers?: CustomerOption[] }, Product]) => {
         setCustomers(custData.customers ?? []);
-        setFoils(foilData.foils ?? []);
         const p = prodData as Record<string, unknown>;
         if (p?.id) {
           const s = (k: string) => (p[k] != null ? String(p[k]) : "");
@@ -82,7 +72,10 @@ export default function ImlProductEditPage() {
             labels_per_sheet: si("labels_per_sheet"),
             pieces_per_box: si("pieces_per_box"),
             pieces_per_pallet: si("pieces_per_pallet"),
-            foil_id: si("foil_id"),
+            foil_material_id: si("foil_material_id"),
+            color_material_id: si("color_material_id"),
+            paper_material_id: si("paper_material_id"),
+            lacquer_material_id: si("lacquer_material_id"),
             foil_type: s("foil_type"),
             color_coverage: s("color_coverage"),
             ean_code: s("ean_code"),
@@ -99,16 +92,14 @@ export default function ImlProductEditPage() {
           setHasImage(!!p.has_image);
           setHasPdf(!!p.has_pdf);
           if (Array.isArray(p.iml_product_colors)) {
-            const rows: ProductColorRow[] = (p.iml_product_colors as ProductColorResp[]).map(
-              (r, i) => ({
-                pantone_id: r.pantone_id,
-                code: r.iml_pantone_colors?.code ?? "",
-                name: r.iml_pantone_colors?.name ?? null,
-                hex: r.iml_pantone_colors?.hex ?? null,
-                coverage_pct: String(r.coverage_pct),
-                sort_order: r.sort_order ?? i,
-              })
-            );
+            const rows: ProductColorRow[] = (p.iml_product_colors as ProductColorResp[]).map((r, i) => ({
+              pantone_id: r.pantone_id,
+              code: r.iml_pantone_colors?.code ?? "",
+              name: r.iml_pantone_colors?.name ?? null,
+              hex: r.iml_pantone_colors?.hex ?? null,
+              coverage_pct: String(r.coverage_pct),
+              sort_order: r.sort_order ?? i,
+            }));
             setColors(rows);
           }
           if (p.custom_data && typeof p.custom_data === "object") {
@@ -131,8 +122,7 @@ export default function ImlProductEditPage() {
 
     const invalidIdx = colors.findIndex((c) => {
       const hasCode = c.code.trim() !== "";
-      const hasCoverage =
-        c.coverage_pct !== "" && Number.isFinite(parseFloat(c.coverage_pct));
+      const hasCoverage = c.coverage_pct !== "" && Number.isFinite(parseFloat(c.coverage_pct));
       const isNonEmpty = hasCode || hasCoverage;
       return isNonEmpty && !(hasCode && hasCoverage);
     });
@@ -158,7 +148,10 @@ export default function ImlProductEditPage() {
         body: JSON.stringify({
           ...form,
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
-          foil_id: form.foil_id ? parseInt(form.foil_id, 10) : null,
+          foil_material_id: form.foil_material_id ? parseInt(form.foil_material_id, 10) : null,
+          color_material_id: form.color_material_id ? parseInt(form.color_material_id, 10) : null,
+          paper_material_id: form.paper_material_id ? parseInt(form.paper_material_id, 10) : null,
+          lacquer_material_id: form.lacquer_material_id ? parseInt(form.lacquer_material_id, 10) : null,
           positions_on_sheet: form.positions_on_sheet ? parseInt(form.positions_on_sheet, 10) : null,
           labels_per_sheet: form.labels_per_sheet ? parseInt(form.labels_per_sheet, 10) : null,
           pieces_per_box: form.pieces_per_box ? parseInt(form.pieces_per_box, 10) : null,
@@ -237,7 +230,6 @@ export default function ImlProductEditPage() {
             form={form}
             setField={setField}
             customers={customers}
-            foils={foils}
             colors={colors}
             onColorsChange={setColors}
           />

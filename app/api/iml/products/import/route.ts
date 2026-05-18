@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import { enrichProductMaterialFields } from "@/lib/iml/product-materials";
 
 function parseCsvLine(line: string, delimiter: string): string[] {
   const result: string[] = [];
@@ -126,6 +127,21 @@ export async function POST(req: NextRequest) {
         customerId = customerByName.get(customerName.toLowerCase()) ?? null;
       }
 
+      let materialFields: Awaited<ReturnType<typeof enrichProductMaterialFields>>;
+      try {
+        materialFields = await enrichProductMaterialFields({
+          foil_material_id: get("foil_material_id") || undefined,
+          color_material_id: get("color_material_id") || undefined,
+          paper_material_id: get("paper_material_id") || undefined,
+          lacquer_material_id: get("lacquer_material_id") || undefined,
+          foil_type: get("foil_type") || undefined,
+          color_coverage: get("color_coverage") || undefined,
+        });
+      } catch (e) {
+        errors.push(`Řádek ${i + 2}: ${e instanceof Error ? e.message : "Neplatný materiál"}`);
+        continue;
+      }
+
       const product = await prisma.iml_products.create({
         data: {
           customer_id: customerId,
@@ -141,8 +157,7 @@ export async function POST(req: NextRequest) {
           positions_on_sheet: get("positions_on_sheet") ? parseInt(get("positions_on_sheet"), 10) : null,
           pieces_per_box: get("pieces_per_box") ? parseInt(get("pieces_per_box"), 10) : null,
           pieces_per_pallet: get("pieces_per_pallet") ? parseInt(get("pieces_per_pallet"), 10) : null,
-          foil_type: get("foil_type") || null,
-          color_coverage: get("color_coverage") || null,
+          ...materialFields,
           print_note: get("print_note") || null,
           has_print_sample: get("has_print_sample").toLowerCase() === "ano" || get("has_print_sample") === "1",
           ean_code: get("ean_code") || null,

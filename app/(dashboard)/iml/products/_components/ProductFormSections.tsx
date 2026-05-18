@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Tabs, type TabDef } from "../../_components/Tabs";
 import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
+import { MaterialSelect } from "../../_components/MaterialSelect";
 import ProductPantoneEditor, {
   type ProductColorRow,
 } from "./ProductPantoneEditor";
@@ -29,7 +30,10 @@ export type ProductFormState = {
   labels_per_sheet: string;
   pieces_per_box: string;
   pieces_per_pallet: string;
-  foil_id: string;
+  foil_material_id: string;
+  color_material_id: string;
+  paper_material_id: string;
+  lacquer_material_id: string;
   foil_type: string;
   color_coverage: string;
   ean_code: string;
@@ -53,6 +57,7 @@ type Props = {
   form: ProductFormState;
   setField: <K extends keyof ProductFormState>(k: K, v: ProductFormState[K]) => void;
   customers: CustomerOption[];
+  /** @deprecated číselník fólií je v katalogu materiálů; ponecháno kvůli kompatibilitě volajících */
   foils?: FoilOption[];
   errors?: ProductFormErrors;
   /**
@@ -79,17 +84,11 @@ export default function ProductFormSections({
   form,
   setField,
   customers,
-  foils = [],
   errors,
   colors,
   onColorsChange,
 }: Props) {
   const err = errors ?? {};
-
-  // Legacy fallback: pokud produkt má vyplněný starý `foil_type` (string),
-  // ale nemá `foil_id`, zobrazíme malou nápovědu, ať uživatel vybere z číselníku
-  // (plná migrace proběhne přes migraci F1 – tohle je safety net pro edit edge-cases).
-  const legacyFoilHint = form.foil_type && !form.foil_id ? form.foil_type : "";
 
   const tabs: TabDef[] = [
     {
@@ -250,38 +249,62 @@ export default function ProductFormSections({
       label: "Materiály",
       icon: <Boxes className="h-4 w-4" />,
       content: (
-        <TabShell title="Materiály a tisk" subtitle="Fólie, barevnost, EAN, vzory a poznámky">
+        <TabShell title="Materiály a tisk" subtitle="Výběr z katalogu materiálů (papír, fólie, barva, lak)">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label="Druh fólie"
-              error={err.foil_id}
-              hint={
-                legacyFoilHint
-                  ? `Starý zápis: „${legacyFoilHint}" – prosím přemapujte na položku číselníku.`
-                  : "Číselník spravujete v Nastavení IML › Fólie."
-              }
-            >
-              <select
-                value={form.foil_id}
-                onChange={(e) => setField("foil_id", e.target.value)}
-                className={inputCls}
-              >
-                <option value="">— Vyberte —</option>
-                {foils.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.code} — {f.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Barevnost / pokrytí" error={err.color_coverage}>
-              <input
-                type="text"
-                value={form.color_coverage}
-                onChange={(e) => setField("color_coverage", e.target.value)}
-                className={inputCls}
+            <div>
+              <MaterialSelect
+                category="PAPER"
+                label="Papír"
+                value={form.paper_material_id}
+                onChange={(mid) => setField("paper_material_id", mid)}
               />
-            </Field>
+              {err.paper_material_id && (
+                <p className="mt-1 text-xs text-red-600">{err.paper_material_id}</p>
+              )}
+            </div>
+            <div>
+              <MaterialSelect
+                category="FOIL"
+                label="Druh fólie"
+                value={form.foil_material_id}
+                onChange={(mid, label) => {
+                  setField("foil_material_id", mid);
+                  if (label) setField("foil_type", label);
+                }}
+              />
+              {err.foil_material_id && (
+                <p className="mt-1 text-xs text-red-600">{err.foil_material_id}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-400">Číselník v Nastavení IML › Fólie.</p>
+            </div>
+            <div>
+              <MaterialSelect
+                category="COLOR"
+                label="Barevnost (katalog)"
+                value={form.color_material_id}
+                onChange={(mid, label) => {
+                  setField("color_material_id", mid);
+                  if (label) setField("color_coverage", label);
+                }}
+                coverageValue={form.color_coverage}
+                onCoverageChange={(v) => setField("color_coverage", v)}
+                coverageLabel="Poznámka / % pokrytí (volitelné)"
+              />
+              {err.color_material_id && (
+                <p className="mt-1 text-xs text-red-600">{err.color_material_id}</p>
+              )}
+            </div>
+            <div>
+              <MaterialSelect
+                category="LACQUER"
+                label="Lak"
+                value={form.lacquer_material_id}
+                onChange={(mid) => setField("lacquer_material_id", mid)}
+              />
+              {err.lacquer_material_id && (
+                <p className="mt-1 text-xs text-red-600">{err.lacquer_material_id}</p>
+              )}
+            </div>
             <Field label="EAN kód" error={err.ean_code}>
               <input
                 type="text"
@@ -476,7 +499,10 @@ export const emptyProductForm: ProductFormState = {
   labels_per_sheet: "",
   pieces_per_box: "",
   pieces_per_pallet: "",
-  foil_id: "",
+  foil_material_id: "",
+  color_material_id: "",
+  paper_material_id: "",
+  lacquer_material_id: "",
   foil_type: "",
   color_coverage: "",
   ean_code: "",

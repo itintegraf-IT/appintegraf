@@ -149,7 +149,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const data = parseProductBody(body);
+    let data: Awaited<ReturnType<typeof parseProductBody>>;
+    try {
+      data = await parseProductBody(body);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Neplatná data produktu";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
 
     if (data.sku) {
       const existing = await prisma.iml_products.findFirst({ where: { sku: data.sku } });
@@ -206,12 +212,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function parseProductBody(body: Record<string, unknown>) {
+async function parseProductBody(body: Record<string, unknown>) {
   const str = (v: unknown) => (v != null && v !== "" ? String(v).trim() : null);
   const int = (v: unknown) => (v != null && v !== "" ? parseInt(String(v), 10) : null);
   const num = (v: unknown) => (v != null && v !== "" ? parseFloat(String(v)) : null);
 
-  return {
+  const { enrichProductMaterialFields } = await import("@/lib/iml/product-materials");
+
+  const base = {
     customer_id: body.customer_id != null ? int(body.customer_id) : null,
     ig_code: str(body.ig_code),
     ig_short_name: str(body.ig_short_name),
@@ -243,6 +251,11 @@ function parseProductBody(body: Record<string, unknown>) {
     is_active: body.is_active !== false,
     custom_data: parseCustomData(body.custom_data),
   };
+
+  const mats = await enrichProductMaterialFields(body);
+  const merged = { ...base, ...mats };
+  if (mats.foil_material_id != null) merged.foil_id = null;
+  return merged;
 }
 
 /**

@@ -23,7 +23,8 @@ export default async function ImlSettingsPage() {
             Nastavení IML
           </h1>
           <p className="mt-1 text-gray-600">
-            Vlastní pole pro produkty a objednávky, číselník fólií
+            Vlastní pole u produktů a objednávek, číselník fólií a barev (Pantone, CMYK) propojený s
+            katalogem materiálů.
           </p>
         </div>
         <Link
@@ -35,7 +36,7 @@ export default async function ImlSettingsPage() {
         </Link>
       </div>
 
-      <ImlSettingsClient />
+      <ImlSettingsClient canWrite={canWrite} />
     </>
   );
 }

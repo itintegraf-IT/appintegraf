@@ -53,6 +53,7 @@ export async function pdfFileToJpegPreviewBlob(
 
     await page
       .render({
+        canvas,
         canvasContext: ctx as unknown as CanvasRenderingContext2D,
         viewport,
       })

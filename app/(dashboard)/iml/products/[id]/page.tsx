@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -18,6 +19,7 @@ import ProductImagePreview from "../_components/ProductImagePreview";
 import ProductPdfHistory from "../_components/ProductPdfHistory";
 import { consumptionKg } from "@/lib/iml-color-consumption";
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
+import { productMaterialIncludes } from "@/lib/iml/product-materials";
 
 export default async function ImlProductDetailPage({
   params,
@@ -42,6 +44,7 @@ export default async function ImlProductDetailPage({
       include: {
         iml_customers: { select: { id: true, name: true } },
         iml_foils: { select: { id: true, code: true, name: true } },
+        ...productMaterialIncludes,
         iml_product_colors: {
           include: {
             iml_pantone_colors: {
@@ -69,6 +72,19 @@ export default async function ImlProductDetailPage({
 
   const fmt = (v: unknown) => (v != null && v !== "" ? String(v) : "-");
   const fmtNum = (v: unknown) => (v != null ? String(v) : "-");
+  const materialLabel = (m: { id: number; name: string; code: string | null } | null) => {
+    if (!m) return null;
+    const label = m.code ? `${m.name} (${m.code})` : m.name;
+    return (
+      <Link href={`/materialy/${m.id}`} className="text-red-600 hover:underline">
+        {label}
+      </Link>
+    );
+  };
+
+  const foilDisplay =
+    materialLabel(product.foil_material) ??
+    (product.iml_foils ? `${product.iml_foils.code} — ${product.iml_foils.name}` : fmt(product.foil_type));
 
   const hasImage = !!(product.image_data && product.image_data.length > 0);
   const hasLegacyPdf = !!(product.pdf_data && product.pdf_data.length > 0);
@@ -129,15 +145,24 @@ export default async function ImlProductDetailPage({
       icon: <Boxes className="h-4 w-4" />,
       content: (
         <div className="grid gap-4 sm:grid-cols-2">
-          <InfoField
-            label="Druh fólie"
-            value={
-              product.iml_foils
-                ? `${product.iml_foils.code} — ${product.iml_foils.name}`
-                : fmt(product.foil_type)
-            }
-          />
-          <InfoField label="Barevnost / pokrytí" value={fmt(product.color_coverage)} />
+          <div>
+            <p className="text-sm text-gray-500">Papír</p>
+            <p className="font-medium">{materialLabel(product.paper_material) ?? "-"}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Druh fólie</p>
+            <p className="font-medium">{foilDisplay}</p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Barevnost / pokrytí</p>
+            <p className="font-medium">
+              {materialLabel(product.color_material) ?? fmt(product.color_coverage)}
+            </p>
+          </div>
+          <div>
+            <p className="text-sm text-gray-500">Lak</p>
+            <p className="font-medium">{materialLabel(product.lacquer_material) ?? "-"}</p>
+          </div>
           <InfoField label="EAN kód" value={fmt(product.ean_code)} mono />
           <InfoField label="Vzor min. tisku" value={product.has_print_sample ? "Ano" : "Ne"} />
           {product.print_note && (
@@ -181,7 +206,7 @@ export default async function ImlProductDetailPage({
             )}
           </div>
         ),
-    } as ProductDetailSection,
+    },
     {
       id: "print",
       label: "Tisková data",

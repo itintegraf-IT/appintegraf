@@ -9,6 +9,7 @@ import {
   type IncomingProductColor,
 } from "@/lib/iml-product-colors";
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
+import { productMaterialIncludes } from "@/lib/iml/product-materials";
 
 export async function GET(
   _req: NextRequest,
@@ -35,6 +36,7 @@ export async function GET(
       include: {
         iml_customers: { select: { id: true, name: true } },
         iml_foils: { select: { id: true, code: true, name: true } },
+        ...productMaterialIncludes,
         iml_product_colors: {
           include: {
             iml_pantone_colors: {
@@ -93,7 +95,13 @@ export async function PUT(
 
   try {
     const body = await req.json();
-    const data = parseProductBody(body);
+    let data: Awaited<ReturnType<typeof parseProductBody>>;
+    try {
+      data = await parseProductBody(body);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Neplatná data produktu";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
 
     if (data.sku) {
       const dup = await prisma.iml_products.findFirst({
@@ -184,11 +192,13 @@ export async function DELETE(
   return NextResponse.json({ success: true });
 }
 
-function parseProductBody(body: Record<string, unknown>) {
+async function parseProductBody(body: Record<string, unknown>) {
   const str = (v: unknown) => (v != null && v !== "" ? String(v).trim() : null);
   const int = (v: unknown) => (v != null && v !== "" ? parseInt(String(v), 10) : null);
 
-  return {
+  const { enrichProductMaterialFields } = await import("@/lib/iml/product-materials");
+
+  const base = {
     customer_id: body.customer_id != null ? int(body.customer_id) : null,
     ig_code: str(body.ig_code),
     ig_short_name: str(body.ig_short_name),
@@ -220,6 +230,11 @@ function parseProductBody(body: Record<string, unknown>) {
     is_active: body.is_active !== false,
     custom_data: parseCustomData(body.custom_data),
   };
+
+  const mats = await enrichProductMaterialFields(body);
+  const merged = { ...base, ...mats };
+  if (mats.foil_material_id != null) merged.foil_id = null;
+  return merged;
 }
 
 /** labels_per_sheet > 0 nebo NULL. */

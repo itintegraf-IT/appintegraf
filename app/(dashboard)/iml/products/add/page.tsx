@@ -10,13 +10,11 @@ import ProductFormSections, {
   emptyProductForm,
   type ProductFormState,
   type CustomerOption,
-  type FoilOption,
 } from "../_components/ProductFormSections";
 import type { ProductColorRow } from "../_components/ProductPantoneEditor";
 
 export default function ImlProductAddPage() {
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
-  const [foils, setFoils] = useState<FoilOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [createdProductId, setCreatedProductId] = useState<number | null>(null);
@@ -24,19 +22,13 @@ export default function ImlProductAddPage() {
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
   const [colors, setColors] = useState<ProductColorRow[]>([]);
 
-  const setField = <K extends keyof ProductFormState>(
-    k: K,
-    v: ProductFormState[K]
-  ) => setForm((f) => ({ ...f, [k]: v }));
+  const setField = <K extends keyof ProductFormState>(k: K, v: ProductFormState[K]) =>
+    setForm((f) => ({ ...f, [k]: v }));
 
   useEffect(() => {
     fetch("/api/iml/customers")
       .then((r) => r.json())
       .then((data) => setCustomers(data.customers ?? []))
-      .catch(() => {});
-    fetch("/api/iml/foils")
-      .then((r) => r.json())
-      .then((data) => setFoils(data.foils ?? []))
       .catch(() => {});
   }, []);
 
@@ -44,11 +36,9 @@ export default function ImlProductAddPage() {
     e.preventDefault();
     setError("");
 
-    // Validace barev: každý neempty řádek musí mít kód i pokrytí.
     const invalidIdx = colors.findIndex((c) => {
       const hasCode = c.code.trim() !== "";
-      const hasCoverage =
-        c.coverage_pct !== "" && Number.isFinite(parseFloat(c.coverage_pct));
+      const hasCoverage = c.coverage_pct !== "" && Number.isFinite(parseFloat(c.coverage_pct));
       const isNonEmpty = hasCode || hasCoverage;
       return isNonEmpty && !(hasCode && hasCoverage);
     });
@@ -74,7 +64,10 @@ export default function ImlProductAddPage() {
         body: JSON.stringify({
           ...form,
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
-          foil_id: form.foil_id ? parseInt(form.foil_id, 10) : null,
+          foil_material_id: form.foil_material_id ? parseInt(form.foil_material_id, 10) : null,
+          color_material_id: form.color_material_id ? parseInt(form.color_material_id, 10) : null,
+          paper_material_id: form.paper_material_id ? parseInt(form.paper_material_id, 10) : null,
+          lacquer_material_id: form.lacquer_material_id ? parseInt(form.lacquer_material_id, 10) : null,
           positions_on_sheet: form.positions_on_sheet ? parseInt(form.positions_on_sheet, 10) : null,
           labels_per_sheet: form.labels_per_sheet ? parseInt(form.labels_per_sheet, 10) : null,
           pieces_per_box: form.pieces_per_box ? parseInt(form.pieces_per_box, 10) : null,
@@ -174,7 +167,6 @@ export default function ImlProductAddPage() {
             form={form}
             setField={setField}
             customers={customers}
-            foils={foils}
             colors={colors}
             onColorsChange={setColors}
           />
