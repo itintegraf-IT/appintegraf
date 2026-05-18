@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { redirectAdminDenied } from "@/lib/navigation-errors";
 import { isAdmin } from "@/lib/auth-utils";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -11,7 +12,7 @@ export default async function AdminContractTypeNewPage() {
 
   const userId = parseInt(session.user.id, 10);
   if (!(await isAdmin(userId))) {
-    redirect("/contacts?error=Nemáte oprávnění");
+    redirectAdminDenied();
   }
 
   return (

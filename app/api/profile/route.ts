@@ -24,6 +24,7 @@ export async function GET() {
       position: true,
       department_name: true,
       last_login: true,
+      totp_enabled: true,
       created_at: true,
     },
   });

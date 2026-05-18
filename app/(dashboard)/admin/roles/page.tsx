@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+import { redirectWithError } from "@/lib/navigation-errors";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { isAdmin } from "@/lib/auth-utils";
@@ -11,7 +12,7 @@ export default async function AdminRolesPage() {
 
   const userId = parseInt(session.user.id, 10);
   if (!(await isAdmin(userId))) {
-    redirect("/admin?error=Nemáte oprávnění");
+    redirectWithError("/admin", "NO_PERMISSION");
   }
 
   const roles = await prisma.roles.findMany({

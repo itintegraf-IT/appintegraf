@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound } from "lucide-react";
 import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
+import { TotpAdminPanel } from "@/components/admin/TotpAdminPanel";
 
 const AVAILABLE_MODULES = [
   { key: "contacts", label: "Kontakty", icon: Users },
@@ -645,6 +646,10 @@ export function AdminUserForm({ user }: { user?: User }) {
           />
         </div>
       </div>
+
+      {isEdit && user?.id && (
+        <TotpAdminPanel userId={user.id} username={form.username || user.username || ""} />
+      )}
 
       {/* Moduly – viditelnost a oprávnění */}
       <div className="mt-6 rounded-xl border border-gray-200 bg-gray-50 p-6">

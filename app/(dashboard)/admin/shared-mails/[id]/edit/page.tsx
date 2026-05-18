@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { redirect, notFound } from "next/navigation";
+import { redirectAdminDenied } from "@/lib/navigation-errors";
 import { isAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
@@ -14,7 +15,7 @@ export default async function EditSharedMailPage({
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const userId = parseInt(session.user.id, 10);
-  if (!(await isAdmin(userId))) redirect("/contacts?error=Nemáte oprávnění");
+  if (!(await isAdmin(userId))) redirectAdminDenied();
 
   const id = parseInt((await params).id, 10);
   if (isNaN(id)) notFound();

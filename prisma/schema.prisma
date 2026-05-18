@@ -810,6 +810,10 @@ model users {
   password_hash                                                  String                        @db.VarChar(255)
   password_custom                                                String?                       @db.VarChar(255)
   password_version                                               Int                           @default(1)
+  totp_secret_enc                                                String?                       @db.VarChar(512)
+  totp_enabled                                                   Boolean                       @default(false)
+  totp_enrollment_required                                       Boolean                       @default(false)
+  totp_enabled_at                                                DateTime?                     @db.DateTime(0)
   first_name                                                     String                        @db.VarChar(50)
   last_name                                                      String                        @db.VarChar(50)
   role_id                                                        Int?
@@ -867,6 +871,7 @@ model users {
   user_secondary_departments                                     user_secondary_departments[]
   user_shared_mails                                              user_shared_mails[]
   user_tokens                                                    user_tokens[]
+  user_totp_backup_codes                                         user_totp_backup_codes[]
   ukoly_assigned                                                 ukoly[]                       @relation("ukoly_assignee")
   ukoly_created                                                  ukoly[]                       @relation("ukoly_creator")
   notifications                                                  notifications[]
@@ -1422,6 +1427,19 @@ model user_tokens {
   @@unique([token_hash], map: "uq_user_tokens_hash")
   @@index([user_id, purpose], map: "idx_user_tokens_user_purpose")
   @@index([expires_at], map: "idx_user_tokens_expires")
+}
+
+model user_totp_backup_codes {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  code_hash  String    @db.VarChar(64)
+  used_at    DateTime? @db.DateTime(0)
+  created_at DateTime  @default(now()) @db.DateTime(0)
+
+  users users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_totp_backup_user")
+
+  @@index([user_id], map: "idx_totp_backup_user")
+  @@index([code_hash], map: "idx_totp_backup_hash")
 }
 
 /// Rate limiting pro veřejné endpointy (zapomenuté heslo apod.).

@@ -10,7 +10,12 @@ export type AuthAuditAction =
   | "admin_sent_reset_link"
   | "account_activation_sent"
   | "account_activated"
-  | "password_reset_rate_limited";
+  | "password_reset_rate_limited"
+  | "totp_required_by_admin"
+  | "totp_enrolled_by_user"
+  | "totp_disabled_by_admin"
+  | "totp_login_failed"
+  | "totp_backup_used";
 
 export async function logAuthAudit(params: {
   userId?: number | null;
