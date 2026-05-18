@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Pencil, Archive, Trash2 } from "lucide-react";
 import type { MaterialCategoryCode } from "@/lib/materialy/categories";
+import type { MaterialFileSummary } from "@/lib/materialy/material-files";
+import { MaterialDocumentCell } from "./MaterialDocumentCell";
 
 type Material = {
   id: number;
@@ -13,6 +15,8 @@ type Material = {
   valid_until: string | null;
   certificate_valid_until?: string | null;
   material_subcategories?: { name: string } | null;
+  sds_file?: MaterialFileSummary | null;
+  certificate_file?: MaterialFileSummary | null;
 };
 
 function fmtDate(v: string | null | undefined) {
@@ -152,8 +156,18 @@ export function MaterialyListClient({
                   </td>
                   <td className="px-4 py-2 text-gray-600">{m.code ?? "—"}</td>
                   <td className="px-4 py-2 text-gray-600">{m.material_subcategories?.name ?? "—"}</td>
-                  <td className="px-4 py-2 text-gray-600">{fmtDate(m.valid_until)}</td>
-                  <td className="px-4 py-2 text-gray-600">{fmtDate(m.certificate_valid_until)}</td>
+                  <td className="px-4 py-2 align-top">
+                    <MaterialDocumentCell
+                      file={m.sds_file}
+                      dateLabel={fmtDate(m.valid_until)}
+                    />
+                  </td>
+                  <td className="px-4 py-2 align-top">
+                    <MaterialDocumentCell
+                      file={m.certificate_file}
+                      dateLabel={fmtDate(m.certificate_valid_until)}
+                    />
+                  </td>
                   {canWrite ? (
                     <td className="px-4 py-2 text-right">
                       <div className="flex justify-end gap-2">

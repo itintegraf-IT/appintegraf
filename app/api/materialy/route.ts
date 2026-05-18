@@ -9,6 +9,7 @@ import { parseMaterialOptionalDate } from "@/lib/materialy/dates";
 import { materialyCreateErrorMessage } from "@/lib/materialy/prisma-errors";
 import { logMaterialyAuditSafe } from "@/lib/materialy/audit";
 import { ensureMaterialsTableColumns } from "@/lib/materialy/ensure-materials-schema";
+import { loadMaterialFileSummaries } from "@/lib/materialy/material-files";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -48,7 +49,17 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ materials });
+    const fileMap = await loadMaterialFileSummaries(materials.map((m) => m.id));
+    const enriched = materials.map((m) => {
+      const files = fileMap.get(m.id);
+      return {
+        ...m,
+        sds_file: files?.sds ?? null,
+        certificate_file: files?.certificate ?? null,
+      };
+    });
+
+    return NextResponse.json({ materials: enriched });
   } catch (e) {
     console.error("materialy GET:", e);
     return NextResponse.json({ error: "Chyba při načítání katalogu" }, { status: 500 });
