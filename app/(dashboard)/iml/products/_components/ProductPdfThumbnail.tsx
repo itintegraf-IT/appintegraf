@@ -86,9 +86,10 @@ export function ProductPdfThumbnail({
         ctx.fillRect(0, 0, viewport.width, viewport.height);
 
         const task = page.render({
+          canvas,
           canvasContext: ctx,
           viewport,
-        });
+        } as Parameters<typeof page.render>[0]);
         renderTask = task;
         await task.promise;
         await pdf.destroy?.().catch(() => {});

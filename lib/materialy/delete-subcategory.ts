@@ -49,7 +49,6 @@ export async function permanentDeleteSubcategory(
     tableName: "material_subcategories",
     recordId: id,
     oldValues: { name: row.name, category_code: row.category_code },
-    newValues: null,
   });
 
   return { ok: true };
