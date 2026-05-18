@@ -85,16 +85,16 @@ export function MaterialDocumentCell({ file, dateLabel }: Props) {
                     target="_blank"
                     rel="noopener noreferrer"
                     download
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs text-red-600 hover:bg-gray-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-2.5 py-1.5 text-xs text-red-600 hover:bg-gray-50"
                   >
-                    <Download className="h-3.5 w-3.5" />
-                    St�hnout
+                    <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                    <span>Stáhnout</span>
                   </a>
                   <button
                     type="button"
                     onClick={() => setPreviewOpen(false)}
                     className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"
-                    title="Zav?�t (Esc)"
+                    title="Zavřít (Esc)"
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -103,7 +103,7 @@ export function MaterialDocumentCell({ file, dateLabel }: Props) {
               <div className="min-h-0 flex-1 overflow-auto bg-gray-100 p-3 sm:p-4">
                 {isPdf ? (
                   <iframe
-                    title={`N�hled: ${file.original_filename}`}
+                    title={`Náhled: ${file.original_filename}`}
                     src={`${file.file_path}#view=FitH`}
                     className="h-[min(78vh,720px)] w-full rounded-lg border border-gray-200 bg-white"
                   />
@@ -125,9 +125,9 @@ export function MaterialDocumentCell({ file, dateLabel }: Props) {
     <>
       <div className="min-w-[8rem] max-w-[14rem] space-y-1">
         {showDate ? <div className="text-gray-600">{dateLabel}</div> : null}
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
           <span className="inline-flex min-w-0 items-center gap-1 text-gray-700" title={file.original_filename}>
-            <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" />
+            <FileText className="h-3.5 w-3.5 shrink-0 text-gray-400" aria-hidden />
             <span className="max-w-[7rem] truncate">{file.original_filename}</span>
           </span>
           <a
@@ -135,21 +135,21 @@ export function MaterialDocumentCell({ file, dateLabel }: Props) {
             target="_blank"
             rel="noopener noreferrer"
             download
-            className="inline-flex items-center gap-0.5 text-red-600 hover:underline"
-            title="St�hnout / otev?�t"
+            className="inline-flex items-center gap-1 text-red-600 hover:underline"
+            title="Stáhnout / otevřít"
           >
-            <Download className="h-3.5 w-3.5" />
-            St�hnout
+            <Download className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            <span>Stáhnout</span>
           </a>
           {canPreview ? (
             <button
               type="button"
               onClick={() => setPreviewOpen(true)}
-              className="inline-flex items-center gap-0.5 text-gray-600 hover:text-red-700"
-              title="Zobrazit n�hled v okn?"
+              className="inline-flex items-center gap-1 text-gray-600 hover:text-red-700"
+              title="Zobrazit náhled v okně"
             >
-              <Eye className="h-3.5 w-3.5" />
-              N�hled
+              <Eye className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <span>Náhled</span>
             </button>
           ) : null}
         </div>
