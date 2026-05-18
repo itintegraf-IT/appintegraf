@@ -54,9 +54,9 @@ export async function pdfFileToJpegPreviewBlob(
     await page
       .render({
         canvas,
-        canvasContext: ctx as unknown as CanvasRenderingContext2D,
+        canvasContext: ctx,
         viewport,
-      })
+      } as Parameters<typeof page.render>[0])
       .promise;
 
     const blob = await new Promise<Blob | null>((resolve) =>
