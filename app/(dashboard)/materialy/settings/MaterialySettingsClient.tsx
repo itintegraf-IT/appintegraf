@@ -21,6 +21,7 @@ export default function MaterialySettingsClient() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [rowBusy, setRowBusy] = useState<number | null>(null);
 
   const activeLabel = MATERIAL_CATEGORIES.find((c) => c.code === category)?.label ?? category;
 
