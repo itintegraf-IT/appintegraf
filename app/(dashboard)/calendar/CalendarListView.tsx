@@ -7,6 +7,7 @@ import { isAllDayEvent } from "./lib/event-types";
 import { formatDateLocal } from "./lib/week-utils";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import {
+  getCalendarEventPrimaryLabel,
   getPeopleColumnText,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
@@ -14,6 +15,7 @@ import {
 type EventRow = {
   id: number;
   title: string;
+  event_type: string | null;
   description: string | null;
   start_date: Date;
   end_date: Date;
@@ -128,7 +130,7 @@ export function CalendarListView({ events, from, to, viewType, eventMetaMode }: 
                 Čas
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
-                Název
+                Typ
               </th>
               <th className="px-4 py-3 text-left text-xs font-medium uppercase text-gray-500">
                 Lidé
@@ -167,8 +169,9 @@ export function CalendarListView({ events, from, to, viewType, eventMetaMode }: 
                         href={calendarGridItemHref(e)}
                         className="font-medium text-red-600 hover:underline"
                         style={{ color: e.color ?? "#DC2626" }}
+                        title={e.title}
                       >
-                        {e.title}
+                        {getCalendarEventPrimaryLabel(e)}
                       </Link>
                       {e.description && (
                         <p className="mt-0.5 max-w-[200px] truncate text-xs text-gray-500">

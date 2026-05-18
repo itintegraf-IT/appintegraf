@@ -1,3 +1,5 @@
+import { getEventTypeLabel } from "@/app/(dashboard)/calendar/lib/event-types";
+
 export type CalendarEventMetaMode = "hidden" | "global" | "global_vedeni";
 
 export type EventMetaInput = {
@@ -23,6 +25,71 @@ function participantNames(
     }
   }
   return parts.join(", ");
+}
+
+/** Hlavní text v buňce kalendáře (týden / měsíc / seznam) – typ události, u úkolů název. */
+export function getCalendarEventPrimaryLabel(e: {
+  title: string;
+  event_type: string | null;
+  ukoly_task_id?: number | null;
+}): string {
+  if (e.ukoly_task_id != null) return e.title;
+  return getEventTypeLabel(e.event_type);
+}
+
+/** Text stavu schválení (shodně s detailem události). */
+export function getCalendarEventApprovalStatusLabel(e: {
+  approval_status: string | null;
+  deputy_id: number | null;
+}): string {
+  if (!e.approval_status) return "";
+  switch (e.approval_status) {
+    case "approved":
+      return "Schváleno";
+    case "rejected":
+      return "Zamítnuto";
+    case "deputy_approved":
+      return "Čeká na schválení";
+    case "pending":
+      return e.deputy_id ? "Čeká na schválení" : "Čeká na zástupce";
+    default:
+      return "";
+  }
+}
+
+/** Kompaktní řádek celodenní události v globálním týdenním kalendáři. */
+export function getCalendarGlobalAllDayCompactLabel(
+  e: EventMetaInput & { title: string; event_type: string | null }
+): string {
+  const typeLabel = getCalendarEventPrimaryLabel(e);
+  if (!e.users) return typeLabel;
+  return `${typeLabel} · ${e.users.first_name} ${e.users.last_name}`;
+}
+
+/** Tooltip celodenní události v globálním týdenním řádku „Celý den“. */
+export function calendarEventGlobalAllDayTooltip(
+  e: EventMetaInput & { title: string; event_type: string | null },
+  mode: CalendarEventMetaMode
+): string {
+  if (e.ukoly_task_id != null) return e.title;
+  const typeLabel = getEventTypeLabel(e.event_type);
+  const parts: string[] = [typeLabel, e.title];
+  const status = getCalendarEventApprovalStatusLabel(e);
+  if (status) parts.push(status);
+  parts.push(...buildEventMetaLines(e, mode));
+  return parts.join(" — ");
+}
+
+/** Tooltip u události v mřížce – typ, původní název a meta (globální). */
+export function calendarEventTooltipTitle(
+  e: EventMetaInput & { title: string; event_type: string | null },
+  mode: CalendarEventMetaMode
+): string {
+  if (e.ukoly_task_id != null) return e.title;
+  const typeLabel = getEventTypeLabel(e.event_type);
+  const extra = buildEventMetaLines(e, mode);
+  if (extra.length === 0) return `${typeLabel} — ${e.title}`;
+  return [typeLabel, e.title, ...extra].join(" — ");
 }
 
 /**
