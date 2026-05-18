@@ -6,6 +6,8 @@ import { isMaterialCategoryCode } from "@/lib/materialy/categories";
 import { logMaterialyAuditSafe } from "@/lib/materialy/audit";
 import { parseMaterialOptionalDate } from "@/lib/materialy/dates";
 import { assertSubcategoryAllowed } from "@/lib/materialy/subcategory-guard";
+import { ensureMaterialsTableColumns } from "@/lib/materialy/ensure-materials-schema";
+import { permanentDeleteMaterial } from "@/lib/materialy/delete-material";
 
 export async function GET(
   _req: NextRequest,
@@ -68,6 +70,7 @@ export async function PUT(
   }
 
   try {
+    await ensureMaterialsTableColumns();
     const body = await req.json();
     const name = body.name != null ? String(body.name).trim() : existing.name;
     if (!name) return NextResponse.json({ error: "Název je povinný" }, { status: 400 });
@@ -155,7 +158,7 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -171,6 +174,18 @@ export async function DELETE(
   const id = parseInt((await params).id, 10);
   if (Number.isNaN(id)) {
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
+  }
+
+  const permanent =
+    req.nextUrl.searchParams.get("permanent") === "1" ||
+    req.nextUrl.searchParams.get("permanent") === "true";
+
+  if (permanent) {
+    const result = await permanentDeleteMaterial(id, userId);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
+    }
+    return NextResponse.json({ success: true, deleted: true });
   }
 
   const existing = await prisma.materials.findUnique({ where: { id } });

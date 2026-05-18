@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Pencil, Archive } from "lucide-react";
+import { Plus, Pencil, Archive, Trash2 } from "lucide-react";
 import type { MaterialCategoryCode } from "@/lib/materialy/categories";
 
 type Material = {
@@ -59,7 +59,7 @@ export function MaterialyListClient({
     setListError("");
     if (
       !confirm(
-        `Deaktivovat „${m.name}“ v katalogu? Záznam zůstane v databázi, přestane se nabízet ve výběrech.`
+        `Skrýt „${m.name}“ v katalogu? Záznam zůstane v databázi, přestane se nabízet ve výběrech.`
       )
     ) {
       return;
@@ -69,7 +69,30 @@ export function MaterialyListClient({
       const r = await fetch(`/api/materialy/${m.id}`, { method: "DELETE" });
       if (!r.ok) {
         const d = (await r.json().catch(() => ({}))) as { error?: string };
-        setListError(typeof d.error === "string" ? d.error : "Deaktivace se nezdařila");
+        setListError(typeof d.error === "string" ? d.error : "Skrytí se nezdařilo");
+        return;
+      }
+      setMaterials((prev) => prev.filter((x) => x.id !== m.id));
+    } finally {
+      setRowBusy(null);
+    }
+  };
+
+  const removePermanent = async (m: Material) => {
+    setListError("");
+    if (
+      !confirm(
+        `Trvale smazat „${m.name}“? Tuto akci nelze vrátit. Nahrané dokumenty budou odstraněny. Pokud je materiál použit u produktů IML, smazání nebude možné — použijte „Skrýt“.`
+      )
+    ) {
+      return;
+    }
+    setRowBusy(m.id);
+    try {
+      const r = await fetch(`/api/materialy/${m.id}?permanent=1`, { method: "DELETE" });
+      if (!r.ok) {
+        const d = (await r.json().catch(() => ({}))) as { error?: string };
+        setListError(typeof d.error === "string" ? d.error : "Smazání se nezdařilo");
         return;
       }
       setMaterials((prev) => prev.filter((x) => x.id !== m.id));
@@ -116,7 +139,7 @@ export function MaterialyListClient({
                 <th className="px-4 py-2">Podtyp</th>
                 <th className="px-4 py-2">Platnost BL / SDS</th>
                 <th className="px-4 py-2">Platnost certifikátu</th>
-                {canWrite ? <th className="w-40 px-4 py-2 text-right">Akce</th> : null}
+                {canWrite ? <th className="min-w-[11rem] px-4 py-2 text-right">Akce</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y">
@@ -151,6 +174,16 @@ export function MaterialyListClient({
                         >
                           <Archive className="h-4 w-4 shrink-0" />
                           <span className="hidden sm:inline">Skrýt</span>
+                        </button>
+                        <button
+                          type="button"
+                          title="Trvale smazat"
+                          disabled={rowBusy === m.id}
+                          onClick={() => void removePermanent(m)}
+                          className="inline-flex items-center gap-1 text-red-700 hover:text-red-900 disabled:opacity-50"
+                        >
+                          <Trash2 className="h-4 w-4 shrink-0" />
+                          <span className="hidden sm:inline">Smazat</span>
                         </button>
                       </div>
                     </td>

@@ -8,6 +8,7 @@ import { assertSubcategoryAllowed } from "@/lib/materialy/subcategory-guard";
 import { parseMaterialOptionalDate } from "@/lib/materialy/dates";
 import { materialyCreateErrorMessage } from "@/lib/materialy/prisma-errors";
 import { logMaterialyAuditSafe } from "@/lib/materialy/audit";
+import { ensureMaterialsTableColumns } from "@/lib/materialy/ensure-materials-schema";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    await ensureMaterialsTableColumns();
     const body = await req.json();
     const name = String(body.name ?? "").trim();
     const category_code = String(body.category_code ?? "").trim();

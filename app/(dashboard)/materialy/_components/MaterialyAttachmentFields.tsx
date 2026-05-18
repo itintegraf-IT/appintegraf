@@ -69,18 +69,32 @@ export function MaterialyDeferredAttachmentFields({
   docType,
   onDocTypeChange,
   onFileChange,
+  compact = false,
 }: {
   docType: string;
   onDocTypeChange: (v: string) => void;
   onFileChange: (f: File | null) => void;
+  compact?: boolean;
 }) {
   return (
-    <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50/80 p-4">
-      <h3 className="mb-1 text-sm font-semibold text-gray-900">Bezpečnostní list a další dokumenty (volitelné)</h3>
-      <p className="mb-3 text-xs text-gray-600">
-        Po kliknutí na „Vytvořit“ se nejdřív uloží materiál a pak se případně nahraje vybraný soubor (PDF, obrázek,
-        Word, Excel, max. 20 MB). Dokumenty můžete doplnit i později na detailu materiálu.
-      </p>
+    <div
+      className={
+        compact
+          ? "rounded-md border border-dashed border-gray-300 bg-gray-50/80 p-2"
+          : "rounded-lg border border-dashed border-gray-300 bg-gray-50/80 p-4"
+      }
+    >
+      <h3 className={compact ? "mb-1 text-xs font-semibold text-gray-800" : "mb-1 text-sm font-semibold text-gray-900"}>
+        Dokument (volitelné)
+      </h3>
+      {compact ? (
+        <p className="mb-2 text-xs text-gray-500">PDF, obrázek, Office — max. 20 MB.</p>
+      ) : (
+        <p className="mb-3 text-xs text-gray-600">
+          Po kliknutí na „Vytvořit“ se nejdřív uloží materiál a pak se případně nahraje vybraný soubor (PDF, obrázek,
+          Word, Excel, max. 20 MB). Dokumenty můžete doplnit i později na detailu materiálu.
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <select
           value={docType}

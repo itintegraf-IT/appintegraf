@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Pencil, Archive } from "lucide-react";
+import { Pencil, Archive, Trash2 } from "lucide-react";
 import { DOCUMENT_TYPES, materialCategorySlug } from "@/lib/materialy/categories";
 
 type FileRow = {
@@ -75,7 +75,7 @@ export function MaterialDetailClient({ id, canWrite }: { id: number; canWrite: b
   const onDeactivate = async () => {
     if (
       !confirm(
-        "Deaktivovat tento materiál v katalogu? Záznam zůstane v databázi (např. u již napojených produktů IML), ale přestane se nabízet ve výběrech."
+        "Skrýt tento materiál v katalogu? Záznam zůstane v databázi (např. u již napojených produktů IML), ale přestane se nabízet ve výběrech."
       )
     ) {
       return;
@@ -85,7 +85,29 @@ export function MaterialDetailClient({ id, canWrite }: { id: number; canWrite: b
     const res = await fetch(`/api/materialy/${id}`, { method: "DELETE" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setActionError(typeof data.error === "string" ? data.error : "Chyba při deaktivaci");
+      setActionError(typeof data.error === "string" ? data.error : "Chyba při skrytí");
+      setDeleting(false);
+      return;
+    }
+    const cat = String(material?.category_code ?? "");
+    router.push(`/materialy/${materialCategorySlug(cat)}`);
+    router.refresh();
+  };
+
+  const onDeletePermanent = async () => {
+    if (
+      !confirm(
+        "Trvale smazat tento materiál? Akci nelze vrátit. Pokud je materiál použit u produktů IML, smazání nebude možné."
+      )
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setActionError("");
+    const res = await fetch(`/api/materialy/${id}?permanent=1`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setActionError(typeof data.error === "string" ? data.error : "Smazání se nezdařilo");
       setDeleting(false);
       return;
     }
@@ -139,14 +161,23 @@ export function MaterialDetailClient({ id, canWrite }: { id: number; canWrite: b
               {!isInactive ? (
                 <button
                   type="button"
-                  onClick={onDeactivate}
+                  onClick={() => void onDeactivate()}
                   disabled={deleting}
-                  className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
                 >
                   <Archive className="h-4 w-4" />
-                  {deleting ? "…" : "Deaktivovat"}
+                  {deleting ? "…" : "Skrýt"}
                 </button>
               ) : null}
+              <button
+                type="button"
+                onClick={() => void onDeletePermanent()}
+                disabled={deleting}
+                className="inline-flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-sm text-red-800 hover:bg-red-100 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                {deleting ? "…" : "Smazat"}
+              </button>
             </div>
           ) : null}
         </div>

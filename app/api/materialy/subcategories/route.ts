@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canReadMaterialCatalog, canWriteMaterialCatalog } from "@/lib/materialy/access";
-import { isMaterialCategoryCode } from "@/lib/materialy/categories";
+import { isMaterialCategoryCode, MATERIAL_CATEGORIES } from "@/lib/materialy/categories";
+
+function resolveCategory(param: string | null): string | null {
+  if (param == null || param.trim() === "") return null;
+  const code = param.trim().toUpperCase();
+  return isMaterialCategoryCode(code) ? code : null;
+}
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -15,19 +21,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
-  const category = req.nextUrl.searchParams.get("category");
+  const category = resolveCategory(req.nextUrl.searchParams.get("category"));
+  if (!category) {
+    return NextResponse.json(
+      { error: "Vyberte kategorii materiálu (parametr category: PAPER, FOIL, COLOR, LACQUER)." },
+      { status: 400 }
+    );
+  }
+
   try {
-    const hasCategory = category != null && category !== "" && isMaterialCategoryCode(category);
     const subcategories = await prisma.material_subcategories.findMany({
       where: {
-        ...(hasCategory ? { category_code: category } : {}),
+        category_code: category,
         is_active: true,
-        ...(hasCategory ? { parent_id: null } : {}),
+        parent_id: null,
       },
       orderBy: [{ sort_order: "asc" }, { name: "asc" }],
     });
 
-    return NextResponse.json({ subcategories });
+    return NextResponse.json({ subcategories, category_code: category });
   } catch (e) {
     console.error("materialy/subcategories GET:", e);
     return NextResponse.json({ error: "Chyba při načítání podtypů" }, { status: 500 });
@@ -48,14 +60,49 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Record<string, unknown>;
     const name = String(body.name ?? "").trim();
-    const category_code = String(body.category_code ?? "").trim();
+    const category_code = resolveCategory(
+      body.category_code != null ? String(body.category_code) : null
+    );
+
     if (!name) return NextResponse.json({ error: "Název je povinný" }, { status: 400 });
-    if (!isMaterialCategoryCode(category_code)) {
-      return NextResponse.json({ error: "Neplatná kategorie" }, { status: 400 });
+    if (!category_code) {
+      return NextResponse.json(
+        { error: "Neplatná nebo chybějící kategorie materiálu (PAPER, FOIL, COLOR, LACQUER)." },
+        { status: 400 }
+      );
     }
 
     const parent_id =
       body.parent_id != null && body.parent_id !== "" ? parseInt(String(body.parent_id), 10) : null;
+
+    if (parent_id != null && Number.isFinite(parent_id)) {
+      const parent = await prisma.material_subcategories.findUnique({
+        where: { id: parent_id },
+        select: { category_code: true },
+      });
+      if (!parent || parent.category_code !== category_code) {
+        return NextResponse.json(
+          { error: "Nadřazený podtyp nepatří do zvolené kategorie materiálu." },
+          { status: 400 }
+        );
+      }
+    }
+
+    const duplicate = await prisma.material_subcategories.findFirst({
+      where: {
+        category_code,
+        name,
+        parent_id: Number.isFinite(parent_id) ? parent_id : null,
+        is_active: true,
+      },
+    });
+    if (duplicate) {
+      const catLabel = MATERIAL_CATEGORIES.find((c) => c.code === category_code)?.label ?? category_code;
+      return NextResponse.json(
+        { error: `Podtyp „${name}" už v kategorii ${catLabel} existuje.` },
+        { status: 400 }
+      );
+    }
 
     const row = await prisma.material_subcategories.create({
       data: {
