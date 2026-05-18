@@ -86,8 +86,7 @@ export function ProductPdfThumbnail({
         ctx.fillRect(0, 0, viewport.width, viewport.height);
 
         const task = page.render({
-          canvas,
-          canvasContext: ctx as unknown as CanvasRenderingContext2D,
+          canvasContext: ctx,
           viewport,
         });
         renderTask = task;
