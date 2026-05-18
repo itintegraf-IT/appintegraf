@@ -1,7 +1,4 @@
--- Modul Katalog materiálů + napojení IML produktů
--- POZOR: Pro `prisma migrate deploy` použijte složku:
---   prisma/migrations/20260518100000_materialy_module/migration.sql
--- Tento soubor je záloha pro ruční spuštění (mysql < …).
+-- Modul Katalog materiálů + napojení IML produktů (základ – musí běžet před ALTER migracemi)
 SET NAMES utf8mb4;
 
 ALTER TABLE `file_uploads`
