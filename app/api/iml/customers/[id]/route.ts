@@ -3,11 +3,25 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import { resolveCatalogCustomerId } from "@/lib/iml-customer-catalog";
+import { assertValidUnitAssignment } from "@/lib/iml-customer-unit-rules";
+import { normalizeTaxCountry } from "@/lib/iml-customer-units";
 import {
-  validateCzPhone,
-  validateDic,
+  parseIncomingContacts,
+  parseIncomingEmails,
+  pickLegacyContactPerson,
+  pickLegacyEmailFromNested,
+  pickLegacyPhoneFromContacts,
+  syncCustomerContacts,
+  syncCustomerEmails,
+  type NormalizedCustomerContact,
+  validateNestedContacts,
+  validateNestedEmails,
+} from "@/lib/iml-customer-nested";
+import {
   validateEmail,
-  validateIco,
+  validateInternationalPhone,
+  validateTaxIds,
 } from "@/lib/iml-validation";
 
 export async function GET(
@@ -29,11 +43,35 @@ export async function GET(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
+  const catalogCustomerId = await resolveCatalogCustomerId(id);
+
   const customer = await prisma.iml_customers.findUnique({
     where: { id },
     include: {
-      iml_products: { select: { id: true, ig_code: true, ig_short_name: true, client_name: true } },
-      iml_orders: { select: { id: true, order_number: true, order_date: true, status: true, total: true } },
+      parent: { select: { id: true, name: true, unit_type: true } },
+      branches: {
+        orderBy: [{ sort_order: "asc" }, { name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          unit_type: true,
+          city: true,
+          email: true,
+          phone: true,
+          sort_order: true,
+        },
+      },
+      iml_customer_emails: { orderBy: [{ sort_order: "asc" }, { id: "asc" }] },
+      iml_customer_contacts: { orderBy: [{ sort_order: "asc" }, { id: "asc" }] },
+      iml_products: {
+        where: { customer_id: catalogCustomerId },
+        select: { id: true, ig_code: true, ig_short_name: true, client_name: true },
+      },
+      iml_orders: {
+        select: { id: true, order_number: true, order_date: true, status: true, total: true },
+        orderBy: { order_date: "desc" },
+        take: 50,
+      },
     },
   });
 
@@ -41,7 +79,10 @@ export async function GET(
     return NextResponse.json({ error: "Zákazník nenalezen" }, { status: 404 });
   }
 
-  return NextResponse.json(customer);
+  return NextResponse.json({
+    ...customer,
+    catalog_customer_id: catalogCustomerId,
+  });
 }
 
 export async function PUT(
@@ -84,68 +125,134 @@ export async function PUT(
       postal_code = null,
       country = "Česká republika",
       billing_company = null,
+      tax_country = null,
       ico = null,
       dic = null,
       label_requirements = null,
       pallet_packaging = null,
       prepress_notes = null,
+      parent_id = existing.parent_id,
+      unit_type = existing.unit_type,
+      sort_order = existing.sort_order,
+      emails: emailsRaw,
+      contacts: contactsRaw,
+      sync_emails = false,
+      sync_contacts = false,
     } = body;
 
     if (!name || !String(name).trim()) {
       return NextResponse.json({ error: "Vyplňte název zákazníka", field: "name" }, { status: 400 });
     }
 
+    const taxCountry = normalizeTaxCountry(tax_country) ?? existing.tax_country;
     const emailV = validateEmail(email);
     if (!emailV.ok) {
       return NextResponse.json({ error: emailV.error, field: "email" }, { status: 400 });
     }
-    const phoneV = validateCzPhone(phone);
+    const phoneV = validateInternationalPhone(phone, (taxCountry ?? "CZ") as "CZ");
     if (!phoneV.ok) {
       return NextResponse.json({ error: phoneV.error, field: "phone" }, { status: 400 });
     }
-    const icoV = validateIco(ico);
+    const { ico: icoV, dic: dicV } = validateTaxIds(taxCountry, ico, dic);
     if (!icoV.ok) {
       return NextResponse.json({ error: icoV.error, field: "ico" }, { status: 400 });
     }
-    const dicV = validateDic(dic);
     if (!dicV.ok) {
       return NextResponse.json({ error: dicV.error, field: "dic" }, { status: 400 });
     }
 
-    if (emailV.value) {
-      const dup = await prisma.iml_customers.findFirst({
-        where: { email: emailV.value, NOT: { id } },
-      });
-      if (dup) {
+    const parentIdParsed =
+      parent_id != null && parent_id !== ""
+        ? parseInt(String(parent_id), 10)
+        : null;
+    const unitCheck = await assertValidUnitAssignment({
+      unitType: unit_type ?? existing.unit_type,
+      parentId: Number.isNaN(parentIdParsed) ? null : parentIdParsed,
+      customerId: id,
+    });
+    if (!unitCheck.ok) {
+      return NextResponse.json({ error: unitCheck.error, field: "parent_id" }, { status: 400 });
+    }
+
+    let emailRows = parseIncomingEmails(emailsRaw);
+    if (sync_emails || emailsRaw != null) {
+      const emailsValidated = await validateNestedEmails(parseIncomingEmails(emailsRaw));
+      if (!emailsValidated.ok) {
         return NextResponse.json(
-          { error: "Zákazník s tímto e-mailem již existuje", field: "email" },
+          { error: emailsValidated.error, field: emailsValidated.field },
           { status: 400 }
         );
       }
+      emailRows = emailsValidated.rows;
     }
 
-    const updated = await prisma.iml_customers.update({
-      where: { id },
-      data: {
-        name: String(name).trim(),
-        email: emailV.value,
-        phone: phoneV.value,
-        contact_person: contact_person ? String(contact_person).trim() : null,
-        allow_under_over_delivery_percent: allow_under_over_delivery_percent != null ? parseFloat(allow_under_over_delivery_percent) : null,
-        customer_note: customer_note ? String(customer_note).trim() : null,
-        billing_address: billing_address ? String(billing_address).trim() : null,
-        shipping_address: shipping_address ? String(shipping_address).trim() : null,
-        individual_requirements: individual_requirements ? String(individual_requirements).trim() : null,
-        city: city ? String(city).trim() : null,
-        postal_code: postal_code ? String(postal_code).trim() : null,
-        country: country ? String(country).trim() : "Česká republika",
-        billing_company: billing_company ? String(billing_company).trim() : null,
-        ico: icoV.value,
-        dic: dicV.value,
-        label_requirements: label_requirements ? String(label_requirements).trim() : null,
-        pallet_packaging: pallet_packaging ? String(pallet_packaging).trim() : null,
-        prepress_notes: prepress_notes ? String(prepress_notes).trim() : null,
-      },
+    let contactRows: NormalizedCustomerContact[] = [];
+    if (sync_contacts || contactsRaw != null) {
+      const contactsValidated = await validateNestedContacts(parseIncomingContacts(contactsRaw));
+      if (!contactsValidated.ok) {
+        return NextResponse.json(
+          { error: contactsValidated.error, field: contactsValidated.field },
+          { status: 400 }
+        );
+      }
+      contactRows = contactsValidated.rows;
+    }
+
+    const legacyEmail =
+      emailV.value ??
+      (emailRows.length > 0 ? pickLegacyEmailFromNested(emailRows) : existing.email);
+    const legacyPhone =
+      phoneV.value ??
+      (contactRows.length > 0 ? pickLegacyPhoneFromContacts(contactRows) : existing.phone);
+    const legacyContact =
+      contact_person != null && String(contact_person).trim() !== ""
+        ? String(contact_person).trim()
+        : contactRows.length > 0
+          ? pickLegacyContactPerson(contactRows)
+          : existing.contact_person;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const row = await tx.iml_customers.update({
+        where: { id },
+        data: {
+          name: String(name).trim(),
+          email: legacyEmail,
+          phone: legacyPhone,
+          contact_person: legacyContact,
+          allow_under_over_delivery_percent:
+            allow_under_over_delivery_percent != null
+              ? parseFloat(allow_under_over_delivery_percent)
+              : null,
+          customer_note: customer_note ? String(customer_note).trim() : null,
+          billing_address: billing_address ? String(billing_address).trim() : null,
+          shipping_address: shipping_address ? String(shipping_address).trim() : null,
+          individual_requirements: individual_requirements
+            ? String(individual_requirements).trim()
+            : null,
+          city: city ? String(city).trim() : null,
+          postal_code: postal_code ? String(postal_code).trim() : null,
+          country: country ? String(country).trim() : "Česká republika",
+          billing_company: billing_company ? String(billing_company).trim() : null,
+          tax_country: taxCountry,
+          ico: icoV.value,
+          dic: dicV.value,
+          label_requirements: label_requirements ? String(label_requirements).trim() : null,
+          pallet_packaging: pallet_packaging ? String(pallet_packaging).trim() : null,
+          prepress_notes: prepress_notes ? String(prepress_notes).trim() : null,
+          parent_id: unitCheck.parentId,
+          unit_type: unitCheck.unitType,
+          sort_order: parseInt(String(sort_order), 10) || 0,
+        },
+      });
+
+      if (sync_emails || emailsRaw != null) {
+        await syncCustomerEmails(tx, id, emailRows);
+      }
+      if (sync_contacts || contactsRaw != null) {
+        await syncCustomerContacts(tx, id, contactRows);
+      }
+
+      return row;
     });
 
     await logImlAudit({
@@ -185,7 +292,10 @@ export async function DELETE(
 
   const existing = await prisma.iml_customers.findUnique({
     where: { id },
-    include: { iml_orders: { take: 1 } },
+    include: {
+      iml_orders: { take: 1 },
+      branches: { take: 1, select: { id: true } },
+    },
   });
 
   if (!existing) {
@@ -195,6 +305,13 @@ export async function DELETE(
   if (existing.iml_orders.length > 0) {
     return NextResponse.json(
       { error: "Zákazníka nelze smazat – má přiřazené objednávky" },
+      { status: 400 }
+    );
+  }
+
+  if (existing.branches.length > 0) {
+    return NextResponse.json(
+      { error: "Nejprve smažte nebo přesuňte pobočky této centrály" },
       { status: 400 }
     );
   }

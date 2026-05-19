@@ -1057,7 +1057,7 @@ model planovani_audit_log {
 model iml_customers {
   id                                Int      @id @default(autoincrement())
   name                              String   @db.VarChar(255)
-  email                             String?  @unique @db.VarChar(255)
+  email                             String?  @db.VarChar(255)
   phone                             String?  @db.VarChar(50)
   contact_person                    String?  @db.VarChar(255)
   allow_under_over_delivery_percent Decimal? @db.Decimal(5, 2)
@@ -1069,22 +1069,67 @@ model iml_customers {
   postal_code                       String?  @db.VarChar(20)
   country                           String?  @default("Česká republika") @db.VarChar(100)
 
-  billing_company    String? @db.VarChar(255)
-  ico                String? @db.VarChar(20)
-  dic                String? @db.VarChar(30)
+  billing_company String? @db.VarChar(255)
+  tax_country     String? @db.VarChar(2)
+  ico             String? @db.VarChar(32)
+  dic             String? @db.VarChar(32)
   label_requirements String? @db.Text
   pallet_packaging   String? @db.Text
   prepress_notes     String? @db.Text
 
+  parent_id  Int?
+  unit_type  String @default("standalone") @db.VarChar(20)
+  sort_order Int    @default(0)
+
   created_at DateTime @default(now()) @db.DateTime(0)
   updated_at DateTime @updatedAt @db.DateTime(0)
+
+  parent   iml_customers?  @relation("CustomerHierarchy", fields: [parent_id], references: [id], onDelete: Restrict)
+  branches iml_customers[] @relation("CustomerHierarchy")
 
   iml_products                    iml_products[]
   iml_orders                      iml_orders[]
   iml_customer_shipping_addresses iml_customer_shipping_addresses[]
   iml_inquiries                   iml_inquiries[]
+  iml_customer_emails             iml_customer_emails[]
+  iml_customer_contacts           iml_customer_contacts[]
 
+  @@index([parent_id])
+  @@index([unit_type])
   @@map("iml_customers")
+}
+
+model iml_customer_emails {
+  id          Int      @id @default(autoincrement())
+  customer_id Int
+  email       String   @db.VarChar(255)
+  kind        String   @default("general") @db.VarChar(30)
+  sort_order  Int      @default(0)
+  is_primary  Boolean  @default(false)
+  created_at  DateTime @default(now()) @db.DateTime(0)
+
+  iml_customers iml_customers @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@index([customer_id])
+  @@index([customer_id, kind])
+  @@map("iml_customer_emails")
+}
+
+model iml_customer_contacts {
+  id          Int      @id @default(autoincrement())
+  customer_id Int
+  name        String   @db.VarChar(255)
+  phone       String?  @db.VarChar(50)
+  email       String?  @db.VarChar(255)
+  role        String?  @db.VarChar(100)
+  sort_order  Int      @default(0)
+  is_primary  Boolean  @default(false)
+  created_at  DateTime @default(now()) @db.DateTime(0)
+
+  iml_customers iml_customers @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@index([customer_id])
+  @@map("iml_customer_contacts")
 }
 
 model iml_products {
@@ -1236,6 +1281,7 @@ model iml_customer_shipping_addresses {
   label_requirements String?  @db.Text
   pallet_packaging   String?  @db.Text
   prepress_notes     String?  @db.Text
+  expedition_note    String?  @db.Text
   created_at         DateTime @default(now()) @db.DateTime(0)
   updated_at         DateTime @updatedAt @db.DateTime(0)
 

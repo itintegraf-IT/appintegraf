@@ -8,8 +8,11 @@ type Customer = {
   id: number;
   name: string;
   email: string | null;
+  primary_email?: string | null;
   phone: string | null;
   contact_person: string | null;
+  unit_type?: string;
+  branches_count?: number;
 };
 
 type Props = { canWrite: boolean };
@@ -98,8 +101,17 @@ export function ImlCustomersClient({ canWrite }: Props) {
             ) : (
               customers.map((c) => (
                 <tr key={c.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
-                  <td className="px-4 py-3 text-gray-600">{c.email ?? "-"}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {c.name}
+                    {(c.branches_count ?? 0) > 0 && (
+                      <span className="ml-2 text-xs font-normal text-gray-500">
+                        ({c.branches_count} poboček)
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {c.primary_email ?? c.email ?? "-"}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{c.contact_person ?? "-"}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-1">

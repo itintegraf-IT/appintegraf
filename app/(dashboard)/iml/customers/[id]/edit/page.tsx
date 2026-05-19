@@ -9,6 +9,12 @@ import CustomerFormSections, {
   type CustomerFormErrors,
   type CustomerFormState,
 } from "../../_components/CustomerFormSections";
+import CustomerEmailsEditor, {
+  type CustomerEmailRow,
+} from "../../_components/CustomerEmailsEditor";
+import CustomerContactsEditor, {
+  type CustomerContactRow,
+} from "../../_components/CustomerContactsEditor";
 import {
   validateCustomerField,
   validateCustomerForm,
@@ -18,12 +24,13 @@ import {
   useViewMode,
 } from "../../../_components/ViewToggle";
 
-type Customer = {
+type CustomerApi = {
   id: number;
   name: string;
   email: string | null;
   phone: string | null;
   contact_person: string | null;
+  tax_country: string | null;
   allow_under_over_delivery_percent: number | null;
   customer_note: string | null;
   billing_address: string | null;
@@ -38,6 +45,20 @@ type Customer = {
   label_requirements: string | null;
   pallet_packaging: string | null;
   prepress_notes: string | null;
+  iml_customer_emails?: Array<{
+    email: string;
+    kind: string;
+    is_primary: boolean;
+    sort_order: number;
+  }>;
+  iml_customer_contacts?: Array<{
+    name: string;
+    phone: string | null;
+    email: string | null;
+    role: string | null;
+    is_primary: boolean;
+    sort_order: number;
+  }>;
 };
 
 export default function ImlCustomerEditPage() {
@@ -49,6 +70,8 @@ export default function ImlCustomerEditPage() {
   const [error, setError] = useState("");
   const [legacyShippingAddress, setLegacyShippingAddress] = useState<string | null>(null);
   const [form, setForm] = useState<CustomerFormState>(emptyCustomerForm);
+  const [emailRows, setEmailRows] = useState<CustomerEmailRow[]>([]);
+  const [contactRows, setContactRows] = useState<CustomerContactRow[]>([]);
   const [errors, setErrors] = useState<CustomerFormErrors>({});
   const [viewMode, setViewMode] = useViewMode("customerForm");
 
@@ -79,13 +102,14 @@ export default function ImlCustomerEditPage() {
   useEffect(() => {
     fetch(`/api/iml/customers/${id}`)
       .then((r) => r.json())
-      .then((data: Customer) => {
+      .then((data: CustomerApi) => {
         if (data?.id) {
           setForm({
             name: data.name ?? "",
             email: data.email ?? "",
             phone: data.phone ?? "",
             contact_person: data.contact_person ?? "",
+            tax_country: data.tax_country ?? "CZ",
             billing_company: data.billing_company ?? "",
             ico: data.ico ?? "",
             dic: data.dic ?? "",
@@ -103,6 +127,24 @@ export default function ImlCustomerEditPage() {
             individual_requirements: data.individual_requirements ?? "",
             customer_note: data.customer_note ?? "",
           });
+          setEmailRows(
+            (data.iml_customer_emails ?? []).map((e) => ({
+              email: e.email,
+              kind: e.kind,
+              is_primary: e.is_primary,
+              sort_order: e.sort_order,
+            }))
+          );
+          setContactRows(
+            (data.iml_customer_contacts ?? []).map((c) => ({
+              name: c.name,
+              phone: c.phone ?? "",
+              email: c.email ?? "",
+              role: c.role ?? "",
+              is_primary: c.is_primary,
+              sort_order: c.sort_order,
+            }))
+          );
           setLegacyShippingAddress(data.shipping_address);
         }
       })
@@ -123,17 +165,24 @@ export default function ImlCustomerEditPage() {
 
     setLoading(true);
 
+    const taxCountry =
+      form.tax_country === "OTHER" ? null : form.tax_country || null;
+
     try {
       const res = await fetch(`/api/iml/customers/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          tax_country: taxCountry,
           allow_under_over_delivery_percent: form.allow_under_over_delivery_percent
             ? parseFloat(form.allow_under_over_delivery_percent)
             : null,
-          // Legacy pole - posilame zpet nezmenene, abychom ho pri uklodeni nesmazali
           shipping_address: legacyShippingAddress,
+          sync_emails: true,
+          emails: emailRows.filter((r) => r.email.trim()),
+          sync_contacts: true,
+          contacts: contactRows.filter((r) => r.name.trim()),
         }),
       });
 
@@ -142,7 +191,10 @@ export default function ImlCustomerEditPage() {
       if (!res.ok) {
         setError(data.error ?? "Chyba při ukládání");
         if (data.field) {
-          setErrors((prev) => ({ ...prev, [data.field as keyof CustomerFormState]: data.error }));
+          setErrors((prev) => ({
+            ...prev,
+            [data.field as keyof CustomerFormState]: data.error,
+          }));
         }
         setLoading(false);
         return;
@@ -198,15 +250,23 @@ export default function ImlCustomerEditPage() {
           onBlurField={handleBlur}
         />
 
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">E-maily</h2>
+          <CustomerEmailsEditor rows={emailRows} onChange={setEmailRows} />
+        </div>
+
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <h2 className="mb-4 text-lg font-semibold text-gray-900">Kontaktní osoby</h2>
+          <CustomerContactsEditor rows={contactRows} onChange={setContactRows} />
+        </div>
+
         {legacyShippingAddress && legacyShippingAddress.trim() !== "" && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
             <div className="flex items-start gap-2">
               <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
               <div className="flex-1">
                 <strong>Legacy pole „Doručovací adresa":</strong> Tento zákazník má
-                vyplněné staré jednořádkové pole, které bylo nahrazeno sekcí „Doručovací
-                adresy" v detailu. Pole zůstává zachováno v databázi, v budoucí fázi
-                migrace bude převedeno a odstraněno.
+                vyplněné staré jednořádkové pole. Spravujte adresy v detailu zákazníka.
                 <div className="mt-1 whitespace-pre-wrap rounded border border-amber-200 bg-white px-2 py-1 text-xs text-gray-700">
                   {legacyShippingAddress}
                 </div>

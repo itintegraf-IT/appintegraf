@@ -9,6 +9,7 @@ export type CustomerFormState = {
   email: string;
   phone: string;
   contact_person: string;
+  tax_country: string;
   billing_company: string;
   ico: string;
   dic: string;
@@ -26,12 +27,22 @@ export type CustomerFormState = {
 
 export type CustomerFormErrors = Partial<Record<keyof CustomerFormState, string>>;
 
+export type CustomerFormSectionId = "identification" | "billing" | "individual" | "other";
+
 type Props = {
   form: CustomerFormState;
   setField: <K extends keyof CustomerFormState>(k: K, v: CustomerFormState[K]) => void;
   mode: ViewMode;
   errors?: CustomerFormErrors;
   onBlurField?: (field: keyof CustomerFormState) => void;
+  /** Zobrazí jen vybrané sekce (např. modal pobočky). */
+  visibleSections?: CustomerFormSectionId[];
+  /** Pobočka: město/PSČ v identifikaci, fakturační sekce bez města. */
+  branchMode?: boolean;
+  /** Bez SectionShell – jen obsah polí (modal). */
+  compact?: boolean;
+  /** Popisek pole název (výchozí „Název zákazníka“). */
+  nameLabel?: string;
 };
 
 const baseInputCls = "w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2";
@@ -52,6 +63,10 @@ export default function CustomerFormSections({
   mode,
   errors,
   onBlurField,
+  visibleSections,
+  branchMode = false,
+  compact = false,
+  nameLabel = "Název zákazníka *",
 }: Props) {
   const err = errors ?? {};
   const blur = (field: keyof CustomerFormState) => () => onBlurField?.(field);
@@ -70,7 +85,7 @@ export default function CustomerFormSections({
       icon: <User className="h-4 w-4" />,
       content: (
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Název zákazníka *" span={2} error={err.name}>
+          <Field label={nameLabel} span={2} error={err.name}>
             <input
               type="text"
               required
@@ -95,7 +110,7 @@ export default function CustomerFormSections({
           <Field
             label="Telefon"
             error={err.phone}
-            hint="formát +420 XXX XXX XXX (mezinárodní, 9 číslic)"
+            hint="mezinárodní formát, např. +420 602 123 456"
           >
             <input
               type="tel"
@@ -115,13 +130,43 @@ export default function CustomerFormSections({
               className={fieldCls(!!err.contact_person)}
             />
           </Field>
+          {branchMode && (
+            <>
+              <Field label="Město" error={err.city}>
+                <input
+                  type="text"
+                  value={form.city}
+                  onChange={(e) => setField("city", e.target.value)}
+                  className={fieldCls(!!err.city)}
+                />
+              </Field>
+              <Field label="PSČ" error={err.postal_code}>
+                <input
+                  type="text"
+                  value={form.postal_code}
+                  onChange={(e) => setField("postal_code", e.target.value)}
+                  className={fieldCls(!!err.postal_code)}
+                />
+              </Field>
+              <Field label="Země" span={2} error={err.country}>
+                <input
+                  type="text"
+                  value={form.country}
+                  onChange={(e) => setField("country", e.target.value)}
+                  className={fieldCls(!!err.country)}
+                />
+              </Field>
+            </>
+          )}
         </div>
       ),
     },
     {
       id: "billing",
-      title: "Fakturační údaje",
-      subtitle: "Údaje pro vystavení faktury (IČO, DIČ, fakturační adresa)",
+      title: branchMode ? "Fakturační / kontaktní adresa" : "Fakturační údaje",
+      subtitle: branchMode
+        ? "Fakturační adresa a daňové údaje pobočky"
+        : "Údaje pro vystavení faktury (IČO, DIČ, fakturační adresa)",
       icon: <Building2 className="h-4 w-4" />,
       content: (
         <div className="grid gap-4 sm:grid-cols-2">
@@ -134,10 +179,26 @@ export default function CustomerFormSections({
               className={fieldCls(!!err.billing_company)}
             />
           </Field>
+          <Field label="Země daně (IČ/DIČ)" error={err.tax_country} hint="ISO kód, např. CZ, SK, DE">
+            <select
+              value={form.tax_country}
+              onChange={(e) => setField("tax_country", e.target.value)}
+              onBlur={blur("tax_country")}
+              className={fieldCls(!!err.tax_country)}
+            >
+              <option value="CZ">CZ – Česká republika</option>
+              <option value="SK">SK – Slovensko</option>
+              <option value="DE">DE – Německo</option>
+              <option value="AT">AT – Rakousko</option>
+              <option value="PL">PL – Polsko</option>
+              <option value="HU">HU – Maďarsko</option>
+              <option value="OTHER">Jiná země</option>
+            </select>
+          </Field>
           <Field
-            label="IČO"
+            label="IČO / identifikační číslo"
             error={err.ico}
-            hint="8 číslic, kontrolní součet dle ARES"
+            hint={form.tax_country === "CZ" ? "8 číslic, kontrolní součet dle ARES" : "2–32 znaků"}
           >
             <input
               type="text"
@@ -151,9 +212,9 @@ export default function CustomerFormSections({
             />
           </Field>
           <Field
-            label="DIČ"
+            label="DIČ / daňové ID"
             error={err.dic}
-            hint="CZ/SK + 8–10 číslic"
+            hint={form.tax_country === "CZ" || form.tax_country === "SK" ? "CZ/SK + číslice" : "2–32 znaků"}
           >
             <input
               type="text"
@@ -173,30 +234,34 @@ export default function CustomerFormSections({
               className={fieldCls(!!err.billing_address)}
             />
           </Field>
-          <Field label="Město" error={err.city}>
-            <input
-              type="text"
-              value={form.city}
-              onChange={(e) => setField("city", e.target.value)}
-              className={fieldCls(!!err.city)}
-            />
-          </Field>
-          <Field label="PSČ" error={err.postal_code}>
-            <input
-              type="text"
-              value={form.postal_code}
-              onChange={(e) => setField("postal_code", e.target.value)}
-              className={fieldCls(!!err.postal_code)}
-            />
-          </Field>
-          <Field label="Země" span={2} error={err.country}>
-            <input
-              type="text"
-              value={form.country}
-              onChange={(e) => setField("country", e.target.value)}
-              className={fieldCls(!!err.country)}
-            />
-          </Field>
+          {!branchMode && (
+            <>
+              <Field label="Město" error={err.city}>
+                <input
+                  type="text"
+                  value={form.city}
+                  onChange={(e) => setField("city", e.target.value)}
+                  className={fieldCls(!!err.city)}
+                />
+              </Field>
+              <Field label="PSČ" error={err.postal_code}>
+                <input
+                  type="text"
+                  value={form.postal_code}
+                  onChange={(e) => setField("postal_code", e.target.value)}
+                  className={fieldCls(!!err.postal_code)}
+                />
+              </Field>
+              <Field label="Země" span={2} error={err.country}>
+                <input
+                  type="text"
+                  value={form.country}
+                  onChange={(e) => setField("country", e.target.value)}
+                  className={fieldCls(!!err.country)}
+                />
+              </Field>
+            </>
+          )}
         </div>
       ),
     },
@@ -277,8 +342,12 @@ export default function CustomerFormSections({
     },
   ];
 
+  const filtered = visibleSections
+    ? sections.filter((s) => visibleSections.includes(s.id as CustomerFormSectionId))
+    : sections;
+
   if (mode === "tabs") {
-    const tabs: TabDef[] = sections.map((s) => ({
+    const tabs: TabDef[] = filtered.map((s) => ({
       id: s.id,
       label: s.title,
       icon: s.icon,
@@ -296,9 +365,19 @@ export default function CustomerFormSections({
     return <Tabs tabs={tabs} storageKey="customerForm" />;
   }
 
+  if (compact) {
+    return (
+      <div className="space-y-4">
+        {filtered.map((s) => (
+          <div key={s.id}>{s.content}</div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
-      {sections.map((s) => (
+      {filtered.map((s) => (
         <SectionShell
           key={s.id}
           title={s.title}
@@ -343,6 +422,7 @@ export const emptyCustomerForm: CustomerFormState = {
   email: "",
   phone: "",
   contact_person: "",
+  tax_country: "CZ",
   billing_company: "",
   ico: "",
   dic: "",

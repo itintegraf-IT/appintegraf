@@ -33,7 +33,7 @@ export default function ImlInquiryAddPage() {
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
 
   useEffect(() => {
-    fetch("/api/iml/customers")
+    fetch("/api/iml/customers?scope=units")
       .then((r) => r.json())
       .then((d) => setCustomers(d.customers ?? []))
       .catch(() => {});

@@ -1,21 +1,31 @@
 import {
-  validateCzPhone,
-  validateDic,
   validateEmail,
-  validateIco,
+  validateInternationalPhone,
+  validateTaxIds,
 } from "@/lib/iml-validation";
+import { normalizeTaxCountry } from "@/lib/iml-customer-units";
 import type {
   CustomerFormErrors,
   CustomerFormState,
 } from "./CustomerFormSections";
 
-/**
- * Klientská validace formuláře zákazníka. Vrací mapu chyb (pokud je objekt prázdný,
- * formulář je validní). Používá stejné validátory jako server (lib/iml-validation),
- * takže UX zpětná vazba a serverová odpověď se shodují.
- */
+function taxCountryForForm(form: CustomerFormState): string | null {
+  const c = form.tax_country === "OTHER" ? null : normalizeTaxCountry(form.tax_country);
+  return c ?? (form.tax_country === "OTHER" ? null : "CZ");
+}
+
+/** Validace formuláře pobočky (stejná pravidla jako zákazník, jiný text u názvu). */
+export function validateBranchForm(form: CustomerFormState): CustomerFormErrors {
+  const errors = validateCustomerForm(form);
+  if (!form.name.trim()) {
+    errors.name = "Vyplňte název pobočky";
+  }
+  return errors;
+}
+
 export function validateCustomerForm(form: CustomerFormState): CustomerFormErrors {
   const errors: CustomerFormErrors = {};
+  const taxCountry = taxCountryForForm(form);
 
   if (!form.name.trim()) {
     errors.name = "Vyplňte název zákazníka";
@@ -24,25 +34,25 @@ export function validateCustomerForm(form: CustomerFormState): CustomerFormError
   const emailV = validateEmail(form.email);
   if (!emailV.ok) errors.email = emailV.error;
 
-  const phoneV = validateCzPhone(form.phone);
+  const phoneV = validateInternationalPhone(
+    form.phone,
+    (taxCountry ?? "CZ") as "CZ"
+  );
   if (!phoneV.ok) errors.phone = phoneV.error;
 
-  const icoV = validateIco(form.ico);
+  const { ico: icoV, dic: dicV } = validateTaxIds(taxCountry, form.ico, form.dic);
   if (!icoV.ok) errors.ico = icoV.error;
-
-  const dicV = validateDic(form.dic);
   if (!dicV.ok) errors.dic = dicV.error;
 
   return errors;
 }
 
-/**
- * Validace jednoho konkrétního pole (pro on-blur handler).
- */
 export function validateCustomerField(
   field: keyof CustomerFormState,
   form: CustomerFormState
 ): string | undefined {
+  const taxCountry = taxCountryForForm(form);
+
   switch (field) {
     case "name":
       return form.name.trim() ? undefined : "Vyplňte název zákazníka";
@@ -51,15 +61,15 @@ export function validateCustomerField(
       return r.ok ? undefined : r.error;
     }
     case "phone": {
-      const r = validateCzPhone(form.phone);
+      const r = validateInternationalPhone(form.phone, (taxCountry ?? "CZ") as "CZ");
       return r.ok ? undefined : r.error;
     }
     case "ico": {
-      const r = validateIco(form.ico);
+      const r = validateTaxIds(taxCountry, form.ico, null).ico;
       return r.ok ? undefined : r.error;
     }
     case "dic": {
-      const r = validateDic(form.dic);
+      const r = validateTaxIds(taxCountry, null, form.dic).dic;
       return r.ok ? undefined : r.error;
     }
     default:

@@ -69,6 +69,7 @@ export default function ImlCustomerAddPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
+          tax_country: form.tax_country === "OTHER" ? null : form.tax_country,
           allow_under_over_delivery_percent: form.allow_under_over_delivery_percent
             ? parseFloat(form.allow_under_over_delivery_percent)
             : null,

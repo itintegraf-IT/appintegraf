@@ -72,7 +72,7 @@ export default function ImlOrderEditPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/iml/customers").then((r) => r.json()),
+      fetch("/api/iml/customers?scope=units").then((r) => r.json()),
       fetch("/api/iml/capabilities").then((r) => r.json()),
       fetch(`/api/iml/orders/${id}`).then((r) => r.json()),
     ])

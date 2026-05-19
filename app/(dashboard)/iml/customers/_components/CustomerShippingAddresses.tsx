@@ -16,6 +16,7 @@ type ShippingAddress = {
   label_requirements: string | null;
   pallet_packaging: string | null;
   prepress_notes: string | null;
+  expedition_note: string | null;
 };
 
 type FormState = {
@@ -29,6 +30,7 @@ type FormState = {
   label_requirements: string;
   pallet_packaging: string;
   prepress_notes: string;
+  expedition_note: string;
 };
 
 const emptyForm: FormState = {
@@ -42,6 +44,7 @@ const emptyForm: FormState = {
   label_requirements: "",
   pallet_packaging: "",
   prepress_notes: "",
+  expedition_note: "",
 };
 
 /**
@@ -116,6 +119,7 @@ export default function CustomerShippingAddresses({
       label_requirements: a.label_requirements ?? "",
       pallet_packaging: a.pallet_packaging ?? "",
       prepress_notes: a.prepress_notes ?? "",
+      expedition_note: a.expedition_note ?? "",
     });
     setModalError(null);
     setModalOpen(true);
@@ -483,6 +487,20 @@ export default function CustomerShippingAddresses({
                         setForm({ ...form, prepress_notes: e.target.value })
                       }
                       rows={2}
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="mb-1 block text-xs font-medium text-gray-700">
+                      Poznámka k expedici
+                    </label>
+                    <textarea
+                      value={form.expedition_note}
+                      onChange={(e) =>
+                        setForm({ ...form, expedition_note: e.target.value })
+                      }
+                      rows={2}
+                      placeholder="Instrukce pro expedici na této adrese"
                       className={inputCls}
                     />
                   </div>

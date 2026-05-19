@@ -10,12 +10,14 @@ Modul IML slouží ke správě zákazníků, katalogu produktů a objednávek v 
 
 | Funkce | Cesta | Popis |
 |--------|-------|-------|
-| Dashboard IML | `/iml` | Přehled, statistiky, reporty, poslední objednávky |
-| Zákazníci | `/iml/customers` | Evidence zákazníků, CRUD, export, import |
-| Produkty | `/iml/products` | Katalog produktů, obrázky, PDF, export, import |
-| Objednávky | `/iml/orders` | Evidence objednávek (Pantone, náhled, expedice), položky, export CSV/Excel, **export podle zvolených polí** (POST), import |
-| Tisk objednávky | `/iml/orders/[id]/print` | HTML sestava pro tisk / uložení PDF (štítek / paletovka MVP) |
-| Nastavení | `/iml/settings` | Vlastní pole, správa rozšíření databáze |
+| Dashboard IML | `/iml` | Přehled, statistiky, konverze poptávek, poslední objednávky |
+| Zákazníci | `/iml/customers` | Evidence zákazníků, dodací adresy, CRUD, export, import |
+| Produkty | `/iml/products` | Katalog produktů, taby (výseky, fólie, Pantone, PDF verze), materiály z katalogu |
+| Poptávky | `/iml/inquiries` | Evidence poptávek, konverze na objednávku |
+| Objednávky | `/iml/orders` | Objednávky, snapshot adresy, export CSV/Excel/XML, import |
+| Report Pantone | `/iml/reports/pantone` | Plánovaná spotřeba barev (report) |
+| Tisk objednávky | `/iml/orders/[id]/print` | HTML sestava pro tisk / uložení PDF |
+| Nastavení | `/iml/settings` | Vlastní pole, číselníky |
 
 ### 1.2 Rychlý start
 
@@ -43,9 +45,18 @@ Globální role uživatele **Admin** (jméno role) má přístup ke všem modul�
 |---------|---------|
 | **Modul** | IML |
 | **Cesta** | `/iml` |
-| **Tabulky** | `iml_customers`, `iml_products`, `iml_orders`, `iml_order_items`, `iml_custom_fields` |
+| **Tabulky** | `iml_customers`, `iml_products`, `iml_orders`, `iml_order_items`, `iml_inquiries`, `iml_inquiry_items`, `iml_product_files`, `iml_pantone_colors`, `iml_product_colors`, `iml_customer_shipping_addresses`, `iml_custom_fields`, … |
 | **Oprávnění** | `iml` (read/write/admin) |
 | **Technologie** | Next.js App Router, Prisma, stávající UI komponenty |
+| **Katalog materiálů** | Vazba na modul [MODUL_MATERIALY.md](./MODUL_MATERIALY.md) – výběr fólie, barvy, papíru, laku na produktu |
+
+### Rozšíření newsec (implementováno)
+
+- **Poptávky** (`/iml/inquiries`) – evidence, položky, konverze na objednávku
+- **Verzování PDF** – tabulka `iml_product_files`, primární verze, historie
+- **Pantone barvy** na produktu + report spotřeby (`/iml/reports/pantone`)
+- **Dodací adresy** zákazníka, snapshot adresy na objednávce
+- Detailní checklist: [IML_NEWSEC_IMPLEMENTATION.md](./IML_NEWSEC_IMPLEMENTATION.md)
 
 ---
 
@@ -88,9 +99,14 @@ Modul IML poskytuje:
 
 ### 3.6 Sekce Klient (zákazník)
 
-- Název zákazníka, Kontaktní osoba, E-mail
-- Procentuální možnost expedovat pod-/nadnáklad, Poznámka
-- Fakturační adresa, Doručovací adresa, Individuální požadavky
+- **Skupina zákazníků:** centrála (`unit_type=headquarters`) a pobočky (`branch`); samostatný zákazník (`standalone`) se po přidání první pobočky stane centrálou.
+- **Objednávka / poptávka:** `customer_id` = konkrétní jednotka (centrála nebo pobočka); doručovací adresy jen z té jednotky.
+- **Katalog produktů:** sdílený na úrovni skupiny – `iml_products.customer_id` = ID centrály; pobočka i centrála objednávají stejné produkty (`resolveCatalogCustomerId`).
+- Více **e-mailů** (obecný, fakturace, objednávky) a **kontaktních osob**; stejný e-mail u více zákazníků je povolen.
+- **Telefony** mezinárodně (`libphonenumber-js`); **IČ/DIČ** dle `tax_country` (CZ/SK algoritmy, jiné země volnější formát).
+- Doručovací adresa: pole **poznámka k expedici** (`expedition_note`).
+- Legacy pole `email`, `phone`, `contact_person` se synchronizují z primárních záznamů pro zpětnou kompatibilitu.
+- **Pobočka** je plnohodnotná jednotka: kontaktní a fakturační adresa, více e-mailů a kontaktních osob (modal na detailu centrály nebo editace pobočky). **Doručovací adresy** se vážou na konkrétní jednotku (`iml_customer_shipping_addresses.customer_id`) – centrála i každá pobočka mají vlastní seznam; v objednávce se vybírá jednotka a její adresy.
 
 ### 3.7 Statistiky a historie
 

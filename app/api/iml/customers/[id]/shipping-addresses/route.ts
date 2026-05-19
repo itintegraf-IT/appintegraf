@@ -104,6 +104,7 @@ export async function POST(
           label_requirements: data.label_requirements,
           pallet_packaging: data.pallet_packaging,
           prepress_notes: data.prepress_notes,
+          expedition_note: data.expedition_note,
         },
       });
     });

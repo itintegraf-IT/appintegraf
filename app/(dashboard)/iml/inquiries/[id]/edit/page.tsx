@@ -43,7 +43,7 @@ export default function ImlInquiryEditPage({
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/iml/customers").then((r) => r.json()),
+      fetch("/api/iml/customers?scope=units").then((r) => r.json()),
       fetch(`/api/iml/inquiries/${id}`).then((r) => r.json()),
     ])
       .then(([custData, inq]) => {

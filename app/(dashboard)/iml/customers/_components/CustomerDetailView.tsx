@@ -93,7 +93,7 @@ export default function CustomerDetailView({
       {stats && <div className="mb-6">{stats}</div>}
 
       {mode === "tabs" ? (
-        <Tabs tabs={tabDefs} storageKey="customerDetail" />
+        <Tabs tabs={tabDefs} storageKey="customerDetail" urlParam="tab" />
       ) : (
         <div className="space-y-6">
           {visible.map((s) => (

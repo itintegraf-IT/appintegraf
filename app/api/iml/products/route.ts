@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import { resolveCatalogCustomerId } from "@/lib/iml-customer-catalog";
 import {
   replaceProductColorsInTx,
   validateProductColorsInput,
@@ -75,7 +76,10 @@ export async function GET(req: NextRequest) {
     ];
   }
   if (customerId) {
-    where.customer_id = parseInt(customerId, 10);
+    const unitId = parseInt(customerId, 10);
+    if (!Number.isNaN(unitId)) {
+      where.customer_id = await resolveCatalogCustomerId(unitId);
+    }
   }
   if (status) {
     where.item_status = status;

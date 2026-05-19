@@ -59,7 +59,7 @@ export default function ImlOrderAddPage() {
   }, [search]);
 
   useEffect(() => {
-    fetch("/api/iml/customers")
+    fetch("/api/iml/customers?scope=units")
       .then((r) => r.json())
       .then((d) => setCustomers(d.customers ?? []))
       .catch(() => {});

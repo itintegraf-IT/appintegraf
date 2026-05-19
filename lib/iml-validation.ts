@@ -1,3 +1,5 @@
+import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
+
 /**
  * Validátory vstupních polí pro IML modul (zákazník, dodavatel, ...).
  *
@@ -41,57 +43,84 @@ export function validateEmail(raw: unknown): ValidationResult {
 }
 
 /**
- * Telefon – akceptujeme:
- *   - mezinárodní předvolbu +420 / +421 + 9 číslic
- *   - bez předvolby 9 číslic (dopíše se +420)
- *   - mezery, pomlčky a závorky ignorujeme
- * Normalizace: "+420 XXX XXX XXX"
+ * Mezinárodní telefon (libphonenumber-js).
+ * Bez předvolby použije defaultCountry (výchozí CZ).
  */
-export function validateCzPhone(raw: unknown): ValidationResult {
+export function validateInternationalPhone(
+  raw: unknown,
+  defaultCountry: CountryCode = "CZ"
+): ValidationResult {
   if (raw == null) return emptyResult();
   const s = String(raw).trim();
   if (s === "") return emptyResult();
 
-  const cleaned = s.replace(/[\s\-().]/g, "");
-  let country = "+420";
-  let digits = cleaned;
-
-  if (cleaned.startsWith("+")) {
-    const match = cleaned.match(/^\+(420|421)(\d+)$/);
-    if (!match) {
-      return {
-        ok: false,
-        value: null,
-        error: "Podporujeme pouze předvolby +420 (CZ) a +421 (SK)",
-      };
-    }
-    country = `+${match[1]}`;
-    digits = match[2];
-  } else if (cleaned.startsWith("00")) {
-    const match = cleaned.match(/^00(420|421)(\d+)$/);
-    if (!match) {
-      return {
-        ok: false,
-        value: null,
-        error: "Podporujeme pouze předvolby 00420 / 00421",
-      };
-    }
-    country = `+${match[1]}`;
-    digits = match[2];
-  } else if (!/^\d+$/.test(cleaned)) {
-    return { ok: false, value: null, error: "Telefon smí obsahovat jen číslice a předvolbu" };
-  }
-
-  if (digits.length !== 9) {
+  const parsed = parsePhoneNumberFromString(s, defaultCountry);
+  if (!parsed || !parsed.isValid()) {
     return {
       ok: false,
       value: null,
-      error: "Telefon musí mít 9 číslic (např. +420 602 123 456)",
+      error: "Neplatné telefonní číslo (uveďte předvolbu, např. +420 602 123 456)",
     };
   }
+  return { ok: true, value: parsed.formatInternational() };
+}
 
-  const formatted = `${country} ${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 9)}`;
-  return { ok: true, value: formatted };
+/** @deprecated Preferujte validateInternationalPhone */
+export function validateCzPhone(raw: unknown): ValidationResult {
+  return validateInternationalPhone(raw, "CZ");
+}
+
+function validateForeignRegistrationId(raw: unknown): ValidationResult {
+  if (raw == null) return emptyResult();
+  const s = String(raw).trim();
+  if (s === "") return emptyResult();
+  const compact = s.replace(/\s+/g, "");
+  if (!/^[A-Za-z0-9./-]{2,32}$/.test(compact)) {
+    return {
+      ok: false,
+      value: null,
+      error: "Identifikační číslo firmy: 2–32 znaků (písmena, číslice, . / -)",
+    };
+  }
+  return { ok: true, value: compact.toUpperCase() };
+}
+
+function validateForeignTaxId(raw: unknown): ValidationResult {
+  if (raw == null) return emptyResult();
+  const s = String(raw).trim();
+  if (s === "") return emptyResult();
+  const compact = s.replace(/[\s/-]/g, "").toUpperCase();
+  if (!/^[A-Z0-9]{2,32}$/.test(compact)) {
+    return {
+      ok: false,
+      value: null,
+      error: "Daňové identifikační číslo: 2–32 znaků (písmena a číslice)",
+    };
+  }
+  return { ok: true, value: compact };
+}
+
+/**
+ * IČO / DIČ podle země (CZ/SK = stávající algoritmy, jinak volnější formát).
+ */
+export function validateTaxIds(
+  taxCountry: string | null | undefined,
+  icoRaw: unknown,
+  dicRaw: unknown
+): { ico: ValidationResult; dic: ValidationResult } {
+  const country = (taxCountry ?? "CZ").toUpperCase();
+  if (country === "CZ") {
+    return { ico: validateIco(icoRaw), dic: validateDic(dicRaw) };
+  }
+  if (country === "SK") {
+    const ico = validateForeignRegistrationId(icoRaw);
+    const dic = validateDic(dicRaw);
+    return { ico, dic };
+  }
+  return {
+    ico: validateForeignRegistrationId(icoRaw),
+    dic: validateForeignTaxId(dicRaw),
+  };
 }
 
 /**

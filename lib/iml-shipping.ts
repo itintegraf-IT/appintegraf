@@ -15,6 +15,7 @@ export type NormalizedShippingAddress = {
   label_requirements: string | null;
   pallet_packaging: string | null;
   prepress_notes: string | null;
+  expedition_note: string | null;
 };
 
 /**
@@ -39,5 +40,6 @@ export function normalizeAddressInput(
     label_requirements: str(raw.label_requirements),
     pallet_packaging: str(raw.pallet_packaging),
     prepress_notes: str(raw.prepress_notes),
+    expedition_note: str(raw.expedition_note),
   };
 }
