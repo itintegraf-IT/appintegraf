@@ -27,7 +27,7 @@ Lze vybrat libovolnou kombinaci: Systém, Kontakty, Majetek, Kalendář, Úkoly,
 
 1. Vyberte moduly (výchozí: vše).
 2. Klikněte **Stáhnout zálohu**.
-3. ZIP se stáhne do prohlížeče.
+3. ZIP se stáhne do prohlížeče (během exportu a stahování se zobrazí průběh v modálním okně, včetně přibližného objemu stažených dat).
 
 ## Obnova (režim „nahradit“)
 
@@ -37,7 +37,11 @@ Data vybraných modulů se **smažou** a nahradí obsahem zálohy.
 2. Zkontrolujte náhled manifestu.
 3. Vyberte moduly k obnově.
 4. Napište potvrzení **`OBNOVIT`**.
-5. Spusťte obnovu.
+5. Spusťte obnovu (zobrazí se modální okno s uplynulým časem; server mezitím maže data, importuje tabulky a obnovuje soubory z archivu).
+
+### IML `iml_product_files` a PDF
+
+Pokud v JSON záloze chybí binární PDF (`pdf_data` je null), obnova se pokusí načíst soubor z cesty `blobs/iml/product-files/{product_id}/{id}.pdf` v archivu. Když ani ten chybí, uloží se prázdný soubor (řádek zůstane, PDF doplníte ručně znovu nahráním).
 
 **Poznámky:**
 

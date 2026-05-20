@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   Download,
@@ -35,6 +35,18 @@ export function BackupRestorePanel() {
   const [serverFiles, setServerFiles] = useState<ServerBackupFile[]>([]);
   const [backupDir, setBackupDir] = useState("");
   const [serverFileName, setServerFileName] = useState("");
+
+  const [exportBytes, setExportBytes] = useState(0);
+  const [importElapsedSec, setImportElapsedSec] = useState(0);
+  const exportBytesUiRef = useRef(0);
+  const exportLastUiMsRef = useRef(0);
+
+  useEffect(() => {
+    if (!importing) return;
+    setImportElapsedSec(0);
+    const id = setInterval(() => setImportElapsedSec((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [importing]);
 
   const moduleList = useMemo(
     () =>
@@ -100,6 +112,9 @@ export function BackupRestorePanel() {
       setError("Vyberte alespoň jeden modul.");
       return;
     }
+    exportBytesUiRef.current = 0;
+    exportLastUiMsRef.current = 0;
+    setExportBytes(0);
     setExporting(true);
     try {
       const res = await fetch("/api/admin/backup/export", {
@@ -111,10 +126,41 @@ export function BackupRestorePanel() {
         const j = (await res.json()) as { error?: string };
         throw new Error(j.error ?? "Export selhal");
       }
-      const blob = await res.blob();
       const disp = res.headers.get("Content-Disposition") ?? "";
       const match = /filename="([^"]+)"/.exec(disp);
       const filename = match?.[1] ?? "integraf-backup.zip";
+
+      const reader = res.body?.getReader();
+      if (!reader) {
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+        setSuccess("Záloha byla stažena.");
+        return;
+      }
+
+      const chunks: BlobPart[] = [];
+      let received = 0;
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          chunks.push(value);
+          received += value.length;
+          exportBytesUiRef.current = received;
+          const now = Date.now();
+          if (now - exportLastUiMsRef.current > 200) {
+            exportLastUiMsRef.current = now;
+            setExportBytes(received);
+          }
+        }
+      }
+      setExportBytes(received);
+      const blob = new Blob(chunks, { type: "application/zip" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -126,6 +172,7 @@ export function BackupRestorePanel() {
       setError(e instanceof Error ? e.message : "Export selhal");
     } finally {
       setExporting(false);
+      setExportBytes(0);
     }
   };
 
@@ -427,6 +474,43 @@ export function BackupRestorePanel() {
           </div>
         </div>
       </section>
+
+      {(exporting || importing) && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="backup-progress-title"
+        >
+          <div className="w-full max-w-lg rounded-xl border border-gray-200 bg-white p-6 shadow-xl">
+            <h3 id="backup-progress-title" className="text-lg font-semibold text-gray-900">
+              {importing ? "Obnova zálohy" : "Export zálohy"}
+            </h3>
+            <p className="mt-3 text-sm text-gray-600">
+              {importing
+                ? "Na serveru probíhá mazání a import tabulek, obnova souborů z archivu. U větších záloh (IML PDF) to může trvat několik minut — nechte stránku otevřenou."
+                : "Server generuje ZIP a data se stahují do prohlížeče. U IML a mnoha souborů může příprava trvat dlouho; níže vidíte průběh stahování."}
+            </p>
+            {importing ? (
+              <div className="mt-6 flex flex-col items-center gap-2">
+                <Loader2 className="h-10 w-10 animate-spin text-red-600" aria-hidden />
+                <p className="text-2xl font-mono font-semibold text-gray-900">{importElapsedSec} s</p>
+                <p className="text-xs text-gray-500">Čas od spuštění obnovy</p>
+              </div>
+            ) : (
+              <div className="mt-6 space-y-2">
+                <Loader2 className="mx-auto h-10 w-10 animate-spin text-red-600" aria-hidden />
+                <p className="text-center text-lg font-semibold text-gray-900">
+                  Staženo {(exportBytes / (1024 * 1024)).toFixed(2)} MB
+                </p>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+                  <div className="h-full w-1/2 animate-pulse rounded-full bg-red-500" />
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

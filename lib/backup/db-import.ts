@@ -2,6 +2,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
 import { ensurePersonalistikaTables } from "@/lib/personalistika-db";
+import { imlProductFileBlobPath } from "@/lib/backup/blobs-iml";
 import { isBlobRef } from "@/lib/backup/serialize";
 import { BLOB_REF_KEY, type BackupModuleId, type BackupTableDef } from "@/lib/backup/types";
 import {
@@ -67,7 +68,8 @@ function prepareRowForInsert(
   for (const col of table.blobColumns ?? []) {
     const val = out[col];
     if (isBlobRef(val)) {
-      const buf = zipEntries.get(val[BLOB_REF_KEY]);
+      const key = val[BLOB_REF_KEY].replace(/\\/g, "/");
+      const buf = zipEntries.get(key);
       out[col] = buf ?? null;
     }
   }
@@ -79,6 +81,21 @@ function prepareRowForInsert(
       out[key] = new Date(val);
     }
   }
+
+  // iml_product_files.pdf_data je v DB povinné; v JSON může být null (starší záloha / chybějící _blob)
+  if (table.name === "iml_product_files") {
+    const pid = Number(out.product_id);
+    const fid = Number(out.id);
+    if (
+      (out.pdf_data === null || out.pdf_data === undefined) &&
+      Number.isFinite(pid) &&
+      Number.isFinite(fid)
+    ) {
+      const blobKey = imlProductFileBlobPath(pid, fid);
+      out.pdf_data = zipEntries.get(blobKey) ?? Buffer.alloc(0);
+    }
+  }
+
   return out;
 }
 
