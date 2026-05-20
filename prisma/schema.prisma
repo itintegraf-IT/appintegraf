@@ -1443,6 +1443,7 @@ model materials {
   cas_number               String?                  @db.VarChar(50)
   is_active              Boolean                  @default(true)
   valid_until            DateTime?                @db.DateTime(0)
+  issued_at              DateTime?                @db.DateTime(0)
   certificate_valid_until DateTime?               @db.DateTime(0)
   thickness_label        String?                  @db.VarChar(80)
   hex_color              String?                  @db.VarChar(7)

@@ -11,8 +11,9 @@ type Material = {
   name: string;
   code: string | null;
   is_active: boolean;
+  created_at?: string;
+  issued_at?: string | null;
   valid_until: string | null;
-  certificate_valid_until?: string | null;
   material_subcategories?: { name: string } | null;
   sds_file?: MaterialFileSummary | null;
   certificate_file?: MaterialFileSummary | null;
@@ -114,6 +115,7 @@ export function MaterialyListClient({
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Hledat ve všech údajích (název, kód, výrobce, podtyp…)"
+          aria-label={categoryLabel ? `Hledat v kategorii ${categoryLabel}` : "Hledat v katalogu materiálů"}
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
         />
         {canWrite && (
@@ -142,8 +144,11 @@ export function MaterialyListClient({
                 <th className="px-4 py-2">Název</th>
                 <th className="px-4 py-2">Kód</th>
                 <th className="px-4 py-2">Podtyp</th>
-                <th className="px-4 py-2">Platnost BL / SDS</th>
-                <th className="px-4 py-2">Platnost certifikátu</th>
+                <th className="px-4 py-2">Datum vložení</th>
+                <th className="px-4 py-2">Vystavení</th>
+                <th className="px-4 py-2">Platnost</th>
+                <th className="px-4 py-2">BL / SDS</th>
+                <th className="px-4 py-2">Certifikát</th>
                 {canWrite ? <th className="min-w-[11rem] px-4 py-2 text-right">Akce</th> : null}
               </tr>
             </thead>
@@ -157,17 +162,14 @@ export function MaterialyListClient({
                   </td>
                   <td className="px-4 py-2 text-gray-600">{m.code ?? "—"}</td>
                   <td className="px-4 py-2 text-gray-600">{m.material_subcategories?.name ?? "—"}</td>
+                  <td className="px-4 py-2 text-gray-600">{fmtDate(m.created_at)}</td>
+                  <td className="px-4 py-2 text-gray-600">{fmtDate(m.issued_at)}</td>
+                  <td className="px-4 py-2 text-gray-600">{fmtDate(m.valid_until)}</td>
                   <td className="px-4 py-2 align-top">
-                    <MaterialDocumentCell
-                      file={m.sds_file}
-                      dateLabel={fmtDate(m.valid_until)}
-                    />
+                    <MaterialDocumentCell file={m.sds_file} />
                   </td>
                   <td className="px-4 py-2 align-top">
-                    <MaterialDocumentCell
-                      file={m.certificate_file}
-                      dateLabel={fmtDate(m.certificate_valid_until)}
-                    />
+                    <MaterialDocumentCell file={m.certificate_file} />
                   </td>
                   {canWrite ? (
                     <td className="px-4 py-2 text-right">

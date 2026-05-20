@@ -21,6 +21,7 @@ const pool = mariadb.createPool({
 });
 
 const COLUMNS = [
+  { name: "issued_at", ddl: "ALTER TABLE `materials` ADD COLUMN `issued_at` DATETIME NULL AFTER `valid_until`" },
   { name: "certificate_valid_until", ddl: "ALTER TABLE `materials` ADD COLUMN `certificate_valid_until` DATETIME NULL" },
   { name: "thickness_label", ddl: "ALTER TABLE `materials` ADD COLUMN `thickness_label` VARCHAR(80) NULL" },
   { name: "hex_color", ddl: "ALTER TABLE `materials` ADD COLUMN `hex_color` VARCHAR(7) NULL" },

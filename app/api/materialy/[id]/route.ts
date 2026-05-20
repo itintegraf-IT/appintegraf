@@ -137,6 +137,10 @@ export async function PUT(
           body.valid_until !== undefined
             ? parseMaterialOptionalDate(body.valid_until)
             : existing.valid_until,
+        issued_at:
+          body.issued_at !== undefined
+            ? parseMaterialOptionalDate(body.issued_at)
+            : existing.issued_at,
         certificate_valid_until:
           body.certificate_valid_until !== undefined
             ? parseMaterialOptionalDate(body.certificate_valid_until)

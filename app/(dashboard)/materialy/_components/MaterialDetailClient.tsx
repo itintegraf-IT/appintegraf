@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Pencil, Archive, Trash2 } from "lucide-react";
-import { DOCUMENT_TYPES, materialCategorySlug } from "@/lib/materialy/categories";
+import { materialCategorySlug } from "@/lib/materialy/categories";
+import { MaterialyLiveAttachmentUploader } from "./MaterialyAttachmentFields";
 
 function categoryListHref(material: Record<string, unknown> | null): string {
   const cat = material?.material_categories as { slug?: string | null } | undefined;
@@ -24,16 +25,18 @@ type FileRow = {
 
 export function MaterialDetailClient({ id, canWrite }: { id: number; canWrite: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [material, setMaterial] = useState<Record<string, unknown> | null>(null);
   const [files, setFiles] = useState<FileRow[]>([]);
-  const [docType, setDocType] = useState("SDS");
-  const [uploading, setUploading] = useState(false);
-  const [fileError, setFileError] = useState("");
   const [actionError, setActionError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [deleting, setDeleting] = useState(false);
+  const [fileDeletingId, setFileDeletingId] = useState<number | null>(null);
+  const [uploadBanner, setUploadBanner] = useState<{ text: string; variant: "success" | "warning" } | null>(
+    null
+  );
 
-  const load = () => {
+  const load = useCallback(() => {
     setLoadError("");
     void (async () => {
       try {
@@ -57,26 +60,53 @@ export function MaterialDetailClient({ id, canWrite }: { id: number; canWrite: b
         setLoadError("Chyba při načítání.");
       }
     })();
-  };
+  }, [id]);
 
   useEffect(() => {
     load();
-  }, [id]);
+  }, [load]);
 
-  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    setFileError("");
-    const fd = new FormData();
-    fd.append("file", file);
-    fd.append("document_type", docType);
-    const res = await fetch(`/api/materialy/${id}/files`, { method: "POST", body: fd });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) setFileError(typeof data.error === "string" ? data.error : "Chyba nahrání");
-    else load();
-    setUploading(false);
-    e.target.value = "";
+  useEffect(() => {
+    const nRaw = searchParams.get("nahrano");
+    const chRaw = searchParams.get("nahrChyb");
+    if (nRaw === null && chRaw === null) return;
+
+    const ok = nRaw !== null ? parseInt(nRaw, 10) : NaN;
+    const fail = chRaw ? parseInt(chRaw, 10) : 0;
+
+    if (Number.isFinite(ok) && ok > 0) {
+      setUploadBanner({
+        variant: "success",
+        text:
+          fail > 0
+            ? `Nahráno ${ok} ${ok === 1 ? "soubor" : "souborů"}, ${fail} se nepodařilo.`
+            : `Nahráno ${ok} ${ok === 1 ? "soubor" : "souborů"}.`,
+      });
+    } else if (fail > 0) {
+      setUploadBanner({
+        variant: "warning",
+        text: `Materiál byl uložen, ale ${fail} ${fail === 1 ? "soubor se nepodařilo" : fail < 5 ? "soubory se nepodařilo" : "souborů se nepodařilo"} nahrát. Dokumenty můžete doplnit níže.`,
+      });
+    }
+
+    router.replace(`/materialy/${id}`, { scroll: false });
+  }, [id, router, searchParams]);
+
+  const onDeleteFile = async (fileId: number, name: string) => {
+    if (!confirm(`Smazat přílohu „${name}“? Soubor bude odstraněn z disku i z evidence.`)) return;
+    setFileDeletingId(fileId);
+    setActionError("");
+    try {
+      const res = await fetch(`/api/materialy/${id}/files/${fileId}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setActionError(typeof data.error === "string" ? data.error : "Smazání se nezdařilo");
+        return;
+      }
+      load();
+    } finally {
+      setFileDeletingId(null);
+    }
   };
 
   const onDeactivate = async () => {
@@ -138,10 +168,29 @@ export function MaterialDetailClient({ id, canWrite }: { id: number; canWrite: b
     return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("cs-CZ");
   };
 
+  const fmtDt = (v: unknown) => {
+    if (v == null || v === "") return "—";
+    const d = new Date(String(v));
+    return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("cs-CZ");
+  };
+
   const isInactive = material.is_active === false;
 
   return (
     <div className="space-y-6">
+      {uploadBanner ? (
+        <p
+          className={
+            uploadBanner.variant === "success"
+              ? "rounded-lg border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-900"
+              : "rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+          }
+          role="status"
+        >
+          {uploadBanner.text}
+        </p>
+      ) : null}
+
       {isInactive ? (
         <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900">
           Tento materiál je v katalogu <strong>neaktivní</strong> (skrytý ve výběrech). Obnovit ho můžete úpravou
@@ -212,12 +261,16 @@ export function MaterialDetailClient({ id, canWrite }: { id: number; canWrite: b
             <dd>{String(material.cas_number ?? "—")}</dd>
           </div>
           <div>
-            <dt className="text-gray-500">Platnost BL / SDS</dt>
-            <dd>{fmt(material.valid_until)}</dd>
+            <dt className="text-gray-500">Datum vložení</dt>
+            <dd>{fmtDt(material.created_at)}</dd>
           </div>
           <div>
-            <dt className="text-gray-500">Platnost certifikátu</dt>
-            <dd>{fmt(material.certificate_valid_until)}</dd>
+            <dt className="text-gray-500">Vystavení</dt>
+            <dd>{fmt(material.issued_at)}</dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Platnost</dt>
+            <dd>{fmt(material.valid_until)}</dd>
           </div>
         </dl>
         {material.notes ? (
@@ -233,36 +286,33 @@ export function MaterialDetailClient({ id, canWrite }: { id: number; canWrite: b
 
       <div className="rounded-xl border border-gray-200 bg-white p-6">
         <h3 className="mb-3 font-semibold">Dokumenty (BL, TDS, …)</h3>
-        {fileError && <p className="mb-2 text-sm text-red-600">{fileError}</p>}
-        {canWrite && (
-          <div className="mb-4 flex flex-wrap items-center gap-2">
-            <select
-              value={docType}
-              onChange={(e) => setDocType(e.target.value)}
-              className="rounded-lg border border-gray-300 px-2 py-1 text-sm"
-            >
-              {DOCUMENT_TYPES.map((t: (typeof DOCUMENT_TYPES)[number]) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-            <label className="cursor-pointer rounded-lg border border-gray-300 px-3 py-1 text-sm hover:bg-gray-50">
-              {uploading ? "Nahrávám…" : "Nahrát soubor"}
-              <input type="file" className="hidden" onChange={onUpload} disabled={uploading} />
-            </label>
+        {canWrite ? (
+          <div className="mb-4">
+            <MaterialyLiveAttachmentUploader materialId={id} onUploaded={load} />
           </div>
-        )}
+        ) : null}
         <ul className="divide-y text-sm">
           {files.map((f) => (
-            <li key={f.id} className="flex items-center justify-between py-2">
+            <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span>
                 {f.original_filename}{" "}
                 <span className="text-gray-400">({f.document_type ?? "—"})</span>
               </span>
-              <a href={f.file_path} target="_blank" rel="noreferrer" className="text-red-600 hover:underline">
-                Stáhnout
-              </a>
+              <span className="flex shrink-0 items-center gap-2">
+                <a href={f.file_path} target="_blank" rel="noreferrer" className="text-red-600 hover:underline">
+                  Stáhnout
+                </a>
+                {canWrite ? (
+                  <button
+                    type="button"
+                    disabled={fileDeletingId === f.id}
+                    onClick={() => void onDeleteFile(f.id, f.original_filename)}
+                    className="text-gray-600 underline-offset-2 hover:text-red-700 hover:underline disabled:opacity-50"
+                  >
+                    {fileDeletingId === f.id ? "…" : "Smazat"}
+                  </button>
+                ) : null}
+              </span>
             </li>
           ))}
           {files.length === 0 && <li className="py-2 text-gray-500">Žádné dokumenty</li>}

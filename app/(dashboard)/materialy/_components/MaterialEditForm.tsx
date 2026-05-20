@@ -30,8 +30,8 @@ function materialPayload(form: MaterialFormValues): Record<string, unknown> {
     description: form.description.trim() || null,
     cas_number: form.cas_number.trim() || null,
     notes: form.notes.trim() || null,
+    issued_at: form.issued_at || null,
     valid_until: form.valid_until || null,
-    certificate_valid_until: form.certificate_valid_until || null,
     is_active: form.is_active,
   };
 }
@@ -41,6 +41,7 @@ export function MaterialEditForm({ materialId }: { materialId: number }) {
   const [loadError, setLoadError] = useState("");
   const [loadingData, setLoadingData] = useState(true);
   const [form, setForm] = useState<MaterialFormValues | null>(null);
+  const [materialCreatedAt, setMaterialCreatedAt] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -63,6 +64,9 @@ export function MaterialEditForm({ materialId }: { materialId: number }) {
         }
         const cat = String(m.category_code ?? "FOIL");
         if (!cancelled) {
+          setMaterialCreatedAt(
+            m.created_at != null ? String(m.created_at) : null
+          );
           setForm({
             ...emptyMaterialFormValues(cat || "FOIL"),
             subcategory_id:
@@ -74,8 +78,8 @@ export function MaterialEditForm({ materialId }: { materialId: number }) {
             description: String(m.description ?? ""),
             cas_number: String(m.cas_number ?? ""),
             notes: String(m.notes ?? ""),
+            issued_at: toDateInputValue(m.issued_at as string | undefined),
             valid_until: toDateInputValue(m.valid_until as string | undefined),
-            certificate_valid_until: toDateInputValue(m.certificate_valid_until as string | undefined),
             is_active: m.is_active !== false,
           });
         }
@@ -109,6 +113,7 @@ export function MaterialEditForm({ materialId }: { materialId: number }) {
       setLoading(false);
       return;
     }
+    setLoading(false);
     router.push(`/materialy/${materialId}`);
     router.refresh();
   };
@@ -118,7 +123,13 @@ export function MaterialEditForm({ materialId }: { materialId: number }) {
       onSubmit={submit}
       className="max-w-4xl rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
     >
-      <MaterialFormFields form={form} setForm={setForm} mode="edit" error={error} />
+      <MaterialFormFields
+        form={form}
+        setForm={setForm}
+        mode="edit"
+        error={error}
+        materialCreatedAt={materialCreatedAt}
+      />
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
         <button

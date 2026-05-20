@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { MaterialCategoryRow, MaterialCategoryCode } from "@/lib/materialy/categories";
-import { MaterialyDeferredAttachmentFields } from "./MaterialyAttachmentFields";
+import {
+  MaterialyDeferredAttachmentFields,
+  type PendingMaterialAttachment,
+} from "./MaterialyAttachmentFields";
 
 const inputCls =
   "w-full rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400";
@@ -18,8 +21,8 @@ export type MaterialFormValues = {
   description: string;
   cas_number: string;
   notes: string;
+  issued_at: string;
   valid_until: string;
-  certificate_valid_until: string;
   is_active: boolean;
 };
 
@@ -35,10 +38,16 @@ export const emptyMaterialFormValues = (
   description: "",
   cas_number: "",
   notes: "",
+  issued_at: "",
   valid_until: "",
-  certificate_valid_until: "",
   is_active: true,
 });
+
+function fmtCreatedAt(iso: string | null | undefined) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("cs-CZ");
+}
 
 type Subcat = { id: number; name: string };
 
@@ -47,10 +56,12 @@ type Props = {
   setForm: (next: MaterialFormValues) => void;
   mode: "create" | "edit";
   error?: string;
-  pendingDocType?: string;
-  onPendingDocTypeChange?: (v: string) => void;
-  onPendingFileChange?: (f: File | null) => void;
-  pendingFileName?: string | null;
+  /** ISO created_at – jen úprava, zobrazení „datum vložení“ */
+  materialCreatedAt?: string | null;
+  pendingAttachments?: PendingMaterialAttachment[];
+  onPendingAttachmentsChange?: (next: PendingMaterialAttachment[]) => void;
+  defaultAttachmentTypeForNew?: string;
+  onDefaultAttachmentTypeForNewChange?: (v: string) => void;
 };
 
 export function MaterialFormFields({
@@ -58,10 +69,11 @@ export function MaterialFormFields({
   setForm,
   mode,
   error,
-  pendingDocType,
-  onPendingDocTypeChange,
-  onPendingFileChange,
-  pendingFileName,
+  materialCreatedAt,
+  pendingAttachments = [],
+  onPendingAttachmentsChange,
+  defaultAttachmentTypeForNew = "SDS",
+  onDefaultAttachmentTypeForNewChange,
 }: Props) {
   const [subs, setSubs] = useState<Subcat[]>([]);
   const [subsLoading, setSubsLoading] = useState(false);
@@ -192,7 +204,7 @@ export function MaterialFormFields({
         </div>
       </div>
 
-      <details className="rounded-lg border border-gray-200 bg-gray-50/60 open:bg-white">
+      <details open className="rounded-lg border border-gray-200 bg-gray-50/60 open:bg-white">
         <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-gray-700">
           Podrobnosti a dokumenty <span className="font-normal text-gray-400">(volitelné)</span>
         </summary>
@@ -206,7 +218,7 @@ export function MaterialFormFields({
               className={inputCls}
             />
           </div>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="mb-0.5 block text-xs font-medium text-gray-600">Číslo CAS</label>
               <input
@@ -216,20 +228,34 @@ export function MaterialFormFields({
               />
             </div>
             <div>
-              <label className="mb-0.5 block text-xs font-medium text-gray-600">Platnost BL / SDS</label>
+              <label className="mb-0.5 block text-xs font-medium text-gray-600">Datum vložení</label>
+              {mode === "create" ? (
+                <p className="rounded-md border border-dashed border-gray-200 bg-white px-2.5 py-1.5 text-sm text-gray-600">
+                  Nastaví se automaticky při uložení záznamu.
+                </p>
+              ) : (
+                <input
+                  readOnly
+                  value={fmtCreatedAt(materialCreatedAt ?? undefined)}
+                  className={`${inputCls} bg-gray-50 text-gray-700`}
+                />
+              )}
+            </div>
+            <div>
+              <label className="mb-0.5 block text-xs font-medium text-gray-600">Vystavení</label>
               <input
                 type="date"
-                value={form.valid_until}
-                onChange={(e) => patch({ valid_until: e.target.value })}
+                value={form.issued_at}
+                onChange={(e) => patch({ issued_at: e.target.value })}
                 className={inputCls}
               />
             </div>
             <div>
-              <label className="mb-0.5 block text-xs font-medium text-gray-600">Platnost certifikátu</label>
+              <label className="mb-0.5 block text-xs font-medium text-gray-600">Platnost</label>
               <input
                 type="date"
-                value={form.certificate_valid_until}
-                onChange={(e) => patch({ certificate_valid_until: e.target.value })}
+                value={form.valid_until}
+                onChange={(e) => patch({ valid_until: e.target.value })}
                 className={inputCls}
               />
             </div>
@@ -244,19 +270,17 @@ export function MaterialFormFields({
             />
           </div>
 
-          {mode === "create" && pendingDocType != null && onPendingDocTypeChange && onPendingFileChange ? (
+          {mode === "create" &&
+          onPendingAttachmentsChange &&
+          onDefaultAttachmentTypeForNewChange ? (
             <div>
               <MaterialyDeferredAttachmentFields
                 compact
-                docType={pendingDocType}
-                onDocTypeChange={onPendingDocTypeChange}
-                onFileChange={onPendingFileChange}
+                defaultTypeForNew={defaultAttachmentTypeForNew}
+                onDefaultTypeForNewChange={onDefaultAttachmentTypeForNewChange}
+                attachments={pendingAttachments}
+                onAttachmentsChange={onPendingAttachmentsChange}
               />
-              {pendingFileName ? (
-                <p className="mt-1 text-xs text-gray-500">
-                  Soubor: <span className="font-medium">{pendingFileName}</span>
-                </p>
-              ) : null}
             </div>
           ) : null}
         </div>

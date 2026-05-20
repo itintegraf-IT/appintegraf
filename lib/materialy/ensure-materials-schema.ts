@@ -4,6 +4,10 @@ let ensured = false;
 
 const COLUMNS: Array<{ name: string; ddl: string }> = [
   {
+    name: "issued_at",
+    ddl: "ALTER TABLE `materials` ADD COLUMN `issued_at` DATETIME NULL AFTER `valid_until`",
+  },
+  {
     name: "certificate_valid_until",
     ddl: "ALTER TABLE `materials` ADD COLUMN `certificate_valid_until` DATETIME NULL",
   },

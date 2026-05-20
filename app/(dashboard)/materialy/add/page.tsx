@@ -8,6 +8,8 @@ import {
   emptyMaterialFormValues,
   type MaterialFormValues,
 } from "../_components/MaterialFormFields";
+import type { PendingMaterialAttachment } from "../_components/MaterialyAttachmentFields";
+import { MATERIALY_MAX_BYTES } from "@/lib/materialy/upload";
 
 function materialPayload(form: MaterialFormValues): Record<string, unknown> {
   return {
@@ -20,8 +22,8 @@ function materialPayload(form: MaterialFormValues): Record<string, unknown> {
     description: form.description.trim() || null,
     cas_number: form.cas_number.trim() || null,
     notes: form.notes.trim() || null,
+    issued_at: form.issued_at || null,
     valid_until: form.valid_until || null,
-    certificate_valid_until: form.certificate_valid_until || null,
   };
 }
 
@@ -32,8 +34,8 @@ function MaterialAddForm() {
   const [form, setForm] = useState<MaterialFormValues>(() => emptyMaterialFormValues(initialCategory || "PAPER"));
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [pendingDocType, setPendingDocType] = useState("SDS");
+  const [pendingAttachments, setPendingAttachments] = useState<PendingMaterialAttachment[]>([]);
+  const [defaultAttachmentTypeForNew, setDefaultAttachmentTypeForNew] = useState("SDS");
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,25 +61,46 @@ function MaterialAddForm() {
       return;
     }
 
-    if (pendingFile) {
+    if (pendingAttachments.length === 0) {
+      setLoading(false);
+      router.push(`/materialy/${created.id}`);
+      return;
+    }
+
+    let ok = 0;
+    const errs: string[] = [];
+    for (const row of pendingAttachments) {
+      const file = row.file;
+      if (file.size > MATERIALY_MAX_BYTES) {
+        errs.push(`${file.name}: větší než 20 MB`);
+        continue;
+      }
       const fd = new FormData();
-      fd.append("file", pendingFile);
-      fd.append("document_type", pendingDocType);
+      fd.append("file", file);
+      fd.append("document_type", row.documentType);
       const up = await fetch(`/api/materialy/${created.id}/files`, { method: "POST", body: fd });
       const upData = await up.json().catch(() => ({}));
       if (!up.ok) {
-        setError(
-          typeof upData.error === "string"
-            ? `${upData.error} (materiál byl vytvořen — dokument nahrajte na detailu.)`
-            : "Materiál byl vytvořen, dokument se nepodařilo nahrát."
+        errs.push(
+          `${file.name}: ${typeof upData.error === "string" ? upData.error : "chyba nahrání"}`
         );
-        setLoading(false);
-        router.push(`/materialy/${created.id}`);
-        return;
+      } else {
+        ok += 1;
       }
     }
 
-    router.push(`/materialy/${created.id}`);
+    if (errs.length > 0 && ok === 0) {
+      setLoading(false);
+      router.push(`/materialy/${created.id}?nahrano=0&nahrChyb=${errs.length}`);
+      return;
+    }
+
+    const q = new URLSearchParams();
+    if (ok > 0) q.set("nahrano", String(ok));
+    if (errs.length > 0) q.set("nahrChyb", String(errs.length));
+
+    setLoading(false);
+    router.push(`/materialy/${created.id}${q.toString() ? `?${q}` : ""}`);
   };
 
   return (
@@ -90,10 +113,10 @@ function MaterialAddForm() {
         setForm={setForm}
         mode="create"
         error={error}
-        pendingDocType={pendingDocType}
-        onPendingDocTypeChange={setPendingDocType}
-        onPendingFileChange={setPendingFile}
-        pendingFileName={pendingFile?.name ?? null}
+        pendingAttachments={pendingAttachments}
+        onPendingAttachmentsChange={setPendingAttachments}
+        defaultAttachmentTypeForNew={defaultAttachmentTypeForNew}
+        onDefaultAttachmentTypeForNewChange={setDefaultAttachmentTypeForNew}
       />
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">

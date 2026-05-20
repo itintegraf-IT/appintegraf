@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { canReadMaterialCatalog } from "@/lib/materialy/access";
@@ -18,7 +19,9 @@ export default async function MaterialDetailPage({ params }: { params: Promise<{
   return (
     <>
       <h1 className="mb-4 text-2xl font-bold">Detail materiálu</h1>
-      <MaterialDetailClient id={id} canWrite={canWrite} />
+      <Suspense fallback={<p className="text-sm text-gray-500">Načítání…</p>}>
+        <MaterialDetailClient id={id} canWrite={canWrite} />
+      </Suspense>
     </>
   );
 }

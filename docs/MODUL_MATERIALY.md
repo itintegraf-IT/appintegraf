@@ -23,7 +23,7 @@ Centrální evidence materiálů (papír, fólie, barvy, laky) včetně bezpečn
 | Přehled kategorií | `/materialy` | Dlaždice Papír, Fólie, Barvy, Laky + globální vyhledávání |
 | Seznam v kategorii | `/materialy/papir`, `/foilie`, `/barvy`, `/laky` | Filtr podkategorií, tabulka materiálů |
 | Detail | `/materialy/[id]` | Údaje materiálu, přílohy, platnost certifikátu |
-| Nový / úprava | `/materialy/add`, `/materialy/[id]/edit` | Formulář (vyžaduje write) |
+| Nový / úprava | `/materialy/add`, `/materialy/[id]/edit` | Formulář (vyžaduje write); u nového materiálu lze před uložením připravit více příloh s různými typy dokumentů |
 
 ---
 
@@ -50,6 +50,8 @@ Podkategorie se spravují v rámci kategorie (API `subcategories`).
 | `OTHER` | Jiný dokument |
 
 Povolené formáty: PDF, obrázky (JPEG, PNG, WebP, GIF), Word, Excel (max 20 MB).
+
+Při **vytváření nového materiálu** lze před odesláním formuláře přidat více souborů (včetně složky v podporovaných prohlížečích) a u **každého řádku** zvlášť zvolit typ dokumentu (SDS / TDS / certifikát / jiný). Pro nově přidané soubory se použije výchozí typ z pole „Typ pro nově přidané soubory“; volitelně lze jedním klikem nastavit stejný typ všem řádkům („Nastavit všem“).
 
 ---
 

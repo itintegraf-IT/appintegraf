@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
         notes: body.notes ? String(body.notes).trim() : null,
         is_active: body.is_active !== false,
         valid_until: parseMaterialOptionalDate(body.valid_until),
+        issued_at: parseMaterialOptionalDate(body.issued_at),
         certificate_valid_until: parseMaterialOptionalDate(body.certificate_valid_until),
       },
     });
