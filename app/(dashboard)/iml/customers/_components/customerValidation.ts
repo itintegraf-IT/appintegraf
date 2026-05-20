@@ -4,6 +4,7 @@ import {
   validateTaxIds,
 } from "@/lib/iml-validation";
 import { normalizeTaxCountry } from "@/lib/iml-customer-units";
+import { vatPrefixToPhoneCountry } from "@/lib/iml-eu-tax";
 import type {
   CustomerFormErrors,
   CustomerFormState,
@@ -36,7 +37,7 @@ export function validateCustomerForm(form: CustomerFormState): CustomerFormError
 
   const phoneV = validateInternationalPhone(
     form.phone,
-    (taxCountry ?? "CZ") as "CZ"
+    vatPrefixToPhoneCountry(taxCountry)
   );
   if (!phoneV.ok) errors.phone = phoneV.error;
 
@@ -61,7 +62,7 @@ export function validateCustomerField(
       return r.ok ? undefined : r.error;
     }
     case "phone": {
-      const r = validateInternationalPhone(form.phone, (taxCountry ?? "CZ") as "CZ");
+      const r = validateInternationalPhone(form.phone, vatPrefixToPhoneCountry(taxCountry));
       return r.ok ? undefined : r.error;
     }
     case "ico": {

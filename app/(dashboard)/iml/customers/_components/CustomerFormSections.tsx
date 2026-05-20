@@ -1,6 +1,11 @@
 "use client";
 
 import { Building2, FileText, User, Wrench } from "lucide-react";
+import {
+  getFrequentEuCountries,
+  getOtherEuCountries,
+  getTaxFieldHints,
+} from "@/lib/iml-eu-tax";
 import { Tabs, type TabDef } from "../../_components/Tabs";
 import { SectionShell, type ViewMode } from "../../_components/ViewToggle";
 
@@ -73,6 +78,21 @@ export default function CustomerFormSections({
 }: Props) {
   const err = errors ?? {};
   const blur = (field: keyof CustomerFormState) => () => onBlurField?.(field);
+  const taxHints = getTaxFieldHints(form.tax_country);
+  const icoDigitsOnly =
+    form.tax_country === "CZ" || form.tax_country === "SK";
+
+  const handleIcoChange = (raw: string) => {
+    if (icoDigitsOnly) {
+      setField("ico", raw.replace(/[^\d\s]/g, ""));
+      return;
+    }
+    setField("ico", raw.replace(/[^\dA-Za-z./-\s]/g, ""));
+  };
+
+  const handleTaxCountryChange = (value: string) => {
+    setField("tax_country", value);
+  };
 
   const sections: Array<{
     id: string;
@@ -185,34 +205,46 @@ export default function CustomerFormSections({
               className={fieldCls(!!err.billing_company)}
             />
           </Field>
-          <Field label="Země daně (IČ/DIČ)" error={err.tax_country} hint="ISO kód, např. CZ, SK, DE">
+          <Field
+            label="Země daně (IČ/DIČ)"
+            error={err.tax_country}
+            hint="VAT prefix (EL = Řecko)"
+          >
             <select
               value={form.tax_country}
-              onChange={(e) => setField("tax_country", e.target.value)}
+              onChange={(e) => handleTaxCountryChange(e.target.value)}
               onBlur={blur("tax_country")}
               className={fieldCls(!!err.tax_country)}
             >
-              <option value="CZ">CZ – Česká republika</option>
-              <option value="SK">SK – Slovensko</option>
-              <option value="DE">DE – Německo</option>
-              <option value="AT">AT – Rakousko</option>
-              <option value="PL">PL – Polsko</option>
-              <option value="HU">HU – Maďarsko</option>
-              <option value="OTHER">Jiná země</option>
+              <optgroup label="Často používané">
+                {getFrequentEuCountries().map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Evropská unie">
+                {getOtherEuCountries().map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
+              <option value="OTHER">Jiná země (mimo EU)</option>
             </select>
           </Field>
           <Field
             label="IČO / identifikační číslo"
             error={err.ico}
-            hint={form.tax_country === "CZ" ? "8 číslic, kontrolní součet dle ARES" : "2–32 znaků"}
+            hint={taxHints.icoHint}
           >
             <input
               type="text"
               value={form.ico}
-              onChange={(e) => setField("ico", e.target.value.replace(/[^\d\s]/g, ""))}
+              onChange={(e) => handleIcoChange(e.target.value)}
               onBlur={blur("ico")}
-              placeholder="12345678"
-              inputMode="numeric"
+              placeholder={form.tax_country === "CZ" ? "12345678" : undefined}
+              inputMode={icoDigitsOnly ? "numeric" : "text"}
               className={fieldCls(!!err.ico)}
               aria-invalid={!!err.ico}
             />
@@ -220,14 +252,14 @@ export default function CustomerFormSections({
           <Field
             label="DIČ / daňové ID"
             error={err.dic}
-            hint={form.tax_country === "CZ" || form.tax_country === "SK" ? "CZ/SK + číslice" : "2–32 znaků"}
+            hint={taxHints.dicHint}
           >
             <input
               type="text"
               value={form.dic}
               onChange={(e) => setField("dic", e.target.value)}
               onBlur={blur("dic")}
-              placeholder="CZ12345678"
+              placeholder={taxHints.dicPlaceholder}
               className={fieldCls(!!err.dic)}
               aria-invalid={!!err.dic}
             />

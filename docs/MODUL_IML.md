@@ -103,7 +103,10 @@ Modul IML poskytuje:
 - **Objednávka / poptávka:** `customer_id` = konkrétní jednotka (centrála nebo pobočka); doručovací adresy jen z té jednotky.
 - **Katalog produktů:** sdílený na úrovni skupiny – `iml_products.customer_id` = ID centrály; pobočka i centrála objednávají stejné produkty (`resolveCatalogCustomerId`).
 - Více **e-mailů** (obecný, fakturace, objednávky) a **kontaktních osob**; stejný e-mail u více zákazníků je povolen.
-- **Telefony** mezinárodně (`libphonenumber-js`); **IČ/DIČ** dle `tax_country` (CZ/SK algoritmy, jiné země volnější formát).
+- **Telefony** mezinárodně (`libphonenumber-js`); země pro parsování telefonu se odvozuje od VAT prefixu (`vatPrefixToPhoneCountry`, u Řecka **EL → GR**).
+- **Země daně (`tax_country`)** – výběr ze všech **27 členských států EU** (VAT prefix; Řecko = **EL**, ne ISO `GR`) nebo **Jiná země (mimo EU)** → v API `null`, volná validace IČ/DIČ.
+- **IČ / identifikační číslo:** pro **CZ** kontrolní součet dle ARES (`validateIco`); pro **SK** 8–10 číslic; pro ostatní EU národní formát (regex dle státu, obecně 2–15 alfanumerických znaků); mimo EU 2–32 znaků.
+- **DIČ (VAT):** pro každý EU stát lokální validace formátu regexem včetně prefixu (`lib/iml-eu-tax.ts`, `validateEuVat`) – např. `DE123456789`, `ATU12345678`, `NL123456789B01`, `EL123456789`. **Online ověření VIES zatím není** (plánováno později).
 - Doručovací adresa: pole **poznámka k expedici** (`expedition_note`).
 - Legacy pole `email`, `phone`, `contact_person` se synchronizují z primárních záznamů pro zpětnou kompatibilitu.
 - **Pobočka** je plnohodnotná jednotka: kontaktní a fakturační adresa, více e-mailů a kontaktních osob. Správa **centrály, poboček a doručovacích adres** probíhá na jedné stránce **Přidat / Upravit zákazníka**: zaškrtávací pole **Centrála**, karta doručovacích adres hlavní jednotky (vždy) a karta poboček (po zaškrtnutí Centrála) s vnořenými adresami u každé pobočky; uložení jedním tlačítkem přes rozšířené API `POST/PUT /api/iml/customers`. Na **detailu** je u poboček jen přehled a odkaz „Spravovat ve formuláři“.

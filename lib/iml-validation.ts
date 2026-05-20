@@ -1,4 +1,9 @@
 import { parsePhoneNumberFromString, type CountryCode } from "libphonenumber-js";
+import {
+  isEuTaxCountry,
+  validateEuRegistrationId,
+  validateEuVat,
+} from "@/lib/iml-eu-tax";
 
 /**
  * Validátory vstupních polí pro IML modul (zákazník, dodavatel, ...).
@@ -109,14 +114,18 @@ export function validateTaxIds(
   dicRaw: unknown
 ): { ico: ValidationResult; dic: ValidationResult } {
   const country = (taxCountry ?? "CZ").toUpperCase();
+
   if (country === "CZ") {
-    return { ico: validateIco(icoRaw), dic: validateDic(dicRaw) };
+    return { ico: validateIco(icoRaw), dic: validateEuVat("CZ", dicRaw) };
   }
-  if (country === "SK") {
-    const ico = validateForeignRegistrationId(icoRaw);
-    const dic = validateDic(dicRaw);
-    return { ico, dic };
+
+  if (isEuTaxCountry(country)) {
+    return {
+      ico: validateEuRegistrationId(country, icoRaw),
+      dic: validateEuVat(country, dicRaw),
+    };
   }
+
   return {
     ico: validateForeignRegistrationId(icoRaw),
     dic: validateForeignTaxId(dicRaw),
