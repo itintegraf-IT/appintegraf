@@ -144,6 +144,9 @@ export function MaterialyDeferredAttachmentFields({
     onAttachmentsChange(attachments.map((a) => ({ ...a, documentType: bulkType })));
   };
 
+  const atLimit = attachments.length >= MAX_MATERIAL_DEFERRED_FILES;
+  const singleAddLabel = attachments.length === 0 ? "Přidat soubor" : "Přidat další soubor";
+
   const selectCls = compact
     ? "max-w-[11rem] rounded border border-gray-300 px-1.5 py-1 text-xs"
     : "max-w-[14rem] rounded-lg border border-gray-300 px-2 py-1.5 text-sm";
@@ -161,8 +164,9 @@ export function MaterialyDeferredAttachmentFields({
       </h3>
       {compact ? (
         <p className="mb-2 text-xs text-gray-500">
-          PDF, obrázek, Office — max. 20 MB na soubor. Lze vybrat více souborů nebo celou složku (Chrome / Edge). U každého
-          souboru zvolte typ (SDS, TDS, …). Celkem max. {MAX_MATERIAL_DEFERRED_FILES} souborů.
+          PDF, obrázek, Office — max. 20 MB na soubor. Začněte „Přidat soubor“; po prvním souboru se zobrazí „Přidat další
+          soubor“. Alternativně „Více souborů…“ nebo složka (Chrome / Edge). U každého řádku zvolte typ (SDS, TDS, …). Max.{" "}
+          {MAX_MATERIAL_DEFERRED_FILES} souborů.
         </p>
       ) : (
         <p className="mb-3 text-xs text-gray-600">
@@ -187,25 +191,46 @@ export function MaterialyDeferredAttachmentFields({
           </select>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50">
-            Soubory…
+          <label
+            className={`cursor-pointer rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-sm font-medium text-red-800 hover:bg-red-100 ${atLimit ? "pointer-events-none opacity-50" : ""}`}
+          >
+            {singleAddLabel}
             <input
               type="file"
               className="hidden"
               accept={ACCEPT}
-              multiple
+              disabled={atLimit}
               onChange={(e) => {
                 addFromList(e.target.files);
                 e.target.value = "";
               }}
             />
           </label>
-          <label className="cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50">
+          <label
+            className={`cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 ${atLimit ? "pointer-events-none opacity-50" : ""}`}
+          >
+            Více souborů…
+            <input
+              type="file"
+              className="hidden"
+              accept={ACCEPT}
+              multiple
+              disabled={atLimit}
+              onChange={(e) => {
+                addFromList(e.target.files);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          <label
+            className={`cursor-pointer rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 ${atLimit ? "pointer-events-none opacity-50" : ""}`}
+          >
             Složka…
             <input
               type="file"
               className="hidden"
               multiple
+              disabled={atLimit}
               {...({ webkitdirectory: "" } as InputHTMLAttributes<HTMLInputElement>)}
               onChange={(e) => {
                 addFromList(e.target.files);
@@ -215,6 +240,15 @@ export function MaterialyDeferredAttachmentFields({
           </label>
         </div>
       </div>
+
+      {atLimit ? (
+        <p className="mb-2 text-xs font-medium text-amber-800">Byl dosažen limit {MAX_MATERIAL_DEFERRED_FILES} souborů.</p>
+      ) : (
+        <p className={`mb-2 text-gray-600 ${compact ? "text-xs" : "text-sm"}`}>
+          Po přidání souboru se zobrazí řádek s typem dokumentu.{" "}
+          <span className="whitespace-nowrap">Materiál uložíte tlačítkem „Vytvořit“ pod formulářem</span> (i bez příloh).
+        </p>
+      )}
 
       {attachments.length > 0 ? (
         <div className="mt-2 space-y-2">
