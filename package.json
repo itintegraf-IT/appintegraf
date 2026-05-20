@@ -20,6 +20,7 @@
     "migrate:planovani": "node migrations/planovani-igvyroba/migrate.mjs",
     "migrate:idvyroba": "node migrations/planovani-igvyroba/migrate.mjs",
     "migrate:passwords": "node scripts/migrate-passwords-to-hash.mjs",
+    "db:ensure-admin": "node scripts/ensure-admin-user.mjs",
     "seed:calendar": "node scripts/seed-calendar-sample.mjs",
     "migrate:totp-2fa": "node scripts/run-totp-2fa-migration.mjs"
   },

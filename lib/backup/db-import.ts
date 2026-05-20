@@ -10,6 +10,7 @@ import {
   getTablesForDelete,
   getTablesForModules,
 } from "@/lib/backup/module-registry";
+import { isBackupTableProtectedWithoutSystem } from "@/lib/backup/protected-tables";
 import type { PrismaTransactionClient } from "@/lib/db";
 
 const BATCH_SIZE = 200;
@@ -55,6 +56,9 @@ async function deleteTable(
   }
 
   if (table.prismaModel) {
+    if (isBackupTableProtectedWithoutSystem(table.prismaModel) && !modules.includes("system")) {
+      return;
+    }
     await getPrismaDelegate(tx, table.prismaModel).deleteMany();
   }
 }
@@ -103,9 +107,18 @@ async function insertTable(
   tx: PrismaTransactionClient,
   table: BackupTableDef,
   rows: Record<string, unknown>[],
-  zipEntries: ZipEntryMap
-): Promise<void> {
-  if (rows.length === 0) return;
+  zipEntries: ZipEntryMap,
+  modules: BackupModuleId[]
+): Promise<number> {
+  if (rows.length === 0) return 0;
+
+  if (
+    table.prismaModel &&
+    isBackupTableProtectedWithoutSystem(table.prismaModel) &&
+    !modules.includes("system")
+  ) {
+    return 0;
+  }
 
   const prepared = rows.map((r) => prepareRowForInsert(r, table, zipEntries));
 
@@ -123,7 +136,7 @@ async function insertTable(
         );
       }
     }
-    return;
+    return prepared.length;
   }
 
   if (table.prismaModel) {
@@ -132,7 +145,10 @@ async function insertTable(
       const batch = prepared.slice(i, i + BATCH_SIZE);
       await delegate.createMany({ data: batch, skipDuplicates: false });
     }
+    return prepared.length;
   }
+
+  return 0;
 }
 
 export async function loadZipEntries(extractDir: string): Promise<ZipEntryMap> {
@@ -195,8 +211,8 @@ export async function importTablesReplace(
           >[];
           rows = parsed;
         }
-        await insertTable(tx, table, rows, zipEntries);
-        imported.push({ name: table.name, rowCount: rows.length });
+        const inserted = await insertTable(tx, table, rows, zipEntries, modules);
+        imported.push({ name: table.name, rowCount: inserted });
       }
 
       await tx.$executeRawUnsafe("SET FOREIGN_KEY_CHECKS = 1");

@@ -11,7 +11,7 @@ import {
   FileArchive,
 } from "lucide-react";
 import { BACKUP_MODULE_IDS, type BackupManifest, type BackupModuleId } from "@/lib/backup/types";
-import { BACKUP_MODULES } from "@/lib/backup/module-registry";
+import { BACKUP_MODULES, normalizeModuleIds } from "@/lib/backup/module-registry";
 
 const CONFIRM_TEXT = "OBNOVIT";
 const MAX_UPLOAD_MB = 60;
@@ -70,6 +70,11 @@ export function BackupRestorePanel() {
     }
     if (selected.has("vyroba")) {
       w.push("Modul Výroba nezálohuje soubory na síťové cestě VYROBA_OUTPUT_PATH.");
+    }
+    if (selected.size > 0 && !selected.has("system")) {
+      w.push(
+        "Bez modulu „Systém“ se neobnoví uživatelé, role ani nastavení — existující účty v databázi zůstanou, ale přihlášení může blokovat např. povinná registrace 2FA. Chráněné tabulky se při takové obnově ani nesmažou ani nepřepíšou. Po ztrátě přístupu na vývoji použijte příkaz npm run db:ensure-admin (viz dokumentace ADMIN_ZALOHA.md)."
+      );
     }
     return w;
   }, [selected, moduleList]);
@@ -178,6 +183,7 @@ export function BackupRestorePanel() {
 
   const inspectZip = async (file: File | null, serverName?: string) => {
     setError(null);
+    setSuccess(null);
     setManifest(null);
     setInspecting(true);
     try {
@@ -197,7 +203,12 @@ export function BackupRestorePanel() {
       }
       const data = (await res.json()) as { manifest?: BackupManifest; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Načtení manifestu selhalo");
-      setManifest(data.manifest ?? null);
+      const man = data.manifest ?? null;
+      setManifest(man);
+      if (man?.modules?.length) {
+        setSelected(new Set(normalizeModuleIds(man.modules)));
+        setSuccess("Výběr modulů byl upraven podle obsahu zálohy.");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Inspect selhal");
     } finally {

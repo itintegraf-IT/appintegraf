@@ -11,7 +11,12 @@ import {
   getFileUploadModulesForExport,
   normalizeModuleIds,
 } from "@/lib/backup/module-registry";
-import type { BackupImportResult, BackupModuleId } from "@/lib/backup/types";
+import { resolveBackupRestoreModules } from "@/lib/backup/restore-modules";
+import type {
+  BackupImportResult,
+  BackupManifest,
+  BackupModuleId,
+} from "@/lib/backup/types";
 import { isBackupRestoreEnabled } from "@/lib/backup/config";
 
 async function clearModuleUploadDirs(modules: BackupModuleId[]): Promise<void> {
@@ -39,6 +44,50 @@ async function restoreFilesFromZip(zipEntries: Map<string, Buffer>): Promise<num
     count++;
   }
   return count;
+}
+
+async function runRestoreWithExtractedZip(
+  manifest: BackupManifest,
+  effective: BackupModuleId[],
+  modulesRequested: BackupModuleId[],
+  tempDir: string,
+  userId: number
+): Promise<BackupImportResult> {
+  const zipEntries = await loadZipEntries(tempDir);
+
+  await clearModuleUploadDirs(effective);
+
+  const tablesImported = await importTablesReplace(
+    effective,
+    path.join(tempDir, "data"),
+    zipEntries
+  );
+
+  const filesRestored = await restoreFilesFromZip(zipEntries);
+
+  await prisma.audit_log.create({
+    data: {
+      user_id: userId,
+      module: "admin",
+      action: "backup_restore",
+      table_name: "backup",
+      new_values: JSON.stringify({
+        modulesRequested,
+        modulesRestored: effective,
+        manifestModules: manifest.modules,
+        tablesImported,
+        filesRestored,
+        backupCreatedAt: manifest.createdAt,
+      }),
+    },
+  });
+
+  return {
+    ok: true,
+    modulesRestored: effective,
+    errors: [],
+    tablesImported,
+  };
 }
 
 export async function runBackupRestore(
@@ -71,40 +120,24 @@ export async function runBackupRestore(
   try {
     const zipRead = await import("@/lib/backup/zip-read");
     const manifest = await zipRead.readManifestFromZip(zipPath);
+    const resolved = resolveBackupRestoreModules(normalized, manifest.modules);
+    if (!resolved.ok) {
+      return {
+        ok: false,
+        modulesRestored: [],
+        errors: [resolved.error],
+        tablesImported: [],
+      };
+    }
+
     tempDir = await zipRead.extractZipToTemp(zipPath);
-    const zipEntries = await loadZipEntries(tempDir);
-
-    await clearModuleUploadDirs(normalized);
-
-    const tablesImported = await importTablesReplace(
+    return await runRestoreWithExtractedZip(
+      manifest,
+      resolved.effective,
       normalized,
-      path.join(tempDir, "data"),
-      zipEntries
+      tempDir,
+      userId
     );
-
-    const filesRestored = await restoreFilesFromZip(zipEntries);
-
-    await prisma.audit_log.create({
-      data: {
-        user_id: userId,
-        module: "admin",
-        action: "backup_restore",
-        table_name: "backup",
-        new_values: JSON.stringify({
-          modules: normalized,
-          tablesImported,
-          filesRestored,
-          backupCreatedAt: manifest.createdAt,
-        }),
-      },
-    });
-
-    return {
-      ok: true,
-      modulesRestored: normalized,
-      errors,
-      tablesImported,
-    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     errors.push(msg);
@@ -152,40 +185,24 @@ export async function runBackupRestoreFromBuffer(
   try {
     const zipRead = await import("@/lib/backup/zip-read");
     const manifest = await zipRead.readManifestFromBuffer(zipBuffer);
+    const resolved = resolveBackupRestoreModules(normalized, manifest.modules);
+    if (!resolved.ok) {
+      return {
+        ok: false,
+        modulesRestored: [],
+        errors: [resolved.error],
+        tablesImported: [],
+      };
+    }
+
     tempDir = await zipRead.extractZipBufferToTemp(zipBuffer);
-    const zipEntries = await loadZipEntries(tempDir);
-
-    await clearModuleUploadDirs(normalized);
-
-    const tablesImported = await importTablesReplace(
+    return await runRestoreWithExtractedZip(
+      manifest,
+      resolved.effective,
       normalized,
-      path.join(tempDir, "data"),
-      zipEntries
+      tempDir,
+      userId
     );
-
-    const filesRestored = await restoreFilesFromZip(zipEntries);
-
-    await prisma.audit_log.create({
-      data: {
-        user_id: userId,
-        module: "admin",
-        action: "backup_restore",
-        table_name: "backup",
-        new_values: JSON.stringify({
-          modules: normalized,
-          tablesImported,
-          filesRestored,
-          backupCreatedAt: manifest.createdAt,
-        }),
-      },
-    });
-
-    return {
-      ok: true,
-      modulesRestored: normalized,
-      errors,
-      tablesImported,
-    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     errors.push(msg);

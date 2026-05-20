@@ -56,4 +56,11 @@ describe("module-registry", () => {
     expect(products?.blobColumns).toContain("image_data");
     expect(products?.blobColumns).toContain("pdf_data");
   });
+
+  it("katalog materiálů nesahá na tabulku users", () => {
+    const del = getTablesForDelete(["materialy"]).map((t) => t.name);
+    const imp = getTablesForModules(["materialy"]).map((t) => t.name);
+    expect(del).not.toContain("users");
+    expect(imp).not.toContain("users");
+  });
 });
