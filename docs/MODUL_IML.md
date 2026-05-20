@@ -106,7 +106,8 @@ Modul IML poskytuje:
 - **Telefony** mezinárodně (`libphonenumber-js`); **IČ/DIČ** dle `tax_country` (CZ/SK algoritmy, jiné země volnější formát).
 - Doručovací adresa: pole **poznámka k expedici** (`expedition_note`).
 - Legacy pole `email`, `phone`, `contact_person` se synchronizují z primárních záznamů pro zpětnou kompatibilitu.
-- **Pobočka** je plnohodnotná jednotka: kontaktní a fakturační adresa, více e-mailů a kontaktních osob (modal na detailu centrály nebo editace pobočky). **Doručovací adresy** se vážou na konkrétní jednotku (`iml_customer_shipping_addresses.customer_id`) – centrála i každá pobočka mají vlastní seznam; v objednávce se vybírá jednotka a její adresy.
+- **Pobočka** je plnohodnotná jednotka: kontaktní a fakturační adresa, více e-mailů a kontaktních osob. Správa **centrály, poboček a doručovacích adres** probíhá na jedné stránce **Přidat / Upravit zákazníka**: zaškrtávací pole **Centrála**, karta doručovacích adres hlavní jednotky (vždy) a karta poboček (po zaškrtnutí Centrála) s vnořenými adresami u každé pobočky; uložení jedním tlačítkem přes rozšířené API `POST/PUT /api/iml/customers`. Na **detailu** je u poboček jen přehled a odkaz „Spravovat ve formuláři“.
+- **Doručovací adresy** se vážou na konkrétní jednotku (`iml_customer_shipping_addresses.customer_id`) – centrála i každá pobočka mají vlastní seznam; v objednávce se vybírá jednotka a její adresy.
 
 ### 3.7 Statistiky a historie
 

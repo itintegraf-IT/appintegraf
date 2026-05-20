@@ -19,6 +19,12 @@ import {
   validateNestedEmails,
 } from "@/lib/iml-customer-nested";
 import {
+  parseDraftShippingList,
+  replaceCustomerShippingAddresses,
+  syncHeadquartersBranches,
+  type IncomingBranchPayload,
+} from "@/lib/iml-customer-persist";
+import {
   validateEmail,
   validateInternationalPhone,
   validateTaxIds,
@@ -49,16 +55,17 @@ export async function GET(
     where: { id },
     include: {
       parent: { select: { id: true, name: true, unit_type: true } },
+      iml_customer_shipping_addresses: {
+        orderBy: [{ is_default: "desc" }, { created_at: "asc" }],
+      },
       branches: {
         orderBy: [{ sort_order: "asc" }, { name: "asc" }],
-        select: {
-          id: true,
-          name: true,
-          unit_type: true,
-          city: true,
-          email: true,
-          phone: true,
-          sort_order: true,
+        include: {
+          iml_customer_emails: { orderBy: [{ sort_order: "asc" }, { id: "asc" }] },
+          iml_customer_contacts: { orderBy: [{ sort_order: "asc" }, { id: "asc" }] },
+          iml_customer_shipping_addresses: {
+            orderBy: [{ is_default: "desc" }, { created_at: "asc" }],
+          },
         },
       },
       iml_customer_emails: { orderBy: [{ sort_order: "asc" }, { id: "asc" }] },
@@ -138,6 +145,9 @@ export async function PUT(
       contacts: contactsRaw,
       sync_emails = false,
       sync_contacts = false,
+      is_headquarters,
+      shipping_addresses: shippingAddressesRaw,
+      branches: branchesRaw,
     } = body;
 
     if (!name || !String(name).trim()) {
@@ -165,14 +175,29 @@ export async function PUT(
       parent_id != null && parent_id !== ""
         ? parseInt(String(parent_id), 10)
         : null;
+    const resolvedUnitType =
+      is_headquarters === true
+        ? "headquarters"
+        : is_headquarters === false && existing.parent_id == null
+          ? "standalone"
+          : unit_type ?? existing.unit_type;
+
     const unitCheck = await assertValidUnitAssignment({
-      unitType: unit_type ?? existing.unit_type,
+      unitType: resolvedUnitType,
       parentId: Number.isNaN(parentIdParsed) ? null : parentIdParsed,
       customerId: id,
     });
     if (!unitCheck.ok) {
       return NextResponse.json({ error: unitCheck.error, field: "parent_id" }, { status: 400 });
     }
+
+    const wantsHeadquarters = is_headquarters === true || unitCheck.unitType === "headquarters";
+    const incomingBranches: IncomingBranchPayload[] | null =
+      branchesRaw != null && Array.isArray(branchesRaw)
+        ? (branchesRaw as IncomingBranchPayload[])
+        : null;
+    const shippingDraft =
+      shippingAddressesRaw != null ? parseDraftShippingList(shippingAddressesRaw) : null;
 
     let emailRows = parseIncomingEmails(emailsRaw);
     if (sync_emails || emailsRaw != null) {
@@ -252,6 +277,37 @@ export async function PUT(
         await syncCustomerContacts(tx, id, contactRows);
       }
 
+      if (shippingDraft != null) {
+        await replaceCustomerShippingAddresses(tx, id, shippingDraft);
+      }
+
+      if (incomingBranches != null) {
+        if (!wantsHeadquarters && incomingBranches.length > 0) {
+          throw new Error("BRANCHES_WITHOUT_HQ");
+        }
+        if (wantsHeadquarters) {
+          if (unitCheck.unitType === "standalone") {
+            await tx.iml_customers.update({
+              where: { id },
+              data: { unit_type: "headquarters" },
+            });
+          }
+          const branchSync = await syncHeadquartersBranches(tx, id, incomingBranches);
+          if ("error" in branchSync) {
+            throw new Error(`BRANCH_SYNC:${branchSync.error}`);
+          }
+        } else if (existing.unit_type === "headquarters") {
+          const branchSync = await syncHeadquartersBranches(tx, id, []);
+          if ("error" in branchSync) {
+            throw new Error(`BRANCH_SYNC:${branchSync.error}`);
+          }
+          await tx.iml_customers.update({
+            where: { id },
+            data: { unit_type: "standalone" },
+          });
+        }
+      }
+
       return row;
     });
 
@@ -266,6 +322,19 @@ export async function PUT(
 
     return NextResponse.json({ success: true });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.startsWith("BRANCH_SYNC:")) {
+      return NextResponse.json(
+        { error: msg.replace("BRANCH_SYNC:", "") },
+        { status: 400 }
+      );
+    }
+    if (msg === "BRANCHES_WITHOUT_HQ") {
+      return NextResponse.json(
+        { error: "Pobočky lze uložit jen u centrály skupiny" },
+        { status: 400 }
+      );
+    }
     console.error("IML customers PUT error:", e);
     return NextResponse.json({ error: "Chyba při ukládání zákazníka" }, { status: 500 });
   }

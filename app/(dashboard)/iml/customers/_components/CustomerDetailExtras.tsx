@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import CustomerBranchesPanel, {
   type BranchListItem,
 } from "./CustomerBranchesPanel";
@@ -46,14 +45,12 @@ export function CustomerBranchesSection({
   branches: BranchFromServer[];
   canWrite: boolean;
 }) {
-  const router = useRouter();
   return (
     <CustomerBranchesPanel
       headquartersId={headquartersId}
       unitType={unitType}
       branches={mapBranches(branches)}
       canWrite={canWrite}
-      onBranchAdded={() => router.refresh()}
     />
   );
 }

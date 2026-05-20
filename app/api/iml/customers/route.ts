@@ -17,6 +17,12 @@ import {
   validateNestedEmails,
 } from "@/lib/iml-customer-nested";
 import {
+  parseDraftShippingList,
+  replaceCustomerShippingAddresses,
+  syncHeadquartersBranches,
+  type IncomingBranchPayload,
+} from "@/lib/iml-customer-persist";
+import {
   validateEmail,
   validateInternationalPhone,
   validateTaxIds,
@@ -144,6 +150,9 @@ export async function POST(req: NextRequest) {
       sort_order = 0,
       emails: emailsRaw,
       contacts: contactsRaw,
+      is_headquarters = false,
+      shipping_addresses: shippingAddressesRaw,
+      branches: branchesRaw,
     } = body;
 
     if (!name || !String(name).trim()) {
@@ -169,8 +178,10 @@ export async function POST(req: NextRequest) {
 
     const parentIdParsed =
       parent_id != null && parent_id !== "" ? parseInt(String(parent_id), 10) : null;
+    const resolvedUnitType = is_headquarters ? "headquarters" : unit_type === "branch" ? "branch" : "standalone";
+
     const unitCheck = await assertValidUnitAssignment({
-      unitType: unit_type,
+      unitType: resolvedUnitType,
       parentId: Number.isNaN(parentIdParsed) ? null : parentIdParsed,
     });
     if (!unitCheck.ok) {
@@ -248,6 +259,22 @@ export async function POST(req: NextRequest) {
         await syncCustomerContacts(tx, created.id, contactsValidated.rows);
       }
 
+      const shippingDraft = parseDraftShippingList(shippingAddressesRaw);
+      if (shippingDraft.length > 0) {
+        await replaceCustomerShippingAddresses(tx, created.id, shippingDraft);
+      }
+
+      if (is_headquarters && Array.isArray(branchesRaw) && branchesRaw.length > 0) {
+        const branchSync = await syncHeadquartersBranches(
+          tx,
+          created.id,
+          branchesRaw as IncomingBranchPayload[]
+        );
+        if ("error" in branchSync) {
+          throw new Error(`BRANCH_SYNC:${branchSync.error}`);
+        }
+      }
+
       return created;
     });
 
@@ -261,6 +288,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, id: customer.id });
   } catch (e) {
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.startsWith("BRANCH_SYNC:")) {
+      return NextResponse.json(
+        { error: msg.replace("BRANCH_SYNC:", "") },
+        { status: 400 }
+      );
+    }
     console.error("IML customers POST error:", e);
     return NextResponse.json({ error: "Chyba při vytváření zákazníka" }, { status: 500 });
   }
