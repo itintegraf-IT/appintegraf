@@ -35,6 +35,8 @@ type CustomerApi = {
   id: number;
   name: string;
   unit_type: string;
+  parent_id: number | null;
+  parent?: { id: number; name: string } | null;
   email: string | null;
   phone: string | null;
   contact_person: string | null;
@@ -155,7 +157,10 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
   const [legacyShippingAddress, setLegacyShippingAddress] = useState<string | null>(null);
   const [errors, setErrors] = useState<CustomerFormErrors>({});
   const [viewMode, setViewMode] = useViewMode("customerForm");
-  const [hqToggleDisabled, setHqToggleDisabled] = useState(false);
+  const [unitType, setUnitType] = useState<string>("standalone");
+  const [parentId, setParentId] = useState<number | null>(null);
+  const [parentName, setParentName] = useState<string | null>(null);
+  const [parentHqId, setParentHqId] = useState<number | null>(null);
   const [branchFieldErrors, setBranchFieldErrors] = useState<
     Record<string, CustomerFormErrors>
   >({});
@@ -234,6 +239,10 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
         }))
       );
       setLegacyShippingAddress(data.shipping_address);
+      setUnitType(data.unit_type ?? "standalone");
+      setParentId(data.parent_id ?? null);
+      setParentName(data.parent?.name ?? null);
+      setParentHqId(data.parent?.id ?? null);
       const hasBranches = (data.branches?.length ?? 0) > 0;
       setDraft({
         isHeadquarters: data.unit_type === "headquarters" || hasBranches,
@@ -242,7 +251,6 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
         ),
         branches: (data.branches ?? []).map((b) => mapApiBranchToDraft(b)),
       });
-      setHqToggleDisabled(hasBranches);
     } catch {
       setError("Chyba při načítání");
     } finally {
@@ -320,6 +328,29 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
 
   const backHref = isEdit ? `/iml/customers/${customerId}` : "/iml/customers";
   const title = isEdit ? "Upravit zákazníka" : "Přidat zákazníka";
+  const isRootCustomer = parentId == null;
+  const hqUncheckLocked = draft.isHeadquarters && draft.branches.length > 0;
+  const showConvertHint =
+    isRootCustomer &&
+    draft.isHeadquarters &&
+    unitType === "standalone" &&
+    draft.branches.length === 0;
+
+  const headquartersToggle = isRootCustomer ? (
+    <CustomerHeadquartersToggle
+      variant="inline"
+      checked={draft.isHeadquarters}
+      uncheckLocked={hqUncheckLocked}
+      showConvertHint={showConvertHint}
+      onChange={(checked) =>
+        setDraft((d) => ({
+          ...d,
+          isHeadquarters: checked,
+          branches: checked ? d.branches : [],
+        }))
+      }
+    />
+  ) : null;
 
   if (loadingData) {
     return (
@@ -357,24 +388,29 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
           </div>
         )}
 
+        {!isRootCustomer && parentHqId != null && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
+            Toto je <strong>pobočka</strong> skupiny
+            {parentName ? (
+              <>
+                {" "}
+                pod centrálou{" "}
+                <Link href={`/iml/customers/${parentHqId}/edit`} className="font-medium text-red-700 hover:underline">
+                  {parentName}
+                </Link>
+              </>
+            ) : null}
+            . Centrálu a pobočky spravujte u centrály skupiny.
+          </div>
+        )}
+
         <CustomerFormSections
           form={form}
           setField={setField}
           mode={viewMode}
           errors={errors}
           onBlurField={handleBlur}
-        />
-
-        <CustomerHeadquartersToggle
-          checked={draft.isHeadquarters}
-          disabled={hqToggleDisabled}
-          onChange={(checked) =>
-            setDraft((d) => ({
-              ...d,
-              isHeadquarters: checked,
-              branches: checked ? d.branches : [],
-            }))
-          }
+          identificationExtra={headquartersToggle}
         />
 
         <CustomerShippingAddressesDraft

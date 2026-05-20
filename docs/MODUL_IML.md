@@ -99,7 +99,7 @@ Modul IML poskytuje:
 
 ### 3.6 Sekce Klient (zákazník)
 
-- **Skupina zákazníků:** centrála (`unit_type=headquarters`) a pobočky (`branch`); samostatný zákazník (`standalone`) se po přidání první pobočky stane centrálou.
+- **Skupina zákazníků:** centrála (`unit_type=headquarters`) a pobočky (`branch`). Samostatného zákazníka (`standalone`) lze ve formuláři **Přidat / Upravit** převést na centrálu zaškrtnutím pole **Centrála** v sekci Identifikace (pod kontaktními poli); po uložení lze přidat pobočky.
 - **Objednávka / poptávka:** `customer_id` = konkrétní jednotka (centrála nebo pobočka); doručovací adresy jen z té jednotky.
 - **Katalog produktů:** sdílený na úrovni skupiny – `iml_products.customer_id` = ID centrály; pobočka i centrála objednávají stejné produkty (`resolveCatalogCustomerId`).
 - Více **e-mailů** (obecný, fakturace, objednávky) a **kontaktních osob**; stejný e-mail u více zákazníků je povolen.

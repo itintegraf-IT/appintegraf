@@ -43,6 +43,8 @@ type Props = {
   compact?: boolean;
   /** Popisek pole název (výchozí „Název zákazníka“). */
   nameLabel?: string;
+  /** Obsah v sekci Identifikace za kontaktními poli (např. přepínač Centrála). */
+  identificationExtra?: React.ReactNode;
 };
 
 const baseInputCls = "w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2";
@@ -67,6 +69,7 @@ export default function CustomerFormSections({
   branchMode = false,
   compact = false,
   nameLabel = "Název zákazníka *",
+  identificationExtra,
 }: Props) {
   const err = errors ?? {};
   const blur = (field: keyof CustomerFormState) => () => onBlurField?.(field);
@@ -130,6 +133,9 @@ export default function CustomerFormSections({
               className={fieldCls(!!err.contact_person)}
             />
           </Field>
+          {identificationExtra && (
+            <div className="sm:col-span-2">{identificationExtra}</div>
+          )}
           {branchMode && (
             <>
               <Field label="Město" error={err.city}>

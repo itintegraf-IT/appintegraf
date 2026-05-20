@@ -171,6 +171,13 @@ export async function PUT(
       return NextResponse.json({ error: dicV.error, field: "dic" }, { status: 400 });
     }
 
+    if (is_headquarters === true && existing.parent_id != null) {
+      return NextResponse.json(
+        { error: "Pobočku nelze označit jako centrálu" },
+        { status: 400 }
+      );
+    }
+
     const parentIdParsed =
       parent_id != null && parent_id !== ""
         ? parseInt(String(parent_id), 10)
@@ -279,6 +286,17 @@ export async function PUT(
 
       if (shippingDraft != null) {
         await replaceCustomerShippingAddresses(tx, id, shippingDraft);
+      }
+
+      if (
+        is_headquarters === true &&
+        existing.parent_id == null &&
+        existing.unit_type === "standalone"
+      ) {
+        await tx.iml_customers.update({
+          where: { id },
+          data: { unit_type: "headquarters" },
+        });
       }
 
       if (incomingBranches != null) {
