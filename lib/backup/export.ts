@@ -1,7 +1,7 @@
-import archiver from "archiver";
+import * as archiverRoot from "archiver";
 import { readFile } from "fs/promises";
 import { PassThrough } from "stream";
-import { Readable } from "stream";
+import type { Readable } from "stream";
 import { readFileSync } from "fs";
 import path from "path";
 import { exportTablesData } from "@/lib/backup/db-export";
@@ -22,7 +22,16 @@ export async function buildBackupZipStream(
 ): Promise<{ stream: Readable; filename: string }> {
   const { modules, createdByUserId } = options;
   const pass = new PassThrough();
-  const archive = archiver("zip", { zlib: { level: 6 } });
+  // archiver v8: named export ZipArchive (@types/archiver ještě popisuje staré API)
+  const { ZipArchive } = archiverRoot as unknown as {
+    ZipArchive: new (options?: { zlib?: { level?: number } }) => {
+      pipe: (dest: PassThrough) => void;
+      append: (source: string | Buffer, data: { name: string }) => unknown;
+      on: (event: "error", listener: (err: Error) => void) => void;
+      finalize: () => Promise<void>;
+    };
+  };
+  const archive = new ZipArchive({ zlib: { level: 6 } });
   archive.pipe(pass);
 
   const warnings = getModuleWarnings(modules);
@@ -73,7 +82,7 @@ export async function buildBackupZipStream(
   const ts = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const filename = `integraf-backup-${ts}.zip`;
 
-  archive.on("error", (err) => pass.destroy(err));
+  archive.on("error", (err: Error) => pass.destroy(err));
   void archive.finalize();
 
   return { stream: pass, filename };
