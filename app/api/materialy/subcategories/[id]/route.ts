@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canWriteMaterialCatalog } from "@/lib/materialy/access";
-import { isMaterialCategoryCode } from "@/lib/materialy/categories";
+import { resolveCategoryCode } from "@/lib/materialy/load-categories";
 import { logMaterialyAuditSafe } from "@/lib/materialy/audit";
 import { permanentDeleteSubcategory } from "@/lib/materialy/delete-subcategory";
 
@@ -27,7 +27,9 @@ export async function DELETE(
 
   const categoryParam = req.nextUrl.searchParams.get("category")?.trim().toUpperCase() ?? null;
   const expectedCategory =
-    categoryParam && isMaterialCategoryCode(categoryParam) ? categoryParam : undefined;
+    categoryParam != null && categoryParam !== ""
+      ? (await resolveCategoryCode(categoryParam)) ?? undefined
+      : undefined;
 
   const permanent =
     req.nextUrl.searchParams.get("permanent") === "1" ||

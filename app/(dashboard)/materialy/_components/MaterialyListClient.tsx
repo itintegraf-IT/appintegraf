@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus, Pencil, Archive, Trash2 } from "lucide-react";
-import type { MaterialCategoryCode } from "@/lib/materialy/categories";
 import type { MaterialFileSummary } from "@/lib/materialy/material-files";
 import { MaterialDocumentCell } from "./MaterialDocumentCell";
 
@@ -27,9 +26,11 @@ function fmtDate(v: string | null | undefined) {
 
 export function MaterialyListClient({
   category,
+  categoryLabel,
   canWrite,
 }: {
-  category: MaterialCategoryCode;
+  category: string;
+  categoryLabel?: string;
   canWrite: boolean;
 }) {
   const [materials, setMaterials] = useState<Material[]>([]);

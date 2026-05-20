@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import type { MaterialCategoryCode } from "@/lib/materialy/categories";
-import { isMaterialCategoryCode } from "@/lib/materialy/categories";
+import { normalizeCategoryCode } from "@/lib/materialy/categories";
 
 const FK_BY_CATEGORY: Record<
   MaterialCategoryCode,
@@ -156,5 +156,6 @@ export async function migrateLegacyImlTablesIfPresent() {
 export function categoryForLegacySource(source: string): MaterialCategoryCode | null {
   if (source === "iml_foils") return "FOIL";
   if (source === "iml_pantone_colors") return "COLOR";
-  return isMaterialCategoryCode(source) ? source : null;
+  const code = normalizeCategoryCode(source);
+  return code || null;
 }

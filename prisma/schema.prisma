@@ -1403,10 +1403,12 @@ model iml_inquiry_items {
 model material_categories {
   code                   String                   @id @db.VarChar(20)
   label                  String                   @db.VarChar(100)
+  slug                   String?                  @db.VarChar(80)
   sort_order             Int                      @default(0)
   material_subcategories material_subcategories[]
   materials              materials[]
 
+  @@unique([slug], map: "idx_material_categories_slug")
   @@map("material_categories")
 }
 

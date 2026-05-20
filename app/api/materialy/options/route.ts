@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canReadMaterialCatalog } from "@/lib/materialy/access";
-import { isMaterialCategoryCode } from "@/lib/materialy/categories";
+import { resolveCategoryCode } from "@/lib/materialy/load-categories";
 import { materialsTextSearchWhere } from "@/lib/materialy/text-search";
 
 export async function GET(req: NextRequest) {
@@ -16,8 +16,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
-  const category = req.nextUrl.searchParams.get("category") ?? "";
-  if (!isMaterialCategoryCode(category)) {
+  const categoryParam = req.nextUrl.searchParams.get("category") ?? "";
+  const category = await resolveCategoryCode(categoryParam);
+  if (!category) {
     return NextResponse.json({ error: "Neplatná kategorie" }, { status: 400 });
   }
 

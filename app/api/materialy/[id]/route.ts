@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canReadMaterialCatalog, canWriteMaterialCatalog } from "@/lib/materialy/access";
-import { isMaterialCategoryCode } from "@/lib/materialy/categories";
+import { resolveCategoryCode } from "@/lib/materialy/load-categories";
 import { logMaterialyAuditSafe } from "@/lib/materialy/audit";
 import { parseMaterialOptionalDate } from "@/lib/materialy/dates";
 import { assertSubcategoryAllowed } from "@/lib/materialy/subcategory-guard";
@@ -31,7 +31,10 @@ export async function GET(
   try {
     const material = await prisma.materials.findUnique({
       where: { id },
-      include: { material_subcategories: { select: { id: true, name: true } } },
+      include: {
+        material_subcategories: { select: { id: true, name: true } },
+        material_categories: { select: { code: true, label: true, slug: true } },
+      },
     });
 
     if (!material) {
@@ -77,7 +80,7 @@ export async function PUT(
 
     const category_code =
       body.category_code != null ? String(body.category_code).trim() : existing.category_code;
-    if (!isMaterialCategoryCode(category_code)) {
+    if (!(await resolveCategoryCode(category_code))) {
       return NextResponse.json({ error: "Neplatná kategorie" }, { status: 400 });
     }
 

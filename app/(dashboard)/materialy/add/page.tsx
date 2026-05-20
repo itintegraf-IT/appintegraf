@@ -3,7 +3,6 @@
 import { useState, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { isMaterialCategoryCode } from "@/lib/materialy/categories";
 import {
   MaterialFormFields,
   emptyMaterialFormValues,
@@ -30,9 +29,7 @@ function MaterialAddForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialCategory = searchParams.get("category") ?? "PAPER";
-  const [form, setForm] = useState<MaterialFormValues>(() =>
-    emptyMaterialFormValues(isMaterialCategoryCode(initialCategory) ? initialCategory : "PAPER")
-  );
+  const [form, setForm] = useState<MaterialFormValues>(() => emptyMaterialFormValues(initialCategory || "PAPER"));
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);

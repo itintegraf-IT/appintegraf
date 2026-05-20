@@ -6,6 +6,13 @@ import { useRouter } from "next/navigation";
 import { Pencil, Archive, Trash2 } from "lucide-react";
 import { DOCUMENT_TYPES, materialCategorySlug } from "@/lib/materialy/categories";
 
+function categoryListHref(material: Record<string, unknown> | null): string {
+  const cat = material?.material_categories as { slug?: string | null } | undefined;
+  if (cat?.slug) return `/materialy/kategorie/${cat.slug}`;
+  const code = String(material?.category_code ?? "");
+  return `/materialy/kategorie/${materialCategorySlug(code)}`;
+}
+
 type FileRow = {
   id: number;
   original_filename: string;
@@ -89,8 +96,7 @@ export function MaterialDetailClient({ id, canWrite }: { id: number; canWrite: b
       setDeleting(false);
       return;
     }
-    const cat = String(material?.category_code ?? "");
-    router.push(`/materialy/${materialCategorySlug(cat)}`);
+    router.push(categoryListHref(material));
     router.refresh();
   };
 
@@ -111,8 +117,7 @@ export function MaterialDetailClient({ id, canWrite }: { id: number; canWrite: b
       setDeleting(false);
       return;
     }
-    const cat = String(material?.category_code ?? "");
-    router.push(`/materialy/${materialCategorySlug(cat)}`);
+    router.push(categoryListHref(material));
     router.refresh();
   };
 

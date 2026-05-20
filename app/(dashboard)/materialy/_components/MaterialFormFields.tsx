@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import {
-  MATERIAL_CATEGORIES,
-  isMaterialCategoryCode,
-  type MaterialCategoryCode,
-} from "@/lib/materialy/categories";
+import type { MaterialCategoryRow, MaterialCategoryCode } from "@/lib/materialy/categories";
 import { MaterialyDeferredAttachmentFields } from "./MaterialyAttachmentFields";
 
 const inputCls =
@@ -69,6 +65,15 @@ export function MaterialFormFields({
 }: Props) {
   const [subs, setSubs] = useState<Subcat[]>([]);
   const [subsLoading, setSubsLoading] = useState(false);
+  const [categories, setCategories] = useState<MaterialCategoryRow[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      const r = await fetch("/api/materialy/categories");
+      const d = (await r.json().catch(() => ({}))) as { categories?: MaterialCategoryRow[] };
+      if (r.ok && Array.isArray(d.categories)) setCategories(d.categories);
+    })();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,12 +116,12 @@ export function MaterialFormFields({
             value={form.category_code}
             onChange={(e) => {
               const v = e.target.value;
-              if (!isMaterialCategoryCode(v)) return;
+              if (!v) return;
               patch({ category_code: v, subcategory_id: "" });
             }}
             className={inputCls}
           >
-            {MATERIAL_CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <option key={c.code} value={c.code}>
                 {c.label}
               </option>

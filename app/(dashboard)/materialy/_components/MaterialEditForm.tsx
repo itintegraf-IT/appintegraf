@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { isMaterialCategoryCode } from "@/lib/materialy/categories";
 import {
   MaterialFormFields,
   emptyMaterialFormValues,
@@ -65,7 +64,7 @@ export function MaterialEditForm({ materialId }: { materialId: number }) {
         const cat = String(m.category_code ?? "FOIL");
         if (!cancelled) {
           setForm({
-            ...emptyMaterialFormValues(isMaterialCategoryCode(cat) ? cat : "FOIL"),
+            ...emptyMaterialFormValues(cat || "FOIL"),
             subcategory_id:
               m.subcategory_id != null && m.subcategory_id !== "" ? String(m.subcategory_id) : "",
             name: String(m.name ?? ""),

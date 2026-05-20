@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { canReadMaterialCatalog } from "@/lib/materialy/access";
-import { MATERIAL_CATEGORIES } from "@/lib/materialy/categories";
+import { getMaterialCategories } from "@/lib/materialy/load-categories";
 import { Layers, FileWarning } from "lucide-react";
 import { MaterialyHubSearch } from "./_components/MaterialyHubSearch";
 
@@ -15,6 +15,7 @@ export default async function MaterialyHubPage() {
   if (!(await canReadMaterialCatalog(userId))) redirect("/");
 
   const canWrite = await hasModuleAccess(userId, "materialy", "write");
+  const categories = await getMaterialCategories();
 
   return (
     <>
@@ -23,16 +24,16 @@ export default async function MaterialyHubPage() {
           <Layers className="h-7 w-7 text-red-600" />
           Katalog materiálů
         </h1>
-        <p className="mt-1 text-gray-600">Bezpečnostní listy a číselníky papírů, fólií, barev a laků</p>
+        <p className="mt-1 text-gray-600">Bezpečnostní listy a číselníky materiálů podle skupin</p>
       </div>
 
       <MaterialyHubSearch />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {MATERIAL_CATEGORIES.map((cat: (typeof MATERIAL_CATEGORIES)[number]) => (
+        {categories.map((cat) => (
           <Link
             key={cat.code}
-            href={`/materialy/${cat.slug}`}
+            href={`/materialy/kategorie/${cat.slug}`}
             className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-red-200 hover:shadow-md"
           >
             <h2 className="font-semibold text-gray-900">{cat.label}</h2>
@@ -54,7 +55,7 @@ export default async function MaterialyHubPage() {
           href="/materialy/settings"
           className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
         >
-          Podtypy materiálu
+          Nastavení katalogu
         </Link>
         <Link
           href="/iml/settings"

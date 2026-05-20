@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canReadMaterialCatalog, canWriteMaterialCatalog } from "@/lib/materialy/access";
-import { isMaterialCategoryCode, MATERIAL_CATEGORIES } from "@/lib/materialy/categories";
+import { findCategoryByCode } from "@/lib/materialy/load-categories";
+import { normalizeCategoryCode } from "@/lib/materialy/categories";
 
-function resolveCategory(param: string | null): string | null {
+async function resolveCategory(param: string | null): Promise<string | null> {
   if (param == null || param.trim() === "") return null;
-  const code = param.trim().toUpperCase();
-  return isMaterialCategoryCode(code) ? code : null;
+  const code = normalizeCategoryCode(param);
+  const cat = await findCategoryByCode(code);
+  return cat?.code ?? null;
 }
 
 export async function GET(req: NextRequest) {
@@ -21,7 +23,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
-  const category = resolveCategory(req.nextUrl.searchParams.get("category"));
+  const category = await resolveCategory(req.nextUrl.searchParams.get("category"));
   if (!category) {
     return NextResponse.json(
       { error: "Vyberte kategorii materiálu (parametr category: PAPER, FOIL, COLOR, LACQUER)." },
@@ -60,7 +62,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Record<string, unknown>;
     const name = String(body.name ?? "").trim();
-    const category_code = resolveCategory(
+    const category_code = await resolveCategory(
       body.category_code != null ? String(body.category_code) : null
     );
 
@@ -97,7 +99,8 @@ export async function POST(req: NextRequest) {
       },
     });
     if (duplicate) {
-      const catLabel = MATERIAL_CATEGORIES.find((c) => c.code === category_code)?.label ?? category_code;
+      const catRow = await findCategoryByCode(category_code);
+      const catLabel = catRow?.label ?? category_code;
       return NextResponse.json(
         { error: `Podtyp „${name}" už v kategorii ${catLabel} existuje.` },
         { status: 400 }

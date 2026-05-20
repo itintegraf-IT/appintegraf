@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { MATERIAL_CATEGORIES } from "@/lib/materialy/categories";
+import type { MaterialCategoryRow } from "@/lib/materialy/categories";
 
 type Row = {
   id: number;
@@ -12,15 +12,23 @@ type Row = {
   material_subcategories?: { name: string } | null;
 };
 
-function categoryLabel(code: string) {
-  return MATERIAL_CATEGORIES.find((c) => c.code === code)?.label ?? code;
-}
-
 export function MaterialyHubSearch() {
   const [q, setQ] = useState("");
   const [debounced, setDebounced] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState<MaterialCategoryRow[]>([]);
+
+  useEffect(() => {
+    void (async () => {
+      const r = await fetch("/api/materialy/categories");
+      const d = (await r.json().catch(() => ({}))) as { categories?: MaterialCategoryRow[] };
+      if (r.ok && Array.isArray(d.categories)) setCategories(d.categories);
+    })();
+  }, []);
+
+  const categoryLabel = (code: string) =>
+    categories.find((c) => c.code === code)?.label ?? code;
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 350);

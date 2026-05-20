@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canReadMaterialCatalog, canWriteMaterialCatalog } from "@/lib/materialy/access";
-import { isMaterialCategoryCode } from "@/lib/materialy/categories";
+import { resolveCategoryCode } from "@/lib/materialy/load-categories";
 import { materialsTextSearchWhere } from "@/lib/materialy/text-search";
 import { assertSubcategoryAllowed } from "@/lib/materialy/subcategory-guard";
 import { parseMaterialOptionalDate } from "@/lib/materialy/dates";
@@ -27,7 +27,9 @@ export async function GET(req: NextRequest) {
   const activeOnly = req.nextUrl.searchParams.get("active") !== "false";
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
 
-  const hasCategory = category != null && category !== "" && isMaterialCategoryCode(category);
+  const resolvedCategory =
+    category != null && category !== "" ? await resolveCategoryCode(category) : null;
+  const hasCategory = resolvedCategory != null;
   const textSearch = materialsTextSearchWhere(q);
 
   if (!hasCategory && !q) {
@@ -37,7 +39,7 @@ export async function GET(req: NextRequest) {
   try {
     const materials = await prisma.materials.findMany({
       where: {
-        ...(hasCategory ? { category_code: category } : {}),
+        ...(hasCategory ? { category_code: resolvedCategory! } : {}),
         ...(hasCategory && Number.isFinite(subcategoryId) ? { subcategory_id: subcategoryId } : {}),
         ...(activeOnly ? { is_active: true } : {}),
         ...(textSearch ? textSearch : {}),
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest) {
     const name = String(body.name ?? "").trim();
     const category_code = String(body.category_code ?? "").trim();
     if (!name) return NextResponse.json({ error: "Název je povinný" }, { status: 400 });
-    if (!isMaterialCategoryCode(category_code)) {
+    if (!(await resolveCategoryCode(category_code))) {
       return NextResponse.json({ error: "Neplatná kategorie" }, { status: 400 });
     }
 

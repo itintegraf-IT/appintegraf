@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { Trash2 } from "lucide-react";
-import { MATERIAL_CATEGORIES, type MaterialCategoryCode } from "@/lib/materialy/categories";
+import type { MaterialCategoryRow } from "@/lib/materialy/categories";
 
 type Sub = {
   id: number;
@@ -15,7 +14,8 @@ type Sub = {
 };
 
 export default function MaterialySettingsClient() {
-  const [category, setCategory] = useState<MaterialCategoryCode>("PAPER");
+  const [categories, setCategories] = useState<MaterialCategoryRow[]>([]);
+  const [category, setCategory] = useState<string>("PAPER");
   const [subs, setSubs] = useState<Sub[]>([]);
   const [name, setName] = useState("");
   const [error, setError] = useState("");
@@ -23,7 +23,24 @@ export default function MaterialySettingsClient() {
   const [saving, setSaving] = useState(false);
   const [rowBusy, setRowBusy] = useState<number | null>(null);
 
-  const activeLabel = MATERIAL_CATEGORIES.find((c) => c.code === category)?.label ?? category;
+  const activeLabel = categories.find((c) => c.code === category)?.label ?? category;
+
+  const loadCategories = useCallback(() => {
+    void (async () => {
+      const r = await fetch("/api/materialy/categories");
+      const d = (await r.json().catch(() => ({}))) as { categories?: MaterialCategoryRow[] };
+      if (r.ok && Array.isArray(d.categories) && d.categories.length > 0) {
+        setCategories(d.categories);
+        setCategory((prev) =>
+          d.categories!.some((c) => c.code === prev) ? prev : d.categories![0].code
+        );
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
 
   const load = useCallback(() => {
     const ac = new AbortController();
@@ -72,7 +89,7 @@ export default function MaterialySettingsClient() {
     return load();
   }, [category, load]);
 
-  const selectCategory = (code: MaterialCategoryCode) => {
+  const selectCategory = (code: string) => {
     if (code === category) return;
     setCategory(code);
   };
@@ -139,21 +156,14 @@ export default function MaterialySettingsClient() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Podtypy materiálu</h1>
-        <Link href="/materialy" className="text-sm text-gray-500 hover:text-red-600">
-          ← Katalog
-        </Link>
-      </div>
-
-      <p className="mb-4 text-sm text-gray-600">
-        Nejprve zvolte skupinu materiálu. Nový podtyp se vždy uloží pouze do aktivní záložky (papír, fólie, barvy
-        nebo laky se nemíchají).
+    <section>
+      <h2 className="text-lg font-semibold text-gray-900">Podtypy materiálu</h2>
+      <p className="mb-4 mt-1 text-sm text-gray-600">
+        Zvolte skupinu materiálu. Nový podtyp se uloží pouze do aktivní záložky.
       </p>
 
       <div className="mb-4 flex flex-wrap gap-2">
-        {MATERIAL_CATEGORIES.map((c) => (
+        {categories.map((c) => (
           <button
             key={c.code}
             type="button"
@@ -229,6 +239,6 @@ export default function MaterialySettingsClient() {
           ))}
         </ul>
       )}
-    </div>
+    </section>
   );
 }
