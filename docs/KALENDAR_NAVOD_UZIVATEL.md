@@ -72,6 +72,10 @@ Do vyhledávání zadejte text z **názvu, popisu nebo místa**, případně jm�
 
 Vyplňte název, časové rozpětí, typ události, případně místo, barvu, oddělení, účastníky podle toho, co formulář nabízí.
 
+### Soukromá událost
+
+Zaškrtněte **Soukromá událost**, pokud má být viditelná **jen vám** (např. osobní poznámka v kalendáři). Ostatní uživatelé ji v globálním kalendáři neuvidí; vy ji máte v osobním pohledu a v seznamu osobním.
+
 ---
 
 ## Typy událostí

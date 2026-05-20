@@ -9,6 +9,7 @@ import {
   CalendarDays,
   Factory,
   Package,
+  Layers,
   Tv,
   Phone,
   GraduationCap,
@@ -64,13 +65,14 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     title: "Nápověda k aplikaci INTEGRAF",
     path: "/",
     intro:
-      "INTEGRAF je interní portál sdružující evidenci kontaktů, majetku, kalendář, úkoly, smlouvy, výrobu, IML a další moduly. Tato nápověda vás rychle provede orientací v aplikaci.",
+      "INTEGRAF je interní portál sdružující evidenci kontaktů, majetku, kalendář, úkoly, smlouvy, výrobu, IML, katalog materiálů a další moduly. Tato nápověda vás rychle provede orientací v aplikaci.",
     features: [
       "Levé menu (sidebar) obsahuje všechny moduly, ke kterým máte přístup.",
       "Pořadí položek menu si můžete změnit přetažením a uloží se ve vašem prohlížeči.",
       "Horní lišta má vyhledávání, přepínač motivu (světlý/tmavý), nápovědu a notifikace.",
       "Notifikace (zvonek) zobrazují události vyžadující vaši pozornost (schválení, úkoly, smlouvy končící platnost).",
-      "Klikem na své jméno vpravo nahoře otevřete Profil, Nastavení a (administrátoři) Administraci.",
+      "Klikem na své jméno vpravo nahoře otevřete Profil (heslo, 2FA), Nastavení a (administrátoři) Administraci.",
+      "Detailní dokumentace modulů: odkazy v sekci „Detailní dokumentace“ nebo přímo /help/…",
     ],
     quickSteps: [
       "Z dashboardu se prokliknete do libovolného modulu pomocí dlaždic nebo levého menu.",
@@ -110,6 +112,7 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       "Kontrola kolize zástupu mimo firmu při plánování/úpravě.",
       "Připomínky v aplikaci a e-mailem před začátkem události.",
       "Export kalendáře do .ics (Outlook/Google).",
+      "Soukromé události – viditelné jen vám, skryté v globálním kalendáři.",
     ],
     quickSteps: [
       "Otevřete Kalendář a zvolte pohled (Týden / Měsíc / Seznam).",
@@ -118,6 +121,7 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       "U typu se schvalováním vždy vyberte zástup.",
       "Volitelně přidejte další účastníky do pole pozvánek.",
       "U služební cesty vyplňte popis kam/ proč (povinné pro schválení).",
+      "Pro osobní poznámku jen pro sebe zaškrtněte Soukromá událost.",
       "Sledujte stavy schválení v dashboardu a notifikacích.",
       "Pro napojení do Outlook/Google použijte export .ics.",
     ],
@@ -157,6 +161,7 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     tips: [
       "Pro hromadné změny používejte import.",
       "Po importu ověřte klíčové kontakty v detailu.",
+      "Osobní telefon a e-mail (pokud je vyplněn) se zobrazí v telefonním seznamu podle oprávnění.",
     ],
   },
 
@@ -248,6 +253,7 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       "Pro náborovou schůzku nastavte status na Pozván.",
       "U přijatých kandidátů doplňte poznámky pro snadnější onboarding.",
       "U brigádníků využijte stav (Student, Důchodce, OSVČ…) pro rychlou orientaci v evidenci.",
+      "Při nahrání CV lze použít automatickou extrakci údajů z PDF (pokud je v UI dostupná).",
     ],
   },
 
@@ -259,17 +265,18 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     path: "/contracts",
     intro: "Centrální evidence smluv s upozorněním na blížící se konec platnosti a workflow schvalování.",
     features: [
-      "Přehled smluv s filtry (typ, stav, platnost).",
-      "Detail smlouvy s přílohami.",
-      "Schvalovací workflow.",
+      "Přehled smluv s filtry (typ, stav, platnost, fulltext).",
+      "Detail smlouvy s přílohami a náhledem PDF.",
+      "Extrakce údajů z PDF při zakládání smlouvy.",
+      "Vícekrokové schvalovací workflow (návrh → schválení → podpis → archiv).",
       "Upozornění na končící platnost (90/60/30 dní).",
-      "Notifikace pro odpovědné osoby.",
+      "Export seznamu do CSV.",
     ],
     quickSteps: [
       "Otevřete Evidence smluv.",
       "Použijte filtry pro nalezení smlouvy (typ, platnost, hledaný text).",
-      "Otevřete detail smlouvy a zkontrolujte přílohy.",
-      "Pomocí tlačítka Nová smlouva založte záznam a přiložte dokumenty.",
+      "Otevřete detail smlouvy a zkontrolujte přílohy (náhled PDF u přílohy).",
+      "Nová smlouva – vyplňte údaje, volitelně nahrajte PDF a použijte extrakci polí.",
       "Sledujte upozornění na končící platnost v dashboardu i notifikacích.",
       "Schvalovatelé řeší žádosti přímo v detailu smlouvy.",
     ],
@@ -344,25 +351,62 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     icon: Package,
     title: "IML",
     path: "/iml",
-    intro: "Modul IML – evidence šablon/etiket s vlastními poli, importem a exportem.",
+    intro:
+      "Správa zákazníků, produktů (etikety IML), poptávek a objednávek včetně tiskových dat, Pantone barev a napojení na katalog materiálů.",
     features: [
-      "Přehled IML záznamů.",
-      "Vlastní pole (custom fields).",
-      "Import a export dat.",
-      "Audit změn.",
+      "Dashboard se statistikami a konverzí poptávek.",
+      "Zákazníci – kontakty, dodací adresy, import/export.",
+      "Produkty – taby (výseky, fólie, barvy), verzování PDF, náhled obrázku.",
+      "Poptávky – evidence a konverze na objednávku.",
+      "Objednávky – položky, snapshot adresy, tisk, export CSV/Excel/XML.",
+      "Report Pantone – plánovaná spotřeba barev.",
+      "Vlastní pole a import/export v nastavení.",
     ],
     quickSteps: [
-      "Otevřete IML.",
-      "Použijte filtry pro nalezení záznamu.",
-      "Pro hromadné práce použijte import / export.",
-      "V detailu upravujte data včetně vlastních polí.",
-      "Změny se zaznamenávají do auditu.",
+      "Otevřete IML dashboard a zvolte sekci (Zákazníci / Produkty / Poptávky / Objednávky).",
+      "Založte zákazníka a produkt; nahrajte PDF tiskových dat a nastavte Pantone.",
+      "V produktu vyberte materiály z katalogu (fólie, barva, …), pokud máte přístup.",
+      "Vytvořte poptávku nebo rovnou objednávku; u poptávky použijte Konvertovat na objednávku.",
+      "Pro hromadné změny použijte import na příslušné stránce.",
     ],
     tips: [
-      "Před importem si vyexportujte aktuální stav jako zálohu.",
-      "Vlastní pole definujte předem – usnadníte si dlouhodobou správu.",
+      "Před importem exportujte aktuální data jako zálohu.",
+      "Historii verzí PDF najdete v detailu produktu.",
+      "Uživatelé s pouze iml:read vidí katalog materiálů, ale nemusí ho editovat.",
     ],
-    docs: [{ label: "Kompletní dokumentace modulu IML", href: "/help/modul-iml" }],
+    docs: [
+      { label: "Kompletní dokumentace modulu IML", href: "/help/modul-iml" },
+      { label: "Implementační plán rozšíření (newsec)", href: "/help/iml-newsec" },
+    ],
+  },
+
+  materialy: {
+    key: "materialy",
+    /** Čtení mají i uživatelé s iml:read – filtr v draweru neomezujeme na module materialy */
+    module: null,
+    icon: Layers,
+    title: "Katalog materiálů",
+    path: "/materialy",
+    intro:
+      "Evidence papírů, fólií, barev a laků včetně bezpečnostních listů (SDS), technických listů a certifikátů.",
+    features: [
+      "Čtyři kategorie: Papír, Fólie, Barvy, Laky.",
+      "Vyhledávání napříč katalogem z úvodní stránky.",
+      "Přílohy SDS, TDS, certifikát (PDF, obrázky, Office).",
+      "Platnost certifikátu a stav aktivní/neaktivní.",
+      "Propojení s produkty IML (výběr materiálu na produktu).",
+    ],
+    quickSteps: [
+      "Otevřete Katalog materiálů a zvolte kategorii nebo vyhledejte materiál.",
+      "V seznamu otevřete detail materiálu.",
+      "Nahrajte SDS/TDS/certifikát (s oprávněním zápisu).",
+      "Při úpravě doplňte výrobce, kód a datum platnosti certifikátu.",
+    ],
+    tips: [
+      "Uživatelé IML s read přístupem katalog vidí, ale nemusí mít právo zápisu.",
+      "Před smazáním materiálu zkontrolujte vazby na produkty IML.",
+    ],
+    docs: [{ label: "Kompletní dokumentace modulu", href: "/help/modul-materialy" }],
   },
 
   kiosk: {
@@ -434,10 +478,11 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     path: "/admin",
     intro: "Sekce pro administrátory – uživatelé, role, oddělení, typy smluv, reporty a globální nastavení.",
     features: [
-      "Správa uživatelů (přidání, deaktivace, role).",
+      "Správa uživatelů (přidání, deaktivace, role, povinné 2FA).",
       "Správa rolí a oprávnění modulů.",
-      "Správa oddělení a typů smluv.",
-      "Reporty napříč moduly.",
+      "Správa oddělení, typů smluv a schvalovatelů kalendáře podle oddělení.",
+      "Sdílené e-mailové schránky (přiřazení uživatelům).",
+      "Reporty napříč moduly a audit log.",
       "Globální nastavení aplikace (e-maily, integrace).",
     ],
     quickSteps: [
@@ -462,17 +507,27 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     icon: User,
     title: "Profil",
     path: "/profile",
-    intro: "Vaše osobní údaje, e-mail a heslo.",
+    intro: "Vaše osobní údaje, e-mail, heslo a dvoufaktorové ověření (2FA).",
     features: [
       "Změna jména, e-mailu, telefonu.",
       "Změna hesla.",
       "Nahrání podpisu pro e-mailovou komunikaci.",
+      "Nastavení 2FA (Google Authenticator) – pokud admin vyžaduje nebo dobrovolně.",
     ],
     quickSteps: [
       "Otevřete Profil.",
-      "Upravte potřebné údaje.",
-      "Uložte změny.",
+      "Upravte potřebné údaje a uložte.",
       "Pro změnu hesla zadejte staré a dvakrát nové heslo.",
+      "Pokud je vyžadováno 2FA, naskenujte QR kód a ověřte kód z aplikace.",
+    ],
+    tips: [
+      "Záložní kódy pro 2FA si uložte na bezpečné místo – zobrazí se jen při aktivaci.",
+    ],
+    docs: [
+      {
+        label: "Obnova hesla, 2FA, politika hesla",
+        href: "/help/auth-sprava-hesel",
+      },
     ],
   },
 
