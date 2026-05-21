@@ -150,7 +150,9 @@ export const BACKUP_MODULES: Record<BackupModuleId, BackupModuleDef> = {
       prisma("iml_inquiry_items"),
       prisma("iml_orders"),
       prisma("iml_order_items"),
+      prisma("file_uploads"),
     ],
+    fileUploadModules: [{ module: "iml_customers", uploadSubdir: "iml-customers" }],
   },
   kiosk: {
     id: "kiosk",

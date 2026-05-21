@@ -29,6 +29,7 @@ import {
   validateInternationalPhone,
   validateTaxIds,
 } from "@/lib/iml-validation";
+import { deleteAllCustomerUploads } from "@/lib/iml-customer-upload";
 
 export async function GET(
   _req: NextRequest,
@@ -403,6 +404,7 @@ export async function DELETE(
     );
   }
 
+  await deleteAllCustomerUploads(id);
   await prisma.iml_customers.delete({ where: { id } });
 
   await logImlAudit({

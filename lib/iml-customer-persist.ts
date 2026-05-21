@@ -7,6 +7,7 @@ import {
   ensureDefaultShippingFlag,
   newTempId,
 } from "@/lib/iml-customer-form-draft";
+import { splitEmailsForEditor } from "@/lib/iml-customer-billing-email";
 import {
   parseIncomingContacts,
   parseIncomingEmails,
@@ -355,6 +356,13 @@ export function mapApiBranchToDraft(branch: {
     expedition_note?: string | null;
   }>;
 }): DraftBranch {
+  const apiEmails = (branch.iml_customer_emails ?? []).map((e) => ({
+    email: e.email,
+    kind: e.kind,
+    is_primary: e.is_primary,
+    sort_order: e.sort_order,
+  }));
+  const { billingEmail, otherRows } = splitEmailsForEditor(apiEmails);
   return {
     tempId: newTempId(),
     id: branch.id,
@@ -364,6 +372,7 @@ export function mapApiBranchToDraft(branch: {
     contact_person: branch.contact_person ?? "",
     tax_country: branch.tax_country ?? "CZ",
     billing_company: branch.billing_company ?? "",
+    billing_email: billingEmail,
     ico: branch.ico ?? "",
     dic: branch.dic ?? "",
     billing_address: branch.billing_address ?? "",
@@ -379,12 +388,7 @@ export function mapApiBranchToDraft(branch: {
         : "",
     individual_requirements: branch.individual_requirements ?? "",
     customer_note: branch.customer_note ?? "",
-    emails: (branch.iml_customer_emails ?? []).map((e) => ({
-      email: e.email,
-      kind: e.kind,
-      is_primary: e.is_primary,
-      sort_order: e.sort_order,
-    })),
+    emails: otherRows,
     contacts: (branch.iml_customer_contacts ?? []).map((c) => ({
       name: c.name,
       phone: c.phone ?? "",

@@ -45,6 +45,11 @@ export function validateCustomerForm(form: CustomerFormState): CustomerFormError
   if (!icoV.ok) errors.ico = icoV.error;
   if (!dicV.ok) errors.dic = dicV.error;
 
+  if (form.billing_email.trim()) {
+    const billingV = validateEmail(form.billing_email);
+    if (!billingV.ok) errors.billing_email = billingV.error;
+  }
+
   return errors;
 }
 
@@ -71,6 +76,11 @@ export function validateCustomerField(
     }
     case "dic": {
       const r = validateTaxIds(taxCountry, null, form.dic).dic;
+      return r.ok ? undefined : r.error;
+    }
+    case "billing_email": {
+      if (!form.billing_email.trim()) return undefined;
+      const r = validateEmail(form.billing_email);
       return r.ok ? undefined : r.error;
     }
     default:

@@ -102,7 +102,8 @@ Modul IML poskytuje:
 - **Skupina zákazníků:** centrála (`unit_type=headquarters`) a pobočky (`branch`). Samostatného zákazníka (`standalone`) lze ve formuláři **Přidat / Upravit** převést na centrálu zaškrtnutím pole **Centrála** v sekci Identifikace (pod kontaktními poli); po uložení lze přidat pobočky.
 - **Objednávka / poptávka:** `customer_id` = konkrétní jednotka (centrála nebo pobočka); doručovací adresy jen z té jednotky.
 - **Katalog produktů:** sdílený na úrovni skupiny – `iml_products.customer_id` = ID centrály; pobočka i centrála objednávají stejné produkty (`resolveCatalogCustomerId`).
-- Více **e-mailů** (obecný, fakturace, objednávky) a **kontaktních osob**; stejný e-mail u více zákazníků je povolen.
+- Více **e-mailů** (obecný, objednávky) v samostatné sekci formuláře a **e-mail pro fakturaci** ve fakturačních údajích (ukládá se jako `iml_customer_emails` s `kind=billing`); **kontaktní osoby**; stejný e-mail u více zákazníků je povolen.
+- **Přílohy zákazníka** (záložka Přílohy na detailu i ve formuláři Přidat/Upravit): nahrání PDF, Word, Excel přes `file_uploads` (`module=iml_customers`, max. 20 MB / soubor); u nového zákazníka až po prvním uložení, u úpravy ihned na záložce Přílohy.
 - **Telefony** mezinárodně (`libphonenumber-js`); země pro parsování telefonu se odvozuje od VAT prefixu (`vatPrefixToPhoneCountry`, u Řecka **EL → GR**).
 - **Země daně (`tax_country`)** – výběr ze všech **27 členských států EU** (VAT prefix; Řecko = **EL**, ne ISO `GR`) nebo **Jiná země (mimo EU)** → v API `null`, volná validace IČ/DIČ.
 - **IČ / identifikační číslo:** pro **CZ** kontrolní součet dle ARES (`validateIco`); pro **SK** 8–10 číslic; pro ostatní EU národní formát (regex dle státu, obecně 2–15 alfanumerických znaků); mimo EU 2–32 znaků.

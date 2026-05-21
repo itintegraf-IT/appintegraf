@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, FileText, User, Wrench } from "lucide-react";
+import { Building2, FileText, Paperclip, User, Wrench } from "lucide-react";
 import {
   getFrequentEuCountries,
   getOtherEuCountries,
@@ -16,6 +16,7 @@ export type CustomerFormState = {
   contact_person: string;
   tax_country: string;
   billing_company: string;
+  billing_email: string;
   ico: string;
   dic: string;
   billing_address: string;
@@ -32,7 +33,12 @@ export type CustomerFormState = {
 
 export type CustomerFormErrors = Partial<Record<keyof CustomerFormState, string>>;
 
-export type CustomerFormSectionId = "identification" | "billing" | "individual" | "other";
+export type CustomerFormSectionId =
+  | "identification"
+  | "billing"
+  | "individual"
+  | "other"
+  | "attachments";
 
 type Props = {
   form: CustomerFormState;
@@ -50,6 +56,9 @@ type Props = {
   nameLabel?: string;
   /** Obsah v sekci Identifikace za kontaktními poli (např. přepínač Centrála). */
   identificationExtra?: React.ReactNode;
+  /** Záložka Přílohy (nahrávání souborů u existujícího zákazníka). */
+  attachmentsContent?: React.ReactNode;
+  attachmentsBadge?: number | null;
 };
 
 const baseInputCls = "w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2";
@@ -75,6 +84,8 @@ export default function CustomerFormSections({
   compact = false,
   nameLabel = "Název zákazníka *",
   identificationExtra,
+  attachmentsContent,
+  attachmentsBadge,
 }: Props) {
   const err = errors ?? {};
   const blur = (field: keyof CustomerFormState) => () => onBlurField?.(field);
@@ -203,6 +214,21 @@ export default function CustomerFormSections({
               onChange={(e) => setField("billing_company", e.target.value)}
               placeholder="Pokud se liší od názvu zákazníka"
               className={fieldCls(!!err.billing_company)}
+            />
+          </Field>
+          <Field
+            label="E-mail pro fakturaci"
+            error={err.billing_email}
+            hint="např. faktury@firma.cz"
+          >
+            <input
+              type="email"
+              value={form.billing_email}
+              onChange={(e) => setField("billing_email", e.target.value)}
+              onBlur={blur("billing_email")}
+              placeholder="faktury@firma.cz"
+              className={fieldCls(!!err.billing_email)}
+              aria-invalid={!!err.billing_email}
             />
           </Field>
           <Field
@@ -378,6 +404,17 @@ export default function CustomerFormSections({
         </div>
       ),
     },
+    ...(attachmentsContent
+      ? [
+          {
+            id: "attachments",
+            title: "Přílohy",
+            subtitle: "PDF, Word, Excel – smlouvy, ceníky a další dokumenty zákazníka",
+            icon: <Paperclip className="h-4 w-4" />,
+            content: attachmentsContent,
+          },
+        ]
+      : []),
   ];
 
   const filtered = visibleSections
@@ -389,6 +426,7 @@ export default function CustomerFormSections({
       id: s.id,
       label: s.title,
       icon: s.icon,
+      badge: s.id === "attachments" ? attachmentsBadge : undefined,
       content: (
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           {s.subtitle && (
@@ -462,6 +500,7 @@ export const emptyCustomerForm: CustomerFormState = {
   contact_person: "",
   tax_country: "CZ",
   billing_company: "",
+  billing_email: "",
   ico: "",
   dic: "",
   billing_address: "",

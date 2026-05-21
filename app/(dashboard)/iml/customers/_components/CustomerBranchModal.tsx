@@ -20,6 +20,10 @@ import {
   validateBranchForm,
   validateCustomerField,
 } from "./customerValidation";
+import {
+  mergeBillingEmailIntoRows,
+  splitEmailsForEditor,
+} from "@/lib/iml-customer-billing-email";
 
 type Mode = "create" | "edit";
 
@@ -71,7 +75,9 @@ function buildPayload(
   return {
     ...form,
     tax_country: taxCountry,
-    emails: emailRows.filter((r) => r.email.trim()),
+    emails: mergeBillingEmailIntoRows(form.billing_email, emailRows).filter((r) =>
+      r.email.trim()
+    ),
     contacts: contactRows.filter((r) => r.name.trim()),
   };
 }
@@ -117,6 +123,13 @@ export default function CustomerBranchModal({
         .then((r) => r.json())
         .then((data: CustomerApi) => {
           if (!data?.id) return;
+          const apiEmails = (data.iml_customer_emails ?? []).map((e) => ({
+            email: e.email,
+            kind: e.kind,
+            is_primary: e.is_primary,
+            sort_order: e.sort_order,
+          }));
+          const { billingEmail, otherRows } = splitEmailsForEditor(apiEmails);
           setForm({
             name: data.name ?? "",
             email: data.email ?? "",
@@ -124,6 +137,7 @@ export default function CustomerBranchModal({
             contact_person: data.contact_person ?? "",
             tax_country: data.tax_country ?? "CZ",
             billing_company: data.billing_company ?? "",
+            billing_email: billingEmail,
             ico: data.ico ?? "",
             dic: data.dic ?? "",
             billing_address: data.billing_address ?? "",
@@ -137,14 +151,7 @@ export default function CustomerBranchModal({
             individual_requirements: "",
             customer_note: "",
           });
-          setEmailRows(
-            (data.iml_customer_emails ?? []).map((e) => ({
-              email: e.email,
-              kind: e.kind,
-              is_primary: e.is_primary,
-              sort_order: e.sort_order,
-            }))
-          );
+          setEmailRows(otherRows);
           setContactRows(
             (data.iml_customer_contacts ?? []).map((c) => ({
               name: c.name,

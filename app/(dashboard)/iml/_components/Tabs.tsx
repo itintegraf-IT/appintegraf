@@ -37,29 +37,40 @@ export function Tabs({
   className?: string;
 }) {
   const visible = tabs.filter((t) => !t.hidden);
+  const visibleIds = visible.map((t) => t.id).join("|");
   const fallback = defaultId ?? visible[0]?.id ?? "";
   const [active, setActive] = useState<string>(fallback);
 
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const tabFromUrl = urlParam ? searchParams.get(urlParam) : null;
 
   useEffect(() => {
-    if (urlParam) {
-      const v = searchParams.get(urlParam);
-      if (v && visible.some((t) => t.id === v)) {
-        setActive(v);
-        return;
-      }
+    const ids = visibleIds.split("|").filter(Boolean);
+    const pick = (id: string) => {
+      setActive((prev) => (prev === id ? prev : id));
+    };
+
+    if (urlParam && tabFromUrl && ids.includes(tabFromUrl)) {
+      pick(tabFromUrl);
+      return;
     }
     if (!storageKey) return;
     try {
       const v = localStorage.getItem(`iml.activeTab.${storageKey}`);
-      if (v && visible.some((t) => t.id === v)) setActive(v);
+      if (v && ids.includes(v)) pick(v);
     } catch {
       /* ignore */
     }
-  }, [storageKey, urlParam, searchParams, visible]);
+  }, [storageKey, urlParam, tabFromUrl, visibleIds]);
+
+  useEffect(() => {
+    const ids = visibleIds.split("|").filter(Boolean);
+    if (!active || ids.includes(active)) return;
+    const next = ids[0] ?? "";
+    setActive((prev) => (prev === next ? prev : next));
+  }, [visibleIds, active]);
 
   const handleChange = (id: string) => {
     setActive(id);

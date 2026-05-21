@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Info } from "lucide-react";
@@ -28,6 +28,13 @@ import {
   validateDraftShippingList,
 } from "@/lib/iml-customer-form-draft";
 import { mapApiBranchToDraft } from "@/lib/iml-customer-persist";
+import {
+  mergeBillingEmailIntoRows,
+  splitEmailsForEditor,
+} from "@/lib/iml-customer-billing-email";
+import CustomerAttachments, {
+  type CustomerAttachmentRow,
+} from "./CustomerAttachments";
 
 type Mode = "create" | "edit";
 
@@ -86,9 +93,15 @@ type CustomerApi = {
   branches?: Array<Parameters<typeof mapApiBranchToDraft>[0]>;
 };
 
+const EMPTY_ATTACHMENTS: CustomerAttachmentRow[] = [];
+
 type Props = {
   mode: Mode;
   customerId?: string;
+  canWrite?: boolean;
+  currentUserId?: number;
+  isAdmin?: boolean;
+  initialAttachments?: CustomerAttachmentRow[];
 };
 
 function buildSubmitPayload(
@@ -108,7 +121,9 @@ function buildSubmitPayload(
     shipping_address: legacyShippingAddress,
     is_headquarters: draft.isHeadquarters,
     sync_emails: true,
-    emails: emailRows.filter((r) => r.email.trim()),
+    emails: mergeBillingEmailIntoRows(form.billing_email, emailRows).filter((r) =>
+      r.email.trim()
+    ),
     sync_contacts: true,
     contacts: contactRows.filter((r) => r.name.trim()),
     shipping_addresses: draft.shipping_addresses,
@@ -136,7 +151,9 @@ function buildSubmitPayload(
             : null,
           individual_requirements: b.individual_requirements,
           customer_note: b.customer_note,
-          emails: b.emails.filter((r) => r.email.trim()),
+          emails: mergeBillingEmailIntoRows(b.billing_email, b.emails).filter((r) =>
+            r.email.trim()
+          ),
           contacts: b.contacts.filter((r) => r.name.trim()),
           shipping_addresses: b.shipping_addresses,
         }))
@@ -144,7 +161,14 @@ function buildSubmitPayload(
   };
 }
 
-export default function CustomerFormWizard({ mode, customerId }: Props) {
+export default function CustomerFormWizard({
+  mode,
+  customerId,
+  canWrite = true,
+  currentUserId = 0,
+  isAdmin = false,
+  initialAttachments = EMPTY_ATTACHMENTS,
+}: Props) {
   const router = useRouter();
   const isEdit = mode === "edit" && Boolean(customerId);
   const [loading, setLoading] = useState(false);
@@ -165,6 +189,8 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
     Record<string, CustomerFormErrors>
   >({});
   const [branchShippingErrors, setBranchShippingErrors] = useState<Record<string, string>>({});
+  const [attachments, setAttachments] =
+    useState<CustomerAttachmentRow[]>(initialAttachments);
 
   const setField = <K extends keyof CustomerFormState>(k: K, v: CustomerFormState[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
@@ -197,6 +223,13 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
         setError("Zákazník nenalezen");
         return;
       }
+      const apiEmails = (data.iml_customer_emails ?? []).map((e) => ({
+        email: e.email,
+        kind: e.kind,
+        is_primary: e.is_primary,
+        sort_order: e.sort_order,
+      }));
+      const { billingEmail, otherRows } = splitEmailsForEditor(apiEmails);
       setForm({
         name: data.name ?? "",
         email: data.email ?? "",
@@ -204,6 +237,7 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
         contact_person: data.contact_person ?? "",
         tax_country: data.tax_country ?? "CZ",
         billing_company: data.billing_company ?? "",
+        billing_email: billingEmail,
         ico: data.ico ?? "",
         dic: data.dic ?? "",
         billing_address: data.billing_address ?? "",
@@ -220,14 +254,7 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
         individual_requirements: data.individual_requirements ?? "",
         customer_note: data.customer_note ?? "",
       });
-      setEmailRows(
-        (data.iml_customer_emails ?? []).map((e) => ({
-          email: e.email,
-          kind: e.kind,
-          is_primary: e.is_primary,
-          sort_order: e.sort_order,
-        }))
-      );
+      setEmailRows(otherRows);
       setContactRows(
         (data.iml_customer_contacts ?? []).map((c) => ({
           name: c.name,
@@ -251,6 +278,39 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
         ),
         branches: (data.branches ?? []).map((b) => mapApiBranchToDraft(b)),
       });
+
+      if (customerId) {
+        const filesRes = await fetch(`/api/iml/customers/${customerId}/files`);
+        if (filesRes.ok) {
+          const filesData = await filesRes.json();
+          setAttachments(
+            (filesData.files ?? []).map(
+              (f: {
+                id: number;
+                original_filename: string;
+                file_path: string;
+                file_size: number;
+                mime_type: string;
+                uploaded_by: number;
+                created_at: string;
+                users: { first_name: string; last_name: string } | null;
+              }) => ({
+                id: f.id,
+                original_filename: f.original_filename,
+                file_path: f.file_path,
+                file_size: f.file_size,
+                mime_type: f.mime_type,
+                uploaded_by: f.uploaded_by,
+                created_at:
+                  typeof f.created_at === "string"
+                    ? f.created_at
+                    : new Date(f.created_at).toISOString(),
+                users: f.users,
+              })
+            )
+          );
+        }
+      }
     } catch {
       setError("Chyba při načítání");
     } finally {
@@ -336,6 +396,35 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
     unitType === "standalone" &&
     draft.branches.length === 0;
 
+  const attachmentsContent = useMemo(
+    () =>
+      isEdit && customerId ? (
+        <CustomerAttachments
+          customerId={parseInt(customerId, 10)}
+          initialFiles={attachments}
+          canUpload={canWrite}
+          currentUserId={currentUserId}
+          isAdmin={isAdmin}
+          onFilesChange={setAttachments}
+        />
+      ) : (
+        <div className="rounded-lg border border-dashed border-gray-300 bg-gray-50 p-6 text-sm text-gray-600">
+          <p>
+            Přílohy (PDF, Word, Excel) lze nahrát <strong>po uložení zákazníka</strong> – na
+            záložce Přílohy v tomto formuláři (režim úpravy) nebo na detailu zákazníka.
+          </p>
+        </div>
+      ),
+    [
+      isEdit,
+      customerId,
+      attachments,
+      canWrite,
+      currentUserId,
+      isAdmin,
+    ]
+  );
+
   const headquartersToggle = isRootCustomer ? (
     <CustomerHeadquartersToggle
       variant="inline"
@@ -411,6 +500,10 @@ export default function CustomerFormWizard({ mode, customerId }: Props) {
           errors={errors}
           onBlurField={handleBlur}
           identificationExtra={headquartersToggle}
+          attachmentsContent={attachmentsContent}
+          attachmentsBadge={
+            isEdit && attachments.length > 0 ? attachments.length : null
+          }
         />
 
         <CustomerShippingAddressesDraft

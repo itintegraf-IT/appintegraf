@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
-import { hasModuleAccess } from "@/lib/auth-utils";
+import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { IML_CUSTOMER_UPLOAD_MODULE } from "@/lib/iml-customer-upload";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import {
@@ -14,8 +15,11 @@ import {
   Wrench,
   MapPin,
   FileText,
+  Paperclip,
 } from "lucide-react";
+import CustomerAttachments from "../_components/CustomerAttachments";
 import { resolveCatalogCustomerId } from "@/lib/iml-customer-catalog";
+import { extractBillingEmail } from "@/lib/iml-customer-billing-email";
 import { unitTypeLabel } from "@/lib/iml-customer-units";
 import CustomerShippingAddresses from "../_components/CustomerShippingAddresses";
 import { CustomerBranchesSection } from "../_components/CustomerDetailExtras";
@@ -34,6 +38,7 @@ export default async function ImlCustomerDetailPage({
   const userId = parseInt(session.user.id, 10);
   const canRead = await hasModuleAccess(userId, "iml", "read");
   const canWrite = await hasModuleAccess(userId, "iml", "write");
+  const admin = await isAdmin(userId);
 
   if (!canRead) redirect("/iml");
 
@@ -42,7 +47,7 @@ export default async function ImlCustomerDetailPage({
 
   const catalogCustomerId = await resolveCatalogCustomerId(id);
 
-  const [customer, stats] = await Promise.all([
+  const [customer, stats, attachmentRows] = await Promise.all([
     prisma.iml_customers.findUnique({
       where: { id },
       include: {
@@ -127,6 +132,13 @@ export default async function ImlCustomerDetailPage({
         ordersCount: orders.length,
       };
     })(),
+    prisma.file_uploads.findMany({
+      where: { module: IML_CUSTOMER_UPLOAD_MODULE, record_id: id },
+      orderBy: { created_at: "desc" },
+      include: {
+        users: { select: { first_name: true, last_name: true } },
+      },
+    }),
   ]);
 
   if (!customer) notFound();
@@ -146,6 +158,8 @@ export default async function ImlCustomerDetailPage({
   };
   const products = customer.iml_products as ProductRow[];
   const orders = customer.iml_orders as OrderRow[];
+
+  const billingEmail = extractBillingEmail(customer.iml_customer_emails);
 
   const hasIndividual =
     Boolean(customer.label_requirements) ||
@@ -216,11 +230,13 @@ export default async function ImlCustomerDetailPage({
           <InfoField label="E-mail (hlavní)" value={customer.email} />
           <InfoField label="Telefon (hlavní)" value={customer.phone} />
           <InfoField label="Kontaktní osoba (hlavní)" value={customer.contact_person} />
-          {customer.iml_customer_emails.length > 0 && (
+          {customer.iml_customer_emails.filter((e) => e.kind !== "billing").length > 0 && (
             <div className="sm:col-span-2">
               <p className="mb-2 text-sm text-gray-500">E-maily</p>
               <ul className="space-y-1 text-sm">
-                {customer.iml_customer_emails.map((e) => (
+                {customer.iml_customer_emails
+                  .filter((e) => e.kind !== "billing")
+                  .map((e) => (
                   <li key={e.id}>
                     <span className="font-medium">{e.email}</span>
                     <span className="ml-2 text-gray-500">
@@ -270,6 +286,7 @@ export default async function ImlCustomerDetailPage({
             value={customer.billing_company ?? customer.name}
             span={2}
           />
+          <InfoField label="E-mail pro fakturaci" value={billingEmail || null} />
           <InfoField
             label="Země daně"
             value={customer.tax_country ?? "—"}
@@ -469,6 +486,30 @@ export default async function ImlCustomerDetailPage({
             </tbody>
           </table>
         </div>
+      ),
+    },
+    {
+      id: "attachments",
+      label: "Přílohy",
+      icon: <Paperclip className="h-4 w-4" />,
+      badge: attachmentRows.length > 0 ? attachmentRows.length : null,
+      content: (
+        <CustomerAttachments
+          customerId={customer.id}
+          initialFiles={attachmentRows.map((f) => ({
+            id: f.id,
+            original_filename: f.original_filename,
+            file_path: f.file_path,
+            file_size: f.file_size,
+            mime_type: f.mime_type,
+            uploaded_by: f.uploaded_by,
+            created_at: f.created_at.toISOString(),
+            users: f.users,
+          }))}
+          canUpload={canWrite}
+          currentUserId={userId}
+          isAdmin={admin}
+        />
       ),
     },
     {

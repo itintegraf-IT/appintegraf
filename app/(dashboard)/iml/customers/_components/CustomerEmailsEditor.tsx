@@ -12,9 +12,11 @@ export type CustomerEmailRow = {
 
 const kindLabels: Record<string, string> = {
   general: "Obecný",
-  billing: "Fakturace",
   orders: "Objednávky",
 };
+
+/** V editoru e-mailů není billing – ten je ve fakturační sekci. */
+const EDITOR_EMAIL_KINDS = IML_EMAIL_KINDS.filter((k) => k !== "billing");
 
 type Props = {
   rows: CustomerEmailRow[];
@@ -69,7 +71,7 @@ export default function CustomerEmailsEditor({ rows, onChange, disabled }: Props
               onChange={(e) => setRow(i, { kind: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-2 py-2 text-sm"
             >
-              {IML_EMAIL_KINDS.map((k) => (
+              {EDITOR_EMAIL_KINDS.map((k) => (
                 <option key={k} value={k}>
                   {kindLabels[k] ?? k}
                 </option>
