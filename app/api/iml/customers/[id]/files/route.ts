@@ -135,7 +135,7 @@ export async function POST(
 
   await logImlAudit({
     userId,
-    action: "upload:customer_file",
+    action: "create",
     tableName: "file_uploads",
     recordId: row.id,
     newValues: {

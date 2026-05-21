@@ -59,7 +59,7 @@ export async function DELETE(
 
   await logImlAudit({
     userId,
-    action: "delete:customer_file",
+    action: "delete",
     tableName: "file_uploads",
     recordId: fileId,
     oldValues: {
