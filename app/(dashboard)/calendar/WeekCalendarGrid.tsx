@@ -17,6 +17,7 @@ import {
   getCalendarGlobalAllDayCompactLabel,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
+import { formatDateYmdPrague, formatTimeCz, getPragueHourFraction } from "@/lib/datetime-cz";
 
 type CalendarEvent = {
   id: number;
@@ -96,9 +97,9 @@ function getEventSliceForDay(
   const dayEnd = new Date(day);
   dayEnd.setHours(23, 59, 59, 999);
 
-  const startDayStr = formatDateLocal(start);
-  const endDayStr = formatDateLocal(end);
-  const dayStr = formatDateLocal(day);
+  const startDayStr = formatDateYmdPrague(start);
+  const endDayStr = formatDateYmdPrague(end);
+  const dayStr = formatDateYmdPrague(day);
 
   if (options?.onlyFirstDayOfMultiDay && startDayStr !== endDayStr) {
     if (dayStr !== startDayStr) return null;
@@ -109,8 +110,7 @@ function getEventSliceForDay(
   const sliceStart = start < dayStart ? dayStart : start;
   const sliceEnd = end > dayEnd ? dayEnd : end;
 
-  const top =
-    (sliceStart.getHours() + sliceStart.getMinutes() / 60) * ROW_HEIGHT;
+  const top = getPragueHourFraction(sliceStart) * ROW_HEIGHT;
   const durationHours =
     (sliceEnd.getTime() - sliceStart.getTime()) / (60 * 60 * 1000);
   let height = Math.max(18, durationHours * ROW_HEIGHT);
@@ -594,8 +594,8 @@ export function WeekCalendarGrid({
                   .map((e) => {
                     const onlyFirst =
                       requiresDeputy(e.event_type) &&
-                      formatDateLocal(new Date(e.start_date)) !==
-                        formatDateLocal(new Date(e.end_date));
+                      formatDateYmdPrague(new Date(e.start_date)) !==
+                        formatDateYmdPrague(new Date(e.end_date));
                     const slice = getEventSliceForDay(e, d, {
                       onlyFirstDayOfMultiDay: onlyFirst,
                     });
@@ -640,10 +640,7 @@ export function WeekCalendarGrid({
                         )}
                         {isFirstDay && (
                           <span className="text-[10px] opacity-80">
-                            {new Date(e.start_date).toLocaleTimeString("cs-CZ", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
+                            {formatTimeCz(new Date(e.start_date))}
                           </span>
                         )}
                         <EventMetaSubtext e={e} mode={eventMetaMode} />

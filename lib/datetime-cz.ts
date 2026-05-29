@@ -92,3 +92,38 @@ export function formatDateTimeCz(
     ...options,
   });
 }
+
+/** Zobrazení data (cs-CZ, Europe/Prague). */
+export function formatDateCz(
+  d: Date,
+  options?: Intl.DateTimeFormatOptions
+): string {
+  return d.toLocaleDateString("cs-CZ", {
+    timeZone: APP_TIMEZONE,
+    ...options,
+  });
+}
+
+/** Zobrazení času HH:mm (cs-CZ, Europe/Prague). */
+export function formatTimeCz(d: Date): string {
+  return d.toLocaleTimeString("cs-CZ", {
+    timeZone: APP_TIMEZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Kalendářní den YYYY-MM-DD v Europe/Prague. */
+export function formatDateYmdPrague(d: Date): string {
+  const p = pragueParts(d);
+  const y = String(p.year);
+  const m = String(p.month).padStart(2, "0");
+  const day = String(p.day).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Hodina + zlomek minuty v Europe/Prague (pro pozicování v mřížce). */
+export function getPragueHourFraction(d: Date): number {
+  const p = pragueParts(d);
+  return p.hour + p.minute / 60;
+}

@@ -9,6 +9,7 @@ import {
   getPeopleColumnText,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
+import { formatDateCz, formatTimeCz } from "@/lib/datetime-cz";
 
 type EventRow = {
   id: number;
@@ -38,18 +39,11 @@ type Props = {
 };
 
 function formatDate(d: Date) {
-  return new Date(d).toLocaleDateString("cs-CZ", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDateCz(new Date(d), { day: "numeric", month: "short", year: "numeric" });
 }
 
 function formatTime(d: Date) {
-  return new Date(d).toLocaleTimeString("cs-CZ", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatTimeCz(new Date(d));
 }
 
 export function CalendarSearchResults({

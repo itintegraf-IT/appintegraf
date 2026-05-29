@@ -11,6 +11,7 @@ import {
 } from "@/lib/calendar-participant-sync";
 import { requiresBusinessTripDescription, requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
 import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
+import { formatDateTimeCz } from "@/lib/datetime-cz";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
@@ -21,16 +22,6 @@ const OUT_OF_OFFICE_TYPES = [
   "lekar",
   "nemoc",
 ];
-
-function formatDateTimeCs(d: Date): string {
-  return d.toLocaleString("cs-CZ", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 export async function GET(
   _req: NextRequest,
@@ -196,7 +187,7 @@ export async function PUT(
 
     const selfOverlap = await findCreatorCalendarOverlap(prisma, userId, start, end, { excludeEventId: id });
     if (selfOverlap) {
-      return NextResponse.json({ error: formatOverlapErrorCs(selfOverlap, formatDateTimeCs) }, { status: 409 });
+      return NextResponse.json({ error: formatOverlapErrorCs(selfOverlap, formatDateTimeCz) }, { status: 409 });
     }
 
     if (deputyIdNum !== null) {
@@ -220,9 +211,9 @@ export async function PUT(
       if (deputyOutOfOfficeOverlap) {
         return NextResponse.json(
           {
-            error: `Zvolený zástup má kolidující událost mimo firmu (${deputyOutOfOfficeOverlap.title}, ${formatDateTimeCs(
+            error: `Zvolený zástup má kolidující událost mimo firmu (${deputyOutOfOfficeOverlap.title}, ${formatDateTimeCz(
               deputyOutOfOfficeOverlap.start_date
-            )}–${formatDateTimeCs(deputyOutOfOfficeOverlap.end_date)}). Vyberte jiného zástupa nebo jiný termín.`,
+            )}–${formatDateTimeCz(deputyOutOfOfficeOverlap.end_date)}). Vyberte jiného zástupa nebo jiný termín.`,
           },
           { status: 409 }
         );

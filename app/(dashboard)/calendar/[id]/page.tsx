@@ -6,6 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { getEventTypeLabel, requiresBusinessTripDescription } from "../lib/event-types";
 import { ApproveRejectButtons } from "../ApproveRejectButtons";
 import { DeleteEventButton } from "../DeleteEventButton";
+import { formatDateCz, formatTimeCz } from "@/lib/datetime-cz";
 
 export default async function CalendarEventPage({
   params,
@@ -50,16 +51,8 @@ export default async function CalendarEventPage({
   );
 
   const formatDate = (d: Date) =>
-    new Date(d).toLocaleDateString("cs-CZ", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
-  const formatTime = (d: Date) =>
-    new Date(d).toLocaleTimeString("cs-CZ", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    formatDateCz(new Date(d), { day: "numeric", month: "long", year: "numeric" });
+  const formatTime = (d: Date) => formatTimeCz(new Date(d));
 
   return (
     <>
