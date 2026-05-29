@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
 import { dismissNotificationsUpdate } from "@/lib/notifications-dismiss";
 import { findCreatorCalendarOverlap, formatOverlapErrorCs } from "@/lib/calendar-time-overlap";
+import { formatDateTimeCz } from "@/lib/datetime-cz";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
@@ -14,16 +15,6 @@ const OUT_OF_OFFICE_TYPES = [
   "lekar",
   "nemoc",
 ] as const;
-
-function formatDateTimeCs(d: Date): string {
-  return d.toLocaleString("cs-CZ", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
 
 /**
  * PATCH /api/calendar/[id]/move
@@ -85,7 +76,7 @@ export async function PATCH(
 
   const selfOverlap = await findCreatorCalendarOverlap(prisma, userId, start, end, { excludeEventId: id });
   if (selfOverlap) {
-    return NextResponse.json({ error: formatOverlapErrorCs(selfOverlap, formatDateTimeCs) }, { status: 409 });
+    return NextResponse.json({ error: formatOverlapErrorCs(selfOverlap, formatDateTimeCz) }, { status: 409 });
   }
 
   if (event.deputy_id) {
@@ -103,9 +94,9 @@ export async function PATCH(
     if (depOverlap) {
       return NextResponse.json(
         {
-          error: `Zástup má kolidující událost mimo firmu (${depOverlap.title}, ${formatDateTimeCs(
+          error: `Zástup má kolidující událost mimo firmu (${depOverlap.title}, ${formatDateTimeCz(
             depOverlap.start_date
-          )}–${formatDateTimeCs(depOverlap.end_date)}). Vyberte jiný termín nebo jiného zástupa v úpravě události.`,
+          )}–${formatDateTimeCz(depOverlap.end_date)}). Vyberte jiný termín nebo jiného zástupa v úpravě události.`,
         },
         { status: 409 }
       );

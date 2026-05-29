@@ -3,16 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 
 import { CALENDAR_OUT_OF_OFFICE_TYPE_LIST } from "@/lib/calendar-out-of-office";
-
-function formatDateTimeCs(d: Date): string {
-  return d.toLocaleString("cs-CZ", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { formatDateTimeCz } from "@/lib/datetime-cz";
 
 /**
  * GET /api/calendar/deputies/check?deputy_id=...&start_date=...&end_date=...&exclude_event_id=...
@@ -69,9 +60,9 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     hasConflict: true,
-    warning: `Zvolený zástup má v tomto termínu kolidující událost mimo firmu: „${overlap.title}“ (${formatDateTimeCs(
+    warning: `Zvolený zástup má v tomto termínu kolidující událost mimo firmu: „${overlap.title}“ (${formatDateTimeCz(
       overlap.start_date
-    )}–${formatDateTimeCs(overlap.end_date)}).`,
+    )}–${formatDateTimeCz(overlap.end_date)}).`,
     conflict: overlap,
   });
 }

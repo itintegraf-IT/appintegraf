@@ -15,6 +15,7 @@ import {
   formatDateLocal,
   formatDateTimeLocalForInput,
 } from "./lib/week-utils";
+import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
 import { CalendarInviteeSelect } from "./CalendarInviteeSelect";
 
 type Department = { id: number; name: string; code: string | null };
@@ -127,8 +128,8 @@ export function CreateEventModal({
         startDate = start;
         endDate = end;
       } else {
-        startDate = new Date(form.start_date).toISOString();
-        endDate = new Date(form.end_date).toISOString();
+        startDate = parseDateTimeLocalInput(form.start_date).toISOString();
+        endDate = parseDateTimeLocalInput(form.end_date).toISOString();
       }
 
       const query = new URLSearchParams({
@@ -167,8 +168,8 @@ export function CreateEventModal({
       startDate = r.start;
       endDate = r.end;
     } else {
-      startDate = new Date(form.start_date).toISOString();
-      endDate = new Date(form.end_date).toISOString();
+      startDate = parseDateTimeLocalInput(form.start_date).toISOString();
+      endDate = parseDateTimeLocalInput(form.end_date).toISOString();
     }
 
     try {

@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   formatDateTimeCz,
   formatDateTimeLocalForInput,
+  formatDateYmdPrague,
+  formatTimeCz,
+  getPragueHourFraction,
   parseDateTimeLocalInput,
 } from "./datetime-cz";
 
@@ -19,5 +22,12 @@ describe("datetime-cz", () => {
     const pragueInput = formatDateTimeLocalForInput(summerUtc);
     expect(isoSlice).toBe("2026-05-16T07:44");
     expect(pragueInput).toBe("2026-05-16T09:44");
+  });
+
+  it("formatTimeCz zobrazí Prague čas bez ohledu na TZ runtime", () => {
+    const summerUtc = new Date("2026-05-28T06:00:00.000Z");
+    expect(formatTimeCz(summerUtc)).toMatch(/08:00/);
+    expect(getPragueHourFraction(summerUtc)).toBe(8);
+    expect(formatDateYmdPrague(summerUtc)).toBe("2026-05-28");
   });
 });

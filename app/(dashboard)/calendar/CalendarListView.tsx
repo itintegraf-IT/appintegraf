@@ -11,6 +11,7 @@ import {
   getPeopleColumnText,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
+import { formatDateCz, formatTimeCz } from "@/lib/datetime-cz";
 
 type EventRow = {
   id: number;
@@ -41,24 +42,19 @@ type Props = {
 };
 
 function formatDate(d: Date) {
-  return new Date(d).toLocaleDateString("cs-CZ", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDateCz(new Date(d), { day: "numeric", month: "short", year: "numeric" });
 }
 
 function formatTime(d: Date) {
-  return new Date(d).toLocaleTimeString("cs-CZ", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatTimeCz(new Date(d));
 }
 
 function formatRange(from: string, to: string) {
   const fromDate = new Date(from);
   const toDate = new Date(to);
-  return `${fromDate.toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" })} – ${toDate.toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" })}`;
+  const fmt = (d: Date) =>
+    formatDateCz(d, { day: "numeric", month: "short", year: "numeric" });
+  return `${fmt(fromDate)} – ${fmt(toDate)}`;
 }
 
 export function CalendarListView({ events, from, to, viewType, eventMetaMode }: Props) {
