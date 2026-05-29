@@ -1,6 +1,5 @@
 import { readFile } from "fs/promises";
 import path from "path";
-import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { logImlAudit } from "@/lib/iml-audit";
 import type { ClassifiedZipFile } from "@/lib/iml-product-import-zip";
@@ -10,10 +9,6 @@ export const MAX_PDF_SIZE = 50 * 1024 * 1024;
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
-
-function toPrismaBytes(buffer: Buffer): Uint8Array {
-  return new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
-}
 
 export function sanitizeFilename(name: string): string {
   return name.replace(/[^\w.\-()+\s]/g, "_").slice(0, 200) || "soubor";
@@ -73,7 +68,7 @@ export async function attachProductPdf(
         filename: safeName,
         file_size: buffer.length,
         mime_type: "application/pdf",
-        pdf_data: toPrismaBytes(buffer),
+        pdf_data: Buffer.from(buffer),
         is_primary: true,
         uploaded_by: userId,
       },
@@ -105,7 +100,7 @@ export async function attachProductPreviewImage(
 
   await prisma.iml_products.update({
     where: { id: productId },
-    data: { image_data: toPrismaBytes(buffer) },
+    data: { image_data: Buffer.from(buffer) },
   });
 
   await logImlAudit({
