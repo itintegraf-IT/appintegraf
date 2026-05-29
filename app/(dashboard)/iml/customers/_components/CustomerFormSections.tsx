@@ -1,0 +1,516 @@
+"use client";
+
+import { Building2, FileText, Paperclip, User, Wrench } from "lucide-react";
+import {
+  getFrequentEuCountries,
+  getOtherEuCountries,
+  getTaxFieldHints,
+} from "@/lib/iml-eu-tax";
+import { Tabs, type TabDef } from "../../_components/Tabs";
+import { SectionShell, type ViewMode } from "../../_components/ViewToggle";
+
+export type CustomerFormState = {
+  name: string;
+  email: string;
+  phone: string;
+  contact_person: string;
+  tax_country: string;
+  billing_company: string;
+  billing_email: string;
+  ico: string;
+  dic: string;
+  billing_address: string;
+  city: string;
+  postal_code: string;
+  country: string;
+  label_requirements: string;
+  pallet_packaging: string;
+  prepress_notes: string;
+  allow_under_over_delivery_percent: string;
+  individual_requirements: string;
+  customer_note: string;
+};
+
+export type CustomerFormErrors = Partial<Record<keyof CustomerFormState, string>>;
+
+export type CustomerFormSectionId =
+  | "identification"
+  | "billing"
+  | "individual"
+  | "other"
+  | "attachments";
+
+type Props = {
+  form: CustomerFormState;
+  setField: <K extends keyof CustomerFormState>(k: K, v: CustomerFormState[K]) => void;
+  mode: ViewMode;
+  errors?: CustomerFormErrors;
+  onBlurField?: (field: keyof CustomerFormState) => void;
+  /** Zobrazí jen vybrané sekce (např. modal pobočky). */
+  visibleSections?: CustomerFormSectionId[];
+  /** Pobočka: město/PSČ v identifikaci, fakturační sekce bez města. */
+  branchMode?: boolean;
+  /** Bez SectionShell – jen obsah polí (modal). */
+  compact?: boolean;
+  /** Popisek pole název (výchozí „Název zákazníka“). */
+  nameLabel?: string;
+  /** Obsah v sekci Identifikace za kontaktními poli (např. přepínač Centrála). */
+  identificationExtra?: React.ReactNode;
+  /** Záložka Přílohy (nahrávání souborů u existujícího zákazníka). */
+  attachmentsContent?: React.ReactNode;
+  attachmentsBadge?: number | null;
+};
+
+const baseInputCls = "w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2";
+const inputOkCls = `${baseInputCls} border-gray-300 focus:ring-red-100 focus:border-red-400`;
+const inputErrCls = `${baseInputCls} border-red-400 bg-red-50 focus:ring-red-200 focus:border-red-500`;
+
+function fieldCls(hasError?: boolean) {
+  return hasError ? inputErrCls : inputOkCls;
+}
+
+/**
+ * Obsah formuláře pro zákazníka, použitelný jak v režimu "sekce pod sebou",
+ * tak v režimu záložek. V režimu záložek se nadpisy sekcí stávají labely tabů.
+ */
+export default function CustomerFormSections({
+  form,
+  setField,
+  mode,
+  errors,
+  onBlurField,
+  visibleSections,
+  branchMode = false,
+  compact = false,
+  nameLabel = "Název zákazníka *",
+  identificationExtra,
+  attachmentsContent,
+  attachmentsBadge,
+}: Props) {
+  const err = errors ?? {};
+  const blur = (field: keyof CustomerFormState) => () => onBlurField?.(field);
+  const taxHints = getTaxFieldHints(form.tax_country);
+  const icoDigitsOnly =
+    form.tax_country === "CZ" || form.tax_country === "SK";
+
+  const handleIcoChange = (raw: string) => {
+    if (icoDigitsOnly) {
+      setField("ico", raw.replace(/[^\d\s]/g, ""));
+      return;
+    }
+    setField("ico", raw.replace(/[^\dA-Za-z./-\s]/g, ""));
+  };
+
+  const handleTaxCountryChange = (value: string) => {
+    setField("tax_country", value);
+  };
+
+  const sections: Array<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    icon?: React.ReactNode;
+    content: React.ReactNode;
+  }> = [
+    {
+      id: "identification",
+      title: "Identifikace",
+      subtitle: "Kontaktní údaje a obchodní jméno zákazníka",
+      icon: <User className="h-4 w-4" />,
+      content: (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={nameLabel} span={2} error={err.name}>
+            <input
+              type="text"
+              required
+              value={form.name}
+              onChange={(e) => setField("name", e.target.value)}
+              onBlur={blur("name")}
+              className={fieldCls(!!err.name)}
+              aria-invalid={!!err.name}
+            />
+          </Field>
+          <Field label="E-mail" error={err.email} hint="např. jmeno@domena.cz">
+            <input
+              type="email"
+              value={form.email}
+              onChange={(e) => setField("email", e.target.value)}
+              onBlur={blur("email")}
+              className={fieldCls(!!err.email)}
+              aria-invalid={!!err.email}
+              placeholder="jmeno@domena.cz"
+            />
+          </Field>
+          <Field
+            label="Telefon"
+            error={err.phone}
+            hint="mezinárodní formát, např. +420 602 123 456"
+          >
+            <input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setField("phone", e.target.value)}
+              onBlur={blur("phone")}
+              className={fieldCls(!!err.phone)}
+              aria-invalid={!!err.phone}
+              placeholder="+420 602 123 456"
+            />
+          </Field>
+          <Field label="Kontaktní osoba" span={2} error={err.contact_person}>
+            <input
+              type="text"
+              value={form.contact_person}
+              onChange={(e) => setField("contact_person", e.target.value)}
+              className={fieldCls(!!err.contact_person)}
+            />
+          </Field>
+          {identificationExtra && (
+            <div className="sm:col-span-2">{identificationExtra}</div>
+          )}
+          {branchMode && (
+            <>
+              <Field label="Město" error={err.city}>
+                <input
+                  type="text"
+                  value={form.city}
+                  onChange={(e) => setField("city", e.target.value)}
+                  className={fieldCls(!!err.city)}
+                />
+              </Field>
+              <Field label="PSČ" error={err.postal_code}>
+                <input
+                  type="text"
+                  value={form.postal_code}
+                  onChange={(e) => setField("postal_code", e.target.value)}
+                  className={fieldCls(!!err.postal_code)}
+                />
+              </Field>
+              <Field label="Země" span={2} error={err.country}>
+                <input
+                  type="text"
+                  value={form.country}
+                  onChange={(e) => setField("country", e.target.value)}
+                  className={fieldCls(!!err.country)}
+                />
+              </Field>
+            </>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "billing",
+      title: branchMode ? "Fakturační / kontaktní adresa" : "Fakturační údaje",
+      subtitle: branchMode
+        ? "Fakturační adresa a daňové údaje pobočky"
+        : "Údaje pro vystavení faktury (IČO, DIČ, fakturační adresa)",
+      icon: <Building2 className="h-4 w-4" />,
+      content: (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Fakturační název firmy" span={2} error={err.billing_company}>
+            <input
+              type="text"
+              value={form.billing_company}
+              onChange={(e) => setField("billing_company", e.target.value)}
+              placeholder="Pokud se liší od názvu zákazníka"
+              className={fieldCls(!!err.billing_company)}
+            />
+          </Field>
+          <Field
+            label="E-mail pro fakturaci"
+            error={err.billing_email}
+            hint="např. faktury@firma.cz"
+          >
+            <input
+              type="email"
+              value={form.billing_email}
+              onChange={(e) => setField("billing_email", e.target.value)}
+              onBlur={blur("billing_email")}
+              placeholder="faktury@firma.cz"
+              className={fieldCls(!!err.billing_email)}
+              aria-invalid={!!err.billing_email}
+            />
+          </Field>
+          <Field
+            label="Země daně (IČ/DIČ)"
+            error={err.tax_country}
+            hint="VAT prefix (EL = Řecko)"
+          >
+            <select
+              value={form.tax_country}
+              onChange={(e) => handleTaxCountryChange(e.target.value)}
+              onBlur={blur("tax_country")}
+              className={fieldCls(!!err.tax_country)}
+            >
+              <optgroup label="Často používané">
+                {getFrequentEuCountries().map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Evropská unie">
+                {getOtherEuCountries().map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
+              <option value="OTHER">Jiná země (mimo EU)</option>
+            </select>
+          </Field>
+          <Field
+            label="IČO / identifikační číslo"
+            error={err.ico}
+            hint={taxHints.icoHint}
+          >
+            <input
+              type="text"
+              value={form.ico}
+              onChange={(e) => handleIcoChange(e.target.value)}
+              onBlur={blur("ico")}
+              placeholder={form.tax_country === "CZ" ? "12345678" : undefined}
+              inputMode={icoDigitsOnly ? "numeric" : "text"}
+              className={fieldCls(!!err.ico)}
+              aria-invalid={!!err.ico}
+            />
+          </Field>
+          <Field
+            label="DIČ / daňové ID"
+            error={err.dic}
+            hint={taxHints.dicHint}
+          >
+            <input
+              type="text"
+              value={form.dic}
+              onChange={(e) => setField("dic", e.target.value)}
+              onBlur={blur("dic")}
+              placeholder={taxHints.dicPlaceholder}
+              className={fieldCls(!!err.dic)}
+              aria-invalid={!!err.dic}
+            />
+          </Field>
+          <Field label="Fakturační adresa (ulice, č. p.)" span={2} error={err.billing_address}>
+            <textarea
+              value={form.billing_address}
+              onChange={(e) => setField("billing_address", e.target.value)}
+              rows={2}
+              className={fieldCls(!!err.billing_address)}
+            />
+          </Field>
+          {!branchMode && (
+            <>
+              <Field label="Město" error={err.city}>
+                <input
+                  type="text"
+                  value={form.city}
+                  onChange={(e) => setField("city", e.target.value)}
+                  className={fieldCls(!!err.city)}
+                />
+              </Field>
+              <Field label="PSČ" error={err.postal_code}>
+                <input
+                  type="text"
+                  value={form.postal_code}
+                  onChange={(e) => setField("postal_code", e.target.value)}
+                  className={fieldCls(!!err.postal_code)}
+                />
+              </Field>
+              <Field label="Země" span={2} error={err.country}>
+                <input
+                  type="text"
+                  value={form.country}
+                  onChange={(e) => setField("country", e.target.value)}
+                  className={fieldCls(!!err.country)}
+                />
+              </Field>
+            </>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "individual",
+      title: "Individuální požadavky",
+      subtitle: "Zákaznické standardy platné pro všechny jeho produkty a objednávky",
+      icon: <Wrench className="h-4 w-4" />,
+      content: (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Požadavky na etikety" span={2} error={err.label_requirements}>
+            <textarea
+              value={form.label_requirements}
+              onChange={(e) => setField("label_requirements", e.target.value)}
+              rows={2}
+              placeholder="Rozměry, orientace, barevnost, potisk…"
+              className={fieldCls(!!err.label_requirements)}
+            />
+          </Field>
+          <Field label="Palety / balení" span={2} error={err.pallet_packaging}>
+            <textarea
+              value={form.pallet_packaging}
+              onChange={(e) => setField("pallet_packaging", e.target.value)}
+              rows={2}
+              placeholder="Typ palety, počet ks na paletu, fixace, stretch…"
+              className={fieldCls(!!err.pallet_packaging)}
+            />
+          </Field>
+          <Field label="Poznámky k pre-pressu" span={2} error={err.prepress_notes}>
+            <textarea
+              value={form.prepress_notes}
+              onChange={(e) => setField("prepress_notes", e.target.value)}
+              rows={2}
+              placeholder="Profily, oříznutí, spadávky, podkladové barvy…"
+              className={fieldCls(!!err.prepress_notes)}
+            />
+          </Field>
+        </div>
+      ),
+    },
+    {
+      id: "other",
+      title: "Ostatní",
+      subtitle: "Tolerance dodávek, obecná poznámka",
+      icon: <FileText className="h-4 w-4" />,
+      content: (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="% tolerance pod-/nadnákladu" error={err.allow_under_over_delivery_percent}>
+            <input
+              type="number"
+              step="0.01"
+              value={form.allow_under_over_delivery_percent}
+              onChange={(e) =>
+                setField("allow_under_over_delivery_percent", e.target.value)
+              }
+              className={fieldCls(!!err.allow_under_over_delivery_percent)}
+            />
+          </Field>
+          <Field label="Obecná poznámka" span={2} error={err.customer_note}>
+            <textarea
+              value={form.customer_note}
+              onChange={(e) => setField("customer_note", e.target.value)}
+              rows={2}
+              className={fieldCls(!!err.customer_note)}
+            />
+          </Field>
+          <Field label="Individuální požadavky (legacy)" span={2} error={err.individual_requirements}>
+            <textarea
+              value={form.individual_requirements}
+              onChange={(e) => setField("individual_requirements", e.target.value)}
+              rows={2}
+              placeholder="Zachováno pro zpětnou kompatibilitu – preferujte strukturovaná pole výše"
+              className={fieldCls(!!err.individual_requirements)}
+            />
+          </Field>
+        </div>
+      ),
+    },
+    ...(attachmentsContent
+      ? [
+          {
+            id: "attachments",
+            title: "Přílohy",
+            subtitle: "PDF, Word, Excel – smlouvy, ceníky a další dokumenty zákazníka",
+            icon: <Paperclip className="h-4 w-4" />,
+            content: attachmentsContent,
+          },
+        ]
+      : []),
+  ];
+
+  const filtered = visibleSections
+    ? sections.filter((s) => visibleSections.includes(s.id as CustomerFormSectionId))
+    : sections;
+
+  if (mode === "tabs") {
+    const tabs: TabDef[] = filtered.map((s) => ({
+      id: s.id,
+      label: s.title,
+      icon: s.icon,
+      badge: s.id === "attachments" ? attachmentsBadge : undefined,
+      content: (
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          {s.subtitle && (
+            <p className="mb-4 border-b border-gray-100 pb-3 text-sm text-gray-500">
+              {s.subtitle}
+            </p>
+          )}
+          {s.content}
+        </div>
+      ),
+    }));
+    return <Tabs tabs={tabs} storageKey="customerForm" />;
+  }
+
+  if (compact) {
+    return (
+      <div className="space-y-4">
+        {filtered.map((s) => (
+          <div key={s.id}>{s.content}</div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {filtered.map((s) => (
+        <SectionShell
+          key={s.id}
+          title={s.title}
+          subtitle={s.subtitle}
+          mode={mode}
+        >
+          {s.content}
+        </SectionShell>
+      ))}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  span = 1,
+  children,
+  error,
+  hint,
+}: {
+  label: string;
+  span?: 1 | 2;
+  children: React.ReactNode;
+  error?: string;
+  hint?: string;
+}) {
+  return (
+    <div className={span === 2 ? "sm:col-span-2" : ""}>
+      <label className="mb-1 block text-sm font-medium text-gray-700">{label}</label>
+      {children}
+      {error ? (
+        <p className="mt-1 text-xs text-red-600">{error}</p>
+      ) : hint ? (
+        <p className="mt-1 text-xs text-gray-400">{hint}</p>
+      ) : null}
+    </div>
+  );
+}
+
+export const emptyCustomerForm: CustomerFormState = {
+  name: "",
+  email: "",
+  phone: "",
+  contact_person: "",
+  tax_country: "CZ",
+  billing_company: "",
+  billing_email: "",
+  ico: "",
+  dic: "",
+  billing_address: "",
+  city: "",
+  postal_code: "",
+  country: "Česká republika",
+  label_requirements: "",
+  pallet_packaging: "",
+  prepress_notes: "",
+  allow_under_over_delivery_percent: "",
+  individual_requirements: "",
+  customer_note: "",
+};

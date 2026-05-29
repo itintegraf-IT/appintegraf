@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Eye, Pencil, Trash2 } from "lucide-react";
+import { Search, Eye, Pencil, Trash2, FileText, ImageOff } from "lucide-react";
+import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
+import { ProductPdfThumbnail } from "./_components/ProductPdfThumbnail";
 
 type Product = {
   id: number;
@@ -12,6 +14,8 @@ type Product = {
   client_name: string | null;
   item_status: string | null;
   iml_customers?: { id: number; name: string } | null;
+  has_image?: boolean;
+  has_pdf?: boolean;
 };
 
 type Customer = { id: number; name: string };
@@ -124,10 +128,9 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Všechny stavy</option>
-            <option value="aktivní">Aktivní</option>
-            <option value="archivní">Archivní</option>
-            <option value="testovací">Testovací</option>
-            <option value="zablokovaná">Zablokovaná</option>
+            {IML_ITEM_STATUSES.map((s) => (
+              <option key={s} value={s}>{imlItemStatusLabel(s)}</option>
+            ))}
           </select>
           <button
             type="submit"
@@ -141,34 +144,81 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
         <table className="w-full">
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
+              <th className="w-14 px-3 py-3 text-left text-sm font-semibold text-gray-700">
+                <span className="sr-only">Náhled</span>
+              </th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kód IG</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Název / Klient</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Zákazník</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stav</th>
+              <th className="w-20 px-3 py-3 text-center text-sm font-semibold text-gray-700">PDF</th>
               <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Akce</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   Načítání…
                 </td>
               </tr>
             ) : products.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                   Žádné produkty
                 </td>
               </tr>
             ) : (
               products.map((p) => (
                 <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <td className="px-3 py-2">
+                    {p.has_image ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={`/api/iml/products/${p.id}/image`}
+                        alt=""
+                        className="h-10 w-10 rounded border border-gray-200 bg-white object-contain"
+                        loading="lazy"
+                      />
+                    ) : p.has_pdf ? (
+                      <div
+                        className="h-10 w-10 overflow-hidden rounded border border-gray-200 bg-white"
+                        title="Náhled z PDF"
+                      >
+                        <ProductPdfThumbnail productId={p.id} maxHeight={40} className="[&_canvas]:max-h-10 [&_canvas]:max-w-10 [&_canvas]:object-contain" />
+                      </div>
+                    ) : (
+                      <div
+                        className="flex h-10 w-10 items-center justify-center rounded border border-dashed border-gray-200 bg-gray-50 text-gray-300"
+                        title="Bez obrázku"
+                      >
+                        <ImageOff className="h-4 w-4" />
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-3 font-mono text-sm">{p.ig_code ?? "-"}</td>
                   <td className="px-4 py-3">{p.client_name ?? p.ig_short_name ?? "-"}</td>
                   <td className="px-4 py-3 text-gray-600">{p.iml_customers?.name ?? "-"}</td>
                   <td className="px-4 py-3">
                     <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">{p.item_status ?? "-"}</span>
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    {p.has_pdf ? (
+                      <a
+                        href={`/api/iml/products/${p.id}/pdf`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50"
+                        title="Otevřít PDF tisková data"
+                      >
+                        <FileText className="h-5 w-5" />
+                      </a>
+                    ) : (
+                      <span className="text-gray-300" title="Bez tiskových dat">
+                        <FileText className="mx-auto h-5 w-5 opacity-30" />
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-1">

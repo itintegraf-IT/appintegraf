@@ -1,7 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Image, FileText, Trash2, Upload } from "lucide-react";
+import { ProductPdfThumbnail } from "./ProductPdfThumbnail";
+import { pdfFileToJpegPreviewBlob } from "@/lib/iml-product-preview-from-pdf";
+
+const PREVIEW_FILE_ACCEPT =
+  "image/jpeg,image/png,image/webp,image/gif,application/pdf,.pdf";
 
 type Props = {
   productId: number;
@@ -12,10 +17,16 @@ type Props = {
 };
 
 export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange, onPdfChange }: Props) {
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [imageError, setImageError] = useState("");
   const [pdfError, setPdfError] = useState("");
+
+  const pickImage = () => imageInputRef.current?.click();
+  const pickPdf = () => pdfInputRef.current?.click();
+  const fileInputClass = "sr-only";
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -23,8 +34,21 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
     setImageError("");
     setImageLoading(true);
     try {
+      const isPdf =
+        file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      let fileToUpload: File = file;
+      if (isPdf) {
+        try {
+          const blob = await pdfFileToJpegPreviewBlob(file);
+          fileToUpload = new File([blob], "nahled-z-pdf.jpg", { type: "image/jpeg" });
+        } catch (convErr) {
+          setImageError(convErr instanceof Error ? convErr.message : "PDF nelze převést na náhled.");
+          return;
+        }
+      }
+
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("file", fileToUpload);
       const res = await fetch(`/api/iml/products/${productId}/image`, {
         method: "POST",
         body: formData,
@@ -45,7 +69,7 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
   };
 
   const handleImageDelete = async () => {
-    if (!confirm("Opravdu smazat obrázek?")) return;
+    if (!confirm("Opravdu smazat náhled (obrázek)?")) return;
     setImageError("");
     setImageLoading(true);
     try {
@@ -76,9 +100,19 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
         method: "POST",
         body: formData,
       });
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
-        setPdfError(data.error ?? "Chyba při nahrávání");
+        if (res.status === 413) {
+          setPdfError(
+            "Požadavek byl odmítnut (413) – typicky malý `client_max_body_size` u nginx. Nastavte alespoň 60M u location pro aplikaci a znovu načtěte konfiguraci."
+          );
+          return;
+        }
+        setPdfError(
+          typeof data.error === "string" && data.error.length > 0
+            ? data.error
+            : "Chyba při nahrávání"
+        );
         return;
       }
       onPdfChange?.();
@@ -116,7 +150,14 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
       <h3 className="mb-4 text-sm font-semibold text-gray-700">Obrázek a PDF</h3>
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
-          <p className="mb-2 text-sm text-gray-600">Náhled (JPG, PNG, WebP, GIF, max 5 MB)</p>
+          <p className="mb-2 text-sm text-gray-600">
+            Náhled – obrázek (JPG, PNG, WebP, GIF) nebo PDF (1. stránka → uloží se jako JPEG, max. 5 MB)
+            {!hasImage && hasPdf && (
+              <span className="mt-0.5 block text-xs font-normal text-gray-500">
+                Dokud nenahrajete vlastní náhled výše, zobrazí se první stránka tiskových dat (PDF vpravo).
+              </span>
+            )}
+          </p>
           {hasImage ? (
             <div className="flex items-center gap-2">
               <img
@@ -134,41 +175,88 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
                   <Trash2 className="h-4 w-4" />
                   Smazat
                 </button>
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50">
+                <button
+                  type="button"
+                  onClick={pickImage}
+                  disabled={imageLoading}
+                  aria-label="Nahrát jiný náhled (obrázek nebo PDF)"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Upload className="h-4 w-4" />
                   Nahradit
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={handleImageUpload}
-                    disabled={imageLoading}
-                    className="hidden"
-                  />
-                </label>
+                </button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept={PREVIEW_FILE_ACCEPT}
+                  onChange={handleImageUpload}
+                  disabled={imageLoading}
+                  className={fileInputClass}
+                  tabIndex={-1}
+                />
+              </div>
+            </div>
+          ) : hasPdf ? (
+            <div className="flex items-center gap-2">
+              <ProductPdfThumbnail productId={productId} maxHeight={96} className="shrink-0" />
+              <div className="flex flex-col gap-1">
+                <button
+                  type="button"
+                  onClick={pickImage}
+                  disabled={imageLoading}
+                  aria-label="Nahrát náhled z obrázku nebo PDF (1. stránka)"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Upload className="h-4 w-4" />
+                  Nahrát náhled
+                </button>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept={PREVIEW_FILE_ACCEPT}
+                  onChange={handleImageUpload}
+                  disabled={imageLoading}
+                  className={fileInputClass}
+                  tabIndex={-1}
+                />
               </div>
             </div>
           ) : (
-            <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 transition-colors hover:border-gray-400 hover:bg-gray-100">
-              <Image className="mb-2 h-10 w-10 text-gray-400" />
-              <span className="text-sm text-gray-600">Klikněte pro nahrání obrázku</span>
+            <>
+              <button
+                type="button"
+                onClick={pickImage}
+                disabled={imageLoading}
+                aria-label="Vybrat náhled – obrázek nebo PDF"
+                className="flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-left transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <Image className="mb-2 h-10 w-10 text-gray-400" />
+                <span className="text-sm text-gray-600">Klikněte pro nahrání náhledu (obrázek nebo PDF)</span>
+              </button>
               <input
+                ref={imageInputRef}
                 type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif"
+                accept={PREVIEW_FILE_ACCEPT}
                 onChange={handleImageUpload}
                 disabled={imageLoading}
-                className="hidden"
+                className={fileInputClass}
+                tabIndex={-1}
               />
-            </label>
+            </>
           )}
           {imageError && <p className="mt-1 text-sm text-red-600">{imageError}</p>}
         </div>
 
         <div>
-          <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max 20 MB)</p>
+          <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max 50 MB)</p>
           {hasPdf ? (
             <div className="flex items-center gap-2">
-              <div className="flex h-24 w-24 items-center justify-center rounded-lg border bg-gray-100">
-                <FileText className="h-10 w-10 text-gray-500" />
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-gray-100">
+                {hasImage ? (
+                  <ProductPdfThumbnail productId={productId} maxHeight={96} className="max-h-24 max-w-24" />
+                ) : (
+                  <FileText className="h-10 w-10 text-gray-500" />
+                )}
               </div>
               <div className="flex flex-col gap-1">
                 <a
@@ -188,31 +276,49 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
                   <Trash2 className="h-4 w-4" />
                   Smazat
                 </button>
-                <label className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50">
+                <button
+                  type="button"
+                  onClick={pickPdf}
+                  disabled={pdfLoading}
+                  aria-label="Nahrát jiné PDF"
+                  className="inline-flex cursor-pointer items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
                   <Upload className="h-4 w-4" />
                   Nahradit
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    onChange={handlePdfUpload}
-                    disabled={pdfLoading}
-                    className="hidden"
-                  />
-                </label>
+                </button>
+                <input
+                  ref={pdfInputRef}
+                  type="file"
+                  accept="application/pdf"
+                  onChange={handlePdfUpload}
+                  disabled={pdfLoading}
+                  className={fileInputClass}
+                  tabIndex={-1}
+                />
               </div>
             </div>
           ) : (
-            <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 transition-colors hover:border-gray-400 hover:bg-gray-100">
-              <FileText className="mb-2 h-10 w-10 text-gray-400" />
-              <span className="text-sm text-gray-600">Klikněte pro nahrání PDF</span>
+            <>
+              <button
+                type="button"
+                onClick={pickPdf}
+                disabled={pdfLoading}
+                aria-label="Vybrat PDF k nahrání"
+                className="flex w-full cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-left transition-colors hover:border-gray-400 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <FileText className="mb-2 h-10 w-10 text-gray-400" />
+                <span className="text-sm text-gray-600">Klikněte pro nahrání PDF</span>
+              </button>
               <input
+                ref={pdfInputRef}
                 type="file"
                 accept="application/pdf"
                 onChange={handlePdfUpload}
                 disabled={pdfLoading}
-                className="hidden"
+                className={fileInputClass}
+                tabIndex={-1}
               />
-            </label>
+            </>
           )}
           {pdfError && <p className="mt-1 text-sm text-red-600">{pdfError}</p>}
         </div>

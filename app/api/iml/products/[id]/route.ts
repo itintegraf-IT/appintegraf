@@ -3,6 +3,13 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import {
+  replaceProductColorsInTx,
+  validateProductColorsInput,
+  type IncomingProductColor,
+} from "@/lib/iml-product-colors";
+import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
+import { productMaterialIncludes } from "@/lib/iml/product-materials";
 
 export async function GET(
   _req: NextRequest,
@@ -23,20 +30,36 @@ export async function GET(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
-  const product = await prisma.iml_products.findUnique({
-    where: { id },
-    include: { iml_customers: { select: { id: true, name: true } } },
-  });
+  const [product, hasFileTablePdf] = await Promise.all([
+    prisma.iml_products.findUnique({
+      where: { id },
+      include: {
+        iml_customers: { select: { id: true, name: true } },
+        iml_foils: { select: { id: true, code: true, name: true } },
+        ...productMaterialIncludes,
+        iml_product_colors: {
+          include: {
+            iml_pantone_colors: {
+              select: { id: true, code: true, name: true, hex: true, is_active: true },
+            },
+          },
+          orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+        },
+      },
+    }),
+    imlProductHasPdfInFilesTable(id),
+  ]);
 
   if (!product) {
     return NextResponse.json({ error: "Produkt nenalezen" }, { status: 404 });
   }
 
   const { image_data, pdf_data, ...rest } = product;
+  const hasPdf = (!!pdf_data && pdf_data.length > 0) || hasFileTablePdf;
   return NextResponse.json({
     ...rest,
     has_image: !!image_data && image_data.length > 0,
-    has_pdf: !!pdf_data && pdf_data.length > 0,
+    has_pdf: hasPdf,
   });
 }
 
@@ -72,7 +95,13 @@ export async function PUT(
 
   try {
     const body = await req.json();
-    const data = parseProductBody(body);
+    let data: Awaited<ReturnType<typeof parseProductBody>>;
+    try {
+      data = await parseProductBody(body);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Neplatná data produktu";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
 
     if (data.sku) {
       const dup = await prisma.iml_products.findFirst({
@@ -85,9 +114,29 @@ export async function PUT(
 
     const customDataForPrisma = data.custom_data;
     const updatePayload = { ...data, custom_data: customDataForPrisma, last_edited_by: editorName };
-    await prisma.iml_products.update({
-      where: { id },
-      data: updatePayload as Parameters<typeof prisma.iml_products.update>[0]["data"],
+
+    const incomingColors = Array.isArray(body.colors)
+      ? (body.colors as IncomingProductColor[])
+      : null;
+    const colorsValidation = incomingColors
+      ? validateProductColorsInput(incomingColors)
+      : null;
+    if (colorsValidation && !colorsValidation.ok) {
+      return NextResponse.json(
+        { error: "Neplatné barvy", details: colorsValidation.details },
+        { status: 400 }
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.iml_products.update({
+        where: { id },
+        data: updatePayload as Parameters<typeof tx.iml_products.update>[0]["data"],
+      });
+      if (colorsValidation && colorsValidation.ok) {
+        const res = await replaceProductColorsInTx(tx, id, colorsValidation.prepared, true);
+        if (!res.ok) throw new Error(res.error);
+      }
     });
 
     await logImlAudit({
@@ -143,11 +192,13 @@ export async function DELETE(
   return NextResponse.json({ success: true });
 }
 
-function parseProductBody(body: Record<string, unknown>) {
+async function parseProductBody(body: Record<string, unknown>) {
   const str = (v: unknown) => (v != null && v !== "" ? String(v).trim() : null);
   const int = (v: unknown) => (v != null && v !== "" ? parseInt(String(v), 10) : null);
 
-  return {
+  const { enrichProductMaterialFields } = await import("@/lib/iml/product-materials");
+
+  const base = {
     customer_id: body.customer_id != null ? int(body.customer_id) : null,
     ig_code: str(body.ig_code),
     ig_short_name: str(body.ig_short_name),
@@ -161,8 +212,10 @@ function parseProductBody(body: Record<string, unknown>) {
     positions_on_sheet: int(body.positions_on_sheet),
     pieces_per_box: int(body.pieces_per_box),
     pieces_per_pallet: int(body.pieces_per_pallet),
+    foil_id: body.foil_id != null ? int(body.foil_id) : null,
     foil_type: str(body.foil_type),
     color_coverage: str(body.color_coverage),
+    labels_per_sheet: parseLabelsPerSheet(body.labels_per_sheet),
     print_note: str(body.print_note),
     has_print_sample: !!body.has_print_sample,
     ean_code: str(body.ean_code),
@@ -177,6 +230,19 @@ function parseProductBody(body: Record<string, unknown>) {
     is_active: body.is_active !== false,
     custom_data: parseCustomData(body.custom_data),
   };
+
+  const mats = await enrichProductMaterialFields(body);
+  const merged = { ...base, ...mats };
+  if (mats.foil_material_id != null) merged.foil_id = null;
+  return merged;
+}
+
+/** labels_per_sheet > 0 nebo NULL. */
+function parseLabelsPerSheet(val: unknown): number | null {
+  if (val == null || val === "") return null;
+  const n = parseInt(String(val), 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
 }
 
 function parseCustomData(val: unknown): Record<string, unknown> | null {

@@ -44,16 +44,22 @@ Aplikace běží na [http://localhost:3000](http://localhost:3000).
 |-------|-------|-------|
 | Dashboard | `/` | Přehled, statistiky, notifikace, události ke schválení |
 | Kontakty | `/contacts` | Evidence osob, oddělení, import, export |
-| Majetek | `/equipment` | Evidence vybavení, kategorie, přiřazení |
-| Kalendář | `/calendar` | Události, týdenní/měsíční zobrazení, schvalování, export .ics |
+| Majetek | `/equipment` | Evidence vybavení, požadavky na techniku, přiřazení |
+| Kalendář | `/calendar` | Události, schvalování, soukromé události, export .ics |
+| Úkoly | `/ukoly` | Zadávání úkolů, archiv, statistiky |
+| Personalistika | `/personalistika` | Uchazeči, pozice, brigádníci |
+| Evidence smluv | `/contracts` | Smlouvy, workflow, přílohy, upozornění na platnost |
+| Plánování | `/planovani` | Plánování výroby |
+| Výroba | `/vyroba` | Výrobní zakázky IG52, protokoly |
+| IML | `/iml` | Zákazníci, produkty, poptávky, objednávky, reporty |
+| Katalog materiálů | `/materialy` | SDS/TDS/certifikáty, papír, fólie, barvy, laky |
+| Kiosk | `/kiosk` | Prezentace pro monitory |
 | Telefonní seznam | `/phone-list` | Seznam zaměstnanců (přihlášení) |
 | Veřejný telefonní seznam | `/public/phone-list` | Bez přihlášení |
 | Požadavek na techniku | `/public/equipment-request` | Veřejný formulář |
-| Kiosk | `/kiosk` | Prezentace pro monitory |
 | Školení | `/training` | Testy, materiály, otázky |
-| Plánování | `/planovani` | Plánování výroby (bloky, codebook, dny firmy) |
-| IML | `/iml` | Zákazníci, produkty, objednávky – export/import CSV/Excel |
-| Admin | `/admin/*` | Uživatelé, oddělení, role, reporty |
+| Admin | `/admin/*` | Uživatelé, role, 2FA, sdílené e-maily, reporty |
+| Nápověda | `/help/{slug}` | Dokumentace modulů z `docs/` |
 
 ## Struktura projektu
 
@@ -67,8 +73,14 @@ app/
 │   ├── phone-list/       # Telefonní seznam
 │   ├── kiosk/            # Kiosk
 │   ├── training/         # Školení
+│   ├── ukoly/            # Úkoly
+│   ├── personalistika/   # Personalistika
+│   ├── contracts/        # Evidence smluv
 │   ├── planovani/        # Plánování výroby
-│   ├── iml/              # IML – zákazníci, produkty, objednávky
+│   ├── vyroba/           # Výroba
+│   ├── iml/              # IML
+│   ├── materialy/        # Katalog materiálů
+│   ├── help/             # Zobrazení dokumentace (markdown)
 │   ├── admin/            # Administrace
 │   └── layout.tsx        # Ochrana rout – přesměrování nepřihlášených na /login
 ├── login/                # Přihlášení
@@ -86,7 +98,10 @@ docs/                     # Dokumentace modulů
 - **[Přehled dokumentace](docs/README.md)** – index všech dokumentů
 - **[Modul Kalendář](docs/MODUL_KALENDAR.md)** – týdenní/měsíční zobrazení, CRUD událostí, schvalování, export .ics
 - **[Kalendář – dvoufázové schvalování](docs/KALENDAR_SCHVALOVANI_FAZE2.md)** – specifikace schvalování zástup → vedoucí
-- **[Modul IML](docs/MODUL_IML.md)** – zákazníci, produkty, objednávky, export/import
+- **[Modul IML](docs/MODUL_IML.md)** – zákazníci, produkty, poptávky, objednávky
+- **[Katalog materiálů](docs/MODUL_MATERIALY.md)** – SDS/TDS, kategorie materiálů
+- **[Evidence smluv](docs/MODUL_EVIDENCE_SMLOUV.md)** – workflow smluv
+- **[Úkoly](docs/MODUL_UKOLY.md)** – zadávání a archiv úkolů
 - **[Migrace plánování](migrations/planovani-igvyroba/README.md)** – migrace dat z igvyroba
 - **[Plán migrace](MIGRACE_NEXTJS.md)** – fáze migrace z PHP na Next.js
 

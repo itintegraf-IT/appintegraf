@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import { resolveCatalogCustomerId } from "@/lib/iml-customer-catalog";
+import {
+  replaceProductColorsInTx,
+  validateProductColorsInput,
+  type IncomingProductColor,
+} from "@/lib/iml-product-colors";
 
 const productListSelect = {
   id: true,
@@ -19,8 +26,10 @@ const productListSelect = {
   positions_on_sheet: true,
   pieces_per_box: true,
   pieces_per_pallet: true,
+  foil_id: true,
   foil_type: true,
   color_coverage: true,
+  labels_per_sheet: true,
   print_note: true,
   has_print_sample: true,
   ean_code: true,
@@ -37,6 +46,7 @@ const productListSelect = {
   created_at: true,
   updated_at: true,
   iml_customers: { select: { id: true, name: true } },
+  iml_foils: { select: { id: true, code: true, name: true } },
 } as const;
 
 export async function GET(req: NextRequest) {
@@ -53,7 +63,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const search = searchParams.get("search")?.trim() ?? "";
   const customerId = searchParams.get("customer_id");
-  const status = searchParams.get("status");
+  const status = searchParams.get("item_status") ?? searchParams.get("status");
 
   const where: Record<string, unknown> = {};
   if (search) {
@@ -66,7 +76,10 @@ export async function GET(req: NextRequest) {
     ];
   }
   if (customerId) {
-    where.customer_id = parseInt(customerId, 10);
+    const unitId = parseInt(customerId, 10);
+    if (!Number.isNaN(unitId)) {
+      where.customer_id = await resolveCatalogCustomerId(unitId);
+    }
   }
   if (status) {
     where.item_status = status;
@@ -82,7 +95,43 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ products });
+  // Efektivní flagy bez stahování blobů: jen OCTET_LENGTH > 0.
+  let flagsById = new Map<number, { has_image: boolean; has_pdf: boolean }>();
+  if (products.length > 0) {
+    const ids = products.map((p) => p.id);
+    const rows = await prisma.$queryRaw<
+      Array<{ id: number; has_image: number; has_pdf: number }>
+    >`
+      SELECT p.id,
+             CASE WHEN p.image_data IS NOT NULL AND OCTET_LENGTH(p.image_data) > 0 THEN 1 ELSE 0 END AS has_image,
+             CASE
+               WHEN (p.pdf_data IS NOT NULL AND OCTET_LENGTH(p.pdf_data) > 0) THEN 1
+               WHEN EXISTS (
+                 SELECT 1 FROM iml_product_files f
+                 WHERE f.product_id = p.id
+                   AND f.pdf_data IS NOT NULL
+                   AND OCTET_LENGTH(f.pdf_data) > 0
+               ) THEN 1
+               ELSE 0
+             END AS has_pdf
+      FROM iml_products p
+      WHERE p.id IN (${Prisma.join(ids)})
+    `;
+    flagsById = new Map(
+      rows.map((r) => [
+        Number(r.id),
+        { has_image: Number(r.has_image) === 1, has_pdf: Number(r.has_pdf) === 1 },
+      ])
+    );
+  }
+
+  const productsWithFlags = products.map((p) => ({
+    ...p,
+    has_image: flagsById.get(p.id)?.has_image ?? false,
+    has_pdf: flagsById.get(p.id)?.has_pdf ?? false,
+  }));
+
+  return NextResponse.json({ products: productsWithFlags });
 }
 
 export async function POST(req: NextRequest) {
@@ -104,7 +153,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const data = parseProductBody(body);
+    let data: Awaited<ReturnType<typeof parseProductBody>>;
+    try {
+      data = await parseProductBody(body);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Neplatná data produktu";
+      return NextResponse.json({ error: msg }, { status: 400 });
+    }
 
     if (data.sku) {
       const existing = await prisma.iml_products.findFirst({ where: { sku: data.sku } });
@@ -115,8 +170,35 @@ export async function POST(req: NextRequest) {
 
     const customDataForPrisma = data.custom_data;
     const createPayload = { ...data, custom_data: customDataForPrisma, last_edited_by: editorName };
-    const product = await prisma.iml_products.create({
-      data: createPayload as Parameters<typeof prisma.iml_products.create>[0]["data"],
+
+    // Volitelné barvy – pokud jsou v body, uložíme je spolu s produktem v jedné transakci.
+    const incomingColors = Array.isArray(body.colors)
+      ? (body.colors as IncomingProductColor[])
+      : null;
+    const colorsValidation = incomingColors
+      ? validateProductColorsInput(incomingColors)
+      : null;
+    if (colorsValidation && !colorsValidation.ok) {
+      return NextResponse.json(
+        { error: "Neplatné barvy", details: colorsValidation.details },
+        { status: 400 }
+      );
+    }
+
+    const productId = await prisma.$transaction(async (tx) => {
+      const created = await tx.iml_products.create({
+        data: createPayload as Parameters<typeof tx.iml_products.create>[0]["data"],
+      });
+      if (colorsValidation && colorsValidation.ok) {
+        const res = await replaceProductColorsInTx(tx, created.id, colorsValidation.prepared, true);
+        if (!res.ok) throw new Error(res.error);
+      }
+      return created.id;
+    });
+
+    const product = await prisma.iml_products.findUniqueOrThrow({
+      where: { id: productId },
+      select: { id: true, ig_code: true, client_name: true },
     });
 
     await logImlAudit({
@@ -134,12 +216,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-function parseProductBody(body: Record<string, unknown>) {
+async function parseProductBody(body: Record<string, unknown>) {
   const str = (v: unknown) => (v != null && v !== "" ? String(v).trim() : null);
   const int = (v: unknown) => (v != null && v !== "" ? parseInt(String(v), 10) : null);
   const num = (v: unknown) => (v != null && v !== "" ? parseFloat(String(v)) : null);
 
-  return {
+  const { enrichProductMaterialFields } = await import("@/lib/iml/product-materials");
+
+  const base = {
     customer_id: body.customer_id != null ? int(body.customer_id) : null,
     ig_code: str(body.ig_code),
     ig_short_name: str(body.ig_short_name),
@@ -153,8 +237,10 @@ function parseProductBody(body: Record<string, unknown>) {
     positions_on_sheet: int(body.positions_on_sheet),
     pieces_per_box: int(body.pieces_per_box),
     pieces_per_pallet: int(body.pieces_per_pallet),
+    foil_id: body.foil_id != null ? int(body.foil_id) : null,
     foil_type: str(body.foil_type),
     color_coverage: str(body.color_coverage),
+    labels_per_sheet: parseLabelsPerSheet(body.labels_per_sheet),
     print_note: str(body.print_note),
     has_print_sample: !!body.has_print_sample,
     ean_code: str(body.ean_code),
@@ -169,6 +255,22 @@ function parseProductBody(body: Record<string, unknown>) {
     is_active: body.is_active !== false,
     custom_data: parseCustomData(body.custom_data),
   };
+
+  const mats = await enrichProductMaterialFields(body);
+  const merged = { ...base, ...mats };
+  if (mats.foil_material_id != null) merged.foil_id = null;
+  return merged;
+}
+
+/**
+ * labels_per_sheet je povinně > 0 nebo NULL.
+ * 0, prázdno, neplatný vstup → NULL (dle specifikace F3.4).
+ */
+function parseLabelsPerSheet(val: unknown): number | null {
+  if (val == null || val === "") return null;
+  const n = parseInt(String(val), 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
 }
 
 function parseCustomData(val: unknown): Record<string, unknown> | null {

@@ -21,7 +21,7 @@ export function ProductFilesUploadPlaceholder() {
           </div>
         </div>
         <div>
-          <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max 20 MB)</p>
+          <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max 50 MB)</p>
           <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 opacity-60">
             <FileText className="mb-2 h-10 w-10 text-gray-400" />
             <span className="text-center text-sm text-gray-500">

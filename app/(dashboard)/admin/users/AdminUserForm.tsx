@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound, Layers } from "lucide-react";
 import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
 import { TotpAdminPanel } from "@/components/admin/TotpAdminPanel";
 
@@ -17,6 +17,7 @@ const AVAILABLE_MODULES = [
   { key: "kiosk", label: "Kiosk Monitory", icon: Tv },
   { key: "training", label: "IT Školení", icon: GraduationCap },
   { key: "iml", label: "IML", icon: Package },
+  { key: "materialy", label: "Katalog materiálů", icon: Layers },
   { key: "ukoly", label: "Úkoly", icon: ClipboardList },
   { key: "personalistika", label: "Personalistika", icon: BriefcaseBusiness },
 ] as const;

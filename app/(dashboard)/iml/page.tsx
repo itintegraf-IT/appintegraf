@@ -3,7 +3,17 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Package, Users, ShoppingCart, FileText, BarChart3, Clock, Settings, Upload } from "lucide-react";
+import {
+  Package,
+  Users,
+  ShoppingCart,
+  FileText,
+  BarChart3,
+  Clock,
+  Settings,
+  Upload,
+  FileQuestion,
+} from "lucide-react";
 import { subMonths } from "date-fns";
 
 export default async function ImlPage() {
@@ -30,6 +40,8 @@ export default async function ImlPage() {
     topCustomersByOrders,
     productsByStatus,
     ordersLast12Months,
+    inquiriesLast12Months,
+    inquiriesConvertedLast12,
   ] = await Promise.all([
     prisma.iml_customers.count(),
     prisma.iml_products.count({ where: { is_active: true } }),
@@ -62,7 +74,21 @@ export default async function ImlPage() {
       _count: { id: true },
       _sum: { total: true },
     }),
+    prisma.iml_inquiries.count({
+      where: { inquiry_date: { gte: twelveMonthsAgo } },
+    }),
+    prisma.iml_inquiries.count({
+      where: {
+        inquiry_date: { gte: twelveMonthsAgo },
+        converted_order_id: { not: null },
+      },
+    }),
   ]);
+
+  const inquiryConversionPct =
+    inquiriesLast12Months > 0
+      ? Math.round((inquiriesConvertedLast12 / inquiriesLast12Months) * 1000) / 10
+      : null;
 
   type OrderStatusRow = { status: string | null; _count: { id: number } };
   type TopCustomerRow = { customer_id: number; _count: { id: number } };
@@ -82,12 +108,45 @@ export default async function ImlPage() {
   type CustomerRow = { id: number; name: string };
   const customerMap = new Map((customerNames as CustomerRow[]).map((c) => [c.id, c.name]));
 
-  const cards = [
+  type DashCard = {
+    href: string;
+    icon: typeof Users;
+    value: string | number;
+    label: string;
+    hint?: string;
+  };
+  const cards: DashCard[] = [
     { href: "/iml/customers", icon: Users, value: customersCount, label: "Zákazníci" },
     { href: "/iml/products", icon: Package, value: productsCount, label: "Produkty" },
     { href: "/iml/orders", icon: ShoppingCart, value: ordersCount, label: "Objednávky" },
+    {
+      href: "/iml/inquiries",
+      icon: FileQuestion,
+      value: inquiriesLast12Months,
+      label: "Poptávky (12 m)",
+      hint:
+        inquiryConversionPct != null
+          ? `Konverze: ${inquiryConversionPct} % (${inquiriesConvertedLast12}/${inquiriesLast12Months})`
+          : "Konverze: —",
+    },
+    {
+      href: "/iml/reports/pantone",
+      icon: BarChart3,
+      value: "",
+      label: "Report Pantone",
+      hint: "Spotřeba barev z objednávek",
+    },
     { href: "/iml/imports", icon: Upload, value: "3", label: "Importy" },
   ];
+  if (canWrite) {
+    cards.push({
+      href: "/iml/settings",
+      icon: Settings,
+      value: "",
+      label: "Nastavení IML",
+      hint: "Vlastní pole • Fólie • Pantone",
+    });
+  }
 
   return (
     <>
@@ -105,9 +164,10 @@ export default async function ImlPage() {
               <Link
                 href="/iml/settings"
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                title="Vlastní pole, číselník fólií a další nastavení modulu"
               >
                 <Settings className="h-4 w-4" />
-                Vlastní pole
+                Nastavení IML
               </Link>
               <Link
                 href="/iml/imports"
@@ -142,7 +202,7 @@ export default async function ImlPage() {
         </div>
       </div>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
         {cards.map((card) => {
           const Icon = card.icon;
           return (
@@ -155,8 +215,13 @@ export default async function ImlPage() {
                 <Icon className="h-6 w-6" />
               </div>
               <div>
-                <p className="text-2xl font-bold text-gray-900">{card.value}</p>
-                <p className="text-sm text-gray-500">{card.label}</p>
+                {card.value !== "" && (
+                  <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+                )}
+                <p className="text-sm font-medium text-gray-700">{card.label}</p>
+                {card.hint && (
+                  <p className="text-xs text-gray-500">{card.hint}</p>
+                )}
               </div>
             </Link>
           );

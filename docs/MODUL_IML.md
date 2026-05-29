@@ -10,11 +10,14 @@ Modul IML slouží ke správě zákazníků, katalogu produktů a objednávek v 
 
 | Funkce | Cesta | Popis |
 |--------|-------|-------|
-| Dashboard IML | `/iml` | Přehled, statistiky, reporty, poslední objednávky |
-| Zákazníci | `/iml/customers` | Evidence zákazníků, CRUD, export, import |
-| Produkty | `/iml/products` | Katalog produktů, obrázky, PDF, export, import |
-| Objednávky | `/iml/orders` | Evidence objednávek, položky, export, import |
-| Nastavení | `/iml/settings` | Vlastní pole, správa rozšíření databáze |
+| Dashboard IML | `/iml` | Přehled, statistiky, konverze poptávek, poslední objednávky |
+| Zákazníci | `/iml/customers` | Evidence zákazníků, dodací adresy, CRUD, export, import |
+| Produkty | `/iml/products` | Katalog produktů, taby (výseky, fólie, Pantone, PDF verze), materiály z katalogu |
+| Poptávky | `/iml/inquiries` | Evidence poptávek, konverze na objednávku |
+| Objednávky | `/iml/orders` | Objednávky, snapshot adresy, export CSV/Excel/XML, import |
+| Report Pantone | `/iml/reports/pantone` | Plánovaná spotřeba barev (report) |
+| Tisk objednávky | `/iml/orders/[id]/print` | HTML sestava pro tisk / uložení PDF |
+| Nastavení | `/iml/settings` | Vlastní pole, číselníky |
 
 ### 1.2 Rychlý start
 
@@ -22,15 +25,38 @@ Modul IML slouží ke správě zákazníků, katalogu produktů a objednávek v 
 2. **Vlastní pole** – v Nastavení IML definujte vlastní pole pro produkty nebo objednávky.
 3. **Import** – CSV/Excel lze importovat na stránkách zákazníků, produktů a objednávek.
 
+#### 1.2.1 Profily uživatelů (Prohlížeč / Editor / Administrátor modulu)
+
+Oprávnění se ukládají do `roles.module_access` nebo `user_roles.module_access` ve formě **JSON objektu** nebo **pole řetězců** (viz `lib/auth-utils.ts`, funkce `hasModuleAccess`). Modul se jmenuje `iml`.
+
+| Profil | Účel | Příklad `module_access` (objekt) | Příklad (pole akcí) |
+|--------|------|-----------------------------------|----------------------|
+| **Prohlížeč** | Čtení seznamů a detailů, exporty kde API dovolí `read` | `{ "iml": "read" }` | `["iml"]`, `["iml.view"]` |
+| **Editor** | CRUD zákazníků, produktů, poptávek, objednávek | `{ "iml": "write" }` | `["iml.write"]` (nebo kombinace `iml.add` / `iml.edit` dle role) |
+| **Administrátor modulu IML** | Totéž co editor + obvykle správa nastavení (Pantone, vlastní pole), dle matice v implementačním plánu | `{ "iml": "admin" }` | doplňkově např. `iml.supervisor_override` pro výjimky u neaktivních produktů v objednávce |
+
+Globální role uživatele **Admin** (jméno role) má přístup ke všem modulům bez ohledu na `module_access`.
+
+**Tip pro testovací účty (např. kolegyně s omezeným přístupem):** v administraci rolí vytvořte roli „IML prohlížeč“ s `{ "iml": "read" }` a přiřaďte ji uživateli; pro plnou editaci použijte `{ "iml": "write" }`.
+
 ### 1.3 Shrnutí modulu
 
 | Položka | Hodnota |
 |---------|---------|
 | **Modul** | IML |
 | **Cesta** | `/iml` |
-| **Tabulky** | `iml_customers`, `iml_products`, `iml_orders`, `iml_order_items`, `iml_custom_fields` |
+| **Tabulky** | `iml_customers`, `iml_products`, `iml_orders`, `iml_order_items`, `iml_inquiries`, `iml_inquiry_items`, `iml_product_files`, `iml_pantone_colors`, `iml_product_colors`, `iml_customer_shipping_addresses`, `iml_custom_fields`, … |
 | **Oprávnění** | `iml` (read/write/admin) |
 | **Technologie** | Next.js App Router, Prisma, stávající UI komponenty |
+| **Katalog materiálů** | Vazba na modul [MODUL_MATERIALY.md](./MODUL_MATERIALY.md) – výběr fólie, barvy, papíru, laku na produktu |
+
+### Rozšíření newsec (implementováno)
+
+- **Poptávky** (`/iml/inquiries`) – evidence, položky, konverze na objednávku
+- **Verzování PDF** – tabulka `iml_product_files`, primární verze, historie
+- **Pantone barvy** na produktu + report spotřeby (`/iml/reports/pantone`)
+- **Dodací adresy** zákazníka, snapshot adresy na objednávce
+- Detailní checklist: [IML_NEWSEC_IMPLEMENTATION.md](./IML_NEWSEC_IMPLEMENTATION.md)
 
 ---
 
@@ -73,9 +99,19 @@ Modul IML poskytuje:
 
 ### 3.6 Sekce Klient (zákazník)
 
-- Název zákazníka, Kontaktní osoba, E-mail
-- Procentuální možnost expedovat pod-/nadnáklad, Poznámka
-- Fakturační adresa, Doručovací adresa, Individuální požadavky
+- **Skupina zákazníků:** centrála (`unit_type=headquarters`) a pobočky (`branch`). Samostatného zákazníka (`standalone`) lze ve formuláři **Přidat / Upravit** převést na centrálu zaškrtnutím pole **Centrála** v sekci Identifikace (pod kontaktními poli); po uložení lze přidat pobočky.
+- **Objednávka / poptávka:** `customer_id` = konkrétní jednotka (centrála nebo pobočka); doručovací adresy jen z té jednotky.
+- **Katalog produktů:** sdílený na úrovni skupiny – `iml_products.customer_id` = ID centrály; pobočka i centrála objednávají stejné produkty (`resolveCatalogCustomerId`).
+- Více **e-mailů** (obecný, objednávky) v samostatné sekci formuláře a **e-mail pro fakturaci** ve fakturačních údajích (ukládá se jako `iml_customer_emails` s `kind=billing`); **kontaktní osoby**; stejný e-mail u více zákazníků je povolen.
+- **Přílohy zákazníka** (záložka Přílohy na detailu i ve formuláři Přidat/Upravit): nahrání PDF, Word, Excel přes `file_uploads` (`module=iml_customers`, max. 20 MB / soubor); u nového zákazníka až po prvním uložení, u úpravy ihned na záložce Přílohy.
+- **Telefony** mezinárodně (`libphonenumber-js`); země pro parsování telefonu se odvozuje od VAT prefixu (`vatPrefixToPhoneCountry`, u Řecka **EL → GR**).
+- **Země daně (`tax_country`)** – výběr ze všech **27 členských států EU** (VAT prefix; Řecko = **EL**, ne ISO `GR`) nebo **Jiná země (mimo EU)** → v API `null`, volná validace IČ/DIČ.
+- **IČ / identifikační číslo:** pro **CZ** kontrolní součet dle ARES (`validateIco`); pro **SK** 8–10 číslic; pro ostatní EU národní formát (regex dle státu, obecně 2–15 alfanumerických znaků); mimo EU 2–32 znaků.
+- **DIČ (VAT):** pro každý EU stát lokální validace formátu regexem včetně prefixu (`lib/iml-eu-tax.ts`, `validateEuVat`) – např. `DE123456789`, `ATU12345678`, `NL123456789B01`, `EL123456789`. **Online ověření VIES zatím není** (plánováno později).
+- Doručovací adresa: pole **poznámka k expedici** (`expedition_note`).
+- Legacy pole `email`, `phone`, `contact_person` se synchronizují z primárních záznamů pro zpětnou kompatibilitu.
+- **Pobočka** je plnohodnotná jednotka: kontaktní a fakturační adresa, více e-mailů a kontaktních osob. Správa **centrály, poboček a doručovacích adres** probíhá na jedné stránce **Přidat / Upravit zákazníka**: zaškrtávací pole **Centrála**, karta doručovacích adres hlavní jednotky (vždy) a karta poboček (po zaškrtnutí Centrála) s vnořenými adresami u každé pobočky; uložení jedním tlačítkem přes rozšířené API `POST/PUT /api/iml/customers`. Na **detailu** je u poboček jen přehled a odkaz „Spravovat ve formuláři“.
+- **Doručovací adresy** se vážou na konkrétní jednotku (`iml_customer_shipping_addresses.customer_id`) – centrála i každá pobočka mají vlastní seznam; v objednávce se vybírá jednotka a její adresy.
 
 ### 3.7 Statistiky a historie
 
@@ -168,16 +204,17 @@ model iml_products {
 
 ```prisma
 model iml_orders {
-  id           Int       @id @default(autoincrement())
-  customer_id  Int
-  order_number String    @unique @db.VarChar(50)
-  order_date   DateTime  @db.DateTime(0)
-  status       String    @default("nová") @db.VarChar(50)
-  total        Decimal?  @db.Decimal(10, 2)
-  notes        String?   @db.Text
-  custom_data  Json?     @db.Json
-  created_at   DateTime  @default(now()) @db.DateTime(0)
-  updated_at   DateTime  @updatedAt @db.DateTime(0)
+  id                  Int       @id @default(autoincrement())
+  customer_id         Int
+  order_number        String    @unique @db.VarChar(50)
+  order_date          DateTime  @db.DateTime(0)
+  expected_ship_date  DateTime? @db.DateTime(0)
+  status              String    @default("nová") @db.VarChar(50)
+  total               Decimal?  @db.Decimal(10, 2)
+  notes               String?   @db.Text
+  custom_data         Json?     @db.Json
+  created_at          DateTime  @default(now()) @db.DateTime(0)
+  updated_at          DateTime  @updatedAt @db.DateTime(0)
 
   iml_customers   iml_customers   @relation(fields: [customer_id], references: [id], onDelete: Restrict)
   iml_order_items iml_order_items[]
@@ -429,6 +466,8 @@ Uživatelé mohou rozšířit databázi o vlastní pole u produktů a objednáve
 
 - Ukládání do `Bytes` (Prisma) – BLOB
 - API: `/api/iml/products/[id]/image` a `/api/iml/products/[id]/pdf`
+- **Verzované PDF:** tabulka `iml_product_files` (více verzí na produkt, primární verze, historie na záložce „Tisková data“). Endpoint `/api/iml/products/[id]/pdf` čte primární verzi z této tabulky a při absenci verzí padá na legacy `iml_products.pdf_data`.
+- **Příznak „má PDF“ v UI:** `GET /api/iml/products` a `GET /api/iml/products/[id]` vrací `has_pdf: true`, pokud je neprázdný buď legacy `pdf_data`, nebo aspoň jeden řádek v `iml_product_files` s neprázdným `pdf_data` (sloupec PDF v katalogu, nástrojová lišta detailu, stav v editaci). Pomocná logika: `lib/iml-product-pdf-flag.ts`.
 - Validace MIME typu při uploadu
 
 ### 11.2 Migrace z NewIML (PHP)

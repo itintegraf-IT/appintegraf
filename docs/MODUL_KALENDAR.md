@@ -23,6 +23,19 @@ Modul kalendáře slouží ke správě událostí a termínů v aplikaci INTEGRA
 - **Opakování** (pouze u typů *bez* povinného zástupu) – denní / týdenní / měsíční série do zvoleného data; každý výskyt = samostatný záznam
 - **Připomínky** – volitelná doba před začátkem (např. 15 min, 1 den); notifikace v aplikaci a/nebo e-mail; vyžaduje plánované volání cron endpointu
 - **Export .ics** – stažení kalendáře pro import do Outlook, Google Calendar atd.
+- **Soukromé události** (`is_private`) – viditelné jen autorovi; v globálním kalendáři a seznamu globálním se nezobrazují
+
+---
+
+## Soukromé události
+
+Při vytvoření nebo úpravě události lze zaškrtnout **Soukromá událost**. Taková událost:
+
+- se zobrazí v **osobním** kalendáři a v detailu autora,
+- **nezobrazí se** v globálním kalendáři ani v seznamu globálním (ostatní uživatelé ji neuvidí),
+- schvalování a notifikace fungují stejně jako u běžných událostí (pokud typ vyžaduje zástup).
+
+Sloupec v DB: `calendar_events.is_private` (migrace `prisma/migrations/20260423_calendar_is_private.sql`).
 
 ---
 

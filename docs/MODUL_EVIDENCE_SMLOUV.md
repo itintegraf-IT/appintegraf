@@ -1,6 +1,36 @@
-# Modul Evidence smluv – návrh a plán implementace
+# Modul Evidence smluv – dokumentace
 
-Dokument shrnuje zadání, architektonické rozhodnutí a **navrhované kroky implementace** modulu evidence smluv v aplikaci INTEGRAF (Next.js, Prisma/MySQL). Podrobný funkcionální seznam požadavků je v kořeni repozitáře v souboru `Evidence_smluv.md`.
+Modul je **implementován** (fáze 1–7 hotové). Tento dokument obsahuje uživatelský návod a technický popis workflow. Původní zadání: `Evidence_smluv.md` v kořeni repozitáře.
+
+---
+
+## Návod pro uživatele
+
+**Cesta:** `/contracts`
+
+### Co modul umí
+
+- Přehled smluv s filtry (typ, stav, text, končící do 30/60/90 dnů)
+- Nová smlouva, úprava v návrhu / vráceno, přílohy (PDF, Office, obrázky)
+- Náhled PDF přílohy v detailu (iframe)
+- Vícekrokové schvalování podle typu smlouvy
+- Podpis a archivace
+- Export seznamu do CSV
+- Upozornění na končící platnost (dashboard, notifikace, cron)
+
+### Rychlý postup
+
+1. Otevřete **Evidence smluv** a vyhledejte smlouvu filtry nebo textem `q`.
+2. **Nová smlouva** – vyplňte údaje; volitelně nahrajte PDF a použijte **extrakci z PDF** (předvyplnění polí).
+3. Přiložte další dokumenty v detailu smlouvy.
+4. Odešlete ke schválení – schvalovatelé postupují v detailu (Schválit / Zamítnout s důvodem).
+5. Po schválení: přechod **Podpis** → **Archivace** (tlačítka v životním cyklu smlouvy).
+6. Sledujte smlouvy končící do 90 dnů na dashboardu a v notifikacích.
+
+### Stavy (zjednodušeně)
+
+`draft` → `in_approval` → `approval_completed` → `signature_pending` → `signed` → `archived`  
+(Zamítnutí: `rejected`, vrácení k úpravě: `returned`.)
 
 ---
 

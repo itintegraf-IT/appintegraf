@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 
-const ENTITIES = ["products", "orders"] as const;
+const ENTITIES = ["products", "orders", "inquiries"] as const;
 const FIELD_TYPES = ["text", "number", "date", "boolean"] as const;
 
 export async function GET(req: NextRequest) {
@@ -58,7 +58,10 @@ export async function POST(req: NextRequest) {
     }
 
     if (!ENTITIES.includes(entity)) {
-      return NextResponse.json({ error: "Neplatná entita (products, orders)" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Neplatná entita (products, orders, inquiries)" },
+        { status: 400 }
+      );
     }
 
     const key = String(field_key).trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");

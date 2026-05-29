@@ -252,6 +252,7 @@ export async function getLayoutAccess(userId: number): Promise<{
   vyroba: boolean;
   ukoly: boolean;
   personalistika: boolean;
+  materialy: boolean;
 }> {
   const roles = await getUserRoles(userId);
   type RoleItem = (typeof roles)[number];
@@ -273,6 +274,7 @@ export async function getLayoutAccess(userId: number): Promise<{
     vyroba: checkModule("vyroba"),
     ukoly: checkModule("ukoly"),
     personalistika: checkModule("personalistika"),
+    materialy: checkModule("materialy"),
   };
 }
 

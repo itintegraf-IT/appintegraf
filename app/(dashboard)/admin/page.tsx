@@ -15,6 +15,7 @@ import {
   UserCog,
   Mail,
   FileText,
+  Archive,
 } from "lucide-react";
 
 export default async function AdminPage() {
@@ -101,6 +102,13 @@ export default async function AdminPage() {
         >
           <FileText className="h-4 w-4" />
           Typy smluv (evidence)
+        </Link>
+        <Link
+          href="/admin/backup"
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+        >
+          <Archive className="h-4 w-4" />
+          Záloha a obnova
         </Link>
       </div>
 

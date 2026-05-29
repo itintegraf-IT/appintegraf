@@ -1,10 +1,31 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
-import { hasModuleAccess } from "@/lib/auth-utils";
+import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { IML_CUSTOMER_UPLOAD_MODULE } from "@/lib/iml-customer-upload";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { ArrowLeft, Package, ShoppingCart, BarChart3, Calendar } from "lucide-react";
+import {
+  Package,
+  ShoppingCart,
+  BarChart3,
+  Calendar,
+  User,
+  Building2,
+  Wrench,
+  MapPin,
+  FileText,
+  Paperclip,
+} from "lucide-react";
+import CustomerAttachments from "../_components/CustomerAttachments";
+import { resolveCatalogCustomerId } from "@/lib/iml-customer-catalog";
+import { extractBillingEmail } from "@/lib/iml-customer-billing-email";
+import { unitTypeLabel } from "@/lib/iml-customer-units";
+import CustomerShippingAddresses from "../_components/CustomerShippingAddresses";
+import { CustomerBranchesSection } from "../_components/CustomerDetailExtras";
+import CustomerDetailView, {
+  type DetailSection,
+} from "../_components/CustomerDetailView";
 
 export default async function ImlCustomerDetailPage({
   params,
@@ -17,19 +38,54 @@ export default async function ImlCustomerDetailPage({
   const userId = parseInt(session.user.id, 10);
   const canRead = await hasModuleAccess(userId, "iml", "read");
   const canWrite = await hasModuleAccess(userId, "iml", "write");
+  const admin = await isAdmin(userId);
 
   if (!canRead) redirect("/iml");
 
   const id = parseInt((await params).id, 10);
   if (isNaN(id)) notFound();
 
-  const [customer, stats] = await Promise.all([
+  const catalogCustomerId = await resolveCatalogCustomerId(id);
+
+  const [customer, stats, attachmentRows] = await Promise.all([
     prisma.iml_customers.findUnique({
       where: { id },
       include: {
-        iml_products: { select: { id: true, ig_code: true, ig_short_name: true, client_name: true } },
+        parent: { select: { id: true, name: true } },
+        branches: {
+          orderBy: [{ sort_order: "asc" }, { name: "asc" }],
+          select: {
+            id: true,
+            name: true,
+            unit_type: true,
+            city: true,
+            postal_code: true,
+            email: true,
+            phone: true,
+            contact_person: true,
+            billing_address: true,
+            _count: { select: { iml_customer_shipping_addresses: true } },
+            iml_customer_emails: {
+              where: { is_primary: true },
+              take: 1,
+              select: { email: true },
+            },
+          },
+        },
+        iml_customer_emails: { orderBy: [{ sort_order: "asc" }, { id: "asc" }] },
+        iml_customer_contacts: { orderBy: [{ sort_order: "asc" }, { id: "asc" }] },
+        iml_products: {
+          where: { customer_id: catalogCustomerId },
+          select: { id: true, ig_code: true, ig_short_name: true, client_name: true },
+        },
         iml_orders: {
-          select: { id: true, order_number: true, order_date: true, status: true, total: true },
+          select: {
+            id: true,
+            order_number: true,
+            order_date: true,
+            status: true,
+            total: true,
+          },
           orderBy: { order_date: "desc" },
         },
       },
@@ -43,21 +99,30 @@ export default async function ImlCustomerDetailPage({
         include: { iml_order_items: { select: { quantity: true } } },
       });
 
-      type OrderRow = { order_date: Date; iml_order_items: Array<{ quantity: number }>; total?: unknown };
+      type OrderRow = {
+        order_date: Date;
+        iml_order_items: Array<{ quantity: number }>;
+        total?: unknown;
+      };
       const ordersTyped = orders as OrderRow[];
 
-      const lastOrder = ordersTyped.length > 0
-        ? ordersTyped.reduce((a, b) => (a.order_date > b.order_date ? a : b))
-        : null;
+      const lastOrder =
+        ordersTyped.length > 0
+          ? ordersTyped.reduce((a, b) => (a.order_date > b.order_date ? a : b))
+          : null;
       const totalQuantity = ordersTyped.reduce(
         (sum, o) => sum + o.iml_order_items.reduce((s, i) => s + i.quantity, 0),
         0
       );
-      const ordersLast12Months = ordersTyped.filter((o) => new Date(o.order_date) >= twelveMonthsAgo);
+      const ordersLast12Months = ordersTyped.filter(
+        (o) => new Date(o.order_date) >= twelveMonthsAgo
+      );
       const avgOrderTotal =
         ordersLast12Months.length > 0
-          ? ordersLast12Months.reduce((s, o) => s + (o.total ? Number(o.total) : 0), 0) /
-            ordersLast12Months.length
+          ? ordersLast12Months.reduce(
+              (s, o) => s + (o.total ? Number(o.total) : 0),
+              0
+            ) / ordersLast12Months.length
           : null;
 
       return {
@@ -67,196 +132,433 @@ export default async function ImlCustomerDetailPage({
         ordersCount: orders.length,
       };
     })(),
+    prisma.file_uploads.findMany({
+      where: { module: IML_CUSTOMER_UPLOAD_MODULE, record_id: id },
+      orderBy: { created_at: "desc" },
+      include: {
+        users: { select: { first_name: true, last_name: true } },
+      },
+    }),
   ]);
 
   if (!customer) notFound();
 
-  type ProductRow = { id: number; ig_code: string | null; client_name: string | null; ig_short_name: string | null };
-  type OrderRow = { id: number; order_number: string; order_date: Date; status: string | null; total: unknown };
+  type ProductRow = {
+    id: number;
+    ig_code: string | null;
+    client_name: string | null;
+    ig_short_name: string | null;
+  };
+  type OrderRow = {
+    id: number;
+    order_number: string;
+    order_date: Date;
+    status: string | null;
+    total: unknown;
+  };
   const products = customer.iml_products as ProductRow[];
   const orders = customer.iml_orders as OrderRow[];
 
-  return (
-    <>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
-          <p className="mt-1 text-gray-600">Detail zákazníka</p>
+  const billingEmail = extractBillingEmail(customer.iml_customer_emails);
+
+  const hasIndividual =
+    Boolean(customer.label_requirements) ||
+    Boolean(customer.pallet_packaging) ||
+    Boolean(customer.prepress_notes) ||
+    Boolean(customer.individual_requirements);
+
+  const statsBlock =
+    stats.ordersCount > 0 ? (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Calendar className="h-4 w-4" />
+            Poslední objednávka
+          </div>
+          <p className="mt-1 text-lg font-semibold text-gray-900">
+            {stats.lastOrderDate
+              ? new Date(stats.lastOrderDate).toLocaleDateString("cs-CZ")
+              : "-"}
+          </p>
         </div>
-        <div className="flex gap-2">
-          {canWrite && (
-            <Link
-              href={`/iml/customers/${customer.id}/edit`}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-            >
-              Upravit
-            </Link>
-          )}
-          <Link
-            href="/iml/customers"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Zpět
-          </Link>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <BarChart3 className="h-4 w-4" />
+            Celkem objednávek
+          </div>
+          <p className="mt-1 text-lg font-semibold text-gray-900">
+            {stats.ordersCount}
+          </p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <Package className="h-4 w-4" />
+            Celkové množství
+          </div>
+          <p className="mt-1 text-lg font-semibold text-gray-900">
+            {stats.totalQuantity} ks
+          </p>
+        </div>
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <ShoppingCart className="h-4 w-4" />
+            Průměrná objednávka (12 m)
+          </div>
+          <p className="mt-1 text-lg font-semibold text-gray-900">
+            {stats.avgOrderTotal != null
+              ? `${Math.round(stats.avgOrderTotal)} Kč`
+              : "-"}
+          </p>
         </div>
       </div>
+    ) : null;
 
-      {stats.ordersCount > 0 && (
-        <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Calendar className="h-4 w-4" />
-              Poslední objednávka
-            </div>
-            <p className="mt-1 text-lg font-semibold text-gray-900">
-              {stats.lastOrderDate
-                ? new Date(stats.lastOrderDate).toLocaleDateString("cs-CZ")
-                : "-"}
-            </p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <BarChart3 className="h-4 w-4" />
-              Celkem objednávek
-            </div>
-            <p className="mt-1 text-lg font-semibold text-gray-900">{stats.ordersCount}</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Package className="h-4 w-4" />
-              Celkové množství
-            </div>
-            <p className="mt-1 text-lg font-semibold text-gray-900">{stats.totalQuantity} ks</p>
-          </div>
-          <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <ShoppingCart className="h-4 w-4" />
-              Průměrná objednávka (12 m)
-            </div>
-            <p className="mt-1 text-lg font-semibold text-gray-900">
-              {stats.avgOrderTotal != null ? `${Math.round(stats.avgOrderTotal)} Kč` : "-"}
-            </p>
-          </div>
-        </div>
-      )}
-
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+  const sections: DetailSection[] = [
+    {
+      id: "contact",
+      label: "Kontakt",
+      icon: <User className="h-4 w-4" />,
+      content: (
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <p className="text-sm text-gray-500">E-mail</p>
-            <p className="font-medium">{customer.email ?? "-"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Telefon</p>
-            <p className="font-medium">{customer.phone ?? "-"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Kontaktní osoba</p>
-            <p className="font-medium">{customer.contact_person ?? "-"}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">% odchylka pod-/nadnákladu</p>
-            <p className="font-medium">{customer.allow_under_over_delivery_percent != null ? `${customer.allow_under_over_delivery_percent} %` : "-"}</p>
-          </div>
+          <InfoField label="Typ jednotky" value={unitTypeLabel(customer.unit_type)} />
+          {customer.parent && (
+            <InfoField
+              label="Centrála skupiny"
+              value={customer.parent.name}
+            />
+          )}
+          <InfoField label="E-mail (hlavní)" value={customer.email} />
+          <InfoField label="Telefon (hlavní)" value={customer.phone} />
+          <InfoField label="Kontaktní osoba (hlavní)" value={customer.contact_person} />
+          {customer.iml_customer_emails.filter((e) => e.kind !== "billing").length > 0 && (
+            <div className="sm:col-span-2">
+              <p className="mb-2 text-sm text-gray-500">E-maily</p>
+              <ul className="space-y-1 text-sm">
+                {customer.iml_customer_emails
+                  .filter((e) => e.kind !== "billing")
+                  .map((e) => (
+                  <li key={e.id}>
+                    <span className="font-medium">{e.email}</span>
+                    <span className="ml-2 text-gray-500">
+                      ({e.kind}{e.is_primary ? ", primární" : ""})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {customer.iml_customer_contacts.length > 0 && (
+            <div className="sm:col-span-2">
+              <p className="mb-2 text-sm text-gray-500">Kontaktní osoby</p>
+              <ul className="space-y-2 text-sm">
+                {customer.iml_customer_contacts.map((c) => (
+                  <li key={c.id} className="rounded border border-gray-100 bg-gray-50 px-3 py-2">
+                    <span className="font-medium">{c.name}</span>
+                    {c.role && <span className="ml-2 text-gray-500">– {c.role}</span>}
+                    <div className="mt-1 text-gray-600">
+                      {c.phone && <span>{c.phone}</span>}
+                      {c.email && <span className="ml-2">{c.email}</span>}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <InfoField
+            label="% tolerance pod-/nadnákladu"
+            value={
+              customer.allow_under_over_delivery_percent != null
+                ? `${customer.allow_under_over_delivery_percent} %`
+                : null
+            }
+          />
+        </div>
+      ),
+    },
+    {
+      id: "billing",
+      label: "Fakturační údaje",
+      icon: <Building2 className="h-4 w-4" />,
+      content: (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <InfoField
+            label="Fakturační název firmy"
+            value={customer.billing_company ?? customer.name}
+            span={2}
+          />
+          <InfoField label="E-mail pro fakturaci" value={billingEmail || null} />
+          <InfoField
+            label="Země daně"
+            value={customer.tax_country ?? "—"}
+          />
+          <InfoField label="IČO" value={customer.ico} />
+          <InfoField label="DIČ" value={customer.dic} />
           {customer.billing_address && (
             <div className="sm:col-span-2">
               <p className="text-sm text-gray-500">Fakturační adresa</p>
-              <p className="whitespace-pre-wrap">{customer.billing_address}</p>
+              <p className="whitespace-pre-wrap font-medium">
+                {customer.billing_address}
+              </p>
             </div>
           )}
-          {customer.shipping_address && (
-            <div className="sm:col-span-2">
-              <p className="text-sm text-gray-500">Doručovací adresa</p>
-              <p className="whitespace-pre-wrap">{customer.shipping_address}</p>
-            </div>
+          {(customer.city || customer.postal_code || customer.country) && (
+            <InfoField
+              label="Město / PSČ / Země"
+              value={
+                [
+                  [customer.postal_code, customer.city].filter(Boolean).join(" "),
+                  customer.country,
+                ]
+                  .filter(Boolean)
+                  .join(", ") || null
+              }
+              span={2}
+            />
+          )}
+        </div>
+      ),
+    },
+    {
+      id: "individual",
+      label: "Individuální požadavky",
+      icon: <Wrench className="h-4 w-4" />,
+      hidden: !hasIndividual,
+      content: (
+        <div className="space-y-4">
+          {customer.label_requirements && (
+            <InfoBlock
+              label="Požadavky na etikety"
+              value={customer.label_requirements}
+            />
+          )}
+          {customer.pallet_packaging && (
+            <InfoBlock label="Palety / balení" value={customer.pallet_packaging} />
+          )}
+          {customer.prepress_notes && (
+            <InfoBlock
+              label="Poznámky k pre-pressu"
+              value={customer.prepress_notes}
+            />
           )}
           {customer.individual_requirements && (
-            <div className="sm:col-span-2">
-              <p className="text-sm text-gray-500">Individuální požadavky</p>
-              <p className="whitespace-pre-wrap">{customer.individual_requirements}</p>
-            </div>
-          )}
-          {customer.customer_note && (
-            <div className="sm:col-span-2">
-              <p className="text-sm text-gray-500">Poznámka</p>
-              <p className="whitespace-pre-wrap">{customer.customer_note}</p>
-            </div>
+            <InfoBlock
+              label="Individuální požadavky (legacy)"
+              value={customer.individual_requirements}
+            />
           )}
         </div>
-      </div>
-
-      {products.length > 0 && (
-        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
-            <Package className="h-5 w-5 text-gray-600" />
-            Produkty ({products.length})
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b border-gray-200 bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Kód IG</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Název</th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700">Akce</th>
+      ),
+    },
+    ...(customer.parent_id == null
+      ? [
+          {
+            id: "branches",
+            label: "Pobočky",
+            icon: <Building2 className="h-4 w-4" />,
+            content: (
+              <CustomerBranchesSection
+                headquartersId={customer.id}
+                unitType={customer.unit_type}
+                branches={customer.branches}
+                canWrite={canWrite}
+              />
+            ),
+          } satisfies DetailSection,
+        ]
+      : []),
+    {
+      id: "shipping",
+      label: "Doručovací adresy",
+      icon: <MapPin className="h-4 w-4" />,
+      content: (
+        <CustomerShippingAddresses
+          customerId={customer.id}
+          canWrite={canWrite}
+          embedded
+        />
+      ),
+    },
+    {
+      id: "products",
+      label: "Produkty",
+      icon: <Package className="h-4 w-4" />,
+      hidden: products.length === 0,
+      badge: products.length || null,
+      content: (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="border-b border-gray-200 bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
+                  Kód IG
+                </th>
+                <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
+                  Název
+                </th>
+                <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700">
+                  Akce
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((p) => (
+                <tr
+                  key={p.id}
+                  className="border-b border-gray-100 hover:bg-gray-50"
+                >
+                  <td className="px-4 py-3 font-mono text-sm">
+                    {p.ig_code ?? "-"}
+                  </td>
+                  <td className="px-4 py-3">
+                    {p.client_name ?? p.ig_short_name ?? "-"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/iml/products/${p.id}`}
+                      className="text-sm font-medium text-red-600 hover:text-red-700"
+                    >
+                      Detail →
+                    </Link>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {products.map((p) => (
-                  <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-sm">{p.ig_code ?? "-"}</td>
-                    <td className="px-4 py-3">{p.client_name ?? p.ig_short_name ?? "-"}</td>
-                    <td className="px-4 py-3 text-right">
-                      <Link href={`/iml/products/${p.id}`} className="text-sm font-medium text-red-600 hover:text-red-700">
-                        Detail →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      {orders.length > 0 && (
-        <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
-            <ShoppingCart className="h-5 w-5 text-gray-600" />
-            Objednávky ({orders.length})
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="border-b border-gray-200 bg-gray-50">
-                <tr>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Číslo</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Datum</th>
-                  <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">Stav</th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700">Celkem</th>
-                  <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700">Akce</th>
+      ),
+    },
+    {
+      id: "orders",
+      label: "Objednávky",
+      icon: <ShoppingCart className="h-4 w-4" />,
+      hidden: orders.length === 0,
+      badge: orders.length || null,
+      content: (
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="border-b border-gray-200 bg-gray-50">
+              <tr>
+                <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
+                  Číslo
+                </th>
+                <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
+                  Datum
+                </th>
+                <th className="px-4 py-2 text-left text-sm font-semibold text-gray-700">
+                  Stav
+                </th>
+                <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700">
+                  Celkem
+                </th>
+                <th className="px-4 py-2 text-right text-sm font-semibold text-gray-700">
+                  Akce
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map((o) => (
+                <tr
+                  key={o.id}
+                  className="border-b border-gray-100 hover:bg-gray-50"
+                >
+                  <td className="px-4 py-3 font-mono text-sm">{o.order_number}</td>
+                  <td className="px-4 py-3">
+                    {new Date(o.order_date).toLocaleDateString("cs-CZ")}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">
+                      {o.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    {o.total != null ? `${Number(o.total)} Kč` : "-"}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/iml/orders/${o.id}`}
+                      className="text-sm font-medium text-red-600 hover:text-red-700"
+                    >
+                      Detail →
+                    </Link>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {orders.map((o) => (
-                  <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-sm">{o.order_number}</td>
-                    <td className="px-4 py-3">{new Date(o.order_date).toLocaleDateString("cs-CZ")}</td>
-                    <td className="px-4 py-3">
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">{o.status}</span>
-                    </td>
-                    <td className="px-4 py-3 text-right">{o.total != null ? `${Number(o.total)} Kč` : "-"}</td>
-                    <td className="px-4 py-3 text-right">
-                      <Link href={`/iml/orders/${o.id}`} className="text-sm font-medium text-red-600 hover:text-red-700">
-                        Detail →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
-    </>
+      ),
+    },
+    {
+      id: "attachments",
+      label: "Přílohy",
+      icon: <Paperclip className="h-4 w-4" />,
+      badge: attachmentRows.length > 0 ? attachmentRows.length : null,
+      content: (
+        <CustomerAttachments
+          customerId={customer.id}
+          initialFiles={attachmentRows.map((f) => ({
+            id: f.id,
+            original_filename: f.original_filename,
+            file_path: f.file_path,
+            file_size: f.file_size,
+            mime_type: f.mime_type,
+            uploaded_by: f.uploaded_by,
+            created_at: f.created_at.toISOString(),
+            users: f.users,
+          }))}
+          canUpload={canWrite}
+          currentUserId={userId}
+          isAdmin={admin}
+        />
+      ),
+    },
+    {
+      id: "notes",
+      label: "Poznámka",
+      icon: <FileText className="h-4 w-4" />,
+      hidden: !customer.customer_note,
+      content: (
+        <p className="whitespace-pre-wrap text-gray-700">
+          {customer.customer_note}
+        </p>
+      ),
+    },
+  ];
+
+  return (
+    <CustomerDetailView
+      title={customer.name}
+      customerId={customer.id}
+      canWrite={canWrite}
+      stats={statsBlock}
+      sections={sections}
+      legacyShippingAddress={customer.shipping_address}
+    />
+  );
+}
+
+function InfoField({
+  label,
+  value,
+  span = 1,
+}: {
+  label: string;
+  value: string | null | undefined;
+  span?: 1 | 2;
+}) {
+  return (
+    <div className={span === 2 ? "sm:col-span-2" : ""}>
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="font-medium">{value && value.trim() !== "" ? value : "-"}</p>
+    </div>
+  );
+}
+
+function InfoBlock({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="mt-1 whitespace-pre-wrap text-gray-800">{value}</p>
+    </div>
   );
 }

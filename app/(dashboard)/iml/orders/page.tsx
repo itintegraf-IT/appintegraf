@@ -33,24 +33,6 @@ export default async function ImlOrdersPage() {
             <ArrowLeft className="h-4 w-4" />
             Přehled IML
           </Link>
-          {canRead && (
-            <>
-              <a
-                href="/api/iml/orders/export?format=csv"
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                download="iml-objednavky.csv"
-              >
-                Export CSV
-              </a>
-              <a
-                href="/api/iml/orders/export?format=xlsx"
-                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-                download="iml-objednavky.xlsx"
-              >
-                Export Excel
-              </a>
-            </>
-          )}
           {canWrite && (
             <>
               <Link
@@ -72,7 +54,7 @@ export default async function ImlOrdersPage() {
         </div>
       </div>
 
-      <ImlOrdersClient canWrite={canWrite} />
+      <ImlOrdersClient canRead={canRead} canWrite={canWrite} />
     </>
   );
 }

@@ -12,7 +12,7 @@ type CustomField = {
 };
 
 type Props = {
-  entity: "products" | "orders";
+  entity: "products" | "orders" | "inquiries";
   values: Record<string, string | number | boolean>;
   onChange: (values: Record<string, string | number | boolean>) => void;
 };

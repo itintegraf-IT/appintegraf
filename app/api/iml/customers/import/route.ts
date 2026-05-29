@@ -96,13 +96,6 @@ export async function POST(req: NextRequest) {
       }
 
       const email = get("email") || null;
-      if (email) {
-        const existing = await prisma.iml_customers.findFirst({ where: { email } });
-        if (existing) {
-          errors.push(`Řádek ${i + 2}: Zákazník s e-mailem ${email} již existuje`);
-          continue;
-        }
-      }
 
       const customer = await prisma.iml_customers.create({
         data: {

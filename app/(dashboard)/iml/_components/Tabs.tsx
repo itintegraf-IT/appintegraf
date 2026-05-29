@@ -1,0 +1,137 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+
+export type TabDef = {
+  id: string;
+  label: string;
+  icon?: React.ReactNode;
+  content: React.ReactNode;
+  badge?: string | number | null;
+  hidden?: boolean;
+};
+
+/**
+ * Lehké záložky bez externí závislosti.
+ *
+ * - Jediná aktivní záložka, stav držen v useState.
+ * - Volitelný parametr `storageKey` persistuje aktivní tab v localStorage
+ *   (např. aby po reloadu zůstala stejná záložka).
+ * - Volitelný parametr `urlParam` synchronizuje aktivní tab s URL query
+ *   parametrem (např. `?tab=material`); pokud je zadán, má přednost
+ *   před `storageKey` a umožňuje sdílet odkaz na konkrétní záložku.
+ * - Skryté taby (`hidden: true`) se nerenderují.
+ */
+export function Tabs({
+  tabs,
+  defaultId,
+  storageKey,
+  urlParam,
+  className = "",
+}: {
+  tabs: TabDef[];
+  defaultId?: string;
+  storageKey?: string;
+  urlParam?: string;
+  className?: string;
+}) {
+  const visible = tabs.filter((t) => !t.hidden);
+  const visibleIds = visible.map((t) => t.id).join("|");
+  const fallback = defaultId ?? visible[0]?.id ?? "";
+  const [active, setActive] = useState<string>(fallback);
+
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const tabFromUrl = urlParam ? searchParams.get(urlParam) : null;
+
+  useEffect(() => {
+    const ids = visibleIds.split("|").filter(Boolean);
+    const pick = (id: string) => {
+      setActive((prev) => (prev === id ? prev : id));
+    };
+
+    if (urlParam && tabFromUrl && ids.includes(tabFromUrl)) {
+      pick(tabFromUrl);
+      return;
+    }
+    if (!storageKey) return;
+    try {
+      const v = localStorage.getItem(`iml.activeTab.${storageKey}`);
+      if (v && ids.includes(v)) pick(v);
+    } catch {
+      /* ignore */
+    }
+  }, [storageKey, urlParam, tabFromUrl, visibleIds]);
+
+  useEffect(() => {
+    const ids = visibleIds.split("|").filter(Boolean);
+    if (!active || ids.includes(active)) return;
+    const next = ids[0] ?? "";
+    setActive((prev) => (prev === next ? prev : next));
+  }, [visibleIds, active]);
+
+  const handleChange = (id: string) => {
+    setActive(id);
+    if (urlParam) {
+      const params = new URLSearchParams(searchParams.toString());
+      params.set(urlParam, id);
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    }
+    if (storageKey) {
+      try {
+        localStorage.setItem(`iml.activeTab.${storageKey}`, id);
+      } catch {
+        /* ignore */
+      }
+    }
+  };
+
+  const activeTab = visible.find((t) => t.id === active) ?? visible[0];
+  if (!activeTab) return null;
+
+  return (
+    <div className={className}>
+      <div
+        className="flex flex-wrap gap-0.5 border-b border-gray-200"
+        role="tablist"
+      >
+        {visible.map((t) => {
+          const isActive = t.id === activeTab.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => handleChange(t.id)}
+              className={
+                isActive
+                  ? "inline-flex items-center gap-1.5 border-b-2 border-red-600 px-4 py-2 text-sm font-medium text-red-700"
+                  : "inline-flex items-center gap-1.5 border-b-2 border-transparent px-4 py-2 text-sm text-gray-600 hover:text-gray-900"
+              }
+            >
+              {t.icon}
+              <span>{t.label}</span>
+              {t.badge != null && t.badge !== "" && (
+                <span
+                  className={
+                    isActive
+                      ? "rounded-full bg-red-100 px-1.5 py-0.5 text-xs text-red-700"
+                      : "rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700"
+                  }
+                >
+                  {t.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div role="tabpanel" className="mt-4">
+        {activeTab.content}
+      </div>
+    </div>
+  );
+}

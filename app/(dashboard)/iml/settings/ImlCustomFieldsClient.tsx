@@ -16,6 +16,7 @@ type CustomField = {
 const ENTITIES = [
   { value: "products", label: "Produkty" },
   { value: "orders", label: "Objednávky" },
+  { value: "inquiries", label: "Poptávky" },
 ] as const;
 
 const FIELD_TYPES = [

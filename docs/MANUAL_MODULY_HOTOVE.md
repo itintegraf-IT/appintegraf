@@ -135,12 +135,83 @@ Tento dokument shrnuje hotové moduly systému INTEGRAF v jednotném formátu pr
 
 ---
 
-## Doporučený postup zaškolení (30-45 minut)
+## 6) Evidence smluv
 
-1. **Kalendář (10 min):** založení události + schvalování.
-2. **Úkoly (10 min):** vytvoření úkolu, změna stavu, archiv.
-3. **Kontakty (5 min):** vyhledání, filtr, export.
-4. **Majetek (10 min):** práce se seznamem a přiřazením.
-5. **Personalistika (5-10 min):** práce s dotazníkem a pozicemi.
+**Cesta:** `/contracts`
+
+### Co modul umí
+- Filtry, vyhledávání, nová smlouva, přílohy, náhled PDF.
+- Schvalovací workflow, podpis, archivace.
+- Upozornění na končící platnost, export CSV.
+
+### Rychlý návod
+1. Otevřete seznam a vyfiltrujte smlouvu.
+2. Založte smlouvu, nahrajte PDF (volitelně extrakce polí z PDF).
+3. Odešlete ke schválení a sledujte stav v detailu.
+4. Po schválení dokončete podpis a archivaci.
+
+---
+
+## 7) IML
+
+**Cesta:** `/iml`
+
+### Co modul umí
+- Zákazníci, produkty (PDF verze, Pantone, materiály z katalogu).
+- Poptávky a konverze na objednávky.
+- Import/export, report Pantone.
+
+### Rychlý návod
+1. Založte zákazníka a produkt v katalogu.
+2. Nahrajte tisková data (PDF) a nastavte barvy.
+3. Vytvořte poptávku nebo objednávku.
+4. Pro hromadné změny použijte import/export.
+
+---
+
+## 8) Katalog materiálů
+
+**Cesta:** `/materialy`
+
+### Co modul umí
+- Kategorie Papír, Fólie, Barvy, Laky.
+- Přílohy SDS, TDS, certifikáty.
+- Vyhledávání napříč katalogem.
+
+### Rychlý návod
+1. Vyberte kategorii nebo vyhledejte materiál.
+2. Otevřete detail a nahrajte dokumenty.
+3. Sledujte platnost certifikátu.
+
+---
+
+## 9) Výroba
+
+**Cesta:** `/vyroba`  
+Detailní manuál: [MANUAL_VYROBA.md](./MANUAL_VYROBA.md)
+
+---
+
+## 10) Kiosk Monitory
+
+**Cesta:** `/kiosk` – správa prezentací pro monitory (obrázky, PDF, rotace).
+
+---
+
+## 11) IT Školení
+
+**Cesta:** `/training` – evidence školení, materiály, potvrzení absolvování.
+
+---
+
+## Doporučený postup zaškolení (60–90 minut)
+
+1. **Kalendář (10 min):** událost, soukromá událost, schvalování.
+2. **Úkoly (10 min):** zadání, stavy, archiv.
+3. **Kontakty (5 min):** vyhledání, export.
+4. **Majetek (10 min):** vybavení a požadavky na techniku.
+5. **Evidence smluv (10 min):** nová smlouva, příloha, schvalování.
+6. **IML / Materiály (15 min):** produkt, materiály, objednávka (dle role).
+7. **Personalistika (5–10 min):** dotazníky a brigádníci.
 
 Výsledek školení: uživatel se orientuje v modulech, umí zadat běžné operace a ví, kde hledat notifikace a výstupy.

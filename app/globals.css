@@ -238,3 +238,56 @@ body {
 .transition-shadow { transition: box-shadow 0.2s ease; }
 .shadow-elevated { box-shadow: var(--shadow-md) !important; }
 .shadow-elevated-lg { box-shadow: var(--shadow-lg) !important; }
+
+/* Indikátor testovacího prostředí (vykresluje se jen když APP_ENV=test) */
+.test-env-overlay {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 38px;
+  height: 100vh;
+  z-index: 9999;
+  pointer-events: none;
+  background: rgba(220, 38, 38, 0.22);
+  border-left: 1px solid rgba(220, 38, 38, 0.45);
+  overflow: hidden;
+  user-select: none;
+}
+
+.test-env-overlay__track {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  animation: test-env-scroll 35s linear infinite;
+  will-change: transform;
+}
+
+.test-env-overlay__text {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  white-space: nowrap;
+  padding: 12px 0;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: rgba(153, 27, 27, 0.95);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+@keyframes test-env-scroll {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .test-env-overlay__track {
+    animation: none;
+  }
+}
+
+@media print {
+  .test-env-overlay { display: none !important; }
+}
