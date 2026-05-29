@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "INTEGRAF",
+  title: "IGIS new",
   description: "Modulární intranetová aplikace",
 };
 

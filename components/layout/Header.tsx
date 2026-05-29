@@ -91,7 +91,7 @@ export function Header({ user, isAdmin, moduleAccess, onMenuClick }: HeaderProps
             style={{ color: "var(--primary)" }}
           >
             <LayoutDashboard className="h-6 w-6" />
-            <span className="hidden sm:inline">INTEGRAF</span>
+            <span className="hidden sm:inline">IGIS new</span>
           </Link>
         </div>
 

@@ -449,7 +449,7 @@ export default function LoginPage() {
               letterSpacing: "-0.01em",
             }}
           >
-            INTEGRAF
+            IGIS new
           </div>
           <div
             style={{
