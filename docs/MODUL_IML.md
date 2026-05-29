@@ -379,8 +379,25 @@ Na hlavní stránce IML (`/iml`):
 
 ### 7.3 Import produktů (`/iml/products/import`)
 
-- Formát: CSV
-- Povinné: `ig_code` nebo `client_name` nebo `ig_short_name`
+**Složka nebo ZIP (IMLEXport) – doporučený postup**
+
+- **Složka** (doporučeno): výběr celé složky exportu v prohlížeči – bez nutnosti vytvářet ZIP; max. **500 MB** celkem
+- **ZIP** (volitelně): archiv se stejnou strukturou; max. 500 MB
+- Kořen: `products.csv` (nebo první `.csv`) + rekurzivní podsložky se soubory
+- **Rychlý náhled (složka):** při mapování a konfliktech se nahraje jen `products.csv` + seznam cest souborů (`previewMode=light`); PDF a obrázky až při **Spustit import**
+- Cesty ze složky se normalizují (společný kořen např. `IMLEXport/` se odstraní, aby odpovídaly struktuře ZIP)
+- API: `POST /api/iml/products/import/preview` (náhled, konflikty), `POST /api/iml/products/import/execute` (zápis včetně všech souborů)
+- Automatické mapování sloupců z IMLEXportu: `code` → `ig_code`, `name` → `client_name`, `contractor` → `customer_name`, `material` / `note` → `production_notes`, `print` → `print_note`
+- **Konflikty** existujícího `ig_code`: před importem náhled; akce **přepsat** (metadata z CSV) nebo **přeskočit** (metadata beze změny, soubory z ZIP se k produktu přiřadí)
+- **Pojmenování souborů v ZIP** (bez ohledu na podsložku):
+  - **Tisková data:** PDF, název začíná kódem produktu (`04-03-002-…pdf`) → `iml_product_files` (verzované PDF, max 50 MB)
+  - **Náhled:** JPG/PNG/WebP/GIF, nebo název začíná `softproof` / `softproof-` / `softproof_` (volitelně PDF softproof → JPEG na serveru, pokud je nainstalován `canvas`) → `iml_products.image_data` (max 5 MB)
+- Ignorováno: `products.csv`, skryté soubory, nepodporované přípony; soubory bez rozpoznaného kódu se v reportu označí
+
+**CSV / Excel bez ZIP (zpětná kompatibilita)**
+
+- `POST /api/iml/products/import` – pouze řádky produktů, bez příloh
+- Povinné mapování: `ig_code` nebo `client_name` nebo `ig_short_name`
 - Mapování: ig_code, ig_short_name, client_code, client_name, sku, customer_name, requester, label_shape_code, product_format, die_cut_tool_code, assembly_code, positions_on_sheet, pieces_per_box, pieces_per_pallet, foil_type, color_coverage, ean_code, item_status, approval_status, has_print_sample
 
 ### 7.4 Import objednávek (`/iml/orders/import`)
@@ -440,7 +457,9 @@ Uživatelé mohou rozšířit databázi o vlastní pole u produktů a objednáve
 | `/api/iml/products/[id]/image` | GET, POST, DELETE | Obrázek produktu |
 | `/api/iml/products/[id]/pdf` | GET, POST, DELETE | PDF produktu |
 | `/api/iml/products/export` | GET | Export CSV/Excel |
-| `/api/iml/products/import` | POST | Import z CSV |
+| `/api/iml/products/import` | POST | Import z CSV/Excel (bez příloh) |
+| `/api/iml/products/import/preview` | POST | Náhled ZIP importu (CSV + soubory, konflikty) |
+| `/api/iml/products/import/execute` | POST | Provedení ZIP importu (CSV + soubory) |
 | `/api/iml/orders` | GET, POST | Seznam, vytvoření |
 | `/api/iml/orders/[id]` | GET, PUT, DELETE | Detail, úprava, smazání |
 | `/api/iml/orders/export` | GET | Export CSV/Excel |
