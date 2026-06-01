@@ -3,7 +3,7 @@ export const APP_TIMEZONE = "Europe/Prague";
 
 const DATETIME_LOCAL_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
 
-function pragueParts(d: Date) {
+export function getPragueParts(d: Date) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: APP_TIMEZONE,
     year: "numeric",
@@ -14,11 +14,13 @@ function pragueParts(d: Date) {
     hour12: false,
   }).formatToParts(d);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
+  let hour = parseInt(get("hour"), 10);
+  if (hour === 24) hour = 0;
   return {
     year: parseInt(get("year"), 10),
     month: parseInt(get("month"), 10),
     day: parseInt(get("day"), 10),
-    hour: parseInt(get("hour"), 10),
+    hour,
     minute: parseInt(get("minute"), 10),
   };
 }
@@ -28,7 +30,7 @@ function pragueParts(d: Date) {
  * (toISOString() je UTC a v CEST posune o 2 hodiny.)
  */
 export function formatDateTimeLocalForInput(d: Date): string {
-  const p = pragueParts(d);
+  const p = getPragueParts(d);
   const y = String(p.year);
   const m = String(p.month).padStart(2, "0");
   const day = String(p.day).padStart(2, "0");
@@ -55,7 +57,7 @@ export function parseDateTimeLocalInput(value: string): Date {
   let ts = Date.UTC(target.year, target.month - 1, target.day, target.hour, target.minute);
 
   for (let i = 0; i < 5; i++) {
-    const p = pragueParts(new Date(ts));
+    const p = getPragueParts(new Date(ts));
     if (
       p.year === target.year &&
       p.month === target.month &&
@@ -115,7 +117,7 @@ export function formatTimeCz(d: Date): string {
 
 /** Kalendářní den YYYY-MM-DD v Europe/Prague. */
 export function formatDateYmdPrague(d: Date): string {
-  const p = pragueParts(d);
+  const p = getPragueParts(d);
   const y = String(p.year);
   const m = String(p.month).padStart(2, "0");
   const day = String(p.day).padStart(2, "0");
@@ -124,6 +126,6 @@ export function formatDateYmdPrague(d: Date): string {
 
 /** Hodina + zlomek minuty v Europe/Prague (pro pozicování v mřížce). */
 export function getPragueHourFraction(d: Date): number {
-  const p = pragueParts(d);
+  const p = getPragueParts(d);
   return p.hour + p.minute / 60;
 }
