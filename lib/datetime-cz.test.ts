@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  allDayYmdRangeToIsoStrings,
   formatDateTimeCz,
   formatDateTimeLocalForInput,
   formatDateYmdPrague,
@@ -23,6 +24,14 @@ describe("datetime-cz", () => {
     const pragueInput = formatDateTimeLocalForInput(summerUtc);
     expect(isoSlice).toBe("2026-05-16T07:44");
     expect(pragueInput).toBe("2026-05-16T09:44");
+  });
+
+  it("allDayYmdRangeToIsoStrings ukládá Prahu 00:00–23:59 nezávisle na TZ runtime", () => {
+    const { start, end } = allDayYmdRangeToIsoStrings("2026-06-26", "2026-07-07");
+    expect(start).toBe("2026-06-25T22:00:00.000Z");
+    expect(end).toBe("2026-07-07T21:59:59.999Z");
+    expect(formatDateYmdPrague(new Date(start))).toBe("2026-06-26");
+    expect(formatDateYmdPrague(new Date(end))).toBe("2026-07-07");
   });
 
   it("getPragueParts normalizuje půlnoc (hour 24 → 0)", () => {

@@ -15,7 +15,7 @@ import {
   formatDateLocal,
   formatDateTimeLocalForInput,
 } from "./lib/week-utils";
-import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
+import { formatDateYmdPrague, parseDateTimeLocalInput } from "@/lib/datetime-cz";
 import { CalendarInviteeSelect } from "./CalendarInviteeSelect";
 
 type Department = { id: number; name: string; code: string | null };
@@ -70,18 +70,16 @@ export function CreateEventModal({
 
   useEffect(() => {
     if (open) {
-      const start = new Date(initialStart);
-      const end = new Date(initialEnd);
-      if (allDay) {
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 0, 0);
-      }
-      const re = new Date(start);
+      const re = new Date(initialStart);
       re.setMonth(re.getMonth() + 3);
       setForm((f) => ({
         ...f,
-        start_date: formatDateTimeLocalForInput(start),
-        end_date: formatDateTimeLocalForInput(end),
+        start_date: allDay
+          ? `${formatDateYmdPrague(initialStart)}T00:00`
+          : formatDateTimeLocalForInput(initialStart),
+        end_date: allDay
+          ? `${formatDateYmdPrague(initialEnd)}T23:59`
+          : formatDateTimeLocalForInput(initialEnd),
         is_all_day: allDay,
         recurrence_end: formatDateLocal(re),
       }));

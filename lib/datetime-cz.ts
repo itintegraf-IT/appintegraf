@@ -115,6 +115,35 @@ export function formatTimeCz(d: Date): string {
   });
 }
 
+/** Začátek kalendářního dne YYYY-MM-DD v Europe/Prague. */
+export function pragueDayStart(ymd: string): Date {
+  return parseDateTimeLocalInput(`${ymd}T00:00`);
+}
+
+/** Konec kalendářního dne YYYY-MM-DD v Europe/Prague (23:59:59.999). */
+export function pragueDayEnd(ymd: string): Date {
+  const end = parseDateTimeLocalInput(`${ymd}T23:59`);
+  end.setSeconds(59, 999);
+  return end;
+}
+
+/** Přičte dní k YYYY-MM-DD (kalendářně, přes UTC poledne kvůli DST). */
+export function addDaysToYmdPrague(ymd: string, days: number): string {
+  const [y, m, day] = ymd.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, day + days, 12, 0, 0, 0));
+  return formatDateYmdPrague(t);
+}
+
+/** Celodenní rozsah podle kalendářních dní v Praze → ISO pro DB. */
+export function allDayYmdRangeToIsoStrings(
+  startYmd: string,
+  endYmd: string
+): { start: string; end: string } {
+  const start = pragueDayStart(startYmd);
+  const end = pragueDayEnd(endYmd);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 /** Kalendářní den YYYY-MM-DD v Europe/Prague. */
 export function formatDateYmdPrague(d: Date): string {
   const p = getPragueParts(d);
