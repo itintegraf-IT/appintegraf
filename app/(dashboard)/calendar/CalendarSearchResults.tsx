@@ -2,14 +2,16 @@
 
 import Link from "next/link";
 import { CalendarRange, ExternalLink } from "lucide-react";
-import { isAllDayEvent } from "./lib/event-types";
+import {
+  formatCalendarListDateCell,
+  formatCalendarListTimeCell,
+} from "./lib/event-types";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import {
   getCalendarEventPrimaryLabel,
   getPeopleColumnText,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
-import { formatDateCz, formatTimeCz } from "@/lib/datetime-cz";
 
 type EventRow = {
   id: number;
@@ -37,14 +39,6 @@ type Props = {
   calendarUrl: string;
   eventMetaMode: CalendarEventMetaMode;
 };
-
-function formatDate(d: Date) {
-  return formatDateCz(new Date(d), { day: "numeric", month: "short", year: "numeric" });
-}
-
-function formatTime(d: Date) {
-  return formatTimeCz(new Date(d));
-}
 
 export function CalendarSearchResults({
   events,
@@ -107,17 +101,18 @@ export function CalendarSearchResults({
           </thead>
           <tbody>
             {events.map((e) => {
-              const allDay = isAllDayEvent(new Date(e.start_date), new Date(e.end_date));
+              const start = new Date(e.start_date);
+              const end = new Date(e.end_date);
               return (
                 <tr
                   key={calendarGridItemKey(e)}
                   className="border-b border-gray-100 transition-colors hover:bg-gray-50/50"
                 >
                   <td className="px-4 py-3 text-sm text-gray-700">
-                    {formatDate(e.start_date)}
+                    {formatCalendarListDateCell(start, end)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-700">
-                    {allDay ? "Celý den" : `${formatTime(e.start_date)} – ${formatTime(e.end_date)}`}
+                    {formatCalendarListTimeCell(start, end)}
                   </td>
                   <td className="px-4 py-3">
                     <Link

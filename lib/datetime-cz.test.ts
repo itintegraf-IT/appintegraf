@@ -5,6 +5,7 @@ import {
   formatDateYmdPrague,
   formatTimeCz,
   getPragueHourFraction,
+  getPragueParts,
   parseDateTimeLocalInput,
 } from "./datetime-cz";
 
@@ -22,6 +23,12 @@ describe("datetime-cz", () => {
     const pragueInput = formatDateTimeLocalForInput(summerUtc);
     expect(isoSlice).toBe("2026-05-16T07:44");
     expect(pragueInput).toBe("2026-05-16T09:44");
+  });
+
+  it("getPragueParts normalizuje půlnoc (hour 24 → 0)", () => {
+    const pragueMidnight = new Date("2026-06-25T22:00:00.000Z");
+    expect(getPragueParts(pragueMidnight).hour).toBe(0);
+    expect(getPragueParts(pragueMidnight).minute).toBe(0);
   });
 
   it("formatTimeCz zobrazí Prague čas bez ohledu na TZ runtime", () => {
