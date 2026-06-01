@@ -20,10 +20,11 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     serverActions: {
-      // Musí být vyšší než nejvyšší aplikační limit (IML PDF upload = 50 MB).
-      bodySizeLimit: "60mb",
+      // Musí být vyšší než nejvyšší aplikační limit (IML ZIP import = 500 MB).
+      bodySizeLimit: "500mb",
     },
-    proxyClientMaxBodySize: "60mb",
+    // Proxy + route handler sdílí buffer těla (složka / ZIP import až 500 MB).
+    proxyClientMaxBodySize: "500mb",
   },
 };
 

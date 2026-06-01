@@ -132,7 +132,7 @@ export default async function DashboardPage() {
           <LayoutDashboard className="h-7 w-7 text-red-600" />
           Dashboard
         </h1>
-        <p className="mt-1 text-gray-600">Vítejte v systému INTEGRAF</p>
+        <p className="mt-1 text-gray-600">Vítejte v systému IGIS new</p>
       </div>
 
       {/* Notifikace */}
