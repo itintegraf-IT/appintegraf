@@ -89,9 +89,10 @@ U typů **Dovolená** a **Osobní** je pole **Zástup** **povinné** – bez zvo
 ## Schvalování (Dovolená / Osobní)
 
 1. **Čeká na zástupce** – zástup dostane upozornění a může událost **schválit** nebo **zamítnout** (u zamítnutí lze zadat důvod).
-2. **Po schválení zástupem** – pokud má vaše oddělení **vedoucího**, událost čeká na **vedoucího oddělení** (druhá fáze). Pokud vedoucí **není** nastaven, může být událost po zástupovi rovnou **definitivně schválena**.
-3. **Schváleno** – finální souhlas (typicky od vedoucího).
-4. **Zamítnuto** – zástupcem nebo vedoucím.
+2. **Po schválení zástupem** – pokud má vaše oddělení **schvalovatele** (primární / sekundární / vedoucí), událost čeká na jeho schválení (druhá fáze). Pokud schvalovatel **není** nastaven, může být událost po zástupovi rovnou **definitivně schválena**.
+3. **Zástup = schvalovatel** – pokud je zvolený zástup zároveň schvalovatelem oddělení, stačí **jedno schválení** zástupem (událost je hned definitivně schválená).
+4. **Schváleno** – finální souhlas (typicky od schvalovatele).
+5. **Zamítnuto** – zástupcem nebo schvalovatelem.
 
 ### Kde vás to upozorní
 

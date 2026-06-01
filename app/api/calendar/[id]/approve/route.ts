@@ -135,7 +135,7 @@ export async function POST(
         id
       );
 
-      if (!resolved || resolved.userId === userId) {
+      if (!resolved) {
         return NextResponse.json(
           {
             error:
@@ -143,6 +143,53 @@ export async function POST(
           },
           { status: 409 }
         );
+      }
+
+      // Zástup je zároveň finální schvalovatel – jedna fáze, definitivní schválení
+      if (resolved.userId === userId) {
+        const combinedNote = `Schváleno zástupem a schvalovatelem dne ${new Date().toLocaleDateString("cs-CZ")} (${deputyName}) – jedna osoba.`;
+        const newDescription = event.description
+          ? `${event.description}\n\n${combinedNote}`
+          : combinedNote;
+
+        await prisma.$transaction([
+          dismissNotificationsUpdate(calendarLink, {
+            userId,
+            types: ["calendar_approval"],
+          }),
+          prisma.calendar_events.update({
+            where: { id },
+            data: {
+              approval_status: "approved",
+              description: newDescription,
+              updated_at: new Date(),
+            },
+          }),
+          prisma.calendar_approvals.updateMany({
+            where: { event_id: id, approver_id: userId },
+            data: {
+              status: "approved",
+              comment: "Schváleno",
+              approved_at: new Date(),
+              updated_at: new Date(),
+            },
+          }),
+          prisma.notifications.create({
+            data: {
+              user_id: creatorId,
+              title: "Událost definitivně schválena",
+              message: `${deputyName} schválil/a vaši událost „${event.title}“ (zástup i schvalovatel).`,
+              type: "calendar_approved",
+              link: calendarLink,
+            },
+          }),
+        ]);
+
+        return NextResponse.json({
+          success: true,
+          action,
+          message: "Událost byla definitivně schválena.",
+        });
       }
 
       const approver = await prisma.users.findUnique({
