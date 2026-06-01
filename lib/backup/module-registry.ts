@@ -74,6 +74,13 @@ export const BACKUP_MODULES: Record<BackupModuleId, BackupModuleDef> = {
     tables: [prisma("ukoly"), prisma("ukoly_departments")],
     extraUploadDirs: ["ukoly"],
   },
+  makety: {
+    id: "makety",
+    label: "Makety",
+    dependsOn: ["system"],
+    tables: [prisma("makety"), prisma("makety_departments"), prisma("makety_comments")],
+    fileUploadModules: [{ module: "makety", uploadSubdir: "makety" }],
+  },
   personalistika: {
     id: "personalistika",
     label: "Personalistika",

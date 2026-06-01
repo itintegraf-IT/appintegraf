@@ -6,6 +6,7 @@ export const BACKUP_MODULE_IDS = [
   "equipment",
   "calendar",
   "ukoly",
+  "makety",
   "personalistika",
   "contracts",
   "planovani",
