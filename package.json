@@ -22,7 +22,8 @@
     "migrate:passwords": "node scripts/migrate-passwords-to-hash.mjs",
     "db:ensure-admin": "node scripts/ensure-admin-user.mjs",
     "seed:calendar": "node scripts/seed-calendar-sample.mjs",
-    "migrate:totp-2fa": "node scripts/run-totp-2fa-migration.mjs"
+    "migrate:totp-2fa": "node scripts/run-totp-2fa-migration.mjs",
+    "db:makety-migrate": "node scripts/run-makety-migration.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

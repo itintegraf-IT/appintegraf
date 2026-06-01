@@ -2,6 +2,16 @@ import { prisma } from "@/lib/db";
 
 export type ModuleAccess = "read" | "write" | "admin";
 
+function parseModuleAccessJson(raw: string): unknown {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return raw;
+  }
+}
+
 /**
  * Načte role uživatele včetně module_access (user_roles nebo fallback na users.role_id)
  */
@@ -42,11 +52,8 @@ export async function getModuleAccessItems(userId: number): Promise<string[]> {
     const raw = role.module_access;
     if (raw === null || raw === undefined) continue;
     let decoded: unknown;
-    try {
-      decoded = typeof raw === "string" ? JSON.parse(raw) : raw;
-    } catch {
-      continue;
-    }
+    decoded = typeof raw === "string" ? parseModuleAccessJson(raw) : raw;
+    if (decoded === null) continue;
     if (Array.isArray(decoded)) {
       for (const x of decoded) {
         if (typeof x === "string") items.push(x.toLowerCase().trim());
@@ -79,11 +86,9 @@ export async function hasModuleAccess(
 
     let decoded: unknown = rawAccess;
     if (typeof rawAccess === "string") {
-      try {
-        decoded = JSON.parse(rawAccess);
-      } catch {
-        decoded = rawAccess;
-      }
+      const parsed = parseModuleAccessJson(rawAccess);
+      if (parsed === null) continue;
+      decoded = parsed;
     }
 
     // Per-module úroveň: { "contacts": "read", "equipment": "write", ... }
@@ -141,11 +146,8 @@ export async function hasMaketyVyrobaAccess(userId: number): Promise<boolean> {
     if (rawAccess === null || rawAccess === undefined) continue;
     let decoded: unknown = rawAccess;
     if (typeof rawAccess === "string") {
-      try {
-        decoded = JSON.parse(rawAccess);
-      } catch {
-        continue;
-      }
+      decoded = parseModuleAccessJson(rawAccess);
+      if (decoded === null) continue;
     }
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
       const perm = (decoded as Record<string, unknown>).makety;
@@ -349,11 +351,9 @@ function hasModuleAccessFromRoles(
 
     let decoded: unknown = rawAccess;
     if (typeof rawAccess === "string") {
-      try {
-        decoded = JSON.parse(rawAccess);
-      } catch {
-        decoded = rawAccess;
-      }
+      const parsed = parseModuleAccessJson(rawAccess);
+      if (parsed === null) continue;
+      decoded = parsed;
     }
 
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
