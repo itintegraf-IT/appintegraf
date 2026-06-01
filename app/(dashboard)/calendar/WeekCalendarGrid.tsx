@@ -35,7 +35,12 @@ type CalendarEvent = {
   users_deputy: { first_name: string; last_name: string } | null;
   calendar_approvals?: Array<{ users: { first_name: string; last_name: string } | null }>;
   ukoly_task_id?: number | null;
+  makety_task_id?: number | null;
 };
+
+function isModuleCalendarTask(e: { ukoly_task_id?: number | null; makety_task_id?: number | null }) {
+  return e.ukoly_task_id != null || e.makety_task_id != null;
+}
 
 type Props = {
   events: CalendarEvent[];
@@ -63,6 +68,7 @@ function EventMetaSubtext({
       approval_status: e.approval_status,
       calendar_approvals: e.calendar_approvals,
       ukoly_task_id: e.ukoly_task_id,
+      makety_task_id: e.makety_task_id,
     },
     mode
   );
@@ -174,7 +180,7 @@ export function WeekCalendarGrid({
   } | null>(null);
 
   const handleDragStart = (e: React.DragEvent, event: CalendarEvent) => {
-    if (event.ukoly_task_id != null) return;
+    if (isModuleCalendarTask(event)) return;
     if (event.created_by !== userId) return;
     e.dataTransfer.setData(
       "application/json",
@@ -272,7 +278,7 @@ export function WeekCalendarGrid({
   const allDayEvents = useMemo(() => {
     return events.filter(
       (e) =>
-        e.ukoly_task_id != null ||
+        isModuleCalendarTask(e) ||
         isAllDayEvent(new Date(e.start_date), new Date(e.end_date))
     );
   }, [events]);
@@ -285,7 +291,7 @@ export function WeekCalendarGrid({
     weekEndDate.setHours(23, 59, 59, 999);
 
     return allDayEvents
-      .filter((e) => e.ukoly_task_id != null)
+      .filter((e) => isModuleCalendarTask(e))
       .map((e) => {
         const start = new Date(e.start_date);
         const end = new Date(e.end_date);
@@ -313,7 +319,7 @@ export function WeekCalendarGrid({
   const timedEvents = useMemo(() => {
     return events.filter(
       (e) =>
-        e.ukoly_task_id == null &&
+        !isModuleCalendarTask(e) &&
         !isAllDayEvent(new Date(e.start_date), new Date(e.end_date))
     );
   }, [events]);
@@ -322,9 +328,9 @@ export function WeekCalendarGrid({
   const allDayColumnAccent = useMemo(() => {
     const m = new Map<string, string>();
     for (const d of days) {
-      const key = formatDateLocal(d);
+      const key = formatDateYmdPrague(d);
       for (const e of allDayEvents) {
-        if (e.ukoly_task_id != null) continue;
+        if (isModuleCalendarTask(e)) continue;
         const s = new Date(e.start_date);
         const en = new Date(e.end_date);
         if (allDayEventDisplayDates(s, en).includes(key)) {
@@ -354,7 +360,7 @@ export function WeekCalendarGrid({
             {days.map((d) => {
               const dayHolidays = holidaysForDay(d);
               const isHoliday = dayHolidays.length > 0;
-              const dayKey = formatDateLocal(d);
+              const dayKey = formatDateYmdPrague(d);
               const isTod = d.toDateString() === today;
               const accent = allDayColumnAccent.get(dayKey);
               return (
@@ -389,7 +395,7 @@ export function WeekCalendarGrid({
             style={{ minHeight: Math.max(36, ukolyRangeEvents.length * 22 + 10) }}
           >
             {days.map((d) => {
-              const dayKey = formatDateLocal(d);
+              const dayKey = formatDateYmdPrague(d);
               const isTod = d.toDateString() === today;
               const accent = allDayColumnAccent.get(dayKey);
               return (
@@ -412,10 +418,10 @@ export function WeekCalendarGrid({
                 ))}
                 {allDayEvents
                   .filter((e) => {
-                    if (e.ukoly_task_id != null) return false;
+                    if (isModuleCalendarTask(e)) return false;
                     const start = new Date(e.start_date);
                     const end = new Date(e.end_date);
-                    return allDayEventDisplayDates(start, end).includes(formatDateLocal(d));
+                    return allDayEventDisplayDates(start, end).includes(formatDateYmdPrague(d));
                   })
                   .map((e) => {
                     const barColor = e.color ?? "#DC2626";
@@ -426,7 +432,7 @@ export function WeekCalendarGrid({
                     const deputyName = e.users_deputy
                       ? `${e.users_deputy.first_name} ${e.users_deputy.last_name}`
                       : null;
-                    const canDrag = e.created_by === userId && e.ukoly_task_id == null;
+                    const canDrag = e.created_by === userId && !isModuleCalendarTask(e);
                     const eventContent = isGlobalAllDay ? (
                       getCalendarGlobalAllDayCompactLabel(e)
                     ) : (
@@ -612,7 +618,7 @@ export function WeekCalendarGrid({
                     const deputyName = e.users_deputy
                       ? `${e.users_deputy.first_name} ${e.users_deputy.last_name}`
                       : null;
-                    const canDrag = e.created_by === userId && e.ukoly_task_id == null;
+                    const canDrag = e.created_by === userId && !isModuleCalendarTask(e);
                     const timedEventContent = (
                       <>
                         <span className="block truncate">
