@@ -119,6 +119,18 @@ if [[ "$SKIP_MIGRATE" -eq 0 ]]; then
   fi
 fi
 
+echo "==> SQL: modul Makety (db:makety-migrate)"
+set +e
+npm run db:makety-migrate
+makety_migrate_exit=$?
+set -e
+if [[ "$makety_migrate_exit" -ne 0 ]]; then
+  echo "Upozornění: db:makety-migrate skončil s kódem $makety_migrate_exit."
+  echo "  Na serveru spusťte ručně: npm run db:makety-migrate"
+  echo "  nebo deploy s: --apply-sql 20260601_makety_module.sql"
+  echo ""
+fi
+
 if [[ "$DO_PLANOVANI" -eq 1 ]]; then
   echo "==> SQL upgrade plánování (db:planovani-upgrade)"
   npm run db:planovani-upgrade
