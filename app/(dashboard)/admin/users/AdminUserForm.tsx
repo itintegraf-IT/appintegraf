@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound, Layers } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, Printer, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound, Layers } from "lucide-react";
 import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
 import { TotpAdminPanel } from "@/components/admin/TotpAdminPanel";
 
@@ -19,6 +19,7 @@ const AVAILABLE_MODULES = [
   { key: "iml", label: "IML", icon: Package },
   { key: "materialy", label: "Katalog materiálů", icon: Layers },
   { key: "ukoly", label: "Úkoly", icon: ClipboardList },
+  { key: "makety", label: "Makety", icon: Printer },
   { key: "personalistika", label: "Personalistika", icon: BriefcaseBusiness },
 ] as const;
 
@@ -36,6 +37,14 @@ function getPermissionOptions(moduleKey: string) {
     return [
       { value: "read", label: "Zaměstnanec (úkolovaný)" },
       { value: "write", label: "Zadavatel úkolů" },
+      { value: "admin", label: "Admin" },
+    ] as const;
+  }
+  if (moduleKey === "makety") {
+    return [
+      { value: "read", label: "Zaměstnanec / výrobce" },
+      { value: "write", label: "Zadavatel maket" },
+      { value: "vyroba", label: "Výroba maket" },
       { value: "admin", label: "Admin" },
     ] as const;
   }

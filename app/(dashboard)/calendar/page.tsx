@@ -16,6 +16,7 @@ import { getMonthGridStart, getMonthGridEnd } from "./lib/month-utils";
 import { getHolidaysForRange } from "./lib/holidays";
 import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
 import { fetchUkolyForCalendarRange, UKOLY_CALENDAR_COLOR } from "@/lib/ukoly-calendar";
+import { fetchMaketyForCalendarRange } from "@/lib/makety-calendar";
 import { isUserInVedeniDepartment } from "@/lib/calendar-vedeni";
 import type { CalendarEventMetaMode } from "@/lib/calendar-event-meta";
 
@@ -40,6 +41,7 @@ export default async function CalendarPage({
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
   const admin = await isAdmin(userId);
   const hasUkoly = await hasModuleAccess(userId, "ukoly", "read");
+  const hasMakety = await hasModuleAccess(userId, "makety", "read");
   const isVedeni = userId > 0 ? await isUserInVedeniDepartment(userId) : false;
 
   const params = await searchParams;
@@ -308,6 +310,7 @@ export default async function CalendarPage({
     users_deputy: { first_name: string; last_name: string } | null;
     calendar_approvals?: Array<{ users: { first_name: string; last_name: string } | null }>;
     ukoly_task_id?: number | null;
+    makety_task_id?: number | null;
     calendar_event_participants?: Array<{
       users: { first_name: string; last_name: string } | null;
     }>;
@@ -331,11 +334,31 @@ export default async function CalendarPage({
     const asGrid: GridEvent[] = ukolyItems.map((u) => ({ ...u }));
 
     if (isListView) {
-      listMerged = [...eventsAsGrid, ...asGrid].sort(
+      listMerged = [...listMerged, ...asGrid].sort(
         (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
       );
     } else {
-      eventsForGrid = [...eventsAsGrid, ...asGrid].sort(
+      eventsForGrid = [...eventsForGrid, ...asGrid].sort(
+        (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      );
+    }
+  }
+
+  if (hasMakety && effectiveScope === "mine" && !showList) {
+    const maketyItems = await fetchMaketyForCalendarRange({
+      fromDate,
+      toDate,
+      userId,
+      mode: "personal",
+    });
+    const asGrid: GridEvent[] = maketyItems.map((m) => ({ ...m }));
+
+    if (isListView) {
+      listMerged = [...listMerged, ...asGrid].sort(
+        (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
+      );
+    } else {
+      eventsForGrid = [...eventsForGrid, ...asGrid].sort(
         (a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime()
       );
     }

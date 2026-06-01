@@ -9,10 +9,15 @@ export type EventMetaInput = {
   approval_status: string | null;
   calendar_approvals?: Array<{ users: { first_name: string; last_name: string } | null }>;
   ukoly_task_id?: number | null;
+  makety_task_id?: number | null;
   calendar_event_participants?: Array<{
     users: { first_name: string; last_name: string } | null;
   }>;
 };
+
+function isModuleTask(e: { ukoly_task_id?: number | null; makety_task_id?: number | null }) {
+  return e.ukoly_task_id != null || e.makety_task_id != null;
+}
 
 function participantNames(
   e: EventMetaInput
@@ -32,8 +37,9 @@ export function getCalendarEventPrimaryLabel(e: {
   title: string;
   event_type: string | null;
   ukoly_task_id?: number | null;
+  makety_task_id?: number | null;
 }): string {
-  if (e.ukoly_task_id != null) return e.title;
+  if (isModuleTask(e)) return e.title;
   return getEventTypeLabel(e.event_type);
 }
 
@@ -71,7 +77,7 @@ export function calendarEventGlobalAllDayTooltip(
   e: EventMetaInput & { title: string; event_type: string | null },
   mode: CalendarEventMetaMode
 ): string {
-  if (e.ukoly_task_id != null) return e.title;
+  if (isModuleTask(e)) return e.title;
   const typeLabel = getEventTypeLabel(e.event_type);
   const parts: string[] = [typeLabel, e.title];
   const status = getCalendarEventApprovalStatusLabel(e);
@@ -85,7 +91,7 @@ export function calendarEventTooltipTitle(
   e: EventMetaInput & { title: string; event_type: string | null },
   mode: CalendarEventMetaMode
 ): string {
-  if (e.ukoly_task_id != null) return e.title;
+  if (isModuleTask(e)) return e.title;
   const typeLabel = getEventTypeLabel(e.event_type);
   const extra = buildEventMetaLines(e, mode);
   if (extra.length === 0) return `${typeLabel} — ${e.title}`;
@@ -99,7 +105,7 @@ export function buildEventMetaLines(
   e: EventMetaInput,
   mode: CalendarEventMetaMode
 ): string[] {
-  if (mode === "hidden" || e.ukoly_task_id != null) return [];
+  if (mode === "hidden" || isModuleTask(e)) return [];
   const lines: string[] = [];
   if (e.users) {
     lines.push(`Vlastník: ${e.users.first_name} ${e.users.last_name}`);
@@ -120,7 +126,7 @@ export function buildEventMetaLines(
 
 /** Sloupec „Lidé“ v seznamu / výsledcích hledání */
 export function getPeopleColumnText(e: EventMetaInput, mode: CalendarEventMetaMode): string {
-  if (e.ukoly_task_id != null) {
+  if (isModuleTask(e)) {
     if (e.users) return `Řešitel: ${e.users.first_name} ${e.users.last_name}`;
     return "—";
   }

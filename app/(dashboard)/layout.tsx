@@ -32,6 +32,7 @@ export default async function DashboardLayout({
     iml,
     vyroba,
     ukoly,
+    makety,
     personalistika,
     materialy,
   } =
@@ -48,6 +49,7 @@ export default async function DashboardLayout({
     iml,
     vyroba,
     ukoly,
+    makety,
     personalistika,
     materialy,
   };
