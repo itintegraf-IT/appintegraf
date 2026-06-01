@@ -1,0 +1,177 @@
+
+<style>
+.phase { border:0.5px solid var(--color-border-tertiary); border-radius:var(--border-radius-lg); margin-bottom:12px; overflow:hidden; }
+.phase-header { display:flex; align-items:center; gap:12px; padding:14px 16px; cursor:pointer; background:var(--color-background-secondary); user-select:none; }
+.phase-header:hover { background:var(--color-background-tertiary); }
+.phase-badge { font-size:11px; font-weight:500; padding:3px 10px; border-radius:20px; white-space:nowrap; }
+.phase-title { font-size:15px; font-weight:500; color:var(--color-text-primary); flex:1; }
+.phase-meta { font-size:12px; color:var(--color-text-secondary); white-space:nowrap; }
+.phase-body { padding:0 16px 14px; border-top:0.5px solid var(--color-border-tertiary); background:var(--color-background-primary); }
+.task-row { display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:0.5px solid var(--color-border-tertiary); }
+.task-row:last-child { border-bottom:none; }
+.task-name { font-size:13px; color:var(--color-text-primary); flex:1; line-height:1.5; }
+.task-file { font-size:11px; font-family:var(--font-mono); color:var(--color-text-secondary); background:var(--color-background-secondary); padding:2px 6px; border-radius:4px; white-space:nowrap; align-self:center; }
+.task-dot { width:6px; height:6px; border-radius:50%; margin-top:6px; flex-shrink:0; }
+.ask-btn { font-size:12px; color:var(--color-text-info); background:none; border:0.5px solid var(--color-border-info); border-radius:6px; padding:3px 10px; cursor:pointer; white-space:nowrap; margin-top:10px; }
+.ask-btn:hover { background:var(--color-background-info); }
+.dep-line { font-size:12px; color:var(--color-text-secondary); padding:8px 0 0; }
+.dep-tag { display:inline-block; font-size:11px; font-family:var(--font-mono); background:var(--color-background-secondary); border:0.5px solid var(--color-border-tertiary); border-radius:4px; padding:1px 6px; margin:2px 3px 2px 0; }
+</style>
+
+<div style="padding:4px 0 16px;">
+  <div style="font-size:13px; color:var(--color-text-secondary); margin-bottom:16px;">
+    Celková doba: ~4–6 týdnů samostatný agent &nbsp;|&nbsp; 6 fází &nbsp;|&nbsp; klikni na fázi pro detaily a akce
+  </div>
+
+  <div class="phase">
+    <div class="phase-header" onclick="toggle('p1')">
+      <span class="phase-badge" style="background:#E6F1FB;color:#0C447C;">Fáze 1</span>
+      <span class="phase-title">Scaffolding projektu a databáze</span>
+      <span class="phase-meta">2–3 dny</span>
+      <span id="p1-arrow" style="color:var(--color-text-secondary); font-size:12px;">▾</span>
+    </div>
+    <div id="p1" style="display:none;">
+      <div class="phase-body">
+        <div class="task-row"><div class="task-dot" style="background:#378ADD;"></div><div class="task-name"><code>npm create next-app</code>, nastavení ESLint, Prettier, Tailwind</div><div class="task-file">package.json</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#378ADD;"></div><div class="task-name">Prisma schéma: tabulky <code>Order</code>, <code>Label</code>, <code>User</code>, <code>AuditLog</code>, <code>Template</code></div><div class="task-file">prisma/schema.prisma</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#378ADD;"></div><div class="task-name">Docker Compose: PostgreSQL + adminer pro lokální dev</div><div class="task-file">docker-compose.yml</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#378ADD;"></div><div class="task-name">Migrace a seed dat: šablony Standard/neut/Oriflame, testoví uživatelé</div><div class="task-file">prisma/seed.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#378ADD;"></div><div class="task-name">Env konfigurace: <code>DATABASE_URL</code>, <code>JWT_SECRET</code>, <code>SMTP_*</code>, <code>STORAGE_PATH</code></div><div class="task-file">.env.example</div></div>
+        <div class="dep-line">Výstup: běžící DB, Prisma client, základní Next.js app na <code>localhost:3000</code></div>
+        <br><button class="ask-btn" onclick="sendPrompt('Vygeneruj Prisma schéma pro štítkový systém: tabulky Order, LabelRow, User, AuditLog, Template s vazbami a správnými typy')">Vygeneruj Prisma schéma ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-header" onclick="toggle('p2')">
+      <span class="phase-badge" style="background:#E1F5EE;color:#085041;">Fáze 2</span>
+      <span class="phase-title">Autentizace a správa uživatelů</span>
+      <span class="phase-meta">2–3 dny</span>
+      <span id="p2-arrow" style="color:var(--color-text-secondary); font-size:12px;">▾</span>
+    </div>
+    <div id="p2" style="display:none;">
+      <div class="phase-body">
+        <div class="task-row"><div class="task-dot" style="background:#1D9E75;"></div><div class="task-name">JWT middleware: generování tokenů, <code>verifyToken()</code>, refresh</div><div class="task-file">lib/auth.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#1D9E75;"></div><div class="task-name">API route <code>POST /api/auth/login</code> — přepis <code>S_901_Kontrola_tiskar</code> (whitelist → DB role)</div><div class="task-file">app/api/auth/login/route.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#1D9E75;"></div><div class="task-name">Role-based guard middleware: <code>zadavatel | tiskař | mistr | admin</code></div><div class="task-file">middleware.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#1D9E75;"></div><div class="task-name">UI: login stránka, session hook <code>useCurrentUser()</code></div><div class="task-file">app/login/page.tsx</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#1D9E75;"></div><div class="task-name">Admin UI pro správu uživatelů a rolí (náhrada sloupce Legenda!W)</div><div class="task-file">app/admin/users/page.tsx</div></div>
+        <div class="dep-line">Závisí na: Fáze 1</div>
+        <br><button class="ask-btn" onclick="sendPrompt('Napiš Next.js JWT auth middleware s rolemi zadavatel, tiskař, mistr, admin — verifyToken funkci a route handler pro login')">Napiš auth middleware ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-header" onclick="toggle('p3')">
+      <span class="phase-badge" style="background:#FAECE7;color:#712B13;">Fáze 3</span>
+      <span class="phase-title">Jádro — zadávání zakázek a validace</span>
+      <span class="phase-meta">4–5 dní</span>
+      <span id="p3-arrow" style="color:var(--color-text-secondary); font-size:12px;">▾</span>
+    </div>
+    <div id="p3" style="display:none;">
+      <div class="phase-body">
+        <div class="task-row"><div class="task-dot" style="background:#D85A30;"></div><div class="task-name">Validační schéma Zod: přepis <code>S_800_Kontrola_zadani</code> — množství, text, číselná řada</div><div class="task-file">lib/validators/order.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#D85A30;"></div><div class="task-name">API CRUD: <code>POST/GET/PATCH /api/orders</code> se stavovým automatem</div><div class="task-file">app/api/orders/route.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#D85A30;"></div><div class="task-name">Logika číselné řady: přepis <code>S_900_Ciselna_rada</code> — generátor 7×7 mřížky s prefixem</div><div class="task-file">lib/ciselnaRada.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#D85A30;"></div><div class="task-name">Formulář <code>OrderForm</code>: pole č. zakázky, množství, balení, 3× text, prefix, od–do</div><div class="task-file">components/OrderForm.tsx</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#D85A30;"></div><div class="task-name">Přehled zakázek s filtry stavu, vyhledáváním, stránkováním</div><div class="task-file">app/orders/page.tsx</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#D85A30;"></div><div class="task-name">Audit log: automatický zápis kdo/kdy/co při každé změně stavu</div><div class="task-file">lib/audit.ts</div></div>
+        <div class="dep-line">Závisí na: Fáze 1, 2 &nbsp;|&nbsp; Klíčový deliverable: funkční vytvoření zakázky end-to-end</div>
+        <br><button class="ask-btn" onclick="sendPrompt('Napiš TypeScript funkci ciselnaRada(prefix, od, do, baleni) která vrátí 2D pole stringů pro mřížku štítků 7×7 s nulami na začátku čísel')">Napiš ciselnaRada.ts ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-header" onclick="toggle('p4')">
+      <span class="phase-badge" style="background:#EEEDFE;color:#3C3489;">Fáze 4</span>
+      <span class="phase-title">Šablony štítků, čárové kódy, tisk</span>
+      <span class="phase-meta">4–5 dní</span>
+      <span id="p4-arrow" style="color:var(--color-text-secondary); font-size:12px;">▾</span>
+    </div>
+    <div id="p4" style="display:none;">
+      <div class="phase-body">
+        <div class="task-row"><div class="task-dot" style="background:#534AB7;"></div><div class="task-name">React komponenta šablony: mřížka 7×7 štítků, font <code>CODE128.ttf</code> → <code>bwip-js</code></div><div class="task-file">components/LabelTemplate.tsx</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#534AB7;"></div><div class="task-name">Náhled před tiskem: živý render šablony Standard / neut / Oriflame</div><div class="task-file">components/LabelPreview.tsx</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#534AB7;"></div><div class="task-name">Server-side PDF generátor: Puppeteer render → <code>Buffer</code> → stažení</div><div class="task-file">app/api/orders/[id]/pdf/route.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#534AB7;"></div><div class="task-name">Tisk přes <code>window.print()</code> s CSS <code>@media print</code> — přesný rozměr A4</div><div class="task-file">styles/print.css</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#534AB7;"></div><div class="task-name">Ukládání souborů: lokální <code>/storage</code> nebo S3 (náhrada <code>W:\\16_Stitky\\</code>)</div><div class="task-file">lib/storage.ts</div></div>
+        <div class="dep-line">Závisí na: Fáze 3 &nbsp;|&nbsp; npm: <code>bwip-js</code>, <code>puppeteer</code></div>
+        <br><button class="ask-btn" onclick="sendPrompt('Napiš React komponentu LabelTemplate která renderuje mřížku 7 sloupců × 7 řádků štítků pro tisk na A4, s čárovým kódem CODE128 z bwip-js')">Napiš LabelTemplate ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-header" onclick="toggle('p5')">
+      <span class="phase-badge" style="background:#EAF3DE;color:#27500A;">Fáze 5</span>
+      <span class="phase-title">Emaily, notifikace, workflow</span>
+      <span class="phase-meta">2–3 dny</span>
+      <span id="p5-arrow" style="color:var(--color-text-secondary); font-size:12px;">▾</span>
+    </div>
+    <div id="p5" style="display:none;">
+      <div class="phase-body">
+        <div class="task-row"><div class="task-dot" style="background:#639922;"></div><div class="task-name">Nodemailer + šablony: "požadavek na výrobu" a "štítky zpracovány" (přepis VBA CDO emailů)</div><div class="task-file">lib/email.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#639922;"></div><div class="task-name">Stavový automat zakázky: <code>draft → zadano → tisk → zpracovano → archivovano</code></div><div class="task-file">lib/orderStateMachine.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#639922;"></div><div class="task-name">Akce "Zpracováno": změní stav, odešle email, přesune do archivu</div><div class="task-file">app/api/orders/[id]/complete/route.ts</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#639922;"></div><div class="task-name">Volitelně: real-time notifikace (Server-Sent Events) místo F5 obnovování</div><div class="task-file">app/api/sse/route.ts</div></div>
+        <div class="dep-line">Závisí na: Fáze 3 &nbsp;|&nbsp; npm: <code>nodemailer</code></div>
+        <br><button class="ask-btn" onclick="sendPrompt('Napiš stavový automat pro zakázku štítků se stavy draft, zadano, tisk, zpracovano, archivovano — včetně přechodových podmínek a side-effectů (email, audit log)')">Napiš stavový automat ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="phase">
+    <div class="phase-header" onclick="toggle('p6')">
+      <span class="phase-badge" style="background:#FAEEDA;color:#633806;">Fáze 6</span>
+      <span class="phase-title">Testování, CI/CD, nasazení</span>
+      <span class="phase-meta">3–4 dny</span>
+      <span id="p6-arrow" style="color:var(--color-text-secondary); font-size:12px;">▾</span>
+    </div>
+    <div id="p6" style="display:none;">
+      <div class="phase-body">
+        <div class="task-row"><div class="task-dot" style="background:#BA7517;"></div><div class="task-name">Unit testy: <code>ciselnaRada</code>, validátory, stavový automat (Vitest)</div><div class="task-file">__tests__/</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#BA7517;"></div><div class="task-name">Integrační testy API routes s test DB (Prisma + in-memory SQLite)</div><div class="task-file">__tests__/api/</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#BA7517;"></div><div class="task-name">E2E testy kritické cesty: zadání → tisk → zpracování (Playwright)</div><div class="task-file">e2e/</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#BA7517;"></div><div class="task-name">GitHub Actions CI: lint + testy při každém PR</div><div class="task-file">.github/workflows/ci.yml</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#BA7517;"></div><div class="task-name">Dockerfile + docker-compose pro produkci, nebo Vercel + managed Postgres</div><div class="task-file">Dockerfile</div></div>
+        <div class="task-row"><div class="task-dot" style="background:#BA7517;"></div><div class="task-name">Migrace dat ze stávajících XLSM souborů (jednorázový import skript)</div><div class="task-file">scripts/migrateFromXlsm.ts</div></div>
+        <div class="dep-line">Závisí na: Fáze 1–5 &nbsp;|&nbsp; Výstup: produkčně nasazená aplikace</div>
+        <br><button class="ask-btn" onclick="sendPrompt('Napiš GitHub Actions CI workflow pro Next.js + Prisma projekt: lint, type-check, vitest unit testy, playwright e2e testy')">Napiš CI workflow ↗</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:16px; padding:12px 14px; background:var(--color-background-secondary); border-radius:var(--border-radius-md); border:0.5px solid var(--color-border-tertiary);">
+    <div style="font-size:12px; color:var(--color-text-secondary); margin-bottom:8px;">Doporučené pořadí pro agenta — každá fáze je jeden self-contained blok práce</div>
+    <div style="display:flex; gap:6px; flex-wrap:wrap;">
+      <span style="font-size:11px; background:var(--color-background-info); color:var(--color-text-info); padding:3px 10px; border-radius:12px;">DB schéma</span>
+      <span style="font-size:13px; color:var(--color-text-tertiary);">→</span>
+      <span style="font-size:11px; background:var(--color-background-info); color:var(--color-text-info); padding:3px 10px; border-radius:12px;">Auth</span>
+      <span style="font-size:13px; color:var(--color-text-tertiary);">→</span>
+      <span style="font-size:11px; background:var(--color-background-info); color:var(--color-text-info); padding:3px 10px; border-radius:12px;">Zakázky API</span>
+      <span style="font-size:13px; color:var(--color-text-tertiary);">→</span>
+      <span style="font-size:11px; background:var(--color-background-info); color:var(--color-text-info); padding:3px 10px; border-radius:12px;">Šablony + tisk</span>
+      <span style="font-size:13px; color:var(--color-text-tertiary);">→</span>
+      <span style="font-size:11px; background:var(--color-background-info); color:var(--color-text-info); padding:3px 10px; border-radius:12px;">Email workflow</span>
+      <span style="font-size:13px; color:var(--color-text-tertiary);">→</span>
+      <span style="font-size:11px; background:var(--color-background-info); color:var(--color-text-info); padding:3px 10px; border-radius:12px;">Deploy</span>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggle(id) {
+  const el = document.getElementById(id);
+  const arrow = document.getElementById(id + '-arrow');
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    arrow.textContent = '▴';
+  } else {
+    el.style.display = 'none';
+    arrow.textContent = '▾';
+  }
+}
+</script>

@@ -93,7 +93,9 @@ export async function hasModuleAccess(
       if (typeof perm === "string") {
         const p = perm.toLowerCase();
         const planovaniTiskar = module === "planovani" && p === "tiskar";
-        if (access === "read" && (["read", "write", "admin"].includes(p) || planovaniTiskar)) return true;
+        const maketyVyroba = module === "makety" && p === "vyroba";
+        if (access === "read" && (["read", "write", "admin"].includes(p) || planovaniTiskar || maketyVyroba))
+          return true;
         if (access === "write" && ["write", "admin"].includes(p)) return true;
         if (access === "admin" && p === "admin") return true;
       }
@@ -128,6 +130,29 @@ export async function isAdmin(userId: number): Promise<boolean> {
   const roles = await getUserRoles(userId);
   type RoleItem = (typeof roles)[number];
   return roles.some((r: RoleItem) => r.name?.toLowerCase() === "admin");
+}
+
+/** Úroveň výroby maket – kalendář výroby a širší přehled fronty. */
+export async function hasMaketyVyrobaAccess(userId: number): Promise<boolean> {
+  if (await isAdmin(userId)) return true;
+  const roles = await getUserRoles(userId);
+  for (const role of roles) {
+    const rawAccess = role.module_access;
+    if (rawAccess === null || rawAccess === undefined) continue;
+    let decoded: unknown = rawAccess;
+    if (typeof rawAccess === "string") {
+      try {
+        decoded = JSON.parse(rawAccess);
+      } catch {
+        continue;
+      }
+    }
+    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+      const perm = (decoded as Record<string, unknown>).makety;
+      if (typeof perm === "string" && perm.toLowerCase() === "vyroba") return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -251,6 +276,7 @@ export async function getLayoutAccess(userId: number): Promise<{
   iml: boolean;
   vyroba: boolean;
   ukoly: boolean;
+  makety: boolean;
   personalistika: boolean;
   materialy: boolean;
 }> {
@@ -258,23 +284,57 @@ export async function getLayoutAccess(userId: number): Promise<{
   type RoleItem = (typeof roles)[number];
   const admin = roles.some((r: RoleItem) => r.name?.toLowerCase() === "admin");
 
-  const checkModule = (module: string) =>
-    admin || hasModuleAccessFromRoles(roles, module, "read");
+  const checkModule = async (module: string) => {
+    if (admin) return true;
+    if (module === "makety" && (await hasMaketyVyrobaAccess(userId))) return true;
+    return hasModuleAccessFromRoles(roles, module, "read");
+  };
+
+  const [
+    contacts,
+    equipment,
+    calendar,
+    contracts,
+    kiosk,
+    training,
+    planovani,
+    iml,
+    vyroba,
+    ukoly,
+    makety,
+    personalistika,
+    materialy,
+  ] = await Promise.all([
+    checkModule("contacts"),
+    checkModule("equipment"),
+    checkModule("calendar"),
+    checkModule("contracts"),
+    checkModule("kiosk"),
+    checkModule("training"),
+    checkModule("planovani"),
+    checkModule("iml"),
+    checkModule("vyroba"),
+    checkModule("ukoly"),
+    checkModule("makety"),
+    checkModule("personalistika"),
+    checkModule("materialy"),
+  ]);
 
   return {
     admin,
-    contacts: checkModule("contacts"),
-    equipment: checkModule("equipment"),
-    calendar: checkModule("calendar"),
-    contracts: checkModule("contracts"),
-    kiosk: checkModule("kiosk"),
-    training: checkModule("training"),
-    planovani: checkModule("planovani"),
-    iml: checkModule("iml"),
-    vyroba: checkModule("vyroba"),
-    ukoly: checkModule("ukoly"),
-    personalistika: checkModule("personalistika"),
-    materialy: checkModule("materialy"),
+    contacts,
+    equipment,
+    calendar,
+    contracts,
+    kiosk,
+    training,
+    planovani,
+    iml,
+    vyroba,
+    ukoly,
+    makety,
+    personalistika,
+    materialy,
   };
 }
 
@@ -302,7 +362,9 @@ function hasModuleAccessFromRoles(
       if (typeof perm === "string") {
         const p = perm.toLowerCase();
         const planovaniTiskar = module === "planovani" && p === "tiskar";
-        if (access === "read" && (["read", "write", "admin"].includes(p) || planovaniTiskar)) return true;
+        const maketyVyroba = module === "makety" && p === "vyroba";
+        if (access === "read" && (["read", "write", "admin"].includes(p) || planovaniTiskar || maketyVyroba))
+          return true;
         if (access === "write" && ["write", "admin"].includes(p)) return true;
         if (access === "admin" && p === "admin") return true;
       }
