@@ -17,7 +17,7 @@ import {
   formatDateLocal,
   formatDateTimeLocalForInput,
 } from "../../lib/week-utils";
-import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
+import { formatDateYmdPrague, parseDateTimeLocalInput } from "@/lib/datetime-cz";
 import { CalendarInviteeSelect } from "../../CalendarInviteeSelect";
 
 type Event = {
@@ -93,10 +93,10 @@ export default function EditCalendarPage() {
             title: event.title,
             description: event.description ?? "",
             start_date: allDay
-              ? `${formatDateLocal(start)}T00:00`
+              ? `${formatDateYmdPrague(start)}T00:00`
               : formatDateTimeLocalForInput(start),
             end_date: allDay
-              ? `${formatDateLocal(end)}T23:59`
+              ? `${formatDateYmdPrague(end)}T23:59`
               : formatDateTimeLocalForInput(end),
             event_type: event.event_type ?? DEFAULT_EVENT_TYPE,
             department_id: event.department_id ? String(event.department_id) : "",

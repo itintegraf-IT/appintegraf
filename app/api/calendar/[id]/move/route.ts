@@ -4,7 +4,11 @@ import { prisma } from "@/lib/db";
 import { requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
 import { dismissNotificationsUpdate } from "@/lib/notifications-dismiss";
 import { findCreatorCalendarOverlap, formatOverlapErrorCs } from "@/lib/calendar-time-overlap";
-import { formatDateTimeCz } from "@/lib/datetime-cz";
+import {
+  allDayYmdRangeToIsoStrings,
+  formatDateTimeCz,
+  formatDateYmdPrague,
+} from "@/lib/datetime-cz";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
@@ -63,15 +67,19 @@ export async function PATCH(
     return NextResponse.json({ error: "Vyplňte datum začátku a konce" }, { status: 400 });
   }
 
-  const start = new Date(start_date);
-  const end = new Date(end_date);
+  let start = new Date(start_date);
+  let end = new Date(end_date);
   if (end <= start) {
     return NextResponse.json({ error: "Datum konce musí být po datu začátku" }, { status: 400 });
   }
 
   if (all_day) {
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
+    const normalized = allDayYmdRangeToIsoStrings(
+      formatDateYmdPrague(start),
+      formatDateYmdPrague(end)
+    );
+    start = new Date(normalized.start);
+    end = new Date(normalized.end);
   }
 
   const selfOverlap = await findCreatorCalendarOverlap(prisma, userId, start, end, { excludeEventId: id });

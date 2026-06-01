@@ -10,6 +10,7 @@ import {
 } from "./lib/month-utils";
 import { CreateEventModal } from "./CreateEventModal";
 import { WEEKDAY_NAMES_MONDAY, formatDateLocal } from "./lib/week-utils";
+import { formatDateYmdPrague } from "@/lib/datetime-cz";
 import type { Holiday } from "./lib/holidays";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import { isAllDayEvent, allDayEventDisplayDates } from "./lib/event-types";
@@ -100,7 +101,7 @@ export function MonthCalendarGrid({
   }, [days]);
 
   const eventsForDay = (day: Date) => {
-    const dayKey = formatDateLocal(day);
+    const dayKey = formatDateYmdPrague(day);
     const dayStart = new Date(day);
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(day);

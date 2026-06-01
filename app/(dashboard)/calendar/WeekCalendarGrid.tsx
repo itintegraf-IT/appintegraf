@@ -17,7 +17,15 @@ import {
   getCalendarGlobalAllDayCompactLabel,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
-import { formatDateYmdPrague, formatTimeCz, getPragueHourFraction } from "@/lib/datetime-cz";
+import {
+  addDaysToYmdPrague,
+  allDayYmdRangeToIsoStrings,
+  formatDateYmdPrague,
+  formatTimeCz,
+  getPragueHourFraction,
+  pragueDayEnd,
+  pragueDayStart,
+} from "@/lib/datetime-cz";
 
 type CalendarEvent = {
   id: number;
@@ -98,14 +106,12 @@ function getEventSliceForDay(
   const start = new Date(event.start_date);
   const end = new Date(event.end_date);
 
-  const dayStart = new Date(day);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(day);
-  dayEnd.setHours(23, 59, 59, 999);
+  const dayStr = formatDateYmdPrague(day);
+  const dayStart = pragueDayStart(dayStr);
+  const dayEnd = pragueDayEnd(dayStr);
 
   const startDayStr = formatDateYmdPrague(start);
   const endDayStr = formatDateYmdPrague(end);
-  const dayStr = formatDateYmdPrague(day);
 
   if (options?.onlyFirstDayOfMultiDay && startDayStr !== endDayStr) {
     if (dayStr !== startDayStr) return null;
@@ -209,23 +215,29 @@ export function WeekCalendarGrid({
     const event = events.find((ev) => ev.id === data.id);
     if (!event || event.created_by !== userId) return;
 
-    const dayStart = new Date(day);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(day);
-    dayEnd.setHours(23, 59, 59, 999);
+    const dropYmd = formatDateYmdPrague(day);
 
     let newStart: Date;
     let newEnd: Date;
     const allDay = data.allDay;
 
     if (allDay) {
-      newStart = new Date(dayStart);
       const oldStart = new Date(data.start);
       const oldEnd = new Date(data.end);
-      const durationDays = Math.round((oldEnd.getTime() - oldStart.getTime()) / (24 * 60 * 60 * 1000)) || 1;
-      newEnd = new Date(dayStart);
-      newEnd.setDate(newEnd.getDate() + durationDays);
-      newEnd.setHours(23, 59, 59, 999);
+      const oldStartYmd = formatDateYmdPrague(oldStart);
+      const oldEndYmd = formatDateYmdPrague(oldEnd);
+      const durationDays =
+        Math.max(
+          1,
+          Math.round(
+            (pragueDayStart(oldEndYmd).getTime() - pragueDayStart(oldStartYmd).getTime()) /
+              86400000
+          ) + 1
+        ) || 1;
+      const endYmd = addDaysToYmdPrague(dropYmd, durationDays - 1);
+      const range = allDayYmdRangeToIsoStrings(dropYmd, endYmd);
+      newStart = new Date(range.start);
+      newEnd = new Date(range.end);
     } else {
       const h = hour ?? 0;
       newStart = new Date(day);
@@ -565,7 +577,7 @@ export function WeekCalendarGrid({
           </div>
           <div className="flex flex-1">
             {days.map((d) => {
-              const dayKey = formatDateLocal(d);
+              const dayKey = formatDateYmdPrague(d);
               const isTod = d.toDateString() === today;
               const accent = allDayColumnAccent.get(dayKey);
               return (
@@ -607,11 +619,10 @@ export function WeekCalendarGrid({
                     });
                     if (!slice) return null;
                     const eventStart = new Date(e.start_date);
-                    const dayStart = new Date(d);
-                    dayStart.setHours(0, 0, 0, 0);
-                    const dayEnd = new Date(d);
-                    dayEnd.setHours(23, 59, 59, 999);
-                    const isFirstDay = eventStart >= dayStart && eventStart <= dayEnd;
+                    const sliceDayStr = formatDateYmdPrague(d);
+                    const sliceDayStart = pragueDayStart(sliceDayStr);
+                    const sliceDayEnd = pragueDayEnd(sliceDayStr);
+                    const isFirstDay = eventStart >= sliceDayStart && eventStart <= sliceDayEnd;
                     const pendingApproval = e.approval_status === "pending" && e.deputy_id;
                     const deputyApproved = e.approval_status === "deputy_approved";
                     const isApproved = e.approval_status === "approved";
