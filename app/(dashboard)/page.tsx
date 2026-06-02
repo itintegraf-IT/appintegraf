@@ -94,7 +94,17 @@ export default async function DashboardPage() {
     ]);
 
   type NotificationRow = { id: number; title: string; message: string | null; link: string | null; read_at: Date | null; created_at: Date };
-  type PendingEventRow = { id: number; title: string; start_date: Date; approval_status: string | null; users: { first_name: string; last_name: string } | null };
+  type PendingEventRow = {
+    id: number;
+    title: string;
+    event_type: string | null;
+    start_date: Date;
+    end_date: Date;
+    approval_status: string | null;
+    ukoly_task_id?: number | null;
+    makety_task_id?: number | null;
+    users: { first_name: string; last_name: string } | null;
+  };
   const notificationsTyped = notifications as NotificationRow[];
   const pendingEventsTyped = pendingEvents as PendingEventRow[];
 

@@ -56,6 +56,9 @@ export async function POST(
     select: {
       id: true,
       title: true,
+      event_type: true,
+      start_date: true,
+      end_date: true,
       created_by: true,
       users: { select: { first_name: true, last_name: true } },
     },

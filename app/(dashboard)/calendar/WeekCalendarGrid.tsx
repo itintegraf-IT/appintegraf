@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useState, type CSSProperties, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
 import { parseDateLocal, formatDateLocal } from "./lib/week-utils";
 import type { Holiday } from "./lib/holidays";
@@ -583,7 +583,7 @@ export function WeekCalendarGrid({
                       : calendarEventTooltipTitle(e, eventMetaMode);
 
                     if (isGlobalMode) {
-                      const blocks: JSX.Element[] = [];
+                      const blocks: ReactElement[] = [];
                       const ownerLines = buildCalendarGlobalOwnerBlock(e, { allDay: true });
                       blocks.push(
                         <CalendarGlobalEventBlock
