@@ -196,3 +196,49 @@ export function formatCalendarListTimeCell(start: Date, end: Date): string {
   if (isAllDayEvent(start, end)) return "Celý den";
   return `${formatTimeCz(start)} – ${formatTimeCz(end)}`;
 }
+
+function isModuleCalendarTask(e: {
+  ukoly_task_id?: number | null;
+  makety_task_id?: number | null;
+}): boolean {
+  return e.ukoly_task_id != null || e.makety_task_id != null;
+}
+
+/** Část textu s trváním (bez typu) – schválení, notifikace, seznam. */
+export function formatCalendarEventDurationPart(start: Date, end: Date): string {
+  const s = new Date(start);
+  const e = new Date(end);
+
+  if (isAllDayEvent(s, e)) {
+    const startYmd = formatDateYmdPrague(s);
+    const endYmd = formatDateYmdPrague(e);
+    if (startYmd === endYmd) {
+      return formatDateCz(s, LIST_DATE_OPTS);
+    }
+    return `${formatDateCz(s, LIST_DATE_OPTS)} – ${formatDateCz(e, LIST_DATE_OPTS)}`;
+  }
+
+  const startYmd = formatDateYmdPrague(s);
+  const endYmd = formatDateYmdPrague(e);
+  if (startYmd === endYmd) {
+    return `${formatDateCz(s, LIST_DATE_OPTS)} ${formatTimeCz(s)} – ${formatTimeCz(e)}`;
+  }
+  return `${formatDateCz(s, LIST_DATE_OPTS)} ${formatTimeCz(s)} – ${formatDateCz(e, LIST_DATE_OPTS)} ${formatTimeCz(e)}`;
+}
+
+/** Typ události + trvání – schválení, notifikace, seznam. */
+export function formatCalendarEventTitleWithDuration(e: {
+  title: string;
+  event_type: string | null;
+  start_date: Date;
+  end_date: Date;
+  ukoly_task_id?: number | null;
+  makety_task_id?: number | null;
+}): string {
+  const label = isModuleCalendarTask(e) ? e.title.trim() : getEventTypeLabel(e.event_type);
+  const duration = formatCalendarEventDurationPart(
+    new Date(e.start_date),
+    new Date(e.end_date)
+  );
+  return `${label} ${duration}`;
+}

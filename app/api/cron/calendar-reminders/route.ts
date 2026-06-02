@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendCalendarReminderEmail } from "@/lib/email";
+import { formatCalendarEventTitleWithDuration } from "@/app/(dashboard)/calendar/lib/event-types";
 
 /**
  * GET s ?secret= (CRON_SECRET) nebo hlavičkou Authorization: Bearer.
@@ -38,6 +39,7 @@ export async function GET(req: NextRequest) {
   });
 
   for (const event of toProcess) {
+    const displayTitle = formatCalendarEventTitleWithDuration(event);
     const u = await prisma.users.findUnique({
       where: { id: event.created_by },
       select: { first_name: true, last_name: true, email: true },
@@ -50,7 +52,7 @@ export async function GET(req: NextRequest) {
         data: {
           user_id: event.created_by,
           title: "Připomínka: nadcházející událost",
-          message: `Za chvíli začíná: „${event.title}“.`,
+          message: `Za chvíli začíná: „${displayTitle}“.`,
           type: "calendar_reminder",
           link: `/calendar/${event.id}`,
         },
@@ -60,7 +62,7 @@ export async function GET(req: NextRequest) {
       await sendCalendarReminderEmail({
         toEmail: u.email,
         toName: `${u.first_name} ${u.last_name}`.trim() || "Uživateli",
-        eventTitle: event.title,
+        eventTitle: displayTitle,
         eventId: event.id,
         startsAt: event.start_date,
       });

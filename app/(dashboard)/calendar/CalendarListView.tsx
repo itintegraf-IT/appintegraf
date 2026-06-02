@@ -11,10 +11,14 @@ import { formatDateCz } from "@/lib/datetime-cz";
 import { formatDateLocal } from "./lib/week-utils";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import {
-  getCalendarEventPrimaryLabel,
+  getCalendarGlobalDeputyHeadline,
+  getCalendarGlobalLabelWithDuration,
+  getCalendarGlobalStatusLine,
   getPeopleColumnText,
+  hasCalendarDeputyBlock,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
+import { formatCalendarEventTitleWithDuration } from "./lib/event-types";
 
 type EventRow = {
   id: number;
@@ -143,6 +147,12 @@ export function CalendarListView({ events, from, to, viewType, eventMetaMode }: 
               events.map((e) => {
                 const start = new Date(e.start_date);
                 const end = new Date(e.end_date);
+                const isGlobal = eventMetaMode !== "hidden";
+                const statusLine = isGlobal ? getCalendarGlobalStatusLine(e) : "";
+                const deputyHeadline =
+                  isGlobal && hasCalendarDeputyBlock(e)
+                    ? getCalendarGlobalDeputyHeadline(e)
+                    : "";
                 return (
                   <tr
                     key={calendarGridItemKey(e)}
@@ -161,8 +171,16 @@ export function CalendarListView({ events, from, to, viewType, eventMetaMode }: 
                         style={{ color: e.color ?? "#DC2626" }}
                         title={e.title}
                       >
-                        {getCalendarEventPrimaryLabel(e)}
+                        {isGlobal
+                          ? getCalendarGlobalLabelWithDuration(e)
+                          : formatCalendarEventTitleWithDuration(e)}
                       </Link>
+                      {statusLine && (
+                        <p className="mt-0.5 text-xs text-gray-600">{statusLine}</p>
+                      )}
+                      {deputyHeadline && (
+                        <p className="mt-0.5 text-xs text-gray-500">{deputyHeadline}</p>
+                      )}
                       {e.description && (
                         <p className="mt-0.5 max-w-[200px] truncate text-xs text-gray-500">
                           {e.description}

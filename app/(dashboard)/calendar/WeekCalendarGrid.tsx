@@ -10,13 +10,24 @@ import { CreateEventModal } from "./CreateEventModal";
 import { ConfirmMoveModal } from "./ConfirmMoveModal";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import {
+  buildCalendarGlobalDeputyBlock,
+  buildCalendarGlobalOwnerBlock,
   buildEventMetaLines,
   calendarEventGlobalAllDayTooltip,
   calendarEventTooltipTitle,
+  CALENDAR_DEPUTY_BLOCK_COLOR,
   getCalendarEventPrimaryLabel,
-  getCalendarGlobalAllDayCompactLabel,
+  hasCalendarDeputyBlock,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
+import {
+  computeAllDayWeekSpan,
+  isMultiDayAllDay,
+  layoutAllDaySpanRows,
+  layoutWeekDayColumns,
+  type WeekDayLayoutItem,
+} from "@/lib/calendar-week-layout";
+import { CalendarGlobalEventBlock } from "./CalendarGlobalEventBlock";
 import {
   addDaysToYmdPrague,
   allDayYmdRangeToIsoStrings,
@@ -26,6 +37,7 @@ import {
   pragueDayEnd,
   pragueDayStart,
 } from "@/lib/datetime-cz";
+import { formatCalendarEventTitleWithDuration } from "./lib/event-types";
 
 type CalendarEvent = {
   id: number;
@@ -96,6 +108,9 @@ const ROW_HEIGHT = 32;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 /** Mřížka = 24 řádků (0–23), celková výška v px – nic nesmí přesáhnout */
 const DAY_GRID_HEIGHT = 24 * ROW_HEIGHT;
+/** Výška jednoho vícedenního pruhu v řádku „Celý den“. */
+const SPAN_ROW_HEIGHT = 38;
+const SPAN_ROW_PADDING = 4;
 
 /** Vypočítá top a height pro daný den – výška je vždy oříznutá na konec dne (24 hodin). */
 function getEventSliceForDay(
@@ -250,7 +265,7 @@ export function WeekCalendarGrid({
 
     setMoveModal({
       eventId: event.id,
-      eventTitle: event.title,
+      eventTitle: formatCalendarEventTitleWithDuration(event),
       newStart,
       newEnd,
       allDay,
@@ -295,39 +310,6 @@ export function WeekCalendarGrid({
     );
   }, [events]);
 
-  const ukolyRangeEvents = useMemo(() => {
-    const weekStartDate = new Date(weekStart);
-    weekStartDate.setHours(0, 0, 0, 0);
-    const weekEndDate = new Date(weekStartDate);
-    weekEndDate.setDate(weekEndDate.getDate() + 6);
-    weekEndDate.setHours(23, 59, 59, 999);
-
-    return allDayEvents
-      .filter((e) => isModuleCalendarTask(e))
-      .map((e) => {
-        const start = new Date(e.start_date);
-        const end = new Date(e.end_date);
-        const clippedStart = start < weekStartDate ? weekStartDate : start;
-        const clippedEnd = end > weekEndDate ? weekEndDate : end;
-        const startIdx = Math.max(
-          0,
-          Math.min(6, Math.floor((clippedStart.getTime() - weekStartDate.getTime()) / (24 * 60 * 60 * 1000)))
-        );
-        const endIdx = Math.max(
-          0,
-          Math.min(6, Math.floor((clippedEnd.getTime() - weekStartDate.getTime()) / (24 * 60 * 60 * 1000)))
-        );
-        return {
-          e,
-          startIdx,
-          endIdx,
-          startsInThisWeek: start >= weekStartDate && start <= weekEndDate,
-          endsInThisWeek: end >= weekStartDate && end <= weekEndDate,
-        };
-      })
-      .filter((x) => x.endIdx >= x.startIdx);
-  }, [allDayEvents, weekStart]);
-
   const timedEvents = useMemo(() => {
     return events.filter(
       (e) =>
@@ -336,9 +318,159 @@ export function WeekCalendarGrid({
     );
   }, [events]);
 
-  /** Barva pro zvýraznění sloupce (pouze běžné celodenní, ne úkoly) */
+  const isGlobalMode = eventMetaMode !== "hidden";
+
+  const weekDayYmds = useMemo(
+    () => days.map((d) => formatDateYmdPrague(d)),
+    [days]
+  );
+
+  type SpanBarKind = "module" | "owner" | "deputy" | "personal";
+
+  const spanningAllDayBars = useMemo(() => {
+    type Bar = {
+      id: string;
+      pairId: string;
+      e: CalendarEvent;
+      startIdx: number;
+      endIdx: number;
+      kind: SpanBarKind;
+      startsInThisWeek: boolean;
+      endsInThisWeek: boolean;
+      showCenterLabel: boolean;
+    };
+    const bars: Bar[] = [];
+    const pairIdFor = (eventId: number) => `ev-${eventId}`;
+
+    for (const e of allDayEvents) {
+      if (isModuleCalendarTask(e)) {
+        const start = new Date(e.start_date);
+        const end = new Date(e.end_date);
+        const span = computeAllDayWeekSpan(weekDayYmds, [
+          formatDateYmdPrague(start),
+          formatDateYmdPrague(end),
+        ]);
+        if (!span) continue;
+        const firstYmd = formatDateYmdPrague(start);
+        const lastYmd = formatDateYmdPrague(end);
+        bars.push({
+          id: `${pairIdFor(e.id)}-module`,
+          pairId: pairIdFor(e.id),
+          e,
+          ...span,
+          kind: "module",
+          startsInThisWeek: weekDayYmds.includes(firstYmd),
+          endsInThisWeek: weekDayYmds.includes(lastYmd),
+          showCenterLabel: firstYmd < weekDayYmds[0] && lastYmd > weekDayYmds[6],
+        });
+        continue;
+      }
+
+      const dates = allDayEventDisplayDates(new Date(e.start_date), new Date(e.end_date));
+      if (!isMultiDayAllDay(dates)) continue;
+      const span = computeAllDayWeekSpan(weekDayYmds, dates);
+      if (!span) continue;
+      const firstYmd = dates[0];
+      const lastYmd = dates[dates.length - 1];
+      const startsInThisWeek = firstYmd >= weekDayYmds[0] && dates.includes(weekDayYmds[span.startIdx]);
+      const endsInThisWeek = lastYmd <= weekDayYmds[6] && dates.includes(weekDayYmds[span.endIdx]);
+      const showCenterLabel = firstYmd < weekDayYmds[0] && lastYmd > weekDayYmds[6];
+      const pairId = pairIdFor(e.id);
+
+      bars.push({
+        id: `${pairId}-${isGlobalMode ? "owner" : "personal"}`,
+        pairId,
+        e,
+        ...span,
+        kind: isGlobalMode ? "owner" : "personal",
+        startsInThisWeek,
+        endsInThisWeek,
+        showCenterLabel,
+      });
+
+      if (isGlobalMode && hasCalendarDeputyBlock(e)) {
+        bars.push({
+          id: `${pairId}-deputy`,
+          pairId,
+          e,
+          ...span,
+          kind: "deputy",
+          startsInThisWeek,
+          endsInThisWeek,
+          showCenterLabel,
+        });
+      }
+    }
+    return bars;
+  }, [allDayEvents, weekDayYmds, isGlobalMode]);
+
+  const spanRowLayout = useMemo(
+    () =>
+      layoutAllDaySpanRows(
+        spanningAllDayBars.map((b) => ({
+          id: b.id,
+          pairId: b.pairId,
+          kind: b.kind,
+          startIdx: b.startIdx,
+          endIdx: b.endIdx,
+        }))
+      ),
+    [spanningAllDayBars]
+  );
+
+  const spanningRowCount = useMemo(() => {
+    let max = 0;
+    for (const pos of spanRowLayout.values()) {
+      max = Math.max(max, pos.rowCount);
+    }
+    return max;
+  }, [spanRowLayout]);
+
+  const timedLayoutByDay = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof layoutWeekDayColumns>>();
+    if (!isGlobalMode) return map;
+
+    for (const d of days) {
+      const dayStr = formatDateYmdPrague(d);
+      const dayStart = pragueDayStart(dayStr);
+      const dayEnd = pragueDayEnd(dayStr);
+      const items: WeekDayLayoutItem[] = [];
+
+      for (const e of timedEvents) {
+        const start = new Date(e.start_date);
+        const end = new Date(e.end_date);
+        if (end <= dayStart || start >= dayEnd) continue;
+        const sliceStart = start < dayStart ? dayStart : start;
+        const sliceEnd = end > dayEnd ? dayEnd : end;
+        const pairId = `ev-${e.id}`;
+        items.push({
+          id: `${pairId}-owner`,
+          eventId: e.id,
+          pairId,
+          kind: "owner",
+          startMs: sliceStart.getTime(),
+          endMs: sliceEnd.getTime(),
+        });
+        if (hasCalendarDeputyBlock(e)) {
+          items.push({
+            id: `${pairId}-deputy`,
+            eventId: e.id,
+            pairId,
+            kind: "deputy",
+            startMs: sliceStart.getTime(),
+            endMs: sliceEnd.getTime(),
+          });
+        }
+      }
+      map.set(dayStr, layoutWeekDayColumns(items));
+    }
+    return map;
+  }, [days, timedEvents, isGlobalMode]);
+
+  /** Barva pro zvýraznění sloupce (pouze běžné celodenní, ne úkoly; jen osobní kalendář) */
   const allDayColumnAccent = useMemo(() => {
     const m = new Map<string, string>();
+    if (isGlobalMode) return m;
     for (const d of days) {
       const key = formatDateYmdPrague(d);
       for (const e of allDayEvents) {
@@ -352,7 +484,7 @@ export function WeekCalendarGrid({
       }
     }
     return m;
-  }, [allDayEvents, days]);
+  }, [allDayEvents, days, isGlobalMode]);
 
   const holidaysForDay = (day: Date) =>
     holidays.filter((h) => h.date === formatDateLocal(day));
@@ -404,7 +536,12 @@ export function WeekCalendarGrid({
           <div className="w-[60px] shrink-0 border-r border-gray-200 bg-gray-50" />
           <div
             className="relative flex flex-1"
-            style={{ minHeight: Math.max(36, ukolyRangeEvents.length * 22 + 10) }}
+            style={{
+              minHeight: Math.max(
+                36,
+                SPAN_ROW_PADDING * 2 + spanningRowCount * SPAN_ROW_HEIGHT
+              ),
+            }}
           >
             {days.map((d) => {
               const dayKey = formatDateYmdPrague(d);
@@ -433,21 +570,66 @@ export function WeekCalendarGrid({
                     if (isModuleCalendarTask(e)) return false;
                     const start = new Date(e.start_date);
                     const end = new Date(e.end_date);
-                    return allDayEventDisplayDates(start, end).includes(formatDateYmdPrague(d));
+                    const dates = allDayEventDisplayDates(start, end);
+                    if (isMultiDayAllDay(dates)) return false;
+                    return dates.includes(formatDateYmdPrague(d));
                   })
-                  .map((e) => {
+                  .flatMap((e) => {
                     const barColor = e.color ?? "#DC2626";
-                    const isGlobalAllDay = eventMetaMode !== "hidden";
+                    const canDrag = e.created_by === userId && !isModuleCalendarTask(e);
+                    const href = calendarGridItemHref(e);
+                    const tooltip = isGlobalMode
+                      ? calendarEventGlobalAllDayTooltip(e, eventMetaMode)
+                      : calendarEventTooltipTitle(e, eventMetaMode);
+
+                    if (isGlobalMode) {
+                      const blocks: JSX.Element[] = [];
+                      const ownerLines = buildCalendarGlobalOwnerBlock(e, { allDay: true });
+                      blocks.push(
+                        <CalendarGlobalEventBlock
+                          key={`${calendarGridItemKey(e)}-owner`}
+                          lines={ownerLines}
+                          color={barColor}
+                          href={href}
+                          title={tooltip}
+                          compact
+                          draggable={canDrag}
+                          onDragStart={canDrag ? (ev) => handleDragStart(ev, e) : undefined}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                          }}
+                          className="w-full shrink-0"
+                        />
+                      );
+                      const deputyLines = buildCalendarGlobalDeputyBlock(e, { allDay: true });
+                      if (deputyLines) {
+                        blocks.push(
+                          <CalendarGlobalEventBlock
+                            key={`${calendarGridItemKey(e)}-deputy`}
+                            lines={deputyLines}
+                            color={CALENDAR_DEPUTY_BLOCK_COLOR}
+                            href={href}
+                            title={tooltip}
+                            compact
+                            draggable={canDrag}
+                            onDragStart={canDrag ? (ev) => handleDragStart(ev, e) : undefined}
+                            onClick={(ev) => {
+                              ev.stopPropagation();
+                            }}
+                            className="w-full shrink-0"
+                          />
+                        );
+                      }
+                      return blocks;
+                    }
+
                     const pendingApproval = e.approval_status === "pending" && e.deputy_id;
                     const deputyApproved = e.approval_status === "deputy_approved";
                     const isApproved = e.approval_status === "approved";
                     const deputyName = e.users_deputy
                       ? `${e.users_deputy.first_name} ${e.users_deputy.last_name}`
                       : null;
-                    const canDrag = e.created_by === userId && !isModuleCalendarTask(e);
-                    const eventContent = isGlobalAllDay ? (
-                      getCalendarGlobalAllDayCompactLabel(e)
-                    ) : (
+                    const eventContent = (
                       <>
                         {getCalendarEventPrimaryLabel(e)}
                         {pendingApproval && (
@@ -476,87 +658,183 @@ export function WeekCalendarGrid({
                         )}
                       </>
                     );
-                    const tooltipTitle = isGlobalAllDay
-                      ? calendarEventGlobalAllDayTooltip(e, eventMetaMode)
-                      : calendarEventTooltipTitle(e, eventMetaMode);
-                    const barClass = isGlobalAllDay
-                      ? "w-full min-h-6 shrink-0 truncate border-l-4 pl-2 pr-1 py-0.5 text-left text-xs font-medium"
-                      : "w-full min-h-8 shrink-0 border-l-4 pl-2 pr-1 py-1 text-left text-xs font-medium";
-                    return canDrag ? (
-                      <div
-                        key={calendarGridItemKey(e)}
-                        draggable
-                        onDragStart={(ev) => handleDragStart(ev, e)}
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          router.push(calendarGridItemHref(e));
-                        }}
-                        title={tooltipTitle}
-                        className={`${barClass} block cursor-grab overflow-hidden rounded-sm hover:opacity-90 active:cursor-grabbing`}
-                        style={{
-                          borderLeftColor: barColor,
-                          backgroundColor: `${barColor}20`,
-                          color: barColor,
-                        }}
-                      >
-                        {eventContent}
-                        {!isGlobalAllDay && (
+                    const barClass =
+                      "w-full min-h-8 shrink-0 border-l-4 pl-2 pr-1 py-1 text-left text-xs font-medium";
+                    const style = {
+                      borderLeftColor: barColor,
+                      backgroundColor: `${barColor}20`,
+                      color: barColor,
+                    };
+                    return [
+                      canDrag ? (
+                        <div
+                          key={calendarGridItemKey(e)}
+                          draggable
+                          onDragStart={(ev) => handleDragStart(ev, e)}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            router.push(href);
+                          }}
+                          title={tooltip}
+                          className={`${barClass} block cursor-grab overflow-hidden rounded-sm hover:opacity-90 active:cursor-grabbing`}
+                          style={style}
+                        >
+                          {eventContent}
                           <EventMetaSubtext e={e} mode={eventMetaMode} />
-                        )}
-                      </div>
-                    ) : (
-                      <Link
-                        key={calendarGridItemKey(e)}
-                        href={calendarGridItemHref(e)}
-                        onClick={(ev) => ev.stopPropagation()}
-                        title={tooltipTitle}
-                        className={`${barClass} block overflow-hidden rounded-sm hover:opacity-90`}
-                        style={{
-                          borderLeftColor: barColor,
-                          backgroundColor: `${barColor}20`,
-                          color: barColor,
-                        }}
-                      >
-                        {eventContent}
-                        {!isGlobalAllDay && (
+                        </div>
+                      ) : (
+                        <Link
+                          key={calendarGridItemKey(e)}
+                          href={href}
+                          onClick={(ev) => ev.stopPropagation()}
+                          title={tooltip}
+                          className={`${barClass} block overflow-hidden rounded-sm hover:opacity-90`}
+                          style={style}
+                        >
+                          {eventContent}
                           <EventMetaSubtext e={e} mode={eventMetaMode} />
-                        )}
-                      </Link>
-                    );
+                        </Link>
+                      ),
+                    ];
                   })}
               </div>
             );
             })}
-            {ukolyRangeEvents.map((item, idx) => {
-              const { e, startIdx, endIdx, startsInThisWeek, endsInThisWeek } = item;
-              const lineColor = e.color ?? "#DC2626";
+            {spanningAllDayBars.map((item) => {
+              const {
+                id,
+                e,
+                startIdx,
+                endIdx,
+                kind,
+                startsInThisWeek,
+                endsInThisWeek,
+                showCenterLabel,
+              } = item;
+              const lineColor =
+                kind === "deputy" ? CALENDAR_DEPUTY_BLOCK_COLOR : e.color ?? "#DC2626";
               const leftPercent = (startIdx / 7) * 100;
               const widthPercent = ((endIdx - startIdx + 1) / 7) * 100;
-              const top = 4 + idx * 22;
-              const showCenterLabel = !startsInThisWeek && !endsInThisWeek;
+              const row = spanRowLayout.get(id)?.row ?? 0;
+              const top = SPAN_ROW_PADDING + row * SPAN_ROW_HEIGHT;
+              const href = calendarGridItemHref(e);
+
+              if (kind === "module" || kind === "personal") {
+                const pendingApproval = e.approval_status === "pending" && e.deputy_id;
+                const deputyApproved = e.approval_status === "deputy_approved";
+                const isApproved = e.approval_status === "approved";
+                const deputyName = e.users_deputy
+                  ? `${e.users_deputy.first_name} ${e.users_deputy.last_name}`
+                  : null;
+                const canDrag = e.created_by === userId && kind === "personal";
+                const label =
+                  kind === "module" ? e.title : getCalendarEventPrimaryLabel(e);
+                const barInner = (
+                  <>
+                    {startsInThisWeek && (
+                      <span className="truncate">
+                        {label}
+                        {kind === "personal" && pendingApproval && (
+                          <span className="ml-1 text-[10px] opacity-90">
+                            (Čeká na schválení
+                            {deputyName ? ` – ${deputyName}` : ""})
+                          </span>
+                        )}
+                        {kind === "personal" && deputyApproved && (
+                          <span className="ml-1 text-[10px] opacity-90">(Čeká na schválení)</span>
+                        )}
+                        {kind === "personal" && isApproved && (
+                          <span className="ml-1 text-[10px] opacity-90">(Schváleno)</span>
+                        )}
+                      </span>
+                    )}
+                    {endsInThisWeek && !startsInThisWeek && (
+                      <span className="float-right truncate">{label}</span>
+                    )}
+                    {showCenterLabel && (
+                      <span className="mx-auto block w-fit truncate">{label}</span>
+                    )}
+                  </>
+                );
+                const barStyle = {
+                  left: `${leftPercent}%`,
+                  width: `${widthPercent}%`,
+                  top,
+                  height: SPAN_ROW_HEIGHT - 4,
+                  color: lineColor,
+                  backgroundColor: `${lineColor}1A`,
+                  borderTop: `2px solid ${lineColor}`,
+                };
+                if (canDrag) {
+                  return (
+                    <div
+                      key={`line-${id}`}
+                      draggable
+                      onDragStart={(ev) => handleDragStart(ev, e)}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        router.push(href);
+                      }}
+                      title={calendarEventTooltipTitle(e, eventMetaMode)}
+                      className="absolute z-10 cursor-grab overflow-hidden rounded-sm px-2 text-[11px] font-medium hover:opacity-90 active:cursor-grabbing"
+                      style={barStyle}
+                    >
+                      <span className="absolute -right-1 -top-[6px]" style={{ color: lineColor }}>
+                        ➜
+                      </span>
+                      {barInner}
+                    </div>
+                  );
+                }
+                return (
+                  <Link
+                    key={`line-${id}`}
+                    href={href}
+                    onClick={(ev) => ev.stopPropagation()}
+                    className="absolute z-10 overflow-hidden rounded-sm px-2 text-[11px] font-medium hover:opacity-90"
+                    style={barStyle}
+                    title={kind === "module" ? e.title : calendarEventTooltipTitle(e, eventMetaMode)}
+                  >
+                    <span className="absolute -right-1 -top-[6px]" style={{ color: lineColor }}>
+                      ➜
+                    </span>
+                    {barInner}
+                  </Link>
+                );
+              }
+
+              const lines =
+                kind === "deputy"
+                  ? buildCalendarGlobalDeputyBlock(e, { allDay: true, statusAlignRight: true })
+                  : buildCalendarGlobalOwnerBlock(e, { allDay: true, statusAlignRight: true });
+              if (!lines) return null;
+
               return (
-                <Link
-                  key={`line-${calendarGridItemKey(e)}-${idx}`}
-                  href={calendarGridItemHref(e)}
-                  onClick={(ev) => ev.stopPropagation()}
-                  className="absolute z-10 h-5 rounded-sm px-2 text-[11px] font-medium hover:opacity-90"
+                <div
+                  key={`line-${id}`}
+                  className="absolute z-10 overflow-hidden rounded-sm"
                   style={{
                     left: `${leftPercent}%`,
                     width: `${widthPercent}%`,
                     top,
-                    color: lineColor,
-                    backgroundColor: `${lineColor}1A`,
-                    borderTop: `2px solid ${lineColor}`,
+                    height: SPAN_ROW_HEIGHT - 4,
                   }}
-                  title={e.title}
                 >
-                  <span className="absolute -right-1 -top-[6px]" style={{ color: lineColor }}>
-                    ➜
-                  </span>
-                  {startsInThisWeek && <span className="truncate">{e.title}</span>}
-                  {endsInThisWeek && !startsInThisWeek && <span className="float-right truncate">{e.title}</span>}
-                  {showCenterLabel && <span className="mx-auto block w-fit truncate">{e.title}</span>}
-                </Link>
+                  <CalendarGlobalEventBlock
+                    lines={lines}
+                    color={lineColor}
+                    href={href}
+                    title={calendarEventGlobalAllDayTooltip(e, eventMetaMode)}
+                    compact
+                    className="h-full w-full"
+                    onClick={(ev) => ev.stopPropagation()}
+                  />
+                  {startsInThisWeek && kind === "owner" && (
+                    <span className="pointer-events-none absolute -right-1 -top-[6px]" style={{ color: lineColor }}>
+                      ➜
+                    </span>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -607,98 +885,172 @@ export function WeekCalendarGrid({
                     style={{ height: ROW_HEIGHT }}
                   />
                 ))}
-                {/* Události - absolutní pozicování, vícedenní se zobrazí ve všech dnech */}
-                {timedEvents
-                  .map((e) => {
-                    const onlyFirst =
-                      requiresDeputy(e.event_type) &&
-                      formatDateYmdPrague(new Date(e.start_date)) !==
-                        formatDateYmdPrague(new Date(e.end_date));
-                    const slice = getEventSliceForDay(e, d, {
-                      onlyFirstDayOfMultiDay: onlyFirst,
-                    });
-                    if (!slice) return null;
-                    const eventStart = new Date(e.start_date);
-                    const sliceDayStr = formatDateYmdPrague(d);
-                    const sliceDayStart = pragueDayStart(sliceDayStr);
-                    const sliceDayEnd = pragueDayEnd(sliceDayStr);
-                    const isFirstDay = eventStart >= sliceDayStart && eventStart <= sliceDayEnd;
-                    const pendingApproval = e.approval_status === "pending" && e.deputy_id;
-                    const deputyApproved = e.approval_status === "deputy_approved";
-                    const isApproved = e.approval_status === "approved";
-                    const deputyName = e.users_deputy
-                      ? `${e.users_deputy.first_name} ${e.users_deputy.last_name}`
-                      : null;
-                    const canDrag = e.created_by === userId && !isModuleCalendarTask(e);
-                    const timedEventContent = (
-                      <>
-                        <span className="block truncate">
-                          {getCalendarEventPrimaryLabel(e)}
-                          {pendingApproval && (
-                            <span className="ml-1 inline-block rounded bg-amber-500/90 px-1 text-[9px] text-white">
-                              Čeká na schválení
-                            </span>
-                          )}
-                          {deputyApproved && (
-                            <span className="ml-1 inline-block rounded bg-blue-600 px-1 text-[9px] text-white">
-                              Čeká na schválení
-                            </span>
-                          )}
-                          {isApproved && (
-                            <span className="ml-1 inline-block rounded bg-red-600 px-1 text-[9px] text-white">
-                              Schváleno
-                            </span>
-                          )}
-                        </span>
-                        {pendingApproval && deputyName && eventMetaMode === "hidden" && (
-                          <span className="block truncate text-[9px] opacity-80">
-                            → {deputyName}
-                          </span>
-                        )}
-                        {isFirstDay && (
-                          <span className="text-[10px] opacity-80">
-                            {formatTimeCz(new Date(e.start_date))}
-                          </span>
-                        )}
-                        <EventMetaSubtext e={e} mode={eventMetaMode} />
-                      </>
-                    );
-                    const timedStyle = {
-                      top: 2 + slice.top,
-                      height: slice.height - 4,
-                      backgroundColor: `${e.color ?? "#DC2626"}24`,
-                      color: e.color ?? "#DC2626",
-                      borderLeft: `3px solid ${e.color ?? "#DC2626"}`,
-                    };
-                    return canDrag ? (
+                {/* Události - absolutní pozicování */}
+                {(isGlobalMode
+                  ? timedEvents.flatMap((e) => {
+                      const onlyFirst =
+                        requiresDeputy(e.event_type) &&
+                        formatDateYmdPrague(new Date(e.start_date)) !==
+                          formatDateYmdPrague(new Date(e.end_date));
+                      const slice = getEventSliceForDay(e, d, {
+                        onlyFirstDayOfMultiDay: onlyFirst,
+                      });
+                      if (!slice) return [];
+                      const pairId = `ev-${e.id}`;
+                      const kinds: Array<"owner" | "deputy"> = ["owner"];
+                      if (hasCalendarDeputyBlock(e)) kinds.push("deputy");
+                      return kinds.map((kind) => ({
+                        e,
+                        kind,
+                        slice,
+                        layoutId: `${pairId}-${kind}`,
+                      }));
+                    })
+                  : timedEvents
+                      .map((e) => {
+                        const onlyFirst =
+                          requiresDeputy(e.event_type) &&
+                          formatDateYmdPrague(new Date(e.start_date)) !==
+                            formatDateYmdPrague(new Date(e.end_date));
+                        const slice = getEventSliceForDay(e, d, {
+                          onlyFirstDayOfMultiDay: onlyFirst,
+                        });
+                        if (!slice) return null;
+                        return { e, kind: "owner" as const, slice, layoutId: `ev-${e.id}-owner` };
+                      })
+                      .filter(Boolean)
+                ).map((item) => {
+                  if (!item) return null;
+                  const { e, kind, slice, layoutId } = item;
+                  const dayLayout = timedLayoutByDay.get(dayKey);
+                  const layout = dayLayout?.get(layoutId);
+                  const column = layout?.column ?? 0;
+                  const columnCount = layout?.columnCount ?? 1;
+                  const widthPct = 100 / columnCount;
+                  const leftPct = column * widthPct;
+                  const barColor =
+                    kind === "deputy" ? CALENDAR_DEPUTY_BLOCK_COLOR : e.color ?? "#DC2626";
+                  const canDrag = e.created_by === userId && !isModuleCalendarTask(e);
+                  const href = calendarGridItemHref(e);
+                  const tooltip = calendarEventTooltipTitle(e, eventMetaMode);
+
+                  const timedStyle: CSSProperties = {
+                    top: 2 + slice.top,
+                    height: slice.height - 4,
+                    left: `calc(${leftPct}% + 2px)`,
+                    width: `calc(${widthPct}% - 4px)`,
+                    backgroundColor: `${barColor}24`,
+                    color: barColor,
+                    borderLeft: `3px solid ${barColor}`,
+                  };
+
+                  if (isGlobalMode) {
+                    const lines =
+                      kind === "deputy"
+                        ? buildCalendarGlobalDeputyBlock(e, { allDay: false })
+                        : buildCalendarGlobalOwnerBlock(e, { allDay: false });
+                    if (!lines) return null;
+                    return (
                       <div
-                        key={`${calendarGridItemKey(e)}-${d.toDateString()}`}
-                        draggable
-                        onDragStart={(ev) => handleDragStart(ev, e)}
-                        onClick={(ev) => {
-                          ev.stopPropagation();
-                          router.push(calendarGridItemHref(e));
-                        }}
-                        title={calendarEventTooltipTitle(e, eventMetaMode)}
-                        className="absolute left-1 right-1 z-10 cursor-grab overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90 active:cursor-grabbing"
+                        key={`${layoutId}-${d.toISOString()}`}
+                        className="absolute z-10 overflow-hidden rounded"
                         style={timedStyle}
                       >
-                        {timedEventContent}
+                        <CalendarGlobalEventBlock
+                          lines={lines}
+                          color={barColor}
+                          href={href}
+                          title={tooltip}
+                          draggable={canDrag}
+                          onDragStart={canDrag ? (ev) => handleDragStart(ev, e) : undefined}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                          }}
+                          className="h-full w-full border-l-0 bg-transparent pl-1"
+                        />
                       </div>
-                    ) : (
-                      <Link
-                        key={`${calendarGridItemKey(e)}-${d.toDateString()}`}
-                        href={calendarGridItemHref(e)}
-                        onClick={(ev) => ev.stopPropagation()}
-                        title={calendarEventTooltipTitle(e, eventMetaMode)}
-                        className="absolute left-1 right-1 z-10 overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90"
-                        style={timedStyle}
-                      >
-                        {timedEventContent}
-                      </Link>
                     );
-                  })
-                  .filter(Boolean)}
+                  }
+
+                  const pendingApproval = e.approval_status === "pending" && e.deputy_id;
+                  const deputyApproved = e.approval_status === "deputy_approved";
+                  const isApproved = e.approval_status === "approved";
+                  const deputyName = e.users_deputy
+                    ? `${e.users_deputy.first_name} ${e.users_deputy.last_name}`
+                    : null;
+                  const eventStart = new Date(e.start_date);
+                  const sliceDayStr = formatDateYmdPrague(d);
+                  const sliceDayStart = pragueDayStart(sliceDayStr);
+                  const sliceDayEnd = pragueDayEnd(sliceDayStr);
+                  const isFirstDay = eventStart >= sliceDayStart && eventStart <= sliceDayEnd;
+                  const timedEventContent = (
+                    <>
+                      <span className="block truncate">
+                        {getCalendarEventPrimaryLabel(e)}
+                        {pendingApproval && (
+                          <span className="ml-1 inline-block rounded bg-amber-500/90 px-1 text-[9px] text-white">
+                            Čeká na schválení
+                          </span>
+                        )}
+                        {deputyApproved && (
+                          <span className="ml-1 inline-block rounded bg-blue-600 px-1 text-[9px] text-white">
+                            Čeká na schválení
+                          </span>
+                        )}
+                        {isApproved && (
+                          <span className="ml-1 inline-block rounded bg-red-600 px-1 text-[9px] text-white">
+                            Schváleno
+                          </span>
+                        )}
+                      </span>
+                      {pendingApproval && deputyName && (
+                        <span className="block truncate text-[9px] opacity-80">
+                          → {deputyName}
+                        </span>
+                      )}
+                      {isFirstDay && (
+                        <span className="text-[10px] opacity-80">
+                          {formatTimeCz(new Date(e.start_date))}
+                        </span>
+                      )}
+                      <EventMetaSubtext e={e} mode={eventMetaMode} />
+                    </>
+                  );
+                  const personalStyle: CSSProperties = {
+                    top: 2 + slice.top,
+                    height: slice.height - 4,
+                    backgroundColor: `${e.color ?? "#DC2626"}24`,
+                    color: e.color ?? "#DC2626",
+                    borderLeft: `3px solid ${e.color ?? "#DC2626"}`,
+                  };
+                  return canDrag ? (
+                    <div
+                      key={`${calendarGridItemKey(e)}-${d.toDateString()}`}
+                      draggable
+                      onDragStart={(ev) => handleDragStart(ev, e)}
+                      onClick={(ev) => {
+                        ev.stopPropagation();
+                        router.push(href);
+                      }}
+                      title={tooltip}
+                      className="absolute left-1 right-1 z-10 cursor-grab overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90 active:cursor-grabbing"
+                      style={personalStyle}
+                    >
+                      {timedEventContent}
+                    </div>
+                  ) : (
+                    <Link
+                      key={`${calendarGridItemKey(e)}-${d.toDateString()}`}
+                      href={href}
+                      onClick={(ev) => ev.stopPropagation()}
+                      title={tooltip}
+                      className="absolute left-1 right-1 z-10 overflow-hidden rounded px-2 py-0.5 text-xs font-medium hover:opacity-90"
+                      style={personalStyle}
+                    >
+                      {timedEventContent}
+                    </Link>
+                  );
+                })}
               </div>
             );
             })}

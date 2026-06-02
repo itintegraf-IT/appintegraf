@@ -9,7 +9,7 @@ import {
   getParticipantUserIds,
   notifyCalendarInvitees,
 } from "@/lib/calendar-participant-sync";
-import { requiresBusinessTripDescription, requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
+import { formatCalendarEventTitleWithDuration, requiresBusinessTripDescription, requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
 import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 
@@ -268,7 +268,12 @@ export async function PUT(
       await notifyCalendarInvitees(prisma, {
         userIds: newOnes,
         eventId: id,
-        eventTitle: String(title).trim(),
+        eventTitle: formatCalendarEventTitleWithDuration({
+          title: String(title).trim(),
+          event_type: eventType,
+          start_date: start,
+          end_date: end,
+        }),
         creatorName,
       });
     }
@@ -319,6 +324,8 @@ export async function DELETE(
     ? `${event.users.first_name} ${event.users.last_name}`
     : "Uživatel";
 
+  const displayTitle = formatCalendarEventTitleWithDuration(event);
+
   type ApprovalRow = (typeof event.calendar_approvals)[number];
   const approverIds = [...new Set(event.calendar_approvals.map((a: ApprovalRow) => a.approver_id))].filter(
     (aid) => aid !== userId
@@ -330,7 +337,7 @@ export async function DELETE(
       data: approverIds.map((approverId) => ({
         user_id: approverId,
         title: "Událost byla smazána",
-        message: `${creatorName} smazal/a událost „${event.title}“, kterou jste schválil/a.`,
+        message: `${creatorName} smazal/a událost „${displayTitle}“, kterou jste schválil/a.`,
         type: "calendar_deleted",
         link: "/calendar",
       })),

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { ArrowLeft } from "lucide-react";
-import { getEventTypeLabel, requiresBusinessTripDescription } from "../lib/event-types";
+import { getEventTypeLabel, requiresBusinessTripDescription, formatCalendarEventTitleWithDuration } from "../lib/event-types";
 import { ApproveRejectButtons } from "../ApproveRejectButtons";
 import { DeleteEventButton } from "../DeleteEventButton";
 import { formatDateCz, formatTimeCz } from "@/lib/datetime-cz";
@@ -54,16 +54,18 @@ export default async function CalendarEventPage({
     formatDateCz(new Date(d), { day: "numeric", month: "long", year: "numeric" });
   const formatTime = (d: Date) => formatTimeCz(new Date(d));
 
+  const displayTitle = formatCalendarEventTitleWithDuration(event);
+
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{event.title}</h1>
+          <h1 className="text-2xl font-bold text-gray-900">{displayTitle}</h1>
           <p className="mt-1 text-gray-600">Detail události</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {(isDeputy || isFinalApprover) && (
-            <ApproveRejectButtons eventId={id} eventTitle={event.title} />
+            <ApproveRejectButtons eventId={id} eventTitle={displayTitle} />
           )}
           {event.created_by === userId && (
             <Link
@@ -74,7 +76,7 @@ export default async function CalendarEventPage({
             </Link>
           )}
           {event.created_by === userId && (
-            <DeleteEventButton eventId={id} eventTitle={event.title} />
+            <DeleteEventButton eventId={id} eventTitle={displayTitle} />
           )}
           <Link
             href="/calendar"
