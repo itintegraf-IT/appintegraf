@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { createCalendarEventUnit } from "@/lib/calendar-create-one";
 import { expandRecurrence, type RecurrenceKind } from "@/lib/calendar-recurrence";
 import {
-  getEventTypeLabel,
+  formatCalendarEventTitleWithDuration,
   requiresBusinessTripDescription,
   requiresDeputy,
 } from "@/app/(dashboard)/calendar/lib/event-types";
@@ -280,30 +280,57 @@ export async function POST(req: NextRequest) {
     });
 
     if (deputyIdNum !== null) {
-      const notifMessage = `${creatorName} vytvořil/a událost „${titleTrim}“ (${getEventTypeLabel(eventType)}), která vyžaduje vaše schválení.`;
       const deputy = await prisma.users.findUnique({
         where: { id: deputyIdNum },
         select: { email: true, first_name: true, last_name: true },
       });
       if (deputy?.email) {
-        for (const eid of ids) {
+        const createdEvents = await prisma.calendar_events.findMany({
+          where: { id: { in: ids } },
+          select: {
+            id: true,
+            title: true,
+            event_type: true,
+            start_date: true,
+            end_date: true,
+            ukoly_task_id: true,
+            makety_task_id: true,
+          },
+        });
+        for (const ev of createdEvents) {
+          const displayTitle = formatCalendarEventTitleWithDuration(ev);
+          const notifMessage = `${creatorName} vytvořil/a událost „${displayTitle}“, která vyžaduje vaše schválení.`;
           await sendCalendarApprovalEmail({
             toEmail: deputy.email,
             toName: `${deputy.first_name} ${deputy.last_name}`.trim() || "Schvalovateli",
             subject: "Událost čeká na schválení – INTEGRAF",
             message: notifMessage,
-            eventTitle: titleTrim,
-            eventId: eid,
+            eventTitle: displayTitle,
+            eventId: ev.id,
           });
         }
       }
     }
 
     if (participantUserIds.length > 0) {
+      const firstEvent = await prisma.calendar_events.findUnique({
+        where: { id: ids[0]! },
+        select: {
+          title: true,
+          event_type: true,
+          start_date: true,
+          end_date: true,
+          ukoly_task_id: true,
+          makety_task_id: true,
+        },
+      });
+      const inviteTitle = firstEvent
+        ? formatCalendarEventTitleWithDuration(firstEvent)
+        : titleTrim;
       await notifyCalendarInvitees(prisma, {
         userIds: participantUserIds,
         eventId: ids[0]!,
-        eventTitle: titleTrim,
+        eventTitle: inviteTitle,
         creatorName,
         extraHint:
           ids.length > 1

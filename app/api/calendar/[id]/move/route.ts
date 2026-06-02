@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
+import { formatCalendarEventTitleWithDuration, requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
 import { dismissNotificationsUpdate } from "@/lib/notifications-dismiss";
 import { findCreatorCalendarOverlap, formatOverlapErrorCs } from "@/lib/calendar-time-overlap";
 import {
@@ -120,6 +120,13 @@ export async function PATCH(
     ? `${event.users.first_name} ${event.users.last_name}`
     : "Uživatel";
 
+  const displayTitle = formatCalendarEventTitleWithDuration({
+    title: event.title,
+    event_type: event.event_type,
+    start_date: start,
+    end_date: end,
+  });
+
   if (needsApprovalReset && event.deputy_id) {
     const calendarLink = `/calendar/${id}`;
     await prisma.$transaction([
@@ -151,7 +158,7 @@ export async function PATCH(
         data: {
           user_id: event.deputy_id,
           title: "Událost byla přesunuta",
-          message: `${creatorName} přesunul/a událost „${event.title}“ na nové datum. Událost čeká na vaše schválení.`,
+          message: `${creatorName} přesunul/a událost „${displayTitle}“. Událost čeká na vaše schválení.`,
           type: "calendar_approval",
           link: `/calendar/${id}`,
         },

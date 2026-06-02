@@ -7,6 +7,7 @@ import {
   resolveDepartmentCalendarApprover,
 } from "@/lib/calendar-approver-resolution";
 import { dismissNotificationsUpdate } from "@/lib/notifications-dismiss";
+import { formatCalendarEventTitleWithDuration } from "@/app/(dashboard)/calendar/lib/event-types";
 
 /**
  * POST /api/calendar/[id]/approve
@@ -52,6 +53,8 @@ export async function POST(
   if (!event) {
     return NextResponse.json({ error: "Událost nenalezena" }, { status: 404 });
   }
+
+  const displayTitle = formatCalendarEventTitleWithDuration(event);
 
   const body = await req.json().catch(() => ({}));
   const action = body.action === "reject" ? "reject" : "approve";
@@ -114,7 +117,7 @@ export async function POST(
             data: {
               user_id: creatorId,
               title: "Událost schválena",
-              message: `${deputyName} schválil/a vaši událost „${event.title}“.`,
+              message: `${deputyName} schválil/a vaši událost „${displayTitle}“.`,
               type: "calendar_approved",
               link: `/calendar/${id}`,
             },
@@ -178,7 +181,7 @@ export async function POST(
             data: {
               user_id: creatorId,
               title: "Událost definitivně schválena",
-              message: `${deputyName} schválil/a vaši událost „${event.title}“ (zástup i schvalovatel).`,
+              message: `${deputyName} schválil/a vaši událost „${displayTitle}“ (zástup i schvalovatel).`,
               type: "calendar_approved",
               link: calendarLink,
             },
@@ -244,7 +247,7 @@ export async function POST(
           data: {
             user_id: resolved.userId,
             title: "Událost čeká na schválení",
-            message: `${deputyName} schválil/a událost „${event.title}“ od ${creatorName}. Událost čeká na vaše schválení.`,
+            message: `${deputyName} schválil/a událost „${displayTitle}“ od ${creatorName}. Událost čeká na vaše schválení.`,
             type: "calendar_approval",
             link: `/calendar/${id}`,
           },
@@ -253,7 +256,7 @@ export async function POST(
           data: {
             user_id: creatorId,
             title: "Událost schválena zástupem",
-            message: `${deputyName} schválil/a vaši událost „${event.title}“. Čeká na schválení: ${approverName}.`,
+            message: `${deputyName} schválil/a vaši událost „${displayTitle}“. Čeká na schválení: ${approverName}.`,
             type: "calendar_approved",
             link: `/calendar/${id}`,
           },
@@ -265,8 +268,8 @@ export async function POST(
           toEmail: approver.email,
           toName: approverName,
           subject: "Událost čeká na schválení – INTEGRAF",
-          message: `${deputyName} schválil/a událost „${event.title}“ od ${creatorName}. Událost čeká na vaše schválení.`,
-          eventTitle: event.title,
+          message: `${deputyName} schválil/a událost „${displayTitle}“ od ${creatorName}. Událost čeká na vaše schválení.`,
+          eventTitle: displayTitle,
           eventId: id,
         });
       }
@@ -289,7 +292,7 @@ export async function POST(
           data: {
             user_id: creatorId,
             title: "Událost zamítnuta",
-            message: `${deputyName} zamítl/a vaši událost „${event.title}“. Důvod: ${comment}`,
+            message: `${deputyName} zamítl/a vaši událost „${displayTitle}“. Důvod: ${comment}`,
             type: "calendar_rejected",
             link: calendarLink,
           },
@@ -343,7 +346,7 @@ export async function POST(
           data: {
             user_id: creatorId,
             title: "Událost definitivně schválena",
-            message: `${approverName} schválil/a vaši událost „${event.title}“.`,
+            message: `${approverName} schválil/a vaši událost „${displayTitle}“.`,
             type: "calendar_approved",
             link: calendarLink,
           },
@@ -368,7 +371,7 @@ export async function POST(
           data: {
             user_id: creatorId,
             title: "Událost zamítnuta",
-            message: `${approverName} zamítl/a vaši událost „${event.title}“. Důvod: ${comment}`,
+            message: `${approverName} zamítl/a vaši událost „${displayTitle}“. Důvod: ${comment}`,
             type: "calendar_rejected",
             link: calendarLink,
           },

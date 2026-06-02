@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { sendCalendarInviteResponseEmail } from "@/lib/email";
+import { formatCalendarEventTitleWithDuration } from "@/app/(dashboard)/calendar/lib/event-types";
 
 function parseEventIdFromLink(link: string | null): number | null {
   if (!link) return null;
@@ -83,11 +84,13 @@ export async function POST(
     ? `${event.users.first_name} ${event.users.last_name}`.trim() || "Pořadatel"
     : "Pořadatel";
 
+  const displayTitle = formatCalendarEventTitleWithDuration(event);
+
   const participantStatus = action === "approve" ? "accepted" : "rejected";
   const ownerMessage =
     action === "approve"
-      ? `${meName} přijal/a pozvánku na událost „${event.title}“.`
-      : `${meName} odmítl/a pozvánku na událost „${event.title}“. Důvod: ${reason}`;
+      ? `${meName} přijal/a pozvánku na událost „${displayTitle}“.`
+      : `${meName} odmítl/a pozvánku na událost „${displayTitle}“. Důvod: ${reason}`;
 
   await prisma.$transaction([
     prisma.calendar_event_participants.update({
@@ -123,7 +126,7 @@ export async function POST(
       toEmail: ownerEmail,
       toName: ownerName,
       responderName: meName,
-      eventTitle: event.title,
+      eventTitle: displayTitle,
       eventId: event.id,
       action,
       reason: action === "reject" ? reason : undefined,

@@ -15,11 +15,16 @@ import type { Holiday } from "./lib/holidays";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import { isAllDayEvent, allDayEventDisplayDates } from "./lib/event-types";
 import {
+  buildCalendarGlobalDeputyBlock,
+  buildCalendarGlobalOwnerBlock,
   buildEventMetaLines,
   calendarEventTooltipTitle,
+  CALENDAR_DEPUTY_BLOCK_COLOR,
   getCalendarEventPrimaryLabel,
+  hasCalendarDeputyBlock,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
+import { CalendarGlobalEventBlock } from "./CalendarGlobalEventBlock";
 
 type CalendarEvent = {
   id: number;
@@ -190,15 +195,43 @@ export function MonthCalendarGrid({
                       </div>
                     ))}
                     <div className="mt-1 space-y-0.5">
-                      {dayEvents.slice(0, 3).map((e) => {
+                      {dayEvents.slice(0, 3).flatMap((e) => {
                         const line = e.color ?? "#DC2626";
+                        const isGlobal = eventMetaMode !== "hidden";
+
+                        if (isGlobal && e.ukoly_task_id == null) {
+                          const start = new Date(e.start_date);
+                          const end = new Date(e.end_date);
+                          const allDay = isAllDayEvent(start, end);
+                          const ownerLines = buildCalendarGlobalOwnerBlock(e, { allDay });
+                          const deputyLines = buildCalendarGlobalDeputyBlock(e, { allDay });
+                          const items = [
+                            { key: "owner", lines: ownerLines, color: line },
+                            ...(deputyLines
+                              ? [{ key: "deputy", lines: deputyLines, color: CALENDAR_DEPUTY_BLOCK_COLOR }]
+                              : []),
+                          ];
+                          return items.map(({ key, lines, color }) => (
+                            <CalendarGlobalEventBlock
+                              key={`${calendarGridItemKey(e)}-${day.toDateString()}-${key}`}
+                              lines={lines}
+                              color={color}
+                              href={calendarGridItemHref(e)}
+                              title={calendarEventTooltipTitle(e, eventMetaMode)}
+                              compact
+                              onClick={(ev) => ev.stopPropagation()}
+                              className="w-full"
+                            />
+                          ));
+                        }
+
                         const primaryMeta = eventMetaPrimaryLine(e, eventMetaMode);
                         const pendingApproval =
                           e.approval_status === "pending" && e.deputy_id;
                         const deputyApproved =
                           e.approval_status === "deputy_approved";
                         const isApproved = e.approval_status === "approved";
-                        return (
+                        return [
                           <Link
                             key={`${calendarGridItemKey(e)}-${day.toDateString()}`}
                             href={calendarGridItemHref(e)}
@@ -234,8 +267,8 @@ export function MonthCalendarGrid({
                                 ✓
                               </span>
                             )}
-                          </Link>
-                        );
+                          </Link>,
+                        ];
                       })}
                       {dayEvents.length > 3 && (
                         <span className="block truncate px-1 text-[10px] text-gray-500">

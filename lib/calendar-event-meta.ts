@@ -1,6 +1,21 @@
-import { getEventTypeLabel } from "@/app/(dashboard)/calendar/lib/event-types";
+import {
+  formatCalendarEventDurationPart,
+  getEventTypeLabel,
+} from "@/app/(dashboard)/calendar/lib/event-types";
+import { formatTimeCz } from "@/lib/datetime-cz";
 
 export type CalendarEventMetaMode = "hidden" | "global" | "global_vedeni";
+
+/** Neutrální barva syntetického bloku zástupu v globálním kalendáři. */
+export const CALENDAR_DEPUTY_BLOCK_COLOR = "#64748B";
+
+export type CalendarGlobalBlockLines = {
+  headline: string;
+  timeRange?: string;
+  subtitle?: string;
+  status?: string;
+  statusAlignRight?: boolean;
+};
 
 export type EventMetaInput = {
   users: { first_name: string; last_name: string } | null;
@@ -30,6 +45,127 @@ function participantNames(
     }
   }
   return parts.join(", ");
+}
+
+/** Iniciála + příjmení (mockup: „V. Burkertová“). */
+export function formatPersonShortName(first: string, last: string): string {
+  const f = first.trim();
+  const l = last.trim();
+  if (!l) return f;
+  const initial = f.charAt(0).toUpperCase();
+  return initial ? `${initial}. ${l}` : l;
+}
+
+/** Hlavní řádek globálního bloku: „Jméno | Typ“. */
+export function getCalendarGlobalHeadline(
+  e: EventMetaInput & { event_type: string | null; title: string }
+): string {
+  if (isModuleTask(e)) return e.title;
+  const typeLabel = getEventTypeLabel(e.event_type);
+  if (!e.users) return typeLabel;
+  return `${formatPersonShortName(e.users.first_name, e.users.last_name)} | ${typeLabel}`;
+}
+
+/** Globální seznam: jméno | typ + trvání. */
+export function getCalendarGlobalLabelWithDuration(
+  e: EventMetaInput & {
+    event_type: string | null;
+    title: string;
+    start_date: Date;
+    end_date: Date;
+  }
+): string {
+  const headline = getCalendarGlobalHeadline(e);
+  const duration = formatCalendarEventDurationPart(
+    new Date(e.start_date),
+    new Date(e.end_date)
+  );
+  return `${headline} ${duration}`;
+}
+
+/** Rozsah času pro časovanou událost. */
+export function getCalendarGlobalTimeRange(start: Date, end: Date): string {
+  return `${formatTimeCz(start)} – ${formatTimeCz(end)}`;
+}
+
+/** Stav schválení pro globální kalendář (mockup: „Schválen“). */
+export function getCalendarGlobalStatusLine(e: {
+  approval_status: string | null;
+  deputy_id: number | null;
+}): string {
+  if (!e.approval_status) return "";
+  switch (e.approval_status) {
+    case "approved":
+      return "Schválen";
+    case "rejected":
+      return "Zamítnuto";
+    case "deputy_approved":
+    case "pending":
+      return e.deputy_id ? "Čeká na schválení" : "Čeká na zástupce";
+    default:
+      return "";
+  }
+}
+
+/** Hlavní řádek bloku zástupu. */
+export function getCalendarGlobalDeputyHeadline(
+  e: EventMetaInput & { event_type: string | null }
+): string {
+  if (!e.deputy_id || !e.users_deputy) return "";
+  const deputy = formatPersonShortName(e.users_deputy.first_name, e.users_deputy.last_name);
+  const owner = e.users
+    ? formatPersonShortName(e.users.first_name, e.users.last_name)
+    : "—";
+  return `${deputy} | Zastupuje za: ${owner}`;
+}
+
+export function hasCalendarDeputyBlock(e: EventMetaInput): boolean {
+  return e.deputy_id != null && e.users_deputy != null;
+}
+
+/** Obsah bloku vlastníka události v globálním kalendáři. */
+export function buildCalendarGlobalOwnerBlock(
+  e: EventMetaInput & {
+    start_date: Date;
+    end_date: Date;
+    event_type: string | null;
+    title: string;
+  },
+  opts: { allDay?: boolean; statusAlignRight?: boolean } = {}
+): CalendarGlobalBlockLines {
+  const headline = getCalendarGlobalHeadline(e);
+  const status = getCalendarGlobalStatusLine(e);
+  if (isModuleTask(e)) {
+    return { headline, status: status || undefined, statusAlignRight: opts.statusAlignRight };
+  }
+  return {
+    headline,
+    timeRange: opts.allDay ? undefined : getCalendarGlobalTimeRange(e.start_date, e.end_date),
+    status: status || undefined,
+    statusAlignRight: opts.statusAlignRight,
+  };
+}
+
+/** Obsah syntetického bloku zástupu (null pokud není zástup). */
+export function buildCalendarGlobalDeputyBlock(
+  e: EventMetaInput & {
+    start_date: Date;
+    end_date: Date;
+    event_type: string | null;
+    title: string;
+  },
+  opts: { allDay?: boolean; statusAlignRight?: boolean } = {}
+): CalendarGlobalBlockLines | null {
+  if (!hasCalendarDeputyBlock(e)) return null;
+  const headline = getCalendarGlobalDeputyHeadline(e);
+  const status = getCalendarGlobalStatusLine(e);
+  return {
+    headline,
+    timeRange: opts.allDay ? undefined : getCalendarGlobalTimeRange(e.start_date, e.end_date),
+    subtitle: "Zastupuje",
+    status: status || undefined,
+    statusAlignRight: opts.statusAlignRight,
+  };
 }
 
 /** Hlavní text v buňce kalendáře (týden / měsíc / seznam) – typ události, u úkolů název. */

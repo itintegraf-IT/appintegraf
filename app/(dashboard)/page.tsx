@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { countMyContractsExpiringWithin } from "@/lib/contracts/expiry-reminders";
+import { formatCalendarEventTitleWithDuration } from "@/app/(dashboard)/calendar/lib/event-types";
 import { NotificationLink } from "./NotificationLink";
 import {
   LayoutDashboard,
@@ -190,7 +191,7 @@ export default async function DashboardPage() {
               const creatorName = e.users
                 ? `${e.users.first_name} ${e.users.last_name}`
                 : "–";
-              const startDate = new Date(e.start_date);
+              const displayTitle = formatCalendarEventTitleWithDuration(e);
               const statusLabel =
                 e.approval_status === "pending"
                   ? "Jako zástup"
@@ -202,10 +203,8 @@ export default async function DashboardPage() {
                   className="flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-white p-4 transition-colors hover:border-amber-400 hover:bg-amber-50/50"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-900">{e.title}</p>
-                    <p className="mt-0.5 text-sm text-gray-600">
-                      {creatorName} • {startDate.toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" })}
-                    </p>
+                    <p className="font-medium text-gray-900">{displayTitle}</p>
+                    <p className="mt-0.5 text-sm text-gray-600">{creatorName}</p>
                     <span className="mt-2 inline-block rounded bg-amber-200 px-2 py-0.5 text-xs font-medium text-amber-900">
                       {statusLabel}
                     </span>
