@@ -293,8 +293,6 @@ export async function POST(req: NextRequest) {
             event_type: true,
             start_date: true,
             end_date: true,
-            ukoly_task_id: true,
-            makety_task_id: true,
           },
         });
         for (const ev of createdEvents) {
@@ -320,8 +318,6 @@ export async function POST(req: NextRequest) {
           event_type: true,
           start_date: true,
           end_date: true,
-          ukoly_task_id: true,
-          makety_task_id: true,
         },
       });
       const inviteTitle = firstEvent
