@@ -297,7 +297,7 @@ export async function POST(req: NextRequest) {
         });
         for (const ev of createdEvents) {
           const displayTitle = formatCalendarEventTitleWithDuration(ev);
-          const notifMessage = `${creatorName} vytvořil/a událost „${displayTitle}“, která vyžaduje vaše schválení.`;
+          const notifMessage = `Událost „${displayTitle}“ vyžaduje vaše schválení. Žadatel: ${creatorName}. Jste uveden/a jako zástupce pro tuto událost.`;
           await sendCalendarApprovalEmail({
             toEmail: deputy.email,
             toName: `${deputy.first_name} ${deputy.last_name}`.trim() || "Schvalovateli",
