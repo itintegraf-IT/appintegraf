@@ -1,5 +1,13 @@
 import { prisma } from "@/lib/db";
 
+function isMissingMaketyTableError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const code = "code" in err ? String((err as { code: unknown }).code) : "";
+  if (code === "P2021" || code === "P2010") return true;
+  const msg = "message" in err ? String((err as { message: unknown }).message) : String(err);
+  return /makety/i.test(msg) && /does not exist|existuje|Unknown table/i.test(msg);
+}
+
 export const MAKETY_CALENDAR_COLOR = "#7C3AED";
 export const MAKETY_CALENDAR_IN_PROGRESS_COLOR = "#F59E0B";
 export const MAKETY_CALENDAR_DONE_COLOR = "#16A34A";
@@ -92,14 +100,22 @@ export async function fetchMaketyForCalendarRange(params: {
     };
   }
 
-  const rows = await prisma.makety.findMany({
-    where,
-    orderBy: { due_at: "asc" },
-    take: 300,
-    include: {
-      users_assignee: { select: { first_name: true, last_name: true } },
-    },
-  });
+  try {
+    const rows = await prisma.makety.findMany({
+      where,
+      orderBy: { due_at: "asc" },
+      take: 300,
+      include: {
+        users_assignee: { select: { first_name: true, last_name: true } },
+      },
+    });
 
-  return rows.map(maketaToGridEvent);
+    return rows.map(maketaToGridEvent);
+  } catch (err) {
+    if (isMissingMaketyTableError(err)) {
+      console.warn("[makety-calendar] Tabulka makety v DB chybí – spusťte npm run db:makety-migrate");
+      return [];
+    }
+    throw err;
+  }
 }
