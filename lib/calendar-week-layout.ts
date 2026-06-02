@@ -221,11 +221,27 @@ export function layoutAllDaySpanRows(
   bars: AllDaySpanBar[]
 ): Map<string, AllDaySpanRowPosition> {
   const result = new Map<string, AllDaySpanRowPosition>();
-  for (const group of buildSpanOverlapGroups(bars)) {
+  let rowOffset = 0;
+
+  const groups = buildSpanOverlapGroups(bars).sort(
+    (a, b) => Math.min(...a.map((bar) => bar.startIdx)) - Math.min(...b.map((bar) => bar.startIdx))
+  );
+
+  for (const group of groups) {
     const groupLayout = layoutSpanOverlapGroup(group);
-    for (const [id, pos] of groupLayout) {
-      result.set(id, pos);
+    let maxRowInGroup = 0;
+    for (const pos of groupLayout.values()) {
+      maxRowInGroup = Math.max(maxRowInGroup, pos.row);
     }
+    for (const [id, pos] of groupLayout) {
+      result.set(id, { row: pos.row + rowOffset, rowCount: 0 });
+    }
+    rowOffset += maxRowInGroup + 1;
+  }
+
+  const totalRowCount = rowOffset;
+  for (const [id, pos] of result) {
+    result.set(id, { row: pos.row, rowCount: totalRowCount });
   }
   return result;
 }
