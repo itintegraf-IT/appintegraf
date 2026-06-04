@@ -59,7 +59,7 @@ export async function GET(
       );
     }
 
-    return new NextResponse(buf, {
+    return new NextResponse(new Uint8Array(buf), {
       headers: {
         "Content-Type": sanitizeMaketyMimeType(fileRow.mime_type),
         "Content-Disposition": maketyFileContentDisposition(fileRow.original_filename),
