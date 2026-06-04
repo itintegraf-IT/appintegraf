@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -129,6 +130,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, id: created.id });
   } catch (e) {
     console.error("POST /api/makety", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    if (
+      e instanceof Prisma.PrismaClientValidationError &&
+      msg.includes("work_type")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Chybí sloupec work_type nebo není přegenerovaný Prisma klient. Spusťte: npm run db:makety-work-type && npx prisma generate, poté restartujte aplikaci.",
+        },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({ error: "Chyba při ukládání makety" }, { status: 500 });
   }
 }
