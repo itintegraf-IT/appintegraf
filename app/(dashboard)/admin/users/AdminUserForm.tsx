@@ -19,7 +19,7 @@ const AVAILABLE_MODULES = [
   { key: "iml", label: "IML", icon: Package },
   { key: "materialy", label: "Katalog materiálů", icon: Layers },
   { key: "ukoly", label: "Úkoly", icon: ClipboardList },
-  { key: "makety", label: "Makety", icon: Printer },
+  { key: "makety", label: "Makety a grafika", icon: Printer },
   { key: "personalistika", label: "Personalistika", icon: BriefcaseBusiness },
 ] as const;
 
@@ -42,10 +42,11 @@ function getPermissionOptions(moduleKey: string) {
   }
   if (moduleKey === "makety") {
     return [
-      { value: "read", label: "Zaměstnanec / výrobce" },
-      { value: "write", label: "Zadavatel maket" },
+      { value: "read", label: "Účastník (vidí své zakázky)" },
+      { value: "write", label: "Zadavatel" },
       { value: "vyroba", label: "Výroba maket" },
-      { value: "admin", label: "Admin" },
+      { value: "grafika", label: "Grafika" },
+      { value: "admin", label: "Admin modulu" },
     ] as const;
   }
   return PERMISSION_LEVELS;

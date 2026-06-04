@@ -7,16 +7,20 @@ import { Archive, Calendar, List, Plus, Users } from "lucide-react";
 export function MaketyTabsNav({
   canWrite,
   canVyroba,
+  canGrafika,
 }: {
   canWrite: boolean;
   canVyroba: boolean;
+  canGrafika: boolean;
 }) {
   const pathname = usePathname();
   const isList = pathname === "/makety";
   const isZadani = pathname === "/makety/zadani";
   const isNew = pathname === "/makety/new";
+  const isNewGrafika = pathname === "/makety/grafika/new";
   const isArchive = pathname === "/makety/archive";
   const isKalendar = pathname === "/makety/kalendar";
+  const isKalendarGrafika = pathname === "/makety/kalendar-grafika";
 
   const tabClass = (active: boolean) =>
     `inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
@@ -43,10 +47,22 @@ export function MaketyTabsNav({
           Nová maketa
         </Link>
       )}
+      {canWrite && (
+        <Link href="/makety/grafika/new" className={tabClass(isNewGrafika)}>
+          <Plus className="h-4 w-4" />
+          Nová grafika
+        </Link>
+      )}
       {canVyroba && (
         <Link href="/makety/kalendar" className={tabClass(isKalendar)}>
           <Calendar className="h-4 w-4" />
           Kalendář maket
+        </Link>
+      )}
+      {canGrafika && (
+        <Link href="/makety/kalendar-grafika" className={tabClass(isKalendarGrafika)}>
+          <Calendar className="h-4 w-4" />
+          Kalendář grafiky
         </Link>
       )}
       <Link href="/makety/archive" className={tabClass(isArchive)}>

@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { hasMaketyVyrobaAccess } from "@/lib/auth-utils";
-import { canViewAllMakety } from "@/lib/makety-access";
+import { hasMaketyGrafikaAccess, hasMaketyVyrobaAccess } from "@/lib/auth-utils";
+import { buildMaketyListWhere } from "@/lib/makety-access";
+import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import {
   maketaPriorityBadgeClass,
@@ -20,14 +21,14 @@ export default async function MaketyListPage({
     status?: string;
     term?: string;
     created?: string;
+    grafika_created?: string;
+    comment_sent?: string;
     completed?: string;
   }>;
 }) {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
   const params = await searchParams;
-  const orgWide = await canViewAllMakety(userId);
-
   const selectedStatus =
     params.status === "open" ||
     params.status === "in_progress" ||
@@ -40,6 +41,8 @@ export default async function MaketyListPage({
       ? params.term
       : "";
   const created = params.created === "1";
+  const grafikaCreated = params.grafika_created === "1";
+  const commentSent = params.comment_sent === "1";
   const completed = params.completed === "1";
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -49,14 +52,10 @@ export default async function MaketyListPage({
   endOfWeek.setDate(endOfWeek.getDate() + 7);
   endOfWeek.setHours(23, 59, 59, 999);
 
-  const where: Record<string, unknown> = orgWide
-    ? {}
-    : { OR: [{ created_by: userId }, { assignee_user_id: userId }] };
-  if (selectedStatus) {
-    where.status = selectedStatus;
-  } else {
-    where.status = { notIn: ["done", "cancelled"] };
-  }
+  const statusFilter: Record<string, unknown> = selectedStatus
+    ? { status: selectedStatus }
+    : { status: { notIn: ["done", "cancelled"] } };
+  const where = await buildMaketyListWhere(userId, statusFilter);
   if (selectedTerm === "overdue") {
     where.due_at = { lt: now };
   } else if (selectedTerm === "today") {
@@ -83,12 +82,23 @@ export default async function MaketyListPage({
   }));
 
   const showVyrobaHint = await hasMaketyVyrobaAccess(userId);
+  const showGrafikaHint = await hasMaketyGrafikaAccess(userId);
 
   return (
     <div className="space-y-5">
       {created && (
         <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
           Maketa byla úspěšně vytvořena.
+        </div>
+      )}
+      {grafikaCreated && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          Zakázka grafiky byla úspěšně vytvořena.
+        </div>
+      )}
+      {commentSent && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          Komentář byl odeslán. Zakázka je zapsaná v přehledu.
         </div>
       )}
       {completed && (
@@ -100,7 +110,16 @@ export default async function MaketyListPage({
         <p className="text-sm text-gray-600">
           Jako výroba maket máte přístup k{" "}
           <Link href="/makety/kalendar" className="font-medium text-violet-600 hover:underline">
-            kalendáři výroby
+            kalendáři maket
+          </Link>
+          .
+        </p>
+      )}
+      {showGrafikaHint && (
+        <p className="text-sm text-gray-600">
+          Jako grafika máte přístup k{" "}
+          <Link href="/makety/kalendar-grafika" className="font-medium text-violet-600 hover:underline">
+            kalendáři grafiky
           </Link>
           .
         </p>
@@ -185,9 +204,10 @@ export default async function MaketyListPage({
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
               <th className="px-4 py-3 font-semibold text-gray-700">Termín</th>
+              <th className="px-4 py-3 font-semibold text-gray-700">Typ</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Zakázka</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Popis</th>
-              <th className="px-4 py-3 font-semibold text-gray-700">Výroba</th>
+              <th className="px-4 py-3 font-semibold text-gray-700">Přiřazeno</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Priorita</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Stav</th>
             </tr>
@@ -195,14 +215,21 @@ export default async function MaketyListPage({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
-                  Žádné makety k zobrazení.
+                <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
+                  Žádné zakázky k zobrazení.
                 </td>
               </tr>
             ) : (
-              rows.map((r) => (
+              rows.map((r) => {
+                const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+                return (
                 <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50/80">
                   <td className="px-4 py-3 text-gray-800">{formatDateTimeCz(new Date(r.due_at))}</td>
+                  <td className="px-4 py-3">
+                    <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                      {maketyWorkTypeLabel(wt)}
+                    </span>
+                  </td>
                   <td className="px-4 py-3 text-gray-700">{r.order_number ?? "—"}</td>
                   <td className="max-w-xs px-4 py-3">
                     <Link href={`/makety/${r.id}`} className="font-medium text-violet-600 hover:underline">
@@ -230,7 +257,8 @@ export default async function MaketyListPage({
                     </span>
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>

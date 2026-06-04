@@ -1,15 +1,15 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { hasMaketyVyrobaAccess } from "@/lib/auth-utils";
+import { hasMaketyGrafikaAccess } from "@/lib/auth-utils";
 import { WeekCalendarGrid } from "@/app/(dashboard)/calendar/WeekCalendarGrid";
-import { MaketyCalendarNav } from "./MaketyCalendarNav";
+import { MaketyCalendarNav } from "../kalendar/MaketyCalendarNav";
 import { formatDateLocal, getWeekStart, getWeekEnd } from "@/app/(dashboard)/calendar/lib/week-utils";
 import { getHolidaysForRange } from "@/app/(dashboard)/calendar/lib/holidays";
 import { fetchMaketyForCalendarRange } from "@/lib/makety-calendar";
 
 export const dynamic = "force-dynamic";
 
-export default async function MaketyKalendarPage({
+export default async function MaketyKalendarGrafikaPage({
   searchParams,
 }: {
   searchParams: Promise<{ from?: string; to?: string }>;
@@ -17,7 +17,7 @@ export default async function MaketyKalendarPage({
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const userId = parseInt(session.user.id, 10);
-  if (!(await hasMaketyVyrobaAccess(userId))) {
+  if (!(await hasMaketyGrafikaAccess(userId))) {
     redirect("/makety");
   }
 
@@ -33,7 +33,7 @@ export default async function MaketyKalendarPage({
     fromDate,
     toDate,
     userId,
-    mode: "vyroba",
+    mode: "grafika",
   });
 
   const events = maketyItems.map((m) => ({
@@ -47,9 +47,9 @@ export default async function MaketyKalendarPage({
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">
-        Přehled aktivních maket ve frontě výroby na plotru. Kliknutím na položku otevřete detail zakázky.
+        Přehled aktivních zakázek grafiky. Kliknutím na položku otevřete detail.
       </p>
-      <MaketyCalendarNav from={from} to={to} />
+      <MaketyCalendarNav from={from} to={to} basePath="/makety/kalendar-grafika" />
       <WeekCalendarGrid
         events={events}
         holidays={holidays}

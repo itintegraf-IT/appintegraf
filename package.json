@@ -23,7 +23,8 @@
     "db:ensure-admin": "node scripts/ensure-admin-user.mjs",
     "seed:calendar": "node scripts/seed-calendar-sample.mjs",
     "migrate:totp-2fa": "node scripts/run-totp-2fa-migration.mjs",
-    "db:makety-migrate": "node scripts/run-makety-migration.mjs"
+    "db:makety-migrate": "node scripts/run-makety-migration.mjs",
+    "db:makety-work-type": "node scripts/run-makety-work-type-migration.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

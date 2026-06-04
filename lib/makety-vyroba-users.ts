@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { hasMaketyVyrobaAccess, isAdmin } from "@/lib/auth-utils";
+import { hasExplicitMaketyVyrobaRole } from "@/lib/auth-utils";
 
 export type MaketyVyrobaUser = {
   id: number;
@@ -7,7 +7,7 @@ export type MaketyVyrobaUser = {
   last_name: string;
 };
 
-/** Aktivní uživatelé s úrovní „Výroba maket“ (nebo admin). */
+/** Aktivní uživatelé s explicitní úrovní „Výroba maket“ (bez globálního admina). */
 export async function getUsersWithMaketyVyrobaAccess(): Promise<MaketyVyrobaUser[]> {
   const users = await prisma.users.findMany({
     where: { is_active: true },
@@ -17,14 +17,14 @@ export async function getUsersWithMaketyVyrobaAccess(): Promise<MaketyVyrobaUser
 
   const result: MaketyVyrobaUser[] = [];
   for (const u of users) {
-    if (await hasMaketyVyrobaAccess(u.id)) {
+    if (await hasExplicitMaketyVyrobaRole(u.id)) {
       result.push(u);
     }
   }
   return result;
 }
 
+/** Validace přiřazení zakázky – jen explicitní role výroby. */
 export async function userHasMaketyVyrobaRole(userId: number): Promise<boolean> {
-  if (await isAdmin(userId)) return true;
-  return hasMaketyVyrobaAccess(userId);
+  return hasExplicitMaketyVyrobaRole(userId);
 }

@@ -7,6 +7,8 @@ import { userCanViewMaketa, userCanEditMaketa } from "@/lib/makety-access";
 import { notifyMaketaRecipients } from "@/lib/makety-notify";
 import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
 import { parseMaketaPriority } from "@/lib/makety-status";
+import { maketyAssigneeRoleLabel, type MaketyWorkType } from "@/lib/makety-work-type";
+import { userHasMaketyGrafikaRole } from "@/lib/makety-grafika-users";
 import { userHasMaketyVyrobaRole } from "@/lib/makety-vyroba-users";
 
 const includeDetail = {
@@ -125,9 +127,13 @@ export async function PUT(
         if (!u) {
           return NextResponse.json({ error: "Uživatel neexistuje" }, { status: 400 });
         }
-        if (!(await userHasMaketyVyrobaRole(n))) {
+        const wt = (existing.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+        const roleLabel = maketyAssigneeRoleLabel(wt);
+        const hasRole =
+          wt === "grafika" ? await userHasMaketyGrafikaRole(n) : await userHasMaketyVyrobaRole(n);
+        if (!hasRole) {
           return NextResponse.json(
-            { error: "Vybraný uživatel nemá roli Výroba maket" },
+            { error: `Vybraný uživatel nemá roli ${roleLabel}` },
             { status: 400 }
           );
         }
@@ -149,8 +155,9 @@ export async function PUT(
     }
 
     if (nextAssignee == null) {
+      const wt = (existing.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
       return NextResponse.json(
-        { error: "Musí být vybrán uživatel s rolí Výroba maket" },
+        { error: `Musí být vybrán uživatel s rolí ${maketyAssigneeRoleLabel(wt)}` },
         { status: 400 }
       );
     }

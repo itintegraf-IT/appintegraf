@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { hasModuleAccess, hasMaketyVyrobaAccess } from "@/lib/auth-utils";
+import { canAccessMaketyModule } from "@/lib/makety-module-access";
+import {
+  maketyAssigneeRoleLabel,
+  maketyWorkTypeLabel,
+  type MaketyWorkType,
+} from "@/lib/makety-work-type";
 import { userCanViewMaketa, userCanEditMaketa, userCanCompleteMaketa } from "@/lib/makety-access";
 import { DeleteMaketaButton } from "./DeleteMaketaButton";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
@@ -28,10 +33,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const userId = parseInt(session.user.id, 10);
-  if (
-    !(await hasModuleAccess(userId, "makety", "read")) &&
-    !(await hasMaketyVyrobaAccess(userId))
-  ) {
+  if (!(await canAccessMaketyModule(userId))) {
     redirect("/");
   }
 
@@ -58,6 +60,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
   const canEdit = await userCanEditMaketa(userId, id);
   const canComplete = await userCanCompleteMaketa(userId, id);
   const isArchived = maketa.status === "done" || maketa.status === "cancelled";
+  const workType = (maketa.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
 
   return (
     <div className="space-y-6">
@@ -68,7 +71,9 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Maketa #{maketa.id}</h2>
+            <h2 className="text-xl font-semibold text-gray-900">
+              {maketyWorkTypeLabel(workType)} #{maketa.id}
+            </h2>
             <p className="mt-1 text-sm text-gray-500">
               Zadal/a: {maketa.users_creator.first_name} {maketa.users_creator.last_name} ·{" "}
               {formatDateTimeCz(new Date(maketa.assigned_at))}
@@ -93,6 +98,10 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
             </dd>
           </div>
           <div>
+            <dt className="text-xs font-medium uppercase text-gray-500">Typ</dt>
+            <dd className="mt-1 text-sm text-gray-900">{maketyWorkTypeLabel(workType)}</dd>
+          </div>
+          <div>
             <dt className="text-xs font-medium uppercase text-gray-500">Priorita</dt>
             <dd className="mt-1">
               <span
@@ -111,19 +120,11 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
             <dd className="mt-1 text-sm text-gray-900">{maketa.order_number ?? "—"}</dd>
           </div>
           <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Materiál</dt>
-            <dd className="mt-1 text-sm text-gray-900">{maketa.material ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Rozměr</dt>
-            <dd className="mt-1 text-sm text-gray-900">{maketa.dimensions ?? "—"}</dd>
-          </div>
-          <div>
             <dt className="text-xs font-medium uppercase text-gray-500">Počet kusů</dt>
             <dd className="mt-1 text-sm text-gray-900">{maketa.quantity ?? "—"}</dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-xs font-medium uppercase text-gray-500">Výroba (Výroba maket)</dt>
+            <dt className="text-xs font-medium uppercase text-gray-500">{maketyAssigneeRoleLabel(workType)}</dt>
             <dd className="mt-1 text-sm text-gray-900">
               {maketa.users_assignee
                 ? `${maketa.users_assignee.first_name} ${maketa.users_assignee.last_name}`
@@ -138,10 +139,19 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
       </div>
 
       {!isArchived && (
-        <MaketaFilesPanel maketaId={id} canDelete={canEdit} showUploadHint={showUploadHint} />
+        <MaketaFilesPanel
+          maketaId={id}
+          canDelete={canEdit}
+          showUploadHint={showUploadHint}
+          uploadHintText={
+            workType === "grafika"
+              ? "Nahrajte podklady pro grafiku — můžete vybrat více souborů najednou."
+              : "Nahrajte podklady pro výrobu makety — můžete vybrat více souborů najednou."
+          }
+        />
       )}
 
-      <MaketaCommentsPanel maketaId={id} />
+      <MaketaCommentsPanel maketaId={id} redirectToListAfterSubmit={showUploadHint} />
     </div>
   );
 }

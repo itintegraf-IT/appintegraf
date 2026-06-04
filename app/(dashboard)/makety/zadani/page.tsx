@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
-import { canViewAllMakety } from "@/lib/makety-access";
+import { canViewAllMaketyTypes } from "@/lib/makety-access";
+import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import { maketaStatusBadgeClass, maketaStatusLabel } from "@/lib/makety-status";
 
@@ -16,14 +17,13 @@ export default async function MaketyZadaniPage() {
     redirect("/makety");
   }
 
-  const orgWide = await canViewAllMakety(userId);
-  const where: Record<string, unknown> = orgWide ? {} : { created_by: userId };
+  const orgWide = await canViewAllMaketyTypes(userId);
+  const listWhere = orgWide
+    ? { status: { notIn: ["cancelled"] } }
+    : { created_by: userId, status: { notIn: ["cancelled"] } };
 
   const rows = await prisma.makety.findMany({
-    where: {
-      ...where,
-      status: { notIn: ["cancelled"] },
-    },
+    where: listWhere,
     orderBy: { due_at: "asc" },
     take: 200,
     include: {
@@ -39,6 +39,7 @@ export default async function MaketyZadaniPage() {
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
               <th className="px-4 py-3 font-semibold text-gray-700">Termín</th>
+              <th className="px-4 py-3 font-semibold text-gray-700">Typ</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Zakázka</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Popis</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Přiřazeno</th>
@@ -48,14 +49,21 @@ export default async function MaketyZadaniPage() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-gray-500">
-                  Zatím nemáte žádné zadané makety.
+                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                  Zatím nemáte žádné zadané zakázky.
                 </td>
               </tr>
             ) : (
-              rows.map((r) => (
+              rows.map((r) => {
+                const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+                return (
                 <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50/80">
                   <td className="px-4 py-3">{formatDateTimeCz(new Date(r.due_at))}</td>
+                  <td className="px-4 py-3">
+                    <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
+                      {maketyWorkTypeLabel(wt)}
+                    </span>
+                  </td>
                   <td className="px-4 py-3">{r.order_number ?? "—"}</td>
                   <td className="px-4 py-3">
                     <Link href={`/makety/${r.id}`} className="font-medium text-violet-600 hover:underline">
@@ -75,7 +83,8 @@ export default async function MaketyZadaniPage() {
                     </span>
                   </td>
                 </tr>
-              ))
+              );
+              })
             )}
           </tbody>
         </table>

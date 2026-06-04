@@ -258,7 +258,7 @@ function ColorRowEditor({
         onSelect={(p) =>
           onChange({
             pantone_id: p.id,
-            code: p.code,
+            code: p.code ?? "",
             name: p.name,
             hex: p.hex,
           })
@@ -268,7 +268,7 @@ function ColorRowEditor({
           if (created) {
             onChange({
               pantone_id: created.id,
-              code: created.code,
+              code: created.code ?? "",
               name: created.name,
               hex: created.hex,
             });

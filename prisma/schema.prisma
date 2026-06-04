@@ -358,6 +358,7 @@ model makety {
   assignee_user_id   Int?
   created_by         Int
   status             String               @default("open") @db.VarChar(20)
+  work_type          String               @default("maketa") @db.VarChar(20)
   created_at         DateTime             @default(now()) @db.Timestamp(0)
   updated_at         DateTime             @default(now()) @updatedAt @db.Timestamp(0)
   users_assignee     users?               @relation("makety_assignee", fields: [assignee_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_assignee_fk")
@@ -369,6 +370,7 @@ model makety {
   @@index([created_by], map: "idx_makety_creator")
   @@index([due_at], map: "idx_makety_due")
   @@index([status], map: "idx_makety_status")
+  @@index([work_type], map: "idx_makety_work_type")
 }
 
 model makety_departments {
