@@ -1,4 +1,9 @@
 import { prisma } from "@/lib/db";
+import {
+  roleHasMaketyGrafikaFromDecoded,
+  roleHasMaketyVyrobaFromDecoded,
+  roleMaketyGrantsModuleAccess,
+} from "@/lib/makety-module-access-flags";
 
 export type ModuleAccess = "read" | "write" | "admin";
 
@@ -93,16 +98,17 @@ export async function hasModuleAccess(
 
     // Per-module úroveň: { "contacts": "read", "equipment": "write", ... }
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-      const perm = (decoded as Record<string, unknown>)[module];
+      const record = decoded as Record<string, unknown>;
+      if (module === "makety" && roleMaketyGrantsModuleAccess(record, access)) return true;
+
+      const perm = record[module];
       if (perm === true) return true;
       if (typeof perm === "string") {
         const p = perm.toLowerCase();
         const planovaniTiskar = module === "planovani" && p === "tiskar";
-        const maketyVyroba = module === "makety" && p === "vyroba";
-        const maketyGrafika = module === "makety" && p === "grafika";
         if (
           access === "read" &&
-          (["read", "write", "admin"].includes(p) || planovaniTiskar || maketyVyroba || maketyGrafika)
+          (["read", "write", "admin"].includes(p) || planovaniTiskar)
         )
           return true;
         if (access === "write" && ["write", "admin"].includes(p)) return true;
@@ -153,8 +159,7 @@ export async function hasExplicitMaketyVyrobaRole(userId: number): Promise<boole
       if (decoded === null) continue;
     }
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-      const perm = (decoded as Record<string, unknown>).makety;
-      if (typeof perm === "string" && perm.toLowerCase() === "vyroba") return true;
+      if (roleHasMaketyVyrobaFromDecoded(decoded as Record<string, unknown>)) return true;
     }
   }
   return false;
@@ -178,8 +183,7 @@ export async function hasExplicitMaketyGrafikaRole(userId: number): Promise<bool
       if (decoded === null) continue;
     }
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-      const perm = (decoded as Record<string, unknown>).makety;
-      if (typeof perm === "string" && perm.toLowerCase() === "grafika") return true;
+      if (roleHasMaketyGrafikaFromDecoded(decoded as Record<string, unknown>)) return true;
     }
   }
   return false;
@@ -392,16 +396,17 @@ function hasModuleAccessFromRoles(
     }
 
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-      const perm = (decoded as Record<string, unknown>)[module];
+      const record = decoded as Record<string, unknown>;
+      if (module === "makety" && roleMaketyGrantsModuleAccess(record, access)) return true;
+
+      const perm = record[module];
       if (perm === true) return true;
       if (typeof perm === "string") {
         const p = perm.toLowerCase();
         const planovaniTiskar = module === "planovani" && p === "tiskar";
-        const maketyVyroba = module === "makety" && p === "vyroba";
-        const maketyGrafika = module === "makety" && p === "grafika";
         if (
           access === "read" &&
-          (["read", "write", "admin"].includes(p) || planovaniTiskar || maketyVyroba || maketyGrafika)
+          (["read", "write", "admin"].includes(p) || planovaniTiskar)
         )
           return true;
         if (access === "write" && ["write", "admin"].includes(p)) return true;

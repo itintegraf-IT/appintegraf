@@ -6,6 +6,13 @@ import Link from "next/link";
 import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, Printer, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound, Layers } from "lucide-react";
 import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
 import { TotpAdminPanel } from "@/components/admin/TotpAdminPanel";
+import {
+  hasMaketyGrafikaFlag,
+  hasMaketyVyrobaFlag,
+  isMaketyModuleEnabled,
+  maketyBaseLevelFromAccess,
+  normalizeMaketyModuleAccessForSave,
+} from "@/lib/makety-module-access-flags";
 
 const AVAILABLE_MODULES = [
   { key: "contacts", label: "Kontakty", icon: Users },
@@ -40,17 +47,14 @@ function getPermissionOptions(moduleKey: string) {
       { value: "admin", label: "Admin" },
     ] as const;
   }
-  if (moduleKey === "makety") {
-    return [
-      { value: "read", label: "Účastník (vidí své zakázky)" },
-      { value: "write", label: "Zadavatel" },
-      { value: "vyroba", label: "Výroba maket" },
-      { value: "grafika", label: "Grafika" },
-      { value: "admin", label: "Admin modulu" },
-    ] as const;
-  }
   return PERMISSION_LEVELS;
 }
+
+const MAKETY_BASE_OPTIONS = [
+  { value: "read", label: "Účastník (vidí své zakázky)" },
+  { value: "write", label: "Zadavatel" },
+  { value: "admin", label: "Admin modulu" },
+] as const;
 
 type Role = { id: number; name: string };
 type Department = { id: number; name: string; code?: string | null };
@@ -173,10 +177,49 @@ export function AdminUserForm({ user }: { user?: User }) {
     setForm((prev) => {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (visible) {
-        next[moduleKey] = "read"; // výchozí Viewer
+        if (moduleKey === "makety") {
+          next.makety = maketyBaseLevelFromAccess(next) || "read";
+        } else {
+          next[moduleKey] = "read";
+        }
       } else {
         delete next[moduleKey];
         if (moduleKey === "planovani") delete next.planovani_machine;
+        if (moduleKey === "makety") {
+          delete next.makety_vyroba;
+          delete next.makety_grafika;
+        }
+      }
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setMaketyBaseLevel = (level: string) => {
+    setForm((prev) => ({
+      ...prev,
+      module_access: { ...prev.module_access, makety: level },
+    }));
+  };
+
+  const setMaketyProductionFlag = (checked: boolean) => {
+    setForm((prev) => {
+      const next: ModuleAccessMap = { ...prev.module_access };
+      if (checked) next.makety_vyroba = "1";
+      else delete next.makety_vyroba;
+      if (!maketyBaseLevelFromAccess(next) && (checked || hasMaketyGrafikaFlag(next))) {
+        next.makety = "read";
+      }
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setMaketyGrafikaFlag = (checked: boolean) => {
+    setForm((prev) => {
+      const next: ModuleAccessMap = { ...prev.module_access };
+      if (checked) next.makety_grafika = "1";
+      else delete next.makety_grafika;
+      if (!maketyBaseLevelFromAccess(next) && (checked || hasMaketyVyrobaFlag(next))) {
+        next.makety = "read";
       }
       return { ...prev, module_access: next };
     });
@@ -276,9 +319,19 @@ export function AdminUserForm({ user }: { user?: User }) {
     try {
       const url = isEdit ? `/api/admin/users/${user!.id}` : "/api/admin/users";
       const method = isEdit ? "PUT" : "POST";
+      const moduleAccess = isMaketyModuleEnabled(form.module_access)
+        ? normalizeMaketyModuleAccessForSave(form.module_access)
+        : (() => {
+            const next = { ...form.module_access };
+            delete next.makety;
+            delete next.makety_vyroba;
+            delete next.makety_grafika;
+            return next;
+          })();
+
       const body: Record<string, unknown> = {
         ...form,
-        module_access: form.module_access,
+        module_access: moduleAccess,
         shared_mail_ids: form.shared_mail_ids,
         password_custom: form.password_custom || undefined,
       };
@@ -687,8 +740,12 @@ export function AdminUserForm({ user }: { user?: User }) {
         >
           {AVAILABLE_MODULES.map((mod) => {
             const Icon = mod.icon;
-            const level = form.module_access[mod.key] ?? "";
-            const isVisible = !!level;
+            const isMakety = mod.key === "makety";
+            const level = isMakety
+              ? maketyBaseLevelFromAccess(form.module_access) ||
+                (isMaketyModuleEnabled(form.module_access) ? "read" : "")
+              : (form.module_access[mod.key] ?? "");
+            const isVisible = isMakety ? isMaketyModuleEnabled(form.module_access) : !!level;
             return (
               <div
                 key={mod.key}
@@ -705,25 +762,68 @@ export function AdminUserForm({ user }: { user?: User }) {
                   <Icon className="h-5 w-5 shrink-0 text-gray-600" />
                   <span className="text-sm font-medium">{mod.label}</span>
                 </label>
-                <select
-                  value={isVisible ? level : ""}
-                  onChange={(e) => setModulePermission(mod.key, e.target.value)}
-                  disabled={!isVisible || isAdminRoleSelected}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <option value="">—</option>
-                  {getPermissionOptions(mod.key).map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                  {mod.key === "planovani" &&
-                    PLANOVA_EXTRA_LEVELS.map((opt) => (
+                {isMakety ? (
+                  <>
+                    <select
+                      value={isVisible ? level || "read" : ""}
+                      onChange={(e) => setMaketyBaseLevel(e.target.value)}
+                      disabled={!isVisible || isAdminRoleSelected}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      title="Základní úroveň v modulu"
+                    >
+                      <option value="">—</option>
+                      {MAKETY_BASE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    {isVisible && (
+                      <div className="flex flex-wrap items-center gap-4 text-sm">
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hasMaketyVyrobaFlag(form.module_access)}
+                            onChange={(e) => setMaketyProductionFlag(e.target.checked)}
+                            disabled={isAdminRoleSelected}
+                            className="rounded"
+                          />
+                          <span>Výroba maket</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hasMaketyGrafikaFlag(form.module_access)}
+                            onChange={(e) => setMaketyGrafikaFlag(e.target.checked)}
+                            disabled={isAdminRoleSelected}
+                            className="rounded"
+                          />
+                          <span>Grafika</span>
+                        </label>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <select
+                    value={isVisible ? level : ""}
+                    onChange={(e) => setModulePermission(mod.key, e.target.value)}
+                    disabled={!isVisible || isAdminRoleSelected}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <option value="">—</option>
+                    {getPermissionOptions(mod.key).map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {opt.label}
                       </option>
                     ))}
-                </select>
+                    {mod.key === "planovani" &&
+                      PLANOVA_EXTRA_LEVELS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                  </select>
+                )}
                 {mod.key === "planovani" && level === "tiskar" && (
                   <select
                     value={form.module_access.planovani_machine ?? "XL_105"}
