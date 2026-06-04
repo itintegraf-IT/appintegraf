@@ -1,4 +1,11 @@
 import { prisma } from "@/lib/db";
+import {
+  canViewAllMaketyTypes,
+} from "@/lib/makety-access";
+import {
+  hasMaketyGrafikaAccess,
+  hasMaketyVyrobaAccess,
+} from "@/lib/auth-utils";
 import { sortMaketyProductionQueueByAssignee } from "@/lib/makety-queue";
 import { type MaketyWorkType } from "@/lib/makety-work-type";
 
@@ -85,13 +92,32 @@ export function maketaToGridEvent(maketa: {
 
 export type MaketyCalendarMode = "personal" | "vyroba" | "grafika";
 
+/** Org přehled (vyroba/grafika) nebo personal filtr pro zadavatele. */
+export async function resolveMaketyCalendarFetchParams(
+  userId: number,
+  workType: MaketyWorkType
+): Promise<{ mode: MaketyCalendarMode; workType?: MaketyWorkType }> {
+  if (await canViewAllMaketyTypes(userId)) {
+    return { mode: workType === "grafika" ? "grafika" : "vyroba" };
+  }
+  if (workType === "maketa" && (await hasMaketyVyrobaAccess(userId))) {
+    return { mode: "vyroba" };
+  }
+  if (workType === "grafika" && (await hasMaketyGrafikaAccess(userId))) {
+    return { mode: "grafika" };
+  }
+  return { mode: "personal", workType };
+}
+
 export async function fetchMaketyForCalendarRange(params: {
   fromDate: Date;
   toDate: Date;
   userId: number;
   mode: MaketyCalendarMode;
+  /** U režimu personal omezí na maketa nebo grafika (zadavatel v modulovém kalendáři). */
+  workType?: MaketyWorkType;
 }): Promise<MaketyGridEvent[]> {
-  const { fromDate, toDate, userId, mode } = params;
+  const { fromDate, toDate, userId, mode, workType } = params;
 
   let where: Record<string, unknown> = {
     status: { notIn: ["done", "cancelled"] },
@@ -104,6 +130,7 @@ export async function fetchMaketyForCalendarRange(params: {
       ...where,
       OR: [{ assignee_user_id: userId }, { created_by: userId }],
     };
+    if (workType) where.work_type = workType;
   } else if (mode === "vyroba") {
     where.work_type = "maketa";
   } else if (mode === "grafika") {

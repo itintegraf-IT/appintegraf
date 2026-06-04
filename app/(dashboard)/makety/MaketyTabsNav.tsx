@@ -28,8 +28,8 @@ export function MaketyTabsNav({
   const isFronta = pathname === "/makety/fronta";
 
   const showZadani = canWrite || canModuleAdmin;
-  const showKalendarMaket = canModuleAdmin || canVyroba;
-  const showKalendarGrafika = canModuleAdmin || canGrafika;
+  const showKalendarMaket = canModuleAdmin || canVyroba || canWrite;
+  const showKalendarGrafika = canModuleAdmin || canGrafika || canWrite;
 
   const tabClass = (active: boolean) =>
     `inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${

@@ -24,6 +24,20 @@ export async function canViewAllMaketyTypes(userId: number): Promise<boolean> {
   return hasModuleAccess(userId, "makety", "admin");
 }
 
+/** Kalendář maket na plotru v modulu Makety (org přehled nebo vlastní zakázky zadavatele). */
+export async function canViewMaketyPlotrCalendar(userId: number): Promise<boolean> {
+  if (await canViewAllMaketyTypes(userId)) return true;
+  if (await hasMaketyVyrobaAccess(userId)) return true;
+  return hasModuleAccess(userId, "makety", "write");
+}
+
+/** Kalendář grafiky v modulu Makety. */
+export async function canViewMaketyGrafikaCalendar(userId: number): Promise<boolean> {
+  if (await canViewAllMaketyTypes(userId)) return true;
+  if (await hasMaketyGrafikaAccess(userId)) return true;
+  return hasModuleAccess(userId, "makety", "write");
+}
+
 /**
  * null = bez filtru work_type (admin modulu / všichni typy u osobního přehledu).
  * Pole = org-wide fronta jen pro uvedené typy (vyroba → maketa, grafika → grafika).

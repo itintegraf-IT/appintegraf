@@ -123,6 +123,7 @@ export default async function MaketyListPage({
 
   const showVyrobaHint = canModuleAdmin || (await hasMaketyVyrobaAccess(userId));
   const showGrafikaHint = canModuleAdmin || (await hasMaketyGrafikaAccess(userId));
+  const showZadavatelCalendarHint = canWrite && !showVyrobaHint && !showGrafikaHint;
 
   return (
     <div className="space-y-5">
@@ -162,6 +163,19 @@ export default async function MaketyListPage({
       {showGrafikaHint && (
         <p className="text-sm text-gray-600">
           Fronta grafiky je seřazená podle termínu a priority (pořadí může upravit supervizor).{" "}
+          <Link href="/makety/kalendar-grafika" className="font-medium text-violet-600 hover:underline">
+            Kalendář grafiky
+          </Link>
+          .
+        </p>
+      )}
+      {showZadavatelCalendarHint && (
+        <p className="text-sm text-gray-600">
+          Termíny svých zakázek podle přiřazení a dokončení:{" "}
+          <Link href="/makety/kalendar" className="font-medium text-violet-600 hover:underline">
+            Kalendář maket
+          </Link>
+          ,{" "}
           <Link href="/makety/kalendar-grafika" className="font-medium text-violet-600 hover:underline">
             Kalendář grafiky
           </Link>
