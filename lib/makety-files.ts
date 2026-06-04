@@ -1,11 +1,34 @@
 import path from "path";
-import { resolveUploadFilePath } from "@/lib/backup/files";
 
 export const MAKETY_FILE_MODULE = "makety";
 
 /** Absolutní cesta k souboru v `public/uploads/…`. */
 export function resolveMaketyFileDiskPath(filePath: string): string | null {
-  return resolveUploadFilePath(filePath);
+  const normalized = filePath.replace(/\\/g, "/");
+  if (normalized.startsWith("/uploads/")) {
+    return path.join(process.cwd(), "public", normalized.slice(1));
+  }
+  if (normalized.startsWith("uploads/")) {
+    return path.join(process.cwd(), "public", normalized);
+  }
+  if (path.isAbsolute(filePath)) return filePath;
+  return null;
+}
+
+/** HTTP hlavička Content-Disposition – pouze ASCII v filename=, UTF-8 v filename*. */
+export function maketyFileContentDisposition(originalName: string): string {
+  const name = (originalName || "soubor").replace(/[\r\n"]/g, "_").trim() || "soubor";
+  const ascii = name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._ -]/g, "_")
+    .slice(0, 150) || "soubor";
+  return `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+}
+
+export function sanitizeMaketyMimeType(mime: string | null | undefined): string {
+  const raw = (mime || "application/octet-stream").split(";")[0].trim();
+  return /^[\w.+-]+\/[\w.+-]+$/.test(raw) ? raw : "application/octet-stream";
 }
 
 export const MAKETY_MAX_BYTES = 20 * 1024 * 1024;
