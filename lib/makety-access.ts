@@ -8,6 +8,16 @@ import {
 } from "@/lib/auth-utils";
 import { type MaketyWorkType } from "@/lib/makety-work-type";
 
+/** Správa fronty výroby (řazení, priorita) – admin modulu nebo globální admin. */
+export async function canManageMaketyQueue(userId: number): Promise<boolean> {
+  return canViewAllMaketyTypes(userId);
+}
+
+/** Alias: správa modulu (přehled všech zakázek, fronta, priorita, mazání). */
+export async function canAdministerMakety(userId: number): Promise<boolean> {
+  return canViewAllMaketyTypes(userId);
+}
+
 /** Globální admin nebo admin modulu – vidí všechny typy zakázek. */
 export async function canViewAllMaketyTypes(userId: number): Promise<boolean> {
   if (await isAdmin(userId)) return true;
@@ -86,6 +96,18 @@ export async function userCanEditMaketa(userId: number, maketaId: number): Promi
   if (!(await hasModuleAccess(userId, "makety", "write"))) return false;
   const row = await prisma.makety.findFirst({
     where: { id: maketaId, created_by: userId },
+    select: { id: true, status: true },
+  });
+  if (!row) return false;
+  return row.status !== "done" && row.status !== "cancelled";
+}
+
+/** Smazání – zadavatel u své aktivní zakázky, nebo admin modulu / globální admin. */
+export async function userCanDeleteMaketa(userId: number, maketaId: number): Promise<boolean> {
+  if (await userCanEditMaketa(userId, maketaId)) return true;
+  if (!(await canViewAllMaketyTypes(userId))) return false;
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId },
     select: { id: true },
   });
   return row != null;

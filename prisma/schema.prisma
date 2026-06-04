@@ -353,6 +353,7 @@ model makety {
   dimensions         String?              @db.VarChar(255)
   quantity           Int?
   priority           String               @default("normal") @db.VarChar(20)
+  queue_position     Int?
   assigned_at        DateTime             @default(now()) @db.DateTime(0)
   due_at             DateTime             @db.DateTime(0)
   assignee_user_id   Int?
@@ -371,6 +372,7 @@ model makety {
   @@index([due_at], map: "idx_makety_due")
   @@index([status], map: "idx_makety_status")
   @@index([work_type], map: "idx_makety_work_type")
+  @@index([work_type, assignee_user_id, queue_position], map: "idx_makety_queue")
 }
 
 model makety_departments {

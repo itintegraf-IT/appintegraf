@@ -2,16 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Archive, Calendar, List, Plus, Users } from "lucide-react";
+import { Archive, Calendar, LayoutList, List, Plus, Users } from "lucide-react";
 
 export function MaketyTabsNav({
   canWrite,
+  canModuleAdmin,
   canVyroba,
   canGrafika,
+  canManageQueue,
 }: {
   canWrite: boolean;
+  canModuleAdmin: boolean;
   canVyroba: boolean;
   canGrafika: boolean;
+  canManageQueue: boolean;
 }) {
   const pathname = usePathname();
   const isList = pathname === "/makety";
@@ -21,6 +25,11 @@ export function MaketyTabsNav({
   const isArchive = pathname === "/makety/archive";
   const isKalendar = pathname === "/makety/kalendar";
   const isKalendarGrafika = pathname === "/makety/kalendar-grafika";
+  const isFronta = pathname === "/makety/fronta";
+
+  const showZadani = canWrite || canModuleAdmin;
+  const showKalendarMaket = canModuleAdmin || canVyroba;
+  const showKalendarGrafika = canModuleAdmin || canGrafika;
 
   const tabClass = (active: boolean) =>
     `inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
@@ -33,9 +42,15 @@ export function MaketyTabsNav({
     <nav className="mb-6 flex flex-wrap gap-2 border-b border-gray-200 pb-4">
       <Link href="/makety" className={tabClass(isList)}>
         <List className="h-4 w-4" />
-        Moje makety
+        {canModuleAdmin ? "Přehled zakázek" : "Moje makety"}
       </Link>
-      {canWrite && (
+      {canManageQueue && (
+        <Link href="/makety/fronta" className={tabClass(isFronta)}>
+          <LayoutList className="h-4 w-4" />
+          Fronta výroby
+        </Link>
+      )}
+      {showZadani && (
         <Link href="/makety/zadani" className={tabClass(isZadani)}>
           <Users className="h-4 w-4" />
           Sledování zadání
@@ -53,13 +68,13 @@ export function MaketyTabsNav({
           Nová grafika
         </Link>
       )}
-      {canVyroba && (
+      {showKalendarMaket && (
         <Link href="/makety/kalendar" className={tabClass(isKalendar)}>
           <Calendar className="h-4 w-4" />
           Kalendář maket
         </Link>
       )}
-      {canGrafika && (
+      {showKalendarGrafika && (
         <Link href="/makety/kalendar-grafika" className={tabClass(isKalendarGrafika)}>
           <Calendar className="h-4 w-4" />
           Kalendář grafiky

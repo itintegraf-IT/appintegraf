@@ -1,6 +1,12 @@
 import path from "path";
+import { resolveUploadFilePath } from "@/lib/backup/files";
 
 export const MAKETY_FILE_MODULE = "makety";
+
+/** Absolutní cesta k souboru v `public/uploads/…`. */
+export function resolveMaketyFileDiskPath(filePath: string): string | null {
+  return resolveUploadFilePath(filePath);
+}
 
 export const MAKETY_MAX_BYTES = 20 * 1024 * 1024;
 

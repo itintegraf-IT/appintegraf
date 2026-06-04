@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sortMaketyProductionQueueByAssignee } from "@/lib/makety-queue";
 import { type MaketyWorkType } from "@/lib/makety-work-type";
 
 function isMissingMaketyTableError(err: unknown): boolean {
@@ -112,14 +113,20 @@ export async function fetchMaketyForCalendarRange(params: {
   try {
     const rows = await prisma.makety.findMany({
       where,
-      orderBy: { due_at: "asc" },
       take: 300,
       include: {
         users_assignee: { select: { first_name: true, last_name: true } },
       },
     });
 
-    return rows.map(maketaToGridEvent);
+    const sorted =
+      mode === "vyroba" || mode === "grafika"
+        ? sortMaketyProductionQueueByAssignee(rows)
+        : rows.sort(
+            (a, b) => new Date(a.due_at).getTime() - new Date(b.due_at).getTime()
+          );
+
+    return sorted.map(maketaToGridEvent);
   } catch (err) {
     if (isMissingMaketyTableError(err)) {
       console.warn("[makety-calendar] Tabulka makety v DB chybí – spusťte npm run db:makety-migrate");

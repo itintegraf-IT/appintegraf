@@ -10,6 +10,10 @@ import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
 import { parseMaketaPriority } from "@/lib/makety-status";
 import { maketyAssigneeRoleLabel, parseMaketyWorkType } from "@/lib/makety-work-type";
 import { userHasMaketyGrafikaRole } from "@/lib/makety-grafika-users";
+import {
+  nextQueuePositionForAssignee,
+  sortMaketyProductionQueueByAssignee,
+} from "@/lib/makety-queue";
 import { userHasMaketyVyrobaRole } from "@/lib/makety-vyroba-users";
 
 export async function GET() {
@@ -28,7 +32,6 @@ export async function GET() {
 
   const rows = await prisma.makety.findMany({
     where,
-    orderBy: { due_at: "asc" },
     take: 200,
     include: {
       users_assignee: { select: { first_name: true, last_name: true } },
@@ -36,7 +39,7 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json({ makety: rows });
+  return NextResponse.json({ makety: sortMaketyProductionQueueByAssignee(rows) });
 }
 
 export async function POST(req: NextRequest) {
@@ -104,6 +107,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const queue_position = await nextQueuePositionForAssignee(work_type, assignee_user_id);
+
     const created = await prisma.makety.create({
       data: {
         body,
@@ -112,6 +117,7 @@ export async function POST(req: NextRequest) {
         dimensions,
         quantity,
         priority,
+        queue_position,
         due_at,
         assignee_user_id,
         created_by: userId,

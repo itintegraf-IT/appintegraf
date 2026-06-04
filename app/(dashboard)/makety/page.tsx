@@ -2,8 +2,14 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
-import { hasMaketyGrafikaAccess, hasMaketyVyrobaAccess } from "@/lib/auth-utils";
-import { buildMaketyListWhere } from "@/lib/makety-access";
+import {
+  hasMaketyGrafikaAccess,
+  hasMaketyVyrobaAccess,
+  hasModuleAccess,
+} from "@/lib/auth-utils";
+import { buildMaketyListWhere, canViewAllMaketyTypes } from "@/lib/makety-access";
+import { MaketyAdminRowActions } from "./MaketyAdminRowActions";
+import { sortMaketyProductionQueueByAssignee } from "@/lib/makety-queue";
 import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import {
@@ -54,6 +60,8 @@ export default async function MaketyListPage({
 }) {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
+  const canWrite = await hasModuleAccess(userId, "makety", "write");
+  const canModuleAdmin = await canViewAllMaketyTypes(userId);
   const params = await searchParams;
   const selectedStatus: MaketaStatus | "" =
     params.status === "open" ||
@@ -82,22 +90,25 @@ export default async function MaketyListPage({
   const baseWhere = await buildMaketyListWhere(userId, {});
   applyTermToWhere(baseWhere, selectedTerm, termBounds);
 
-  const allForTerm = await prisma.makety.findMany({
+  const allForTermRaw = await prisma.makety.findMany({
     where: baseWhere,
-    orderBy: { due_at: "asc" },
     take: 500,
     include: {
       users_assignee: { select: { first_name: true, last_name: true } },
       users_creator: { select: { first_name: true, last_name: true } },
     },
   });
+  const allForTerm = sortMaketyProductionQueueByAssignee(allForTermRaw);
 
-  const grouped = STATUS_ORDER.map((status) => ({
-    status,
-    label: maketaStatusLabel(status),
-    count: allForTerm.filter((r) => r.status === status).length,
-    preview: allForTerm.filter((r) => r.status === status).slice(0, 3),
-  }));
+  const grouped = STATUS_ORDER.map((status) => {
+    const items = allForTerm.filter((r) => r.status === status);
+    return {
+      status,
+      label: maketaStatusLabel(status),
+      count: items.length,
+      preview: items.slice(0, 3),
+    };
+  });
 
   const rows = selectedStatus
     ? allForTerm.filter((r) => r.status === selectedStatus)
@@ -105,10 +116,13 @@ export default async function MaketyListPage({
 
   const tableHeading = selectedStatus
     ? maketaStatusLabel(selectedStatus)
-    : "Aktivní zakázky";
+    : canModuleAdmin
+      ? "Přehled aktivních zakázek"
+      : "Aktivní zakázky";
+  const tableColSpan = canModuleAdmin ? 9 : 8;
 
-  const showVyrobaHint = await hasMaketyVyrobaAccess(userId);
-  const showGrafikaHint = await hasMaketyGrafikaAccess(userId);
+  const showVyrobaHint = canModuleAdmin || (await hasMaketyVyrobaAccess(userId));
+  const showGrafikaHint = canModuleAdmin || (await hasMaketyGrafikaAccess(userId));
 
   return (
     <div className="space-y-5">
@@ -134,18 +148,22 @@ export default async function MaketyListPage({
       )}
       {showVyrobaHint && (
         <p className="text-sm text-gray-600">
-          Jako výroba maket máte přístup k{" "}
+          Fronta maket je seřazená podle termínu a priority (pořadí může upravit supervizor v{" "}
+          <Link href="/makety/fronta" className="font-medium text-violet-600 hover:underline">
+            Frontě výroby
+          </Link>
+          ).{" "}
           <Link href="/makety/kalendar" className="font-medium text-violet-600 hover:underline">
-            kalendáři maket
+            Kalendář maket
           </Link>
           .
         </p>
       )}
       {showGrafikaHint && (
         <p className="text-sm text-gray-600">
-          Jako grafika máte přístup k{" "}
+          Fronta grafiky je seřazená podle termínu a priority (pořadí může upravit supervizor).{" "}
           <Link href="/makety/kalendar-grafika" className="font-medium text-violet-600 hover:underline">
-            kalendáři grafiky
+            Kalendář grafiky
           </Link>
           .
         </p>
@@ -244,21 +262,30 @@ export default async function MaketyListPage({
               <th className="px-4 py-3 font-semibold text-gray-700">Typ</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Zakázka</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Popis</th>
+              {canModuleAdmin && (
+                <th className="px-4 py-3 font-semibold text-gray-700">Zadal</th>
+              )}
               <th className="px-4 py-3 font-semibold text-gray-700">Přiřazeno</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Priorita</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Stav</th>
+              <th className="px-4 py-3 font-semibold text-gray-700">Akce</th>
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-10 text-center text-gray-500">
+                <td colSpan={tableColSpan} className="px-4 py-10 text-center text-gray-500">
                   Žádné zakázky k zobrazení.
                 </td>
               </tr>
             ) : (
               rows.map((r) => {
                 const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+                const canEditRow =
+                  canWrite &&
+                  r.created_by === userId &&
+                  r.status !== "done" &&
+                  r.status !== "cancelled";
                 return (
                   <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50/80">
                     <td className="px-4 py-3 text-gray-800">{formatDateTimeCz(new Date(r.due_at))}</td>
@@ -274,6 +301,13 @@ export default async function MaketyListPage({
                         {r.body.length > 80 ? "…" : ""}
                       </Link>
                     </td>
+                    {canModuleAdmin && (
+                      <td className="px-4 py-3 text-gray-700">
+                        {r.users_creator
+                          ? `${r.users_creator.first_name} ${r.users_creator.last_name}`
+                          : "—"}
+                      </td>
+                    )}
                     <td className="px-4 py-3 text-gray-700">
                       {r.users_assignee
                         ? `${r.users_assignee.first_name} ${r.users_assignee.last_name}`
@@ -292,6 +326,27 @@ export default async function MaketyListPage({
                       >
                         {maketaStatusLabel(r.status)}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {canEditRow && (
+                          <Link
+                            href={`/makety/${r.id}/edit`}
+                            className="text-sm font-medium text-violet-600 hover:underline"
+                          >
+                            Upravit
+                          </Link>
+                        )}
+                        {canModuleAdmin ? (
+                          <MaketyAdminRowActions
+                            id={r.id}
+                            priority={r.priority}
+                            status={r.status}
+                          />
+                        ) : (
+                          !canEditRow && <span className="text-gray-400">—</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

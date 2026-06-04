@@ -8,7 +8,14 @@ import {
   maketyWorkTypeLabel,
   type MaketyWorkType,
 } from "@/lib/makety-work-type";
-import { userCanViewMaketa, userCanEditMaketa, userCanCompleteMaketa } from "@/lib/makety-access";
+import {
+  userCanViewMaketa,
+  userCanEditMaketa,
+  userCanDeleteMaketa,
+  userCanCompleteMaketa,
+  canManageMaketyQueue,
+} from "@/lib/makety-access";
+import { MaketyDetailPrioritySelect } from "./MaketyDetailPrioritySelect";
 import { DeleteMaketaButton } from "./DeleteMaketaButton";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import {
@@ -58,8 +65,11 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
   if (!maketa) notFound();
 
   const canEdit = await userCanEditMaketa(userId, id);
+  const canDelete = await userCanDeleteMaketa(userId, id);
   const canComplete = await userCanCompleteMaketa(userId, id);
   const isArchived = maketa.status === "done" || maketa.status === "cancelled";
+  const canManagePriority =
+    (await canManageMaketyQueue(userId)) && !isArchived;
   const workType = (maketa.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
 
   return (
@@ -80,9 +90,17 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            {canEdit && (
+              <Link
+                href={`/makety/${maketa.id}/edit`}
+                className="rounded-lg border border-violet-300 px-4 py-2 text-sm font-medium text-violet-700 hover:bg-violet-50"
+              >
+                Upravit
+              </Link>
+            )}
             {canComplete && maketa.status === "open" && <StartMaketaButton id={maketa.id} />}
             {canComplete && !isArchived && <CompleteMaketaButton id={maketa.id} />}
-            {canEdit && <DeleteMaketaButton id={maketa.id} />}
+            {canDelete && <DeleteMaketaButton id={maketa.id} isAdmin={!canEdit && canDelete} />}
           </div>
         </div>
 
@@ -103,13 +121,17 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
           </div>
           <div>
             <dt className="text-xs font-medium uppercase text-gray-500">Priorita</dt>
-            <dd className="mt-1">
-              <span
-                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaPriorityBadgeClass(maketa.priority)}`}
-              >
-                {maketaPriorityLabel(maketa.priority)}
-              </span>
-            </dd>
+            {canManagePriority ? (
+              <MaketyDetailPrioritySelect maketaId={maketa.id} initialPriority={maketa.priority} />
+            ) : (
+              <dd className="mt-1">
+                <span
+                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaPriorityBadgeClass(maketa.priority)}`}
+                >
+                  {maketaPriorityLabel(maketa.priority)}
+                </span>
+              </dd>
+            )}
           </div>
           <div>
             <dt className="text-xs font-medium uppercase text-gray-500">Termín</dt>

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { buildMaketyListWhere } from "@/lib/makety-access";
+import { buildMaketyListWhere, canViewAllMaketyTypes } from "@/lib/makety-access";
+import { MaketyAdminRowActions } from "../MaketyAdminRowActions";
 import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import { maketaStatusBadgeClass, maketaStatusLabel } from "@/lib/makety-status";
@@ -11,6 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function MaketyArchivePage() {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
+  const canModuleAdmin = await canViewAllMaketyTypes(userId);
   const where = await buildMaketyListWhere(userId, {
     status: { in: ["done", "cancelled"] },
   });
@@ -37,12 +39,15 @@ export default async function MaketyArchivePage() {
               <th className="px-4 py-3 font-semibold text-gray-700">Popis</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Přiřazeno</th>
               <th className="px-4 py-3 font-semibold text-gray-700">Stav</th>
+              {canModuleAdmin && (
+                <th className="px-4 py-3 font-semibold text-gray-700">Akce</th>
+              )}
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-gray-500">
+                <td colSpan={canModuleAdmin ? 7 : 6} className="px-4 py-10 text-center text-gray-500">
                   Archiv je prázdný.
                 </td>
               </tr>
@@ -75,6 +80,16 @@ export default async function MaketyArchivePage() {
                       {maketaStatusLabel(r.status)}
                     </span>
                   </td>
+                  {canModuleAdmin && (
+                    <td className="px-4 py-3">
+                      <MaketyAdminRowActions
+                        id={r.id}
+                        priority={r.priority}
+                        status={r.status}
+                        showPriority={false}
+                      />
+                    </td>
+                  )}
                 </tr>
               );
               })

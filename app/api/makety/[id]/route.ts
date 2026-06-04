@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
-import { userCanViewMaketa, userCanEditMaketa } from "@/lib/makety-access";
+import { userCanViewMaketa, userCanEditMaketa, userCanDeleteMaketa } from "@/lib/makety-access";
+import { revalidateMaketyViews } from "@/lib/makety-revalidate";
 import { notifyMaketaRecipients } from "@/lib/makety-notify";
 import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
 import { parseMaketaPriority } from "@/lib/makety-status";
@@ -95,8 +97,6 @@ export async function PUT(
       typeof body.priority === "string"
         ? parseMaketaPriority(body.priority)
         : existing.priority;
-    const nextStatus =
-      typeof body.status === "string" ? body.status.trim() : existing.status;
 
     let nextQuantity: number | null = existing.quantity;
     if ("quantity" in body) {
@@ -177,7 +177,6 @@ export async function PUT(
         priority: nextPriority,
         due_at: nextDue,
         assignee_user_id: nextAssignee,
-        status: nextStatus,
       },
     });
 
@@ -196,6 +195,8 @@ export async function PUT(
       include: includeDetail,
     });
 
+    revalidateMaketyViews();
+    revalidatePath(`/makety/${id}`);
     return NextResponse.json({ success: true, maketa });
   } catch (e) {
     console.error("PUT /api/makety/[id]", e);
@@ -221,8 +222,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
-  if (!(await userCanEditMaketa(userId, id))) {
-    return NextResponse.json({ error: "Smazat může jen zadavatel" }, { status: 403 });
+  if (!(await userCanDeleteMaketa(userId, id))) {
+    return NextResponse.json({ error: "Nemáte oprávnění smazat zakázku" }, { status: 403 });
   }
 
   const files = await prisma.file_uploads.findMany({
@@ -234,5 +235,6 @@ export async function DELETE(
   }
 
   await prisma.makety.delete({ where: { id } });
+  revalidateMaketyViews();
   return NextResponse.json({ success: true });
 }

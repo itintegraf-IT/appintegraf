@@ -134,7 +134,7 @@ export function MaketaFilesPanel({
           {files.map((f) => (
             <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
               <a
-                href={f.file_path}
+                href={`/api/makety/${maketaId}/files/${f.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="break-all text-violet-600 hover:underline"

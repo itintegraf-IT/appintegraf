@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { hasMaketyGrafikaAccess } from "@/lib/auth-utils";
+import { canViewAllMaketyTypes } from "@/lib/makety-access";
 import { WeekCalendarGrid } from "@/app/(dashboard)/calendar/WeekCalendarGrid";
 import { MaketyCalendarNav } from "../kalendar/MaketyCalendarNav";
 import { formatDateLocal, getWeekStart, getWeekEnd } from "@/app/(dashboard)/calendar/lib/week-utils";
@@ -17,7 +18,7 @@ export default async function MaketyKalendarGrafikaPage({
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const userId = parseInt(session.user.id, 10);
-  if (!(await hasMaketyGrafikaAccess(userId))) {
+  if (!(await hasMaketyGrafikaAccess(userId)) && !(await canViewAllMaketyTypes(userId))) {
     redirect("/makety");
   }
 
@@ -47,7 +48,8 @@ export default async function MaketyKalendarGrafikaPage({
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">
-        Přehled aktivních zakázek grafiky. Kliknutím na položku otevřete detail.
+        Přehled aktivních zakázek grafiky podle termínu. Pořadí a priorita z Fronty výroby (záložka Grafika)
+        se berou při načtení stránky (priorita = barva pruhu). Kliknutím na položku otevřete detail.
       </p>
       <MaketyCalendarNav from={from} to={to} basePath="/makety/kalendar-grafika" />
       <WeekCalendarGrid

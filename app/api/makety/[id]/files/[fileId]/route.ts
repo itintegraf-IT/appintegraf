@@ -3,9 +3,68 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { userCanViewMaketa, userCanEditMaketa } from "@/lib/makety-access";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
-import { MAKETY_FILE_MODULE } from "@/lib/makety-files";
-import { unlink } from "fs/promises";
-import path from "path";
+import { MAKETY_FILE_MODULE, resolveMaketyFileDiskPath } from "@/lib/makety-files";
+import { readFile, unlink } from "fs/promises";
+
+function contentDispositionFilename(name: string): string {
+  const safe = name.replace(/[^\w.\- ()áčďéěíňóřšťúůýžÁČĎÉĚÍŇÓŘŠŤÚŮÝŽ]/g, "_").slice(0, 200);
+  return `inline; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+}
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string; fileId: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return new NextResponse("Neautorizováno", { status: 401 });
+  }
+  const userId = parseInt(session.user.id, 10);
+  if (!(await canAccessMaketyModule(userId))) {
+    return new NextResponse("Nemáte oprávnění", { status: 403 });
+  }
+
+  const maketaId = parseInt((await params).id, 10);
+  const fileId = parseInt((await params).fileId, 10);
+  if (Number.isNaN(maketaId) || Number.isNaN(fileId)) {
+    return new NextResponse("Neplatné ID", { status: 400 });
+  }
+
+  if (!(await userCanViewMaketa(userId, maketaId))) {
+    return new NextResponse("Maketa nenalezena", { status: 404 });
+  }
+
+  const fileRow = await prisma.file_uploads.findFirst({
+    where: { id: fileId, module: MAKETY_FILE_MODULE, record_id: maketaId },
+  });
+  if (!fileRow) {
+    return new NextResponse("Soubor nenalezen", { status: 404 });
+  }
+
+  const diskPath = resolveMaketyFileDiskPath(fileRow.file_path);
+  if (!diskPath) {
+    return new NextResponse("Neplatná cesta k souboru", { status: 500 });
+  }
+
+  let buf: Buffer;
+  try {
+    buf = await readFile(diskPath);
+  } catch {
+    return new NextResponse(
+      "Soubor na serveru chybí. Pokud byl nahrán na jiném prostředí, nahrajte ho znovu.",
+      { status: 404 }
+    );
+  }
+
+  return new NextResponse(new Uint8Array(buf), {
+    headers: {
+      "Content-Type": fileRow.mime_type || "application/octet-stream",
+      "Content-Disposition": contentDispositionFilename(fileRow.original_filename),
+      "Content-Length": String(buf.length),
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
 
 export async function DELETE(
   _req: NextRequest,
@@ -42,7 +101,10 @@ export async function DELETE(
     return NextResponse.json({ error: "Soubor nenalezen" }, { status: 404 });
   }
 
-  const diskPath = path.join(process.cwd(), "public", fileRow.file_path.replace(/^\//, ""));
+  const diskPath = resolveMaketyFileDiskPath(fileRow.file_path);
+  if (!diskPath) {
+    return NextResponse.json({ error: "Neplatná cesta k souboru" }, { status: 500 });
+  }
   try {
     await unlink(diskPath);
   } catch {
