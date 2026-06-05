@@ -67,7 +67,7 @@ export async function createCalendarEventUnit(
       start_date: a.start,
       end_date: a.end,
     });
-    const notifMessage = `${a.creatorName} vytvořil/a událost „${displayTitle}“, která vyžaduje vaše schválení.`;
+    const notifMessage = `Událost „${displayTitle}“ vyžaduje vaše schválení. Žadatel: ${a.creatorName}. Jste uveden/a jako zástupce pro tuto událost.`;
     await db.notifications.create({
       data: {
         user_id: a.deputyIdNum,

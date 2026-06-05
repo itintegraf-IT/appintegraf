@@ -12,10 +12,21 @@ export function formatDateLocal(date: Date): string {
 }
 
 /** @see lib/datetime-cz.ts */
-export {
-  allDayYmdRangeToIsoStrings,
-  formatDateTimeLocalForInput,
-} from "@/lib/datetime-cz";
+export { formatDateTimeLocalForInput } from "@/lib/datetime-cz";
+
+/**
+ * Celodenní událost podle místních kalendářních dní (YYYY-MM-DD) → ISO do DB.
+ */
+export function allDayYmdRangeToIsoStrings(
+  startYmd: string,
+  endYmd: string
+): { start: string; end: string } {
+  const [ys, ms, ds] = startYmd.split("-").map(Number);
+  const [ye, me, de] = endYmd.split("-").map(Number);
+  const start = new Date(ys, ms - 1, ds, 0, 0, 0, 0);
+  const end = new Date(ye, me - 1, de, 23, 59, 59, 999);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
 
 /** Parsuje řetězec YYYY-MM-DD jako lokální datum (ne UTC). */
 export function parseDateLocal(str: string): Date {

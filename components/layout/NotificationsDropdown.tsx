@@ -18,6 +18,7 @@ export function NotificationsDropdown() {
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const [actionLoading, setActionLoading] = useState<Record<number, "approve" | "reject">>({});
   const [rejectOpenFor, setRejectOpenFor] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -30,6 +31,7 @@ export function NotificationsDropdown() {
       .then((data) => {
         setNotifications(data.notifications ?? []);
         setUnreadCount(data.unreadCount ?? 0);
+        setPendingApprovalsCount(data.pendingApprovalsCount ?? 0);
       })
       .catch(() => {});
   };
@@ -130,7 +132,20 @@ export function NotificationsDropdown() {
           </div>
           {notifications.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-              Žádné notifikace
+              {pendingApprovalsCount > 0 ? (
+                <>
+                  <p>Žádné systémové notifikace.</p>
+                  <Link
+                    href="/calendar?scope=mine"
+                    onClick={() => setOpen(false)}
+                    className="mt-2 inline-block text-xs font-medium text-blue-600 hover:text-blue-700"
+                  >
+                    Máte {pendingApprovalsCount} událostí ke schválení
+                  </Link>
+                </>
+              ) : (
+                "Žádné notifikace"
+              )}
             </div>
           ) : (
             <div className="py-1">

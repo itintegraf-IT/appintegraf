@@ -24,9 +24,34 @@ export async function GET(req: NextRequest) {
     take: 50,
   });
 
-  const unreadCount = await prisma.notifications.count({
+  const unreadNotificationsCount = await prisma.notifications.count({
     where: { user_id: userId, read_at: null },
   });
 
-  return NextResponse.json({ notifications, unreadCount });
+  const pendingApprovalsCount = await prisma.calendar_events.count({
+    where: {
+      OR: [
+        { deputy_id: userId, approval_status: "pending" },
+        {
+          approval_status: "deputy_approved",
+          calendar_approvals: {
+            some: {
+              approver_id: userId,
+              status: "pending",
+              approval_type: { not: "deputy" },
+            },
+          },
+        },
+      ],
+    },
+  });
+
+  const unreadCount = unreadNotificationsCount + pendingApprovalsCount;
+
+  return NextResponse.json({
+    notifications,
+    unreadCount,
+    unreadNotificationsCount,
+    pendingApprovalsCount,
+  });
 }

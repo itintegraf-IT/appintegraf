@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { formatDateCz, formatTimeCz } from "@/lib/datetime-cz";
 
 type Props = {
   eventId: number;
@@ -28,8 +27,9 @@ export function ConfirmMoveModal({
   const [error, setError] = useState<string | null>(null);
 
   const formatDate = (d: Date) =>
-    formatDateCz(d, { day: "numeric", month: "short", year: "numeric" });
-  const formatTime = (d: Date) => formatTimeCz(d);
+    d.toLocaleDateString("cs-CZ", { day: "numeric", month: "short", year: "numeric" });
+  const formatTime = (d: Date) =>
+    d.toLocaleTimeString("cs-CZ", { hour: "2-digit", minute: "2-digit" });
 
   const handleConfirm = async () => {
     setLoading(true);

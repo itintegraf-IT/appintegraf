@@ -19,10 +19,12 @@ export function MaketaFilesPanel({
   maketaId,
   canDelete,
   showUploadHint,
+  uploadHintText = "Nahrajte podklady pro výrobu makety — můžete vybrat více souborů najednou.",
 }: {
   maketaId: number;
   canDelete: boolean;
   showUploadHint?: boolean;
+  uploadHintText?: string;
 }) {
   const router = useRouter();
   const [files, setFiles] = useState<FileRow[]>([]);
@@ -103,7 +105,7 @@ export function MaketaFilesPanel({
       </p>
       {showUploadHint && (
         <p className="mb-2 text-sm text-violet-700">
-          Nahrajte podklady pro plotr — můžete vybrat více souborů najednou.
+          {uploadHintText}
         </p>
       )}
       <input
@@ -132,7 +134,7 @@ export function MaketaFilesPanel({
           {files.map((f) => (
             <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
               <a
-                href={f.file_path}
+                href={`/api/makety/${maketaId}/files/${f.id}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="break-all text-violet-600 hover:underline"

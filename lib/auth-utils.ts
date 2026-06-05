@@ -1,4 +1,9 @@
 import { prisma } from "@/lib/db";
+import {
+  roleHasMaketyGrafikaFromDecoded,
+  roleHasMaketyVyrobaFromDecoded,
+  roleMaketyGrantsModuleAccess,
+} from "@/lib/makety-module-access-flags";
 
 export type ModuleAccess = "read" | "write" | "admin";
 
@@ -93,13 +98,18 @@ export async function hasModuleAccess(
 
     // Per-module úroveň: { "contacts": "read", "equipment": "write", ... }
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-      const perm = (decoded as Record<string, unknown>)[module];
+      const record = decoded as Record<string, unknown>;
+      if (module === "makety" && roleMaketyGrantsModuleAccess(record, access)) return true;
+
+      const perm = record[module];
       if (perm === true) return true;
       if (typeof perm === "string") {
         const p = perm.toLowerCase();
         const planovaniTiskar = module === "planovani" && p === "tiskar";
-        const maketyVyroba = module === "makety" && p === "vyroba";
-        if (access === "read" && (["read", "write", "admin"].includes(p) || planovaniTiskar || maketyVyroba))
+        if (
+          access === "read" &&
+          (["read", "write", "admin"].includes(p) || planovaniTiskar)
+        )
           return true;
         if (access === "write" && ["write", "admin"].includes(p)) return true;
         if (access === "admin" && p === "admin") return true;
@@ -137,9 +147,8 @@ export async function isAdmin(userId: number): Promise<boolean> {
   return roles.some((r: RoleItem) => r.name?.toLowerCase() === "admin");
 }
 
-/** Úroveň výroby maket – kalendář výroby a širší přehled fronty. */
-export async function hasMaketyVyrobaAccess(userId: number): Promise<boolean> {
-  if (await isAdmin(userId)) return true;
+/** Pouze explicitní `makety: vyroba` v module_access (bez globálního admina). */
+export async function hasExplicitMaketyVyrobaRole(userId: number): Promise<boolean> {
   const roles = await getUserRoles(userId);
   for (const role of roles) {
     const rawAccess = role.module_access;
@@ -150,11 +159,40 @@ export async function hasMaketyVyrobaAccess(userId: number): Promise<boolean> {
       if (decoded === null) continue;
     }
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-      const perm = (decoded as Record<string, unknown>).makety;
-      if (typeof perm === "string" && perm.toLowerCase() === "vyroba") return true;
+      if (roleHasMaketyVyrobaFromDecoded(decoded as Record<string, unknown>)) return true;
     }
   }
   return false;
+}
+
+/** Úroveň výroby maket – kalendář a fronta plotru (včetně globálního admina). */
+export async function hasMaketyVyrobaAccess(userId: number): Promise<boolean> {
+  if (await isAdmin(userId)) return true;
+  return hasExplicitMaketyVyrobaRole(userId);
+}
+
+/** Pouze explicitní `makety: grafika` v module_access (bez globálního admina). */
+export async function hasExplicitMaketyGrafikaRole(userId: number): Promise<boolean> {
+  const roles = await getUserRoles(userId);
+  for (const role of roles) {
+    const rawAccess = role.module_access;
+    if (rawAccess === null || rawAccess === undefined) continue;
+    let decoded: unknown = rawAccess;
+    if (typeof rawAccess === "string") {
+      decoded = parseModuleAccessJson(rawAccess);
+      if (decoded === null) continue;
+    }
+    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+      if (roleHasMaketyGrafikaFromDecoded(decoded as Record<string, unknown>)) return true;
+    }
+  }
+  return false;
+}
+
+/** Oddělení grafiky – kalendář a fronta grafiky (včetně globálního admina). */
+export async function hasMaketyGrafikaAccess(userId: number): Promise<boolean> {
+  if (await isAdmin(userId)) return true;
+  return hasExplicitMaketyGrafikaRole(userId);
 }
 
 /**
@@ -289,6 +327,7 @@ export async function getLayoutAccess(userId: number): Promise<{
   const checkModule = async (module: string) => {
     if (admin) return true;
     if (module === "makety" && (await hasMaketyVyrobaAccess(userId))) return true;
+    if (module === "makety" && (await hasMaketyGrafikaAccess(userId))) return true;
     return hasModuleAccessFromRoles(roles, module, "read");
   };
 
@@ -357,13 +396,18 @@ function hasModuleAccessFromRoles(
     }
 
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-      const perm = (decoded as Record<string, unknown>)[module];
+      const record = decoded as Record<string, unknown>;
+      if (module === "makety" && roleMaketyGrantsModuleAccess(record, access)) return true;
+
+      const perm = record[module];
       if (perm === true) return true;
       if (typeof perm === "string") {
         const p = perm.toLowerCase();
         const planovaniTiskar = module === "planovani" && p === "tiskar";
-        const maketyVyroba = module === "makety" && p === "vyroba";
-        if (access === "read" && (["read", "write", "admin"].includes(p) || planovaniTiskar || maketyVyroba))
+        if (
+          access === "read" &&
+          (["read", "write", "admin"].includes(p) || planovaniTiskar)
+        )
           return true;
         if (access === "write" && ["write", "admin"].includes(p)) return true;
         if (access === "admin" && p === "admin") return true;

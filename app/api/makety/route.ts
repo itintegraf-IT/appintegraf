@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
-import { canViewAllMakety } from "@/lib/makety-access";
+import { buildMaketyListWhere } from "@/lib/makety-access";
 import { notifyMaketaRecipients } from "@/lib/makety-notify";
 import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
 import { parseMaketaPriority } from "@/lib/makety-status";
+import { maketyAssigneeRoleLabel, parseMaketyWorkType } from "@/lib/makety-work-type";
+import { userHasMaketyGrafikaRole } from "@/lib/makety-grafika-users";
+import {
+  nextQueuePositionForAssignee,
+  sortMaketyProductionQueueByAssignee,
+} from "@/lib/makety-queue";
 import { userHasMaketyVyrobaRole } from "@/lib/makety-vyroba-users";
 
 export async function GET() {
@@ -19,17 +26,12 @@ export async function GET() {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
-  const orgWide = await canViewAllMakety(userId);
-  const where: Record<string, unknown> = {
+  const where = await buildMaketyListWhere(userId, {
     status: { notIn: ["done", "cancelled"] },
-  };
-  if (!orgWide) {
-    where.OR = [{ created_by: userId }, { assignee_user_id: userId }];
-  }
+  });
 
   const rows = await prisma.makety.findMany({
     where,
-    orderBy: { due_at: "asc" },
     take: 200,
     include: {
       users_assignee: { select: { first_name: true, last_name: true } },
@@ -37,7 +39,7 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json({ makety: rows });
+  return NextResponse.json({ makety: sortMaketyProductionQueueByAssignee(rows) });
 }
 
 export async function POST(req: NextRequest) {
@@ -61,11 +63,14 @@ export async function POST(req: NextRequest) {
     const priority = parseMaketaPriority(String(formData.get("priority") ?? "normal"));
     const dueRaw = String(formData.get("due_at") ?? "").trim();
 
+    const work_type = parseMaketyWorkType(String(formData.get("work_type") ?? "maketa"));
+
     const assigneeRaw = String(formData.get("assignee_user_id") ?? "").trim();
     const assignee_user_id = assigneeRaw ? parseInt(assigneeRaw, 10) : null;
+    const roleLabel = maketyAssigneeRoleLabel(work_type);
     if (!assigneeRaw || assignee_user_id == null || Number.isNaN(assignee_user_id)) {
       return NextResponse.json(
-        { error: "Vyberte uživatele s rolí Výroba maket" },
+        { error: `Vyberte uživatele s rolí ${roleLabel}` },
         { status: 400 }
       );
     }
@@ -91,12 +96,18 @@ export async function POST(req: NextRequest) {
     if (!assignee) {
       return NextResponse.json({ error: "Uživatel neexistuje nebo není aktivní" }, { status: 400 });
     }
-    if (!(await userHasMaketyVyrobaRole(assignee_user_id))) {
+    const hasRole =
+      work_type === "grafika"
+        ? await userHasMaketyGrafikaRole(assignee_user_id)
+        : await userHasMaketyVyrobaRole(assignee_user_id);
+    if (!hasRole) {
       return NextResponse.json(
-        { error: "Vybraný uživatel nemá roli Výroba maket" },
+        { error: `Vybraný uživatel nemá roli ${roleLabel}` },
         { status: 400 }
       );
     }
+
+    const queue_position = await nextQueuePositionForAssignee(work_type, assignee_user_id);
 
     const created = await prisma.makety.create({
       data: {
@@ -106,9 +117,11 @@ export async function POST(req: NextRequest) {
         dimensions,
         quantity,
         priority,
+        queue_position,
         due_at,
         assignee_user_id,
         created_by: userId,
+        work_type,
       },
     });
 
@@ -123,6 +136,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, id: created.id });
   } catch (e) {
     console.error("POST /api/makety", e);
+    const msg = e instanceof Error ? e.message : String(e);
+    if (
+      e instanceof Prisma.PrismaClientValidationError &&
+      msg.includes("work_type")
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "Chybí sloupec work_type nebo není přegenerovaný Prisma klient. Spusťte: npm run db:makety-work-type && npx prisma generate, poté restartujte aplikaci.",
+        },
+        { status: 500 }
+      );
+    }
     return NextResponse.json({ error: "Chyba při ukládání makety" }, { status: 500 });
   }
 }

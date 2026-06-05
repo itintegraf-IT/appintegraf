@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { hasModuleAccess, hasMaketyVyrobaAccess } from "@/lib/auth-utils";
+import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { userCanCompleteMaketa } from "@/lib/makety-access";
 import { notifyMaketaDone } from "@/lib/makety-notify";
 import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
@@ -15,10 +15,7 @@ export async function POST(
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
-  if (
-    !(await hasModuleAccess(userId, "makety", "read")) &&
-    !(await hasMaketyVyrobaAccess(userId))
-  ) {
+  if (!(await canAccessMaketyModule(userId))) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 

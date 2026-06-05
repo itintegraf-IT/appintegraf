@@ -72,4 +72,16 @@ describe("calendar-week-layout", () => {
     expect(layout.get("ev-1-owner")).toEqual({ row: 0, rowCount: 2 });
     expect(layout.get("ev-1-deputy")).toEqual({ row: 1, rowCount: 2 });
   });
+
+  it("layoutAllDaySpanRows – nesouvislé skupiny = globální offset řádků", () => {
+    const layout = layoutAllDaySpanRows([
+      { id: "ev-1-owner", pairId: "ev-1", startIdx: 0, endIdx: 2, kind: "owner" },
+      { id: "ev-1-deputy", pairId: "ev-1", startIdx: 0, endIdx: 2, kind: "deputy" },
+      { id: "ev-2-owner", pairId: "ev-2", startIdx: 4, endIdx: 4, kind: "owner" },
+    ]);
+    expect(layout.get("ev-1-owner")?.row).toBe(0);
+    expect(layout.get("ev-1-deputy")?.row).toBe(1);
+    expect(layout.get("ev-2-owner")?.row).toBe(2);
+    expect(layout.get("ev-2-owner")?.rowCount).toBe(3);
+  });
 });

@@ -78,6 +78,10 @@ export default async function DashboardPage() {
           take: 10,
           include: {
             users: { select: { first_name: true, last_name: true } },
+            calendar_approvals: {
+              where: { status: "pending", approver_id: userId },
+              select: { approval_type: true },
+            },
           },
         });
         return events;
@@ -104,6 +108,7 @@ export default async function DashboardPage() {
     ukoly_task_id?: number | null;
     makety_task_id?: number | null;
     users: { first_name: string; last_name: string } | null;
+    calendar_approvals?: Array<{ approval_type: string }>;
   };
   const notificationsTyped = notifications as NotificationRow[];
   const pendingEventsTyped = pendingEvents as PendingEventRow[];
@@ -202,10 +207,17 @@ export default async function DashboardPage() {
                 ? `${e.users.first_name} ${e.users.last_name}`
                 : "–";
               const displayTitle = formatCalendarEventTitleWithDuration(e);
+              const approvalType = e.calendar_approvals?.[0]?.approval_type;
               const statusLabel =
-                e.approval_status === "pending"
+                e.approval_status === "pending" || approvalType === "deputy"
                   ? "Jako zástup"
-                  : "Jako vedoucí oddělení";
+                  : approvalType === "primary"
+                    ? "Jako primární schvalovatel"
+                    : approvalType === "secondary"
+                      ? "Jako sekundární schvalovatel"
+                      : approvalType === "tertiary"
+                        ? "Jako terciární schvalovatel"
+                        : "Jako vedoucí oddělení";
               return (
                 <Link
                   key={e.id}

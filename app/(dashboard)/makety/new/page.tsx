@@ -20,7 +20,7 @@ export default async function NewMaketaPage() {
     <div>
       <h2 className="mb-4 text-xl font-semibold text-gray-900">Nová maketa</h2>
       <p className="mb-6 text-sm text-gray-600">
-        Zadání výroby na plotru. Zakázka se přiřadí vybranému uživateli s rolí Výroba maket.
+        Zadání výroby na plotru. Zakázka se přiřadí uživateli s rolí Výroba maket.
       </p>
       <NewMaketaForm vyrobaUsers={vyrobaUsers} />
     </div>

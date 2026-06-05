@@ -7,9 +7,10 @@ import { formatWeekRange, parseDateLocal, formatDateLocal } from "@/app/(dashboa
 type Props = {
   from: string;
   to: string;
+  basePath?: string;
 };
 
-export function MaketyCalendarNav({ from, to }: Props) {
+export function MaketyCalendarNav({ from, to, basePath = "/makety/kalendar" }: Props) {
   const fromDate = parseDateLocal(from);
   const prevFrom = new Date(fromDate);
   prevFrom.setDate(prevFrom.getDate() - 7);
@@ -21,7 +22,7 @@ export function MaketyCalendarNav({ from, to }: Props) {
   nextTo.setDate(nextTo.getDate() + 6);
 
   const link = (f: string, t: string) =>
-    `/makety/kalendar?from=${f}&to=${t}`;
+    `${basePath}?from=${f}&to=${t}`;
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3">

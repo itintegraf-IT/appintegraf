@@ -11,7 +11,14 @@ type Comment = {
   users: { first_name: string; last_name: string };
 };
 
-export function MaketaCommentsPanel({ maketaId }: { maketaId: number }) {
+export function MaketaCommentsPanel({
+  maketaId,
+  redirectToListAfterSubmit = false,
+}: {
+  maketaId: number;
+  /** Po odeslání přejít na přehled (např. po doplnění nové zakázky). */
+  redirectToListAfterSubmit?: boolean;
+}) {
   const router = useRouter();
   const [comments, setComments] = useState<Comment[]>([]);
   const [text, setText] = useState("");
@@ -51,13 +58,18 @@ export function MaketaCommentsPanel({ maketaId }: { maketaId: number }) {
         setError(typeof data.error === "string" ? data.error : "Odeslání se nezdařilo");
       } else {
         setText("");
+        if (redirectToListAfterSubmit) {
+          router.push("/makety?comment_sent=1");
+          return;
+        }
         await load();
         router.refresh();
       }
     } catch {
       setError("Síťová chyba");
+    } finally {
+      setSending(false);
     }
-    setSending(false);
   };
 
   return (

@@ -3,12 +3,15 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-export function DeleteMaketaButton({ id }: { id: number }) {
+export function DeleteMaketaButton({ id, isAdmin = false }: { id: number; isAdmin?: boolean }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   const onDelete = async () => {
-    if (!confirm("Opravdu smazat tuto maketu?")) return;
+    const msg = isAdmin
+      ? "Opravdu trvale smazat tuto zakázku? Tuto akci nelze vrátit."
+      : "Opravdu smazat tuto zakázku?";
+    if (!confirm(msg)) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/makety/${id}`, { method: "DELETE" });

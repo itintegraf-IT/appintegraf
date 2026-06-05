@@ -22,7 +22,7 @@ export type ProductColorRow = {
 
 type PantoneCatalogItem = {
   id: number;
-  code: string;
+  code: string | null;
   name: string | null;
   hex: string | null;
   is_active: boolean;
@@ -258,7 +258,7 @@ function ColorRowEditor({
         onSelect={(p) =>
           onChange({
             pantone_id: p.id,
-            code: p.code,
+            code: p.code ?? "",
             name: p.name,
             hex: p.hex,
           })
@@ -268,7 +268,7 @@ function ColorRowEditor({
           if (created) {
             onChange({
               pantone_id: created.id,
-              code: created.code,
+              code: created.code ?? "",
               name: created.name,
               hex: created.hex,
             });
@@ -362,13 +362,15 @@ function PantoneCombobox({
     const active = catalog.filter((p) => p.is_active);
     if (!query) return active.slice(0, 50);
     return active
-      .filter(
-        (p) => p.code.includes(query) || (p.name ?? "").toUpperCase().includes(query)
-      )
+      .filter((p) => {
+        const code = (p.code ?? "").toUpperCase();
+        const name = (p.name ?? "").toUpperCase();
+        return code.includes(query) || name.includes(query);
+      })
       .slice(0, 50);
   }, [query, catalog]);
 
-  const exactMatch = matches.find((p) => p.code === normalized) ?? null;
+  const exactMatch = matches.find((p) => (p.code ?? "") === normalized) ?? null;
   const canCreate = normalized.length > 0 && !exactMatch;
 
   // Resetuj zvýraznění při změně seznamu
@@ -506,7 +508,7 @@ function PantoneCombobox({
               ) : (
                 <span className="inline-block h-4 w-4 shrink-0 rounded border border-dashed border-gray-200" />
               )}
-              <span className="font-mono">{p.code}</span>
+              <span className="font-mono">{p.code ?? "—"}</span>
               {p.name && (
                 <span className="truncate text-gray-500">— {p.name}</span>
               )}

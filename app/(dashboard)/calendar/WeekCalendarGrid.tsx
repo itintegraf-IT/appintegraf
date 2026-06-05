@@ -421,10 +421,15 @@ export function WeekCalendarGrid({
   const spanningRowCount = useMemo(() => {
     let max = 0;
     for (const pos of spanRowLayout.values()) {
-      max = Math.max(max, pos.rowCount);
+      max = Math.max(max, pos.rowCount, pos.row + 1);
     }
     return max;
   }, [spanRowLayout]);
+
+  const spanAreaHeight =
+    spanningRowCount > 0
+      ? SPAN_ROW_PADDING * 2 + spanningRowCount * SPAN_ROW_HEIGHT
+      : 0;
 
   const timedLayoutByDay = useMemo(() => {
     const map = new Map<string, ReturnType<typeof layoutWeekDayColumns>>();
@@ -537,10 +542,7 @@ export function WeekCalendarGrid({
           <div
             className="relative flex flex-1"
             style={{
-              minHeight: Math.max(
-                36,
-                SPAN_ROW_PADDING * 2 + spanningRowCount * SPAN_ROW_HEIGHT
-              ),
+              minHeight: Math.max(44, spanAreaHeight + 36),
             }}
           >
             {days.map((d) => {
@@ -554,7 +556,10 @@ export function WeekCalendarGrid({
                 onDrop={(ev) => handleDrop(ev, d)}
                 onDragOver={handleDragOver}
                 className="flex min-h-11 flex-1 cursor-pointer flex-col gap-1 border-r border-gray-200 px-1 py-1 align-top last:border-r-0 transition-colors hover:bg-[var(--accent)]/45"
-                style={cellAllDayShadeStyle(accent, isTod, holidaysForDay(d).length > 0)}
+                style={{
+                  ...cellAllDayShadeStyle(accent, isTod, holidaysForDay(d).length > 0),
+                  paddingTop: spanAreaHeight > 0 ? spanAreaHeight : undefined,
+                }}
               >
                 {holidaysForDay(d).map((h) => (
                   <div
