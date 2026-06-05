@@ -10,6 +10,7 @@ import {
 } from "@/lib/iml-product-colors";
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
+import { parseImlProductBodyForSave } from "@/lib/iml/parse-product-body";
 
 export async function GET(
   _req: NextRequest,
@@ -95,9 +96,9 @@ export async function PUT(
 
   try {
     const body = await req.json();
-    let data: Awaited<ReturnType<typeof parseProductBody>>;
+    let data: Awaited<ReturnType<typeof parseImlProductBodyForSave>>;
     try {
-      data = await parseProductBody(body);
+      data = await parseImlProductBodyForSave(body);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Neplatná data produktu";
       return NextResponse.json({ error: msg }, { status: 400 });
@@ -192,72 +193,3 @@ export async function DELETE(
   return NextResponse.json({ success: true });
 }
 
-async function parseProductBody(body: Record<string, unknown>) {
-  const str = (v: unknown) => (v != null && v !== "" ? String(v).trim() : null);
-  const int = (v: unknown) => (v != null && v !== "" ? parseInt(String(v), 10) : null);
-
-  const { enrichProductMaterialFields } = await import("@/lib/iml/product-materials");
-
-  const base = {
-    customer_id: body.customer_id != null ? int(body.customer_id) : null,
-    ig_code: str(body.ig_code),
-    ig_short_name: str(body.ig_short_name),
-    client_code: str(body.client_code),
-    client_name: str(body.client_name),
-    requester: str(body.requester),
-    label_shape_code: str(body.label_shape_code),
-    product_format: str(body.product_format),
-    die_cut_tool_code: str(body.die_cut_tool_code),
-    assembly_code: str(body.assembly_code),
-    positions_on_sheet: int(body.positions_on_sheet),
-    pieces_per_box: int(body.pieces_per_box),
-    pieces_per_pallet: int(body.pieces_per_pallet),
-    foil_id: body.foil_id != null ? int(body.foil_id) : null,
-    foil_type: str(body.foil_type),
-    color_coverage: str(body.color_coverage),
-    labels_per_sheet: parseLabelsPerSheet(body.labels_per_sheet),
-    print_note: str(body.print_note),
-    has_print_sample: !!body.has_print_sample,
-    ean_code: str(body.ean_code),
-    production_notes: str(body.production_notes),
-    approval_status: str(body.approval_status),
-    realization_log: str(body.realization_log),
-    internal_note: str(body.internal_note),
-    item_status: str(body.item_status),
-    print_data_version: str(body.print_data_version),
-    stock_quantity: int(body.stock_quantity),
-    sku: str(body.sku),
-    is_active: body.is_active !== false,
-    custom_data: parseCustomData(body.custom_data),
-  };
-
-  const mats = await enrichProductMaterialFields(body);
-  const merged = { ...base, ...mats };
-  if (mats.foil_material_id != null) merged.foil_id = null;
-  return merged;
-}
-
-/** labels_per_sheet > 0 nebo NULL. */
-function parseLabelsPerSheet(val: unknown): number | null {
-  if (val == null || val === "") return null;
-  const n = parseInt(String(val), 10);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return n;
-}
-
-function parseCustomData(val: unknown): Record<string, unknown> | null {
-  if (val == null) return null;
-  if (typeof val === "object" && !Array.isArray(val)) {
-    const obj = val as Record<string, unknown>;
-    const clean: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      if (typeof k === "string" && /^[a-z0-9_]+$/.test(k)) {
-        if (v === null || v === undefined || v === "") continue;
-        if (typeof v === "string" || typeof v === "number" || typeof v === "boolean") clean[k] = v;
-        else if (v instanceof Date) clean[k] = v.toISOString().slice(0, 10);
-      }
-    }
-    return Object.keys(clean).length > 0 ? clean : null;
-  }
-  return null;
-}

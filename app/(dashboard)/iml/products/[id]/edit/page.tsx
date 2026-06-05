@@ -12,6 +12,7 @@ import ProductFormSections, {
   type CustomerOption,
 } from "../../_components/ProductFormSections";
 import type { ProductColorRow } from "../../_components/ProductPantoneEditor";
+import { parseProductFormatToMm } from "@/lib/iml/product-format";
 
 type ProductColorResp = {
   id: number;
@@ -56,6 +57,21 @@ export default function ImlProductEditPage() {
         if (p?.id) {
           const s = (k: string) => (p[k] != null ? String(p[k]) : "");
           const si = (k: string) => (p[k] != null ? String(p[k] as number) : "");
+          const sd = (k: string) => {
+            const v = p[k];
+            if (v == null || v === "") return "";
+            const d = new Date(String(v));
+            return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+          };
+          let formatWidth = si("format_width_mm");
+          let formatHeight = si("format_height_mm");
+          if (!formatWidth && !formatHeight && p.product_format) {
+            const parsed = parseProductFormatToMm(String(p.product_format));
+            if (parsed) {
+              formatWidth = String(parsed.width);
+              formatHeight = String(parsed.height);
+            }
+          }
           setForm({
             customer_id: si("customer_id"),
             ig_code: s("ig_code"),
@@ -65,7 +81,6 @@ export default function ImlProductEditPage() {
             requester: s("requester"),
             sku: s("sku"),
             label_shape_code: s("label_shape_code"),
-            product_format: s("product_format"),
             die_cut_tool_code: s("die_cut_tool_code"),
             assembly_code: s("assembly_code"),
             positions_on_sheet: si("positions_on_sheet"),
@@ -78,12 +93,19 @@ export default function ImlProductEditPage() {
             lacquer_material_id: si("lacquer_material_id"),
             foil_type: s("foil_type"),
             color_coverage: s("color_coverage"),
-            ean_code: s("ean_code"),
-            has_print_sample: !!p.has_print_sample,
             print_note: s("print_note"),
             production_notes: s("production_notes"),
             approval_status: s("approval_status"),
+            approval_date: sd("approval_date"),
             item_status: s("item_status") || "aktivní",
+            format_width_mm: formatWidth,
+            format_height_mm: formatHeight,
+            color_count: si("color_count"),
+            print_colors_text: s("print_colors_text"),
+            label_type: s("label_type"),
+            ean_code: s("ean_code"),
+            has_print_sample: !!p.has_print_sample,
+            has_print_proof: !!p.has_print_proof,
             print_data_version: s("print_data_version"),
             stock_quantity: si("stock_quantity"),
             realization_log: s("realization_log"),

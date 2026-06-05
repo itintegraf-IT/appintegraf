@@ -27,3 +27,16 @@ export function imlItemStatusLabel(status: string): string {
   if (!status) return "";
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
+
+/** Typ etikety na záložce Tisková data (`iml_products.label_type`). */
+export const IML_LABEL_TYPES = [
+  { value: "rezana", label: "Řezaná" },
+  { value: "s_vysekem", label: "S výsekem" },
+] as const;
+
+export type ImlLabelType = (typeof IML_LABEL_TYPES)[number]["value"];
+
+export function imlLabelTypeLabel(value: string | null | undefined): string {
+  if (!value) return "";
+  return IML_LABEL_TYPES.find((t) => t.value === value)?.label ?? value;
+}

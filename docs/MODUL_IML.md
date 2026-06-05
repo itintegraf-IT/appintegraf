@@ -12,7 +12,7 @@ Modul IML slouží ke správě zákazníků, katalogu produktů a objednávek v 
 |--------|-------|-------|
 | Dashboard IML | `/iml` | Přehled, statistiky, konverze poptávek, poslední objednávky |
 | Zákazníci | `/iml/customers` | Evidence zákazníků, dodací adresy, CRUD, export, import |
-| Produkty | `/iml/products` | Katalog produktů, taby (výseky, fólie, Pantone, PDF verze), materiály z katalogu |
+| Produkty | `/iml/products` | Katalog produktů – záložky Identifikace, Výseky, Materiály, Barvy (Pantone), Tisková data |
 | Poptávky | `/iml/inquiries` | Evidence poptávek, konverze na objednávku |
 | Objednávky | `/iml/orders` | Objednávky, snapshot adresy, export CSV/Excel/XML, import |
 | Report Pantone | `/iml/reports/pantone` | Plánovaná spotřeba barev (report) |
@@ -78,26 +78,40 @@ Modul IML poskytuje:
 - Kód produktu (IG), Název zkrácený (IG), Kód produktu (klient), Název originální (klient)
 - Náhled (jpg), Zadavatel
 
-### 3.2 Výseky a montáže
+### 3.2 Formulář produktu – záložky (UI)
 
-- Kódové označení tvaru etikety, Rozměr/formát produktu, Kód výsekového nástroje, Kód montáže
-- Počet pozic na Tiskovém Archu, Počet kusů v krabici, Počet KS/krabic na paletě
+| Záložka | Pole |
+|---------|------|
+| **Identifikace** | Zákazník, kódy IG/klient, zadavatel, SKU |
+| **Výseky** | Tvar etikety, výsek, montáž, pozice na archu, etiket na TA (`labels_per_sheet`), balení |
+| **Materiály** | Papír, fólie, **barevnost (katalog materiálů)**, lak, poznámky k tisku/výrobě |
+| **Barvy** | Pantone řádky + % pokrytí, live preview spotřeby (závisí na `labels_per_sheet`) |
+| **Tisková data** | Schválení + datum, stav položky, verze PDF, sklad, **formát š/v (mm)**, počet barev, souhrn barev (text), etiketa (řezaná/výsek), EAN, vzor min. tisku, nátisk, log, interní pozn. |
 
-### 3.3 Materiály a tisk
+**Spotřeba barvy (kg):** počítá se výhradně z řádků na záložce **Barvy** (`iml_product_colors.coverage_pct`) a `labels_per_sheet`. Katalogová barevnost na Materiálech (`color_material_id`, `color_coverage`) je metadata pro sklad/export – do vzorce `consumptionKg` nevstupuje. CMYK dle specifikace také nevstupuje do kg algoritmu.
 
-- Název/druh fólie, Barevnost + procentuální pokrytí, Poznámka k tisku, Tisková data (PDF)
-- Vzor min tisku/nátisk, EAN kód, Výrobní poznámky
+### 3.3 Výseky a montáže
 
-### 3.4 Schvalování a historie
+- Kódové označení tvaru etikety, Kód výsekového nástroje, Kód montáže
+- Počet pozic na Tiskovém Archu, Počet etiket na TA, Počet kusů v krabici, Počet KS/krabic na paletě
 
-- Stav schválení, LOG realizací, Volná poznámka
+### 3.4 Materiály
 
-### 3.5 Metadata produktu
+- Název/druh fólie, Barevnost (katalog) + volitelná poznámka / % pokrytí, Lak, Poznámka k tisku, Výrobní poznámky
+
+### 3.5 Tisková data a schvalování
+
+- Stav schválení, Datum schválení, Rozměr š/v v mm (`format_width_mm`, `format_height_mm` → odvozený `product_format`)
+- Počet barev (1–8), Barvy souhrn (volný text), Etiketa (řezaná / s výsekem)
+- EAN, Vzor min. tisku, Nátisk, LOG realizací, Interní poznámka
+- Tisková data (PDF), verze, sklad
+
+### 3.6 Metadata produktu
 
 - Datum založení, Datum poslední aktualizace, Kdo naposledy editoval
 - Stav položky (aktivní/archivní/testovací/zablokovaná), Verze tiskových dat, Skladová zásoba
 
-### 3.6 Sekce Klient (zákazník)
+### 3.7 Sekce Klient (zákazník)
 
 - **Skupina zákazníků:** centrála (`unit_type=headquarters`) a pobočky (`branch`). Samostatného zákazníka (`standalone`) lze ve formuláři **Přidat / Upravit** převést na centrálu zaškrtnutím pole **Centrála** v sekci Identifikace (pod kontaktními poli); po uložení lze přidat pobočky.
 - **Objednávka / poptávka:** `customer_id` = konkrétní jednotka (centrála nebo pobočka); doručovací adresy jen z té jednotky.
@@ -113,7 +127,7 @@ Modul IML poskytuje:
 - **Pobočka** je plnohodnotná jednotka: kontaktní a fakturační adresa, více e-mailů a kontaktních osob. Správa **centrály, poboček a doručovacích adres** probíhá na jedné stránce **Přidat / Upravit zákazníka**: zaškrtávací pole **Centrála**, karta doručovacích adres hlavní jednotky (vždy) a karta poboček (po zaškrtnutí Centrála) s vnořenými adresami u každé pobočky; uložení jedním tlačítkem přes rozšířené API `POST/PUT /api/iml/customers`. Na **detailu** je u poboček jen přehled a odkaz „Spravovat ve formuláři“.
 - **Doručovací adresy** se vážou na konkrétní jednotku (`iml_customer_shipping_addresses.customer_id`) – centrála i každá pobočka mají vlastní seznam; v objednávce se vybírá jednotka a její adresy.
 
-### 3.7 Statistiky a historie
+### 3.8 Statistiky a historie
 
 - Historie objednávek / poslední datum výroby
 - Celkové množství vyrobených kusů
@@ -162,7 +176,9 @@ model iml_products {
   client_name         String?   @db.VarChar(255)
   requester           String?   @db.VarChar(255)
   label_shape_code    String?   @db.VarChar(100)
-  product_format      String?   @db.VarChar(100)
+  product_format      String?   @db.VarChar(100)   // odvozený text, např. "45 × 30 mm"
+  format_width_mm     Decimal?  @db.Decimal(8, 2)
+  format_height_mm    Decimal?  @db.Decimal(8, 2)
   die_cut_tool_code   String?   @db.VarChar(100)
   assembly_code       String?   @db.VarChar(100)
   positions_on_sheet  Int?
@@ -174,9 +190,14 @@ model iml_products {
   image_data          Bytes?    // BLOB – náhled
   pdf_data            Bytes?    // BLOB – tisková data
   has_print_sample    Boolean   @default(false)
+  has_print_proof     Boolean   @default(false)
   ean_code            String?   @db.VarChar(50)
   production_notes   String?   @db.Text
   approval_status    String?   @db.VarChar(50)
+  approval_date      DateTime? @db.Date
+  color_count        Int?
+  print_colors_text  String?   @db.VarChar(255)
+  label_type         String?   @db.VarChar(20)   // rezana | s_vysekem
   realization_log   String?   @db.Text
   internal_note      String?   @db.Text
   last_edited_by     String?   @db.VarChar(255)
@@ -398,7 +419,7 @@ Na hlavní stránce IML (`/iml`):
 
 - `POST /api/iml/products/import` – pouze řádky produktů, bez příloh
 - Povinné mapování: `ig_code` nebo `client_name` nebo `ig_short_name`
-- Mapování: ig_code, ig_short_name, client_code, client_name, sku, customer_name, requester, label_shape_code, product_format, die_cut_tool_code, assembly_code, positions_on_sheet, pieces_per_box, pieces_per_pallet, foil_type, color_coverage, ean_code, item_status, approval_status, has_print_sample
+- Mapování: ig_code, ig_short_name, client_code, client_name, sku, customer_name, requester, label_shape_code, product_format, format_width_mm, format_height_mm, die_cut_tool_code, assembly_code, positions_on_sheet, pieces_per_box, pieces_per_pallet, foil_type, color_coverage, ean_code, item_status, approval_status, approval_date, color_count, print_colors_text, label_type, has_print_sample, has_print_proof
 
 ### 7.4 Import objednávek (`/iml/orders/import`)
 

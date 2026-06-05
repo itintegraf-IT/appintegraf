@@ -1,5 +1,12 @@
 import { enrichProductMaterialFields } from "@/lib/iml/product-materials";
+import {
+  parseProductFormatToMm,
+  syncProductFormatFromMm,
+} from "@/lib/iml/product-format";
+import { IML_LABEL_TYPES } from "@/lib/iml-constants";
 import { findMaterialForImlLegacyId } from "@/lib/materialy/iml-compat";
+
+const VALID_LABEL_TYPES = new Set(IML_LABEL_TYPES.map((t) => t.value));
 
 function parseCustomData(val: unknown): Record<string, unknown> | null {
   if (val == null) return null;
@@ -44,6 +51,42 @@ async function resolveLegacyMaterialIds(body: Record<string, unknown>) {
   return enriched;
 }
 
+/** labels_per_sheet > 0 nebo NULL. */
+export function parseLabelsPerSheet(val: unknown): number | null {
+  if (val == null || val === "") return null;
+  const n = parseInt(String(val), 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+function parseDecimalMm(val: unknown): number | null {
+  if (val == null || val === "") return null;
+  const n = parseFloat(String(val).replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return Math.round(n * 100) / 100;
+}
+
+function parseApprovalDate(val: unknown): Date | null {
+  if (val == null || val === "") return null;
+  const s = String(val).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return null;
+  const d = new Date(`${s}T00:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function parseColorCount(val: unknown): number | null {
+  if (val == null || val === "") return null;
+  const n = parseInt(String(val), 10);
+  if (!Number.isFinite(n) || n < 1 || n > 8) return null;
+  return n;
+}
+
+function parseLabelType(val: unknown): string | null {
+  if (val == null || val === "") return null;
+  const s = String(val).trim();
+  return VALID_LABEL_TYPES.has(s as (typeof IML_LABEL_TYPES)[number]["value"]) ? s : null;
+}
+
 export async function parseImlProductBody(body: Record<string, unknown>) {
   const str = (v: unknown) => (v != null && v !== "" ? String(v).trim() : null);
   const int = (v: unknown) => {
@@ -52,7 +95,22 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
     return Number.isFinite(n) ? n : null;
   };
 
-  const materialFields = await enrichProductMaterialFields(await resolveLegacyMaterialIds(body));
+  const resolved = await resolveLegacyMaterialIds(body);
+  const materialFields = await enrichProductMaterialFields(resolved);
+
+  let formatWidthMm = parseDecimalMm(body.format_width_mm);
+  let formatHeightMm = parseDecimalMm(body.format_height_mm);
+  const manualFormat = str(body.product_format);
+
+  if (formatWidthMm == null && formatHeightMm == null && manualFormat) {
+    const parsed = parseProductFormatToMm(manualFormat);
+    if (parsed) {
+      formatWidthMm = parsed.width;
+      formatHeightMm = parsed.height;
+    }
+  }
+
+  const productFormat = syncProductFormatFromMm(formatWidthMm, formatHeightMm, manualFormat);
 
   return {
     customer_id: body.customer_id != null ? int(body.customer_id) : null,
@@ -62,18 +120,26 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
     client_name: str(body.client_name),
     requester: str(body.requester),
     label_shape_code: str(body.label_shape_code),
-    product_format: str(body.product_format),
+    product_format: productFormat,
+    format_width_mm: formatWidthMm,
+    format_height_mm: formatHeightMm,
     die_cut_tool_code: str(body.die_cut_tool_code),
     assembly_code: str(body.assembly_code),
     positions_on_sheet: int(body.positions_on_sheet),
     pieces_per_box: int(body.pieces_per_box),
     pieces_per_pallet: int(body.pieces_per_pallet),
     ...materialFields,
+    labels_per_sheet: parseLabelsPerSheet(body.labels_per_sheet),
     print_note: str(body.print_note),
     has_print_sample: !!body.has_print_sample,
+    has_print_proof: !!body.has_print_proof,
     ean_code: str(body.ean_code),
     production_notes: str(body.production_notes),
     approval_status: str(body.approval_status),
+    approval_date: parseApprovalDate(body.approval_date),
+    color_count: parseColorCount(body.color_count),
+    print_colors_text: str(body.print_colors_text),
+    label_type: parseLabelType(body.label_type),
     realization_log: str(body.realization_log),
     internal_note: str(body.internal_note),
     item_status: str(body.item_status),
@@ -82,5 +148,14 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
     sku: str(body.sku),
     is_active: body.is_active !== false,
     custom_data: parseCustomData(body.custom_data),
+    foil_id: body.foil_id != null ? int(body.foil_id) : null,
   };
+}
+
+/** Výsledek parseImlProductBody s vynulovaným foil_id při aktivním foil_material_id. */
+export async function parseImlProductBodyForSave(body: Record<string, unknown>) {
+  const data = await parseImlProductBody(body);
+  const merged = { ...data };
+  if (merged.foil_material_id != null) merged.foil_id = null;
+  return merged;
 }

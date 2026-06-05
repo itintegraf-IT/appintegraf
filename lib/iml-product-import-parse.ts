@@ -1,6 +1,11 @@
 import * as XLSX from "xlsx";
 import type { Prisma } from "@prisma/client";
 import { enrichProductMaterialFields } from "@/lib/iml/product-materials";
+import {
+  parseProductFormatToMm,
+  syncProductFormatFromMm,
+} from "@/lib/iml/product-format";
+import { IML_LABEL_TYPES } from "@/lib/iml-constants";
 
 export type ColumnMapping = Record<string, number>;
 
@@ -166,6 +171,44 @@ export async function buildProductPayload(
     };
   }
 
+  const parseMm = (key: string) => {
+    const raw = get(key);
+    if (!raw) return null;
+    const n = parseFloat(raw.replace(",", "."));
+    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+  };
+  let formatWidthMm = parseMm("format_width_mm");
+  let formatHeightMm = parseMm("format_height_mm");
+  const manualFormat = get("product_format") || null;
+  if (formatWidthMm == null && formatHeightMm == null && manualFormat) {
+    const parsed = parseProductFormatToMm(manualFormat);
+    if (parsed) {
+      formatWidthMm = parsed.width;
+      formatHeightMm = parsed.height;
+    }
+  }
+  const productFormat = syncProductFormatFromMm(formatWidthMm, formatHeightMm, manualFormat);
+
+  const colorCountRaw = get("color_count");
+  let colorCount: number | null = null;
+  if (colorCountRaw) {
+    const n = parseInt(colorCountRaw, 10);
+    if (Number.isFinite(n) && n >= 1 && n <= 8) colorCount = n;
+  }
+
+  const labelTypeRaw = get("label_type").trim().toLowerCase();
+  const validLabelTypes = new Set(IML_LABEL_TYPES.map((t) => t.value));
+  const labelType = validLabelTypes.has(labelTypeRaw as (typeof IML_LABEL_TYPES)[number]["value"])
+    ? labelTypeRaw
+    : null;
+
+  const approvalDateRaw = get("approval_date");
+  let approvalDate: Date | null = null;
+  if (approvalDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(approvalDateRaw)) {
+    const d = new Date(`${approvalDateRaw}T00:00:00.000Z`);
+    if (!Number.isNaN(d.getTime())) approvalDate = d;
+  }
+
   const data: Prisma.iml_productsUncheckedCreateInput = {
     customer_id: customerId,
     ig_code: igCode ? normalizeProductCode(igCode) : null,
@@ -174,7 +217,9 @@ export async function buildProductPayload(
     client_name: clientName || null,
     requester: get("requester") || null,
     label_shape_code: get("label_shape_code") || null,
-    product_format: get("product_format") || null,
+    product_format: productFormat,
+    format_width_mm: formatWidthMm,
+    format_height_mm: formatHeightMm,
     die_cut_tool_code: get("die_cut_tool_code") || null,
     assembly_code: get("assembly_code") || null,
     positions_on_sheet: get("positions_on_sheet")
@@ -193,9 +238,15 @@ export async function buildProductPayload(
     print_note: get("print_note") || null,
     has_print_sample:
       get("has_print_sample").toLowerCase() === "ano" || get("has_print_sample") === "1",
+    has_print_proof:
+      get("has_print_proof").toLowerCase() === "ano" || get("has_print_proof") === "1",
     ean_code: get("ean_code") || null,
     production_notes: get("production_notes") || null,
     approval_status: get("approval_status") || null,
+    approval_date: approvalDate,
+    color_count: colorCount,
+    print_colors_text: get("print_colors_text") || null,
+    label_type: labelType,
     item_status: get("item_status") || null,
     sku,
     last_edited_by: editorName,

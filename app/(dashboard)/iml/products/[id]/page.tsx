@@ -20,6 +20,8 @@ import ProductPdfHistory from "../_components/ProductPdfHistory";
 import { consumptionKg } from "@/lib/iml-color-consumption";
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
+import { imlLabelTypeLabel } from "@/lib/iml-constants";
+import { formatProductFormatFromMm } from "@/lib/iml/product-format";
 
 export default async function ImlProductDetailPage({
   params,
@@ -72,6 +74,16 @@ export default async function ImlProductDetailPage({
 
   const fmt = (v: unknown) => (v != null && v !== "" ? String(v) : "-");
   const fmtNum = (v: unknown) => (v != null ? String(v) : "-");
+  const fmtDate = (v: unknown) => {
+    if (v == null || v === "") return "-";
+    const d = new Date(String(v));
+    return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString("cs-CZ");
+  };
+  const formatDisplay =
+    formatProductFormatFromMm(
+      product.format_width_mm != null ? Number(product.format_width_mm) : null,
+      product.format_height_mm != null ? Number(product.format_height_mm) : null
+    ) ?? fmt(product.product_format);
   const materialLabel = (m: { id: number; name: string; code: string | null } | null) => {
     if (!m) return null;
     const label = m.code ? `${m.name} (${m.code})` : m.name;
@@ -129,7 +141,6 @@ export default async function ImlProductDetailPage({
       content: (
         <div className="grid gap-4 sm:grid-cols-2">
           <InfoField label="Kód tvaru etikety" value={fmt(product.label_shape_code)} />
-          <InfoField label="Rozměr / formát" value={fmt(product.product_format)} />
           <InfoField label="Kód výsekového nástroje" value={fmt(product.die_cut_tool_code)} />
           <InfoField label="Kód montáže" value={fmt(product.assembly_code)} />
           <InfoField label="Pozic na archu" value={fmtNum(product.positions_on_sheet)} />
@@ -163,8 +174,6 @@ export default async function ImlProductDetailPage({
             <p className="text-sm text-gray-500">Lak</p>
             <p className="font-medium">{materialLabel(product.lacquer_material) ?? "-"}</p>
           </div>
-          <InfoField label="EAN kód" value={fmt(product.ean_code)} mono />
-          <InfoField label="Vzor min. tisku" value={product.has_print_sample ? "Ano" : "Ne"} />
           {product.print_note && (
             <InfoField label="Poznámka k tisku" value={product.print_note} span={2} pre />
           )}
@@ -215,9 +224,19 @@ export default async function ImlProductDetailPage({
         <div className="space-y-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <InfoField label="Stav schválení" value={fmt(product.approval_status)} />
+            <InfoField label="Datum schválení" value={fmtDate(product.approval_date)} />
             <InfoField label="Stav položky" value={fmt(product.item_status)} />
             <InfoField label="Verze tiskových dat" value={fmt(product.print_data_version)} />
             <InfoField label="Skladem" value={fmtNum(product.stock_quantity)} />
+            <InfoField label="Formát" value={formatDisplay} />
+            <InfoField label="Počet barev" value={fmtNum(product.color_count)} />
+            <InfoField label="Etiketa" value={imlLabelTypeLabel(product.label_type) || "-"} />
+            {product.print_colors_text && (
+              <InfoField label="Barvy (souhrn)" value={product.print_colors_text} span={2} />
+            )}
+            <InfoField label="EAN kód" value={fmt(product.ean_code)} mono />
+            <InfoField label="Vzor min. tisku" value={product.has_print_sample ? "Ano" : "Ne"} />
+            <InfoField label="Nátisk" value={product.has_print_proof ? "Ano" : "Ne"} />
             <InfoField label="Naposledy editoval" value={fmt(product.last_edited_by)} />
             {product.realization_log && (
               <InfoField label="LOG realizací" value={product.realization_log} span={2} pre />

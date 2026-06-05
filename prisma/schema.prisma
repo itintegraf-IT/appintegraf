@@ -1199,6 +1199,8 @@ model iml_products {
   requester            String?   @db.VarChar(255)
   label_shape_code     String?   @db.VarChar(100)
   product_format       String?   @db.VarChar(100)
+  format_width_mm      Decimal?  @db.Decimal(8, 2)
+  format_height_mm     Decimal?  @db.Decimal(8, 2)
   die_cut_tool_code    String?   @db.VarChar(100)
   assembly_code        String?   @db.VarChar(100)
   positions_on_sheet   Int?
@@ -1215,9 +1217,14 @@ model iml_products {
   image_data           Bytes?    @db.LongBlob
   pdf_data             Bytes?    @db.LongBlob
   has_print_sample     Boolean   @default(false)
+  has_print_proof      Boolean   @default(false)
   ean_code             String?   @db.VarChar(50)
   production_notes     String?   @db.Text
   approval_status      String?   @db.VarChar(50)
+  approval_date        DateTime? @db.Date
+  color_count          Int?
+  print_colors_text    String?   @db.VarChar(255)
+  label_type           String?   @db.VarChar(20)
   realization_log      String?   @db.Text
   internal_note        String?   @db.Text
   last_edited_by       String?   @db.VarChar(255)

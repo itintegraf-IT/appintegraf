@@ -152,6 +152,12 @@ export async function POST(req: NextRequest) {
           requester: get("requester") || null,
           label_shape_code: get("label_shape_code") || null,
           product_format: get("product_format") || null,
+          format_width_mm: get("format_width_mm")
+            ? parseFloat(get("format_width_mm").replace(",", ".")) || null
+            : null,
+          format_height_mm: get("format_height_mm")
+            ? parseFloat(get("format_height_mm").replace(",", ".")) || null
+            : null,
           die_cut_tool_code: get("die_cut_tool_code") || null,
           assembly_code: get("assembly_code") || null,
           positions_on_sheet: get("positions_on_sheet") ? parseInt(get("positions_on_sheet"), 10) : null,
@@ -160,9 +166,16 @@ export async function POST(req: NextRequest) {
           ...materialFields,
           print_note: get("print_note") || null,
           has_print_sample: get("has_print_sample").toLowerCase() === "ano" || get("has_print_sample") === "1",
+          has_print_proof: get("has_print_proof").toLowerCase() === "ano" || get("has_print_proof") === "1",
           ean_code: get("ean_code") || null,
           production_notes: get("production_notes") || null,
           approval_status: get("approval_status") || null,
+          approval_date: get("approval_date") && /^\d{4}-\d{2}-\d{2}$/.test(get("approval_date"))
+            ? new Date(`${get("approval_date")}T00:00:00.000Z`)
+            : null,
+          color_count: get("color_count") ? parseInt(get("color_count"), 10) || null : null,
+          print_colors_text: get("print_colors_text") || null,
+          label_type: get("label_type") || null,
           item_status: get("item_status") || null,
           sku,
           last_edited_by: editorName,

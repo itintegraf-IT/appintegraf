@@ -53,6 +53,8 @@ export async function GET(req: NextRequest) {
     requester: p.requester ?? "",
     label_shape_code: p.label_shape_code ?? "",
     product_format: p.product_format ?? "",
+    format_width_mm: p.format_width_mm != null ? String(p.format_width_mm) : "",
+    format_height_mm: p.format_height_mm != null ? String(p.format_height_mm) : "",
     die_cut_tool_code: p.die_cut_tool_code ?? "",
     assembly_code: p.assembly_code ?? "",
     positions_on_sheet: p.positions_on_sheet ?? "",
@@ -67,7 +69,14 @@ export async function GET(req: NextRequest) {
     ean_code: p.ean_code ?? "",
     item_status: p.item_status ?? "",
     approval_status: p.approval_status ?? "",
+    approval_date: p.approval_date
+      ? new Date(p.approval_date).toISOString().slice(0, 10)
+      : "",
+    color_count: p.color_count ?? "",
+    print_colors_text: p.print_colors_text ?? "",
+    label_type: p.label_type ?? "",
     has_print_sample: p.has_print_sample ? "ano" : "ne",
+    has_print_proof: p.has_print_proof ? "ano" : "ne",
     is_active: p.is_active ? "ano" : "ne",
     created_at: p.created_at ? new Date(p.created_at).toISOString().slice(0, 10) : "",
     updated_at: p.updated_at ? new Date(p.updated_at).toISOString().slice(0, 10) : "",
@@ -87,7 +96,7 @@ export async function GET(req: NextRequest) {
   }
 
   const header =
-    "id;ig_code;ig_short_name;client_code;client_name;sku;customer_name;requester;label_shape_code;product_format;die_cut_tool_code;assembly_code;positions_on_sheet;pieces_per_box;pieces_per_pallet;foil_type;foil_material_id;color_coverage;color_material_id;paper_material_id;lacquer_material_id;ean_code;item_status;approval_status;has_print_sample;is_active;created_at;updated_at";
+    "id;ig_code;ig_short_name;client_code;client_name;sku;customer_name;requester;label_shape_code;product_format;format_width_mm;format_height_mm;die_cut_tool_code;assembly_code;positions_on_sheet;pieces_per_box;pieces_per_pallet;foil_type;foil_material_id;color_coverage;color_material_id;paper_material_id;lacquer_material_id;ean_code;item_status;approval_status;approval_date;color_count;print_colors_text;label_type;has_print_sample;has_print_proof;is_active;created_at;updated_at";
   type CsvRow = (typeof rows)[number];
   const csvRows = rows.map((r: CsvRow) =>
     [
@@ -101,6 +110,8 @@ export async function GET(req: NextRequest) {
       escapeCsv(r.requester),
       escapeCsv(r.label_shape_code),
       escapeCsv(r.product_format),
+      r.format_width_mm,
+      r.format_height_mm,
       escapeCsv(r.die_cut_tool_code),
       escapeCsv(r.assembly_code),
       r.positions_on_sheet,
@@ -115,7 +126,12 @@ export async function GET(req: NextRequest) {
       escapeCsv(r.ean_code),
       escapeCsv(r.item_status),
       escapeCsv(r.approval_status),
+      escapeCsv(r.approval_date),
+      r.color_count,
+      escapeCsv(r.print_colors_text),
+      escapeCsv(r.label_type),
       escapeCsv(r.has_print_sample),
+      escapeCsv(r.has_print_proof),
       escapeCsv(r.is_active),
       escapeCsv(r.created_at),
       escapeCsv(r.updated_at),

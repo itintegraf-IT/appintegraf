@@ -8,7 +8,12 @@ import {
   Printer,
 } from "lucide-react";
 import { Tabs, type TabDef } from "../../_components/Tabs";
-import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
+import {
+  IML_ITEM_STATUSES,
+  IML_LABEL_TYPES,
+  imlItemStatusLabel,
+} from "@/lib/iml-constants";
+import { formatProductFormatFromMm } from "@/lib/iml/product-format";
 import { MaterialSelect } from "../../_components/MaterialSelect";
 import ProductPantoneEditor, {
   type ProductColorRow,
@@ -23,7 +28,6 @@ export type ProductFormState = {
   requester: string;
   sku: string;
   label_shape_code: string;
-  product_format: string;
   die_cut_tool_code: string;
   assembly_code: string;
   positions_on_sheet: string;
@@ -36,12 +40,19 @@ export type ProductFormState = {
   lacquer_material_id: string;
   foil_type: string;
   color_coverage: string;
-  ean_code: string;
-  has_print_sample: boolean;
   print_note: string;
   production_notes: string;
   approval_status: string;
+  approval_date: string;
   item_status: string;
+  format_width_mm: string;
+  format_height_mm: string;
+  color_count: string;
+  print_colors_text: string;
+  label_type: string;
+  ean_code: string;
+  has_print_sample: boolean;
+  has_print_proof: boolean;
   print_data_version: string;
   stock_quantity: string;
   realization_log: string;
@@ -89,6 +100,10 @@ export default function ProductFormSections({
   onColorsChange,
 }: Props) {
   const err = errors ?? {};
+  const formatPreview = formatProductFormatFromMm(
+    form.format_width_mm ? parseFloat(form.format_width_mm) : null,
+    form.format_height_mm ? parseFloat(form.format_height_mm) : null
+  );
 
   const tabs: TabDef[] = [
     {
@@ -177,14 +192,6 @@ export default function ProductFormSections({
                 className={inputCls}
               />
             </Field>
-            <Field label="Rozměr / formát" error={err.product_format}>
-              <input
-                type="text"
-                value={form.product_format}
-                onChange={(e) => setField("product_format", e.target.value)}
-                className={inputCls}
-              />
-            </Field>
             <Field label="Kód výsekového nástroje" error={err.die_cut_tool_code}>
               <input
                 type="text"
@@ -249,7 +256,7 @@ export default function ProductFormSections({
       label: "Materiály",
       icon: <Boxes className="h-4 w-4" />,
       content: (
-        <TabShell title="Materiály a tisk" subtitle="Výběr z katalogu materiálů (papír, fólie, barva, lak)">
+        <TabShell title="Materiály" subtitle="Výběr z katalogu materiálů (papír, fólie, barevnost, lak) a poznámky">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <MaterialSelect
@@ -305,26 +312,6 @@ export default function ProductFormSections({
                 <p className="mt-1 text-xs text-red-600">{err.lacquer_material_id}</p>
               )}
             </div>
-            <Field label="EAN kód" error={err.ean_code}>
-              <input
-                type="text"
-                value={form.ean_code}
-                onChange={(e) => setField("ean_code", e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <div className="flex items-center gap-2 sm:pt-7">
-              <input
-                type="checkbox"
-                id="has_print_sample"
-                checked={form.has_print_sample}
-                onChange={(e) => setField("has_print_sample", e.target.checked)}
-                className="rounded border-gray-300"
-              />
-              <label htmlFor="has_print_sample" className="text-sm font-medium text-gray-700">
-                Máme vzor min. tisku
-              </label>
-            </div>
             <Field label="Poznámka k tisku" span={2} error={err.print_note}>
               <textarea
                 value={form.print_note}
@@ -373,7 +360,7 @@ export default function ProductFormSections({
       label: "Tisková data",
       icon: <Printer className="h-4 w-4" />,
       content: (
-        <TabShell title="Tisková data a stavy" subtitle="Schvalování, stav položky, verze PDF, skladové množství a poznámky">
+        <TabShell title="Tisková data a stavy" subtitle="Schvalování, rozměry, parametry tisku, EAN, vzorky a poznámky">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Stav schválení" error={err.approval_status}>
               <input
@@ -381,6 +368,14 @@ export default function ProductFormSections({
                 value={form.approval_status}
                 onChange={(e) => setField("approval_status", e.target.value)}
                 placeholder="máme / nemáme / řeší grafik…"
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Datum schválení" error={err.approval_date}>
+              <input
+                type="date"
+                value={form.approval_date}
+                onChange={(e) => setField("approval_date", e.target.value)}
                 className={inputCls}
               />
             </Field>
@@ -412,6 +407,102 @@ export default function ProductFormSections({
                 className={inputCls}
               />
             </Field>
+            <Field label="Formát š (mm)" error={err.format_width_mm}>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={form.format_width_mm}
+                onChange={(e) => setField("format_width_mm", e.target.value)}
+                className={inputCls}
+                placeholder="např. 45"
+              />
+            </Field>
+            <Field label="Formát v (mm)" error={err.format_height_mm}>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={form.format_height_mm}
+                onChange={(e) => setField("format_height_mm", e.target.value)}
+                className={inputCls}
+                placeholder="např. 30"
+              />
+            </Field>
+            {formatPreview && (
+              <div className="sm:col-span-2">
+                <p className="text-xs text-gray-500">
+                  Formát: <span className="font-medium text-gray-700">{formatPreview}</span>
+                </p>
+              </div>
+            )}
+            <Field label="Počet barev" error={err.color_count} hint="1–8, informativní pro tiskárnu">
+              <input
+                type="number"
+                min={1}
+                max={8}
+                step={1}
+                value={form.color_count}
+                onChange={(e) => setField("color_count", e.target.value)}
+                className={inputCls}
+                placeholder="1–8"
+              />
+            </Field>
+            <Field label="Etiketa" error={err.label_type}>
+              <select
+                value={form.label_type}
+                onChange={(e) => setField("label_type", e.target.value)}
+                className={inputCls}
+              >
+                <option value="">— Vyberte —</option>
+                {IML_LABEL_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Barvy (souhrn pro tiskárnu)" span={2} error={err.print_colors_text} hint="Volný text, např. CMYK PA365 PA 276. Výpočet spotřeby zůstává na záložce Barvy.">
+              <input
+                type="text"
+                value={form.print_colors_text}
+                onChange={(e) => setField("print_colors_text", e.target.value)}
+                className={inputCls}
+                placeholder="CMYK PA365 PA 276"
+              />
+            </Field>
+            <Field label="EAN kód" error={err.ean_code}>
+              <input
+                type="text"
+                value={form.ean_code}
+                onChange={(e) => setField("ean_code", e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <div className="flex flex-col gap-3 sm:pt-7">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="has_print_sample"
+                  checked={form.has_print_sample}
+                  onChange={(e) => setField("has_print_sample", e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="has_print_sample" className="text-sm font-medium text-gray-700">
+                  Máme vzor min. tisku
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="has_print_proof"
+                  checked={form.has_print_proof}
+                  onChange={(e) => setField("has_print_proof", e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                <label htmlFor="has_print_proof" className="text-sm font-medium text-gray-700">
+                  Máme nátisk
+                </label>
+              </div>
+            </div>
             <Field label="LOG realizací" span={2} error={err.realization_log}>
               <textarea
                 value={form.realization_log}
@@ -492,7 +583,6 @@ export const emptyProductForm: ProductFormState = {
   requester: "",
   sku: "",
   label_shape_code: "",
-  product_format: "",
   die_cut_tool_code: "",
   assembly_code: "",
   positions_on_sheet: "",
@@ -505,12 +595,19 @@ export const emptyProductForm: ProductFormState = {
   lacquer_material_id: "",
   foil_type: "",
   color_coverage: "",
-  ean_code: "",
-  has_print_sample: false,
   print_note: "",
   production_notes: "",
   approval_status: "",
+  approval_date: "",
   item_status: "aktivní",
+  format_width_mm: "",
+  format_height_mm: "",
+  color_count: "",
+  print_colors_text: "",
+  label_type: "",
+  ean_code: "",
+  has_print_sample: false,
+  has_print_proof: false,
   print_data_version: "",
   stock_quantity: "",
   realization_log: "",

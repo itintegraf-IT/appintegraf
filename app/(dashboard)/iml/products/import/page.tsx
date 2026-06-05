@@ -33,7 +33,9 @@ const TARGET_FIELDS = [
   { key: "customer_name", label: "Zákazník (pro párování)", required: false },
   { key: "requester", label: "Zadavatel", required: false },
   { key: "label_shape_code", label: "Kód tvaru etikety", required: false },
-  { key: "product_format", label: "Rozměr/formát", required: false },
+  { key: "product_format", label: "Rozměr/formát (text)", required: false },
+  { key: "format_width_mm", label: "Formát š (mm)", required: false },
+  { key: "format_height_mm", label: "Formát v (mm)", required: false },
   { key: "die_cut_tool_code", label: "Kód výsekového nástroje", required: false },
   { key: "assembly_code", label: "Kód montáže", required: false },
   { key: "positions_on_sheet", label: "Pozic na archu", required: false },
@@ -50,7 +52,12 @@ const TARGET_FIELDS = [
   { key: "production_notes", label: "Výrobní poznámky", required: false },
   { key: "item_status", label: "Stav položky", required: false },
   { key: "approval_status", label: "Stav schválení", required: false },
+  { key: "approval_date", label: "Datum schválení (YYYY-MM-DD)", required: false },
+  { key: "color_count", label: "Počet barev (1–8)", required: false },
+  { key: "print_colors_text", label: "Barvy (souhrn)", required: false },
+  { key: "label_type", label: "Etiketa (rezana/s_vysekem)", required: false },
   { key: "has_print_sample", label: "Vzor min. tisku (ano/1)", required: false },
+  { key: "has_print_proof", label: "Nátisk (ano/1)", required: false },
 ] as const;
 
 type Mapping = Record<string, number>;
