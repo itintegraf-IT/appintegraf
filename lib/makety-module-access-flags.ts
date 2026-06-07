@@ -1,6 +1,8 @@
-/** Parsování rozšířených oprávnění modulu makety (základ + vyroba + grafika). */
+/** Parsování rozšířených oprávnění modulu makety (základ + vyroba + grafika + zadavatel). */
 
+/** Úrovně v selectu administrace (write je legacy, ukládá se jako příznaky zadavatele). */
 export const MAKETY_BASE_LEVELS = ["read", "write", "admin"] as const;
+export const MAKETY_ADMIN_BASE_LEVELS = ["read", "admin"] as const;
 export type MaketyBaseLevel = (typeof MAKETY_BASE_LEVELS)[number];
 
 export function isModuleAccessFlag(value: unknown): boolean {
@@ -12,11 +14,16 @@ export function isModuleAccessFlag(value: unknown): boolean {
   return false;
 }
 
+function legacyMaketyWrite(moduleAccess: Record<string, string>): boolean {
+  return moduleAccess.makety?.toLowerCase() === "write";
+}
+
 export function maketyBaseLevelFromAccess(
   moduleAccess: Record<string, string>
 ): MaketyBaseLevel | "" {
   const raw = moduleAccess.makety?.toLowerCase() ?? "";
-  if (MAKETY_BASE_LEVELS.includes(raw as MaketyBaseLevel)) return raw as MaketyBaseLevel;
+  if (raw === "write") return "read";
+  if (raw === "read" || raw === "admin") return raw;
   return "";
 }
 
@@ -32,16 +39,29 @@ export function hasMaketyGrafikaFlag(moduleAccess: Record<string, string>): bool
   return isModuleAccessFlag(moduleAccess.makety_grafika);
 }
 
+export function hasMaketyZadavatelMaketaFlag(moduleAccess: Record<string, string>): boolean {
+  if (legacyMaketyWrite(moduleAccess)) return true;
+  return isModuleAccessFlag(moduleAccess.makety_zadavatel_maketa);
+}
+
+export function hasMaketyZadavatelGrafikaFlag(moduleAccess: Record<string, string>): boolean {
+  if (legacyMaketyWrite(moduleAccess)) return true;
+  return isModuleAccessFlag(moduleAccess.makety_zadavatel_grafika);
+}
+
 export function isMaketyModuleEnabled(moduleAccess: Record<string, string>): boolean {
   return (
     !!maketyBaseLevelFromAccess(moduleAccess) ||
+    legacyMaketyWrite(moduleAccess) ||
     hasMaketyVyrobaFlag(moduleAccess) ||
     hasMaketyGrafikaFlag(moduleAccess) ||
+    hasMaketyZadavatelMaketaFlag(moduleAccess) ||
+    hasMaketyZadavatelGrafikaFlag(moduleAccess) ||
     ["vyroba", "grafika"].includes(moduleAccess.makety?.toLowerCase() ?? "")
   );
 }
 
-/** Uložení z admin formuláře – legacy hodnoty vyroba/grafika v `makety` převést na příznaky. */
+/** Uložení z admin formuláře – legacy hodnoty převést na příznaky. */
 export function normalizeMaketyModuleAccessForSave(
   moduleAccess: Record<string, string>
 ): Record<string, string> {
@@ -53,15 +73,33 @@ export function normalizeMaketyModuleAccessForSave(
   if (legacyMakety === "vyroba") vyroba = true;
   if (legacyMakety === "grafika") grafika = true;
 
-  let base = maketyBaseLevelFromAccess(next);
-  if (!base && (vyroba || grafika || legacyMakety === "vyroba" || legacyMakety === "grafika")) {
-    base = "read";
+  let zadavatelMaketa = hasMaketyZadavatelMaketaFlag(next);
+  let zadavatelGrafika = hasMaketyZadavatelGrafikaFlag(next);
+  if (legacyMakety === "write") {
+    zadavatelMaketa = true;
+    zadavatelGrafika = true;
   }
 
-  if (!base && !vyroba && !grafika) {
+  let base = maketyBaseLevelFromAccess(next);
+  if (legacyMakety === "admin") base = "admin";
+
+  const needsBase =
+    vyroba ||
+    grafika ||
+    zadavatelMaketa ||
+    zadavatelGrafika ||
+    legacyMakety === "vyroba" ||
+    legacyMakety === "grafika" ||
+    legacyMakety === "write";
+
+  if (!base && needsBase) base = "read";
+
+  if (!base && !needsBase) {
     delete next.makety;
     delete next.makety_vyroba;
     delete next.makety_grafika;
+    delete next.makety_zadavatel_maketa;
+    delete next.makety_zadavatel_grafika;
     return next;
   }
 
@@ -70,6 +108,10 @@ export function normalizeMaketyModuleAccessForSave(
   else delete next.makety_vyroba;
   if (grafika) next.makety_grafika = "1";
   else delete next.makety_grafika;
+  if (zadavatelMaketa) next.makety_zadavatel_maketa = "1";
+  else delete next.makety_zadavatel_maketa;
+  if (zadavatelGrafika) next.makety_zadavatel_grafika = "1";
+  else delete next.makety_zadavatel_grafika;
 
   return next;
 }
@@ -86,11 +128,24 @@ export function roleHasMaketyGrafikaFromDecoded(decoded: Record<string, unknown>
   return isModuleAccessFlag(decoded.makety_grafika);
 }
 
+export function roleHasMaketyZadavatelMaketaFromDecoded(decoded: Record<string, unknown>): boolean {
+  const perm = decoded.makety;
+  if (typeof perm === "string" && perm.toLowerCase() === "write") return true;
+  return isModuleAccessFlag(decoded.makety_zadavatel_maketa);
+}
+
+export function roleHasMaketyZadavatelGrafikaFromDecoded(decoded: Record<string, unknown>): boolean {
+  const perm = decoded.makety;
+  if (typeof perm === "string" && perm.toLowerCase() === "write") return true;
+  return isModuleAccessFlag(decoded.makety_zadavatel_grafika);
+}
+
 function maketyBaseFromDecoded(decoded: Record<string, unknown>): string {
   const perm = decoded.makety;
   if (typeof perm !== "string") return "";
   const p = perm.toLowerCase();
-  if (MAKETY_BASE_LEVELS.includes(p as MaketyBaseLevel)) return p;
+  if (p === "admin") return "admin";
+  if (p === "read" || p === "write") return p;
   return "";
 }
 
@@ -103,10 +158,18 @@ export function roleMaketyGrantsModuleAccess(
     return (
       ["read", "write", "admin"].includes(base) ||
       roleHasMaketyVyrobaFromDecoded(decoded) ||
-      roleHasMaketyGrafikaFromDecoded(decoded)
+      roleHasMaketyGrafikaFromDecoded(decoded) ||
+      roleHasMaketyZadavatelMaketaFromDecoded(decoded) ||
+      roleHasMaketyZadavatelGrafikaFromDecoded(decoded)
     );
   }
-  if (access === "write") return ["write", "admin"].includes(base);
+  if (access === "write") {
+    return (
+      ["write", "admin"].includes(base) ||
+      roleHasMaketyZadavatelMaketaFromDecoded(decoded) ||
+      roleHasMaketyZadavatelGrafikaFromDecoded(decoded)
+    );
+  }
   if (access === "admin") return base === "admin";
   return false;
 }

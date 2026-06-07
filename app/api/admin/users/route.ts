@@ -8,6 +8,7 @@ import { createUserToken } from "@/lib/tokens";
 import { sendAccountActivationEmail } from "@/lib/email";
 import { logAuthAudit, getRequestIp } from "@/lib/auth-audit";
 import { validatePassword } from "@/lib/password-policy";
+import { parseStoredModuleAccess } from "@/lib/app-modules";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -57,33 +58,9 @@ export async function GET(req: NextRequest) {
   type UserRow = (typeof users)[number];
   const usersWithModules = users.map((u: UserRow) => {
     const ur = u.user_roles?.[0];
-    let module_access: Record<string, string> = {};
-    if (ur?.module_access) {
-      try {
-        const decoded = JSON.parse(ur.module_access);
-        if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-          if (decoded.all === true) {
-            module_access = {
-              contacts: "admin",
-              equipment: "admin",
-              calendar: "admin",
-              contracts: "admin",
-              planovani: "admin",
-              vyroba: "admin",
-              kiosk: "admin",
-              training: "admin",
-              iml: "admin",
-              ukoly: "admin",
-              personalistika: "admin",
-            };
-          } else {
-            module_access = decoded as Record<string, string>;
-          }
-        }
-      } catch {
-        // ignore
-      }
-    }
+    const module_access = ur?.module_access
+      ? parseStoredModuleAccess(ur.module_access)
+      : {};
     const { user_roles: _, ...rest } = u;
     return { ...rest, module_access };
   });

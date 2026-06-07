@@ -2,6 +2,8 @@ import { prisma } from "@/lib/db";
 import {
   roleHasMaketyGrafikaFromDecoded,
   roleHasMaketyVyrobaFromDecoded,
+  roleHasMaketyZadavatelGrafikaFromDecoded,
+  roleHasMaketyZadavatelMaketaFromDecoded,
   roleMaketyGrantsModuleAccess,
 } from "@/lib/makety-module-access-flags";
 
@@ -193,6 +195,42 @@ export async function hasExplicitMaketyGrafikaRole(userId: number): Promise<bool
 export async function hasMaketyGrafikaAccess(userId: number): Promise<boolean> {
   if (await isAdmin(userId)) return true;
   return hasExplicitMaketyGrafikaRole(userId);
+}
+
+/** Explicitní zadavatel maket (bez globálního admina). */
+export async function hasExplicitMaketyZadavatelMaketaRole(userId: number): Promise<boolean> {
+  const roles = await getUserRoles(userId);
+  for (const role of roles) {
+    const rawAccess = role.module_access;
+    if (rawAccess === null || rawAccess === undefined) continue;
+    let decoded: unknown = rawAccess;
+    if (typeof rawAccess === "string") {
+      decoded = parseModuleAccessJson(rawAccess);
+      if (decoded === null) continue;
+    }
+    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+      if (roleHasMaketyZadavatelMaketaFromDecoded(decoded as Record<string, unknown>)) return true;
+    }
+  }
+  return false;
+}
+
+/** Explicitní zadavatel grafiky (bez globálního admina). */
+export async function hasExplicitMaketyZadavatelGrafikaRole(userId: number): Promise<boolean> {
+  const roles = await getUserRoles(userId);
+  for (const role of roles) {
+    const rawAccess = role.module_access;
+    if (rawAccess === null || rawAccess === undefined) continue;
+    let decoded: unknown = rawAccess;
+    if (typeof rawAccess === "string") {
+      decoded = parseModuleAccessJson(rawAccess);
+      if (decoded === null) continue;
+    }
+    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+      if (roleHasMaketyZadavatelGrafikaFromDecoded(decoded as Record<string, unknown>)) return true;
+    }
+  }
+  return false;
 }
 
 /**

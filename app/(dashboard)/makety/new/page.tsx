@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { hasModuleAccess } from "@/lib/auth-utils";
+import { canZadatMaketyWork } from "@/lib/makety-access";
 import { getUsersWithMaketyVyrobaAccess } from "@/lib/makety-vyroba-users";
 import { NewMaketaForm } from "./NewMaketaForm";
 
@@ -10,7 +10,7 @@ export default async function NewMaketaPage() {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const userId = parseInt(session.user.id, 10);
-  if (!(await hasModuleAccess(userId, "makety", "write"))) {
+  if (!(await canZadatMaketyWork(userId, "maketa"))) {
     redirect("/makety");
   }
 

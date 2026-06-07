@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { hasModuleAccess } from "@/lib/auth-utils";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
-import { buildMaketyListWhere } from "@/lib/makety-access";
+import { buildMaketyListWhere, canZadatMaketyWork } from "@/lib/makety-access";
 import { notifyMaketaRecipients } from "@/lib/makety-notify";
 import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
 import { parseMaketaPriority } from "@/lib/makety-status";
@@ -48,9 +47,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
-  if (!(await hasModuleAccess(userId, "makety", "write"))) {
-    return NextResponse.json({ error: "Nemáte oprávnění zadávat makety" }, { status: 403 });
-  }
 
   try {
     const formData = await req.formData();
@@ -64,6 +60,10 @@ export async function POST(req: NextRequest) {
     const dueRaw = String(formData.get("due_at") ?? "").trim();
 
     const work_type = parseMaketyWorkType(String(formData.get("work_type") ?? "maketa"));
+
+    if (!(await canZadatMaketyWork(userId, work_type))) {
+      return NextResponse.json({ error: "Nemáte oprávnění zadávat tento typ zakázky" }, { status: 403 });
+    }
 
     const assigneeRaw = String(formData.get("assignee_user_id") ?? "").trim();
     const assignee_user_id = assigneeRaw ? parseInt(assigneeRaw, 10) : null;

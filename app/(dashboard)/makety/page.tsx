@@ -2,12 +2,13 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
+import { hasMaketyGrafikaAccess, hasMaketyVyrobaAccess } from "@/lib/auth-utils";
 import {
-  hasMaketyGrafikaAccess,
-  hasMaketyVyrobaAccess,
-  hasModuleAccess,
-} from "@/lib/auth-utils";
-import { buildMaketyListWhere, canViewAllMaketyTypes } from "@/lib/makety-access";
+  buildMaketyListWhere,
+  canViewAllMaketyTypes,
+  canZadatAnyMaketyWork,
+  canZadatMaketyWork,
+} from "@/lib/makety-access";
 import { MaketyAdminRowActions } from "./MaketyAdminRowActions";
 import { sortMaketyProductionQueueByAssignee } from "@/lib/makety-queue";
 import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type";
@@ -60,7 +61,8 @@ export default async function MaketyListPage({
 }) {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
-  const canWrite = await hasModuleAccess(userId, "makety", "write");
+  const canWriteMaketa = await canZadatMaketyWork(userId, "maketa");
+  const canWriteGrafika = await canZadatMaketyWork(userId, "grafika");
   const canModuleAdmin = await canViewAllMaketyTypes(userId);
   const params = await searchParams;
   const selectedStatus: MaketaStatus | "" =
@@ -123,7 +125,8 @@ export default async function MaketyListPage({
 
   const showVyrobaHint = canModuleAdmin || (await hasMaketyVyrobaAccess(userId));
   const showGrafikaHint = canModuleAdmin || (await hasMaketyGrafikaAccess(userId));
-  const showZadavatelCalendarHint = canWrite && !showVyrobaHint && !showGrafikaHint;
+  const showZadavatelCalendarHint =
+    (await canZadatAnyMaketyWork(userId)) && !showVyrobaHint && !showGrafikaHint;
 
   return (
     <div className="space-y-5">
@@ -296,7 +299,7 @@ export default async function MaketyListPage({
               rows.map((r) => {
                 const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
                 const canEditRow =
-                  canWrite &&
+                  (wt === "grafika" ? canWriteGrafika : canWriteMaketa) &&
                   r.created_by === userId &&
                   r.status !== "done" &&
                   r.status !== "cancelled";

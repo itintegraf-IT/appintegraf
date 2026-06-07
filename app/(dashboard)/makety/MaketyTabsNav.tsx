@@ -5,13 +5,17 @@ import { usePathname } from "next/navigation";
 import { Archive, Calendar, LayoutList, List, Plus, Users } from "lucide-react";
 
 export function MaketyTabsNav({
-  canWrite,
+  canWriteMaketa,
+  canWriteGrafika,
+  canWriteAny,
   canModuleAdmin,
   canVyroba,
   canGrafika,
   canManageQueue,
 }: {
-  canWrite: boolean;
+  canWriteMaketa: boolean;
+  canWriteGrafika: boolean;
+  canWriteAny: boolean;
   canModuleAdmin: boolean;
   canVyroba: boolean;
   canGrafika: boolean;
@@ -27,9 +31,9 @@ export function MaketyTabsNav({
   const isKalendarGrafika = pathname === "/makety/kalendar-grafika";
   const isFronta = pathname === "/makety/fronta";
 
-  const showZadani = canWrite || canModuleAdmin;
-  const showKalendarMaket = canModuleAdmin || canVyroba || canWrite;
-  const showKalendarGrafika = canModuleAdmin || canGrafika || canWrite;
+  const showZadani = canWriteAny || canModuleAdmin;
+  const showKalendarMaket = canModuleAdmin || canVyroba || canWriteMaketa;
+  const showKalendarGrafika = canModuleAdmin || canGrafika || canWriteGrafika;
 
   const tabClass = (active: boolean) =>
     `inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
@@ -56,13 +60,13 @@ export function MaketyTabsNav({
           Sledování zadání
         </Link>
       )}
-      {canWrite && (
+      {canWriteMaketa && (
         <Link href="/makety/new" className={tabClass(isNew)}>
           <Plus className="h-4 w-4" />
           Nová maketa
         </Link>
       )}
-      {canWrite && (
+      {canWriteGrafika && (
         <Link href="/makety/grafika/new" className={tabClass(isNewGrafika)}>
           <Plus className="h-4 w-4" />
           Nová grafika

@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AdminUserForm } from "../../AdminUserForm";
+import { parseStoredModuleAccess } from "@/lib/app-modules";
 
 export default async function AdminUserEditPage({
   params,
@@ -55,31 +56,9 @@ export default async function AdminUserEditPage({
   if (!row) notFound();
 
   const ur = row.user_roles?.[0];
-  let module_access: Record<string, string> = {};
-  if (ur?.module_access) {
-    try {
-      const decoded = JSON.parse(ur.module_access);
-      if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-        if (decoded.all === true) {
-          module_access = {
-            contacts: "admin",
-            equipment: "admin",
-            calendar: "admin",
-            planovani: "admin",
-            vyroba: "admin",
-            kiosk: "admin",
-            training: "admin",
-            iml: "admin",
-            ukoly: "admin",
-          };
-        } else {
-          module_access = decoded as Record<string, string>;
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
+  const module_access = ur?.module_access
+    ? parseStoredModuleAccess(ur.module_access)
+    : {};
 
   // Legacy: pokud má department_name ale ne department_id, zkusíme najít oddělení podle názvu
   let department_id = row.department_id;

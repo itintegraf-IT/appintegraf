@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { hasModuleAccess } from "@/lib/auth-utils";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { userCanViewMaketa, userCanEditMaketa, userCanDeleteMaketa } from "@/lib/makety-access";
 import { revalidateMaketyViews } from "@/lib/makety-revalidate";
@@ -61,9 +60,6 @@ export async function PUT(
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
-  if (!(await hasModuleAccess(userId, "makety", "write"))) {
-    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
-  }
 
   const id = parseInt((await params).id, 10);
   if (Number.isNaN(id)) {
@@ -213,9 +209,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
-  if (!(await hasModuleAccess(userId, "makety", "write"))) {
-    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
-  }
 
   const id = parseInt((await params).id, 10);
   if (Number.isNaN(id)) {

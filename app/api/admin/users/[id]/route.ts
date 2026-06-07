@@ -5,6 +5,7 @@ import { isAdmin } from "@/lib/auth-utils";
 import bcrypt from "bcryptjs";
 import { validatePassword } from "@/lib/password-policy";
 import { logAuthAudit } from "@/lib/auth-audit";
+import { parseStoredModuleAccess } from "@/lib/app-modules";
 
 export async function GET(
   _req: NextRequest,
@@ -62,33 +63,9 @@ export async function GET(
   }
 
   const ur = user.user_roles?.[0];
-  let module_access: Record<string, string> = {};
-  if (ur?.module_access) {
-    try {
-      const decoded = JSON.parse(ur.module_access);
-      if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
-        if (decoded.all === true) {
-          module_access = {
-            contacts: "admin",
-            equipment: "admin",
-            calendar: "admin",
-            contracts: "admin",
-            planovani: "admin",
-            vyroba: "admin",
-            kiosk: "admin",
-            training: "admin",
-            iml: "admin",
-            ukoly: "admin",
-            personalistika: "admin",
-          };
-        } else {
-          module_access = decoded as Record<string, string>;
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
+  const module_access = ur?.module_access
+    ? parseStoredModuleAccess(ur.module_access)
+    : {};
   const roleId = ur?.role_id ?? user.role_id;
 
   // Legacy: pokud má department_name ale ne department_id, zkusíme najít oddělení podle názvu

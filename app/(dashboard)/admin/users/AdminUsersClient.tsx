@@ -17,7 +17,11 @@ import {
   ClipboardList,
   BriefcaseBusiness,
   Layers,
+  FileText,
+  Printer,
 } from "lucide-react";
+import { APP_MODULE_KEYS } from "@/lib/app-modules";
+import { isMaketyModuleEnabled } from "@/lib/makety-module-access-flags";
 
 const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   contacts: Users,
@@ -25,11 +29,13 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   calendar: Calendar,
   planovani: CalendarDays,
   vyroba: Factory,
+  contracts: FileText,
   iml: Package,
   materialy: Layers,
   kiosk: Tv,
   training: GraduationCap,
   ukoly: ClipboardList,
+  makety: Printer,
   personalistika: BriefcaseBusiness,
 };
 
@@ -39,13 +45,25 @@ const MODULE_LABELS: Record<string, string> = {
   calendar: "Kalendář",
   planovani: "Plánování výroby",
   vyroba: "Výroba",
+  contracts: "Evidence smluv",
   iml: "IML",
   materialy: "Katalog materiálů",
   kiosk: "Kiosk Monitory",
   training: "IT Školení",
   ukoly: "Úkoly",
+  makety: "Makety a grafika",
   personalistika: "Personalistika",
 };
+
+function isModuleVisible(key: string, moduleAccess: Record<string, string>): boolean {
+  if (key === "makety") return isMaketyModuleEnabled(moduleAccess);
+  return !!moduleAccess[key];
+}
+
+function visibleModuleKeys(moduleAccess: Record<string, string> | undefined): string[] {
+  if (!moduleAccess) return [];
+  return APP_MODULE_KEYS.filter((key) => isModuleVisible(key, moduleAccess));
+}
 
 type User = {
   id: number;
@@ -159,29 +177,32 @@ export function AdminUsersClient() {
                     <div className="text-xs text-gray-500">Úkoly: {ukolyRoleLabel(u.module_access?.ukoly)}</div>
                   </td>
                   <td className="px-4 py-3">
-                    <div
-                      className="flex flex-wrap gap-1"
-                      title={Object.keys(u.module_access ?? {})
-                        .map((k) => MODULE_LABELS[k] ?? k)
-                        .join(", ") || "—"}
-                    >
-                      {Object.entries(u.module_access ?? {}).map(([key]) => {
-                        const Icon = MODULE_ICONS[key];
-                        if (!Icon) return null;
-                        return (
-                          <span
-                            key={key}
-                            className="inline-flex rounded bg-gray-100 p-1 text-gray-600"
-                            title={MODULE_LABELS[key] ?? key}
-                          >
-                            <Icon className="h-4 w-4" />
-                          </span>
-                        );
-                      })}
-                      {(!u.module_access || Object.keys(u.module_access).length === 0) && (
-                        <span className="text-gray-400 text-xs">—</span>
-                      )}
-                    </div>
+                    {(() => {
+                      const keys = visibleModuleKeys(u.module_access);
+                      return (
+                        <div
+                          className="flex flex-wrap gap-1"
+                          title={keys.map((k) => MODULE_LABELS[k] ?? k).join(", ") || "—"}
+                        >
+                          {keys.map((key) => {
+                            const Icon = MODULE_ICONS[key];
+                            if (!Icon) return null;
+                            return (
+                              <span
+                                key={key}
+                                className="inline-flex rounded bg-gray-100 p-1 text-gray-600"
+                                title={MODULE_LABELS[key] ?? key}
+                              >
+                                <Icon className="h-4 w-4" />
+                              </span>
+                            );
+                          })}
+                          {keys.length === 0 && (
+                            <span className="text-gray-400 text-xs">—</span>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-4 py-3">
                     <span

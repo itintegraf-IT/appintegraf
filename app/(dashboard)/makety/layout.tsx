@@ -1,10 +1,15 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { hasModuleAccess, hasMaketyGrafikaAccess, hasMaketyVyrobaAccess } from "@/lib/auth-utils";
+import { hasMaketyGrafikaAccess, hasMaketyVyrobaAccess } from "@/lib/auth-utils";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { Printer } from "lucide-react";
 import { MAKETY_MODULE_LABEL } from "@/lib/makety-module-label";
-import { canManageMaketyQueue, canViewAllMaketyTypes } from "@/lib/makety-access";
+import {
+  canManageMaketyQueue,
+  canViewAllMaketyTypes,
+  canZadatAnyMaketyWork,
+  canZadatMaketyWork,
+} from "@/lib/makety-access";
 import { MaketyTabsNav } from "./MaketyTabsNav";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +22,9 @@ export default async function MaketyLayout({ children }: { children: React.React
     redirect("/");
   }
 
-  const canWrite = await hasModuleAccess(userId, "makety", "write");
+  const canWriteMaketa = await canZadatMaketyWork(userId, "maketa");
+  const canWriteGrafika = await canZadatMaketyWork(userId, "grafika");
+  const canWriteAny = await canZadatAnyMaketyWork(userId);
   const canModuleAdmin = await canViewAllMaketyTypes(userId);
   const canVyroba = await hasMaketyVyrobaAccess(userId);
   const canGrafika = await hasMaketyGrafikaAccess(userId);
@@ -33,7 +40,9 @@ export default async function MaketyLayout({ children }: { children: React.React
         <p className="mt-1 text-gray-600">Zadávání výroby na plotru a grafiku</p>
       </div>
       <MaketyTabsNav
-        canWrite={canWrite}
+        canWriteMaketa={canWriteMaketa}
+        canWriteGrafika={canWriteGrafika}
+        canWriteAny={canWriteAny}
         canModuleAdmin={canModuleAdmin}
         canVyroba={canVyroba}
         canGrafika={canGrafika}

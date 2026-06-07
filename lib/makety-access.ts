@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   hasModuleAccess,
+  hasExplicitMaketyZadavatelGrafikaRole,
+  hasExplicitMaketyZadavatelMaketaRole,
   hasMaketyGrafikaAccess,
   hasMaketyVyrobaAccess,
   isAdmin,
@@ -24,18 +26,35 @@ export async function canViewAllMaketyTypes(userId: number): Promise<boolean> {
   return hasModuleAccess(userId, "makety", "admin");
 }
 
+/** Může zakládat/editovat vlastní zakázky daného typu (admin modulu = oba typy). */
+export async function canZadatMaketyWork(userId: number, workType: MaketyWorkType): Promise<boolean> {
+  if (await canViewAllMaketyTypes(userId)) return true;
+  if (workType === "maketa" && (await hasExplicitMaketyZadavatelMaketaRole(userId))) return true;
+  if (workType === "grafika" && (await hasExplicitMaketyZadavatelGrafikaRole(userId))) return true;
+  return false;
+}
+
+/** Alespoň jeden typ zadavatele – záložka Sledování zadání. */
+export async function canZadatAnyMaketyWork(userId: number): Promise<boolean> {
+  if (await canViewAllMaketyTypes(userId)) return true;
+  return (
+    (await hasExplicitMaketyZadavatelMaketaRole(userId)) ||
+    (await hasExplicitMaketyZadavatelGrafikaRole(userId))
+  );
+}
+
 /** Kalendář maket na plotru v modulu Makety (org přehled nebo vlastní zakázky zadavatele). */
 export async function canViewMaketyPlotrCalendar(userId: number): Promise<boolean> {
   if (await canViewAllMaketyTypes(userId)) return true;
   if (await hasMaketyVyrobaAccess(userId)) return true;
-  return hasModuleAccess(userId, "makety", "write");
+  return canZadatMaketyWork(userId, "maketa");
 }
 
 /** Kalendář grafiky v modulu Makety. */
 export async function canViewMaketyGrafikaCalendar(userId: number): Promise<boolean> {
   if (await canViewAllMaketyTypes(userId)) return true;
   if (await hasMaketyGrafikaAccess(userId)) return true;
-  return hasModuleAccess(userId, "makety", "write");
+  return canZadatMaketyWork(userId, "grafika");
 }
 
 /**
@@ -107,13 +126,14 @@ export async function userCanViewMaketa(userId: number, maketaId: number): Promi
 }
 
 export async function userCanEditMaketa(userId: number, maketaId: number): Promise<boolean> {
-  if (!(await hasModuleAccess(userId, "makety", "write"))) return false;
   const row = await prisma.makety.findFirst({
     where: { id: maketaId, created_by: userId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, work_type: true },
   });
   if (!row) return false;
-  return row.status !== "done" && row.status !== "cancelled";
+  if (row.status === "done" || row.status === "cancelled") return false;
+  const workType = (row.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+  return canZadatMaketyWork(userId, workType);
 }
 
 /** Smazání – zadavatel u své aktivní zakázky, nebo admin modulu / globální admin. */
