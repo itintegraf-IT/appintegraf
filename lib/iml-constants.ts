@@ -40,3 +40,15 @@ export function imlLabelTypeLabel(value: string | null | undefined): string {
   if (!value) return "";
   return IML_LABEL_TYPES.find((t) => t.value === value)?.label ?? value;
 }
+
+/** Stav schválení tiskových dat (`iml_products.approval_status`). */
+export const IML_APPROVAL_STATUSES = [
+  "máme",
+  "nemáme",
+  "řeší grafik",
+] as const;
+
+export type ImlApprovalStatus = (typeof IML_APPROVAL_STATUSES)[number];
+
+/** Počet barev na záložce Tisková data (`iml_products.color_count`). */
+export const IML_COLOR_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const;

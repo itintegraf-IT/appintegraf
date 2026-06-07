@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 import { Tabs, type TabDef } from "../../_components/Tabs";
 import {
+  IML_APPROVAL_STATUSES,
+  IML_COLOR_COUNT_OPTIONS,
   IML_ITEM_STATUSES,
   IML_LABEL_TYPES,
   imlItemStatusLabel,
@@ -104,6 +106,11 @@ export default function ProductFormSections({
     form.format_width_mm ? parseFloat(form.format_width_mm) : null,
     form.format_height_mm ? parseFloat(form.format_height_mm) : null
   );
+  const legacyApprovalStatus =
+    form.approval_status &&
+    !(IML_APPROVAL_STATUSES as readonly string[]).includes(form.approval_status)
+      ? form.approval_status
+      : null;
 
   const tabs: TabDef[] = [
     {
@@ -363,13 +370,19 @@ export default function ProductFormSections({
         <TabShell title="Tisková data a stavy" subtitle="Schvalování, rozměry, parametry tisku, EAN, vzorky a poznámky">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Stav schválení" error={err.approval_status}>
-              <input
-                type="text"
+              <select
                 value={form.approval_status}
                 onChange={(e) => setField("approval_status", e.target.value)}
-                placeholder="máme / nemáme / řeší grafik…"
                 className={inputCls}
-              />
+              >
+                <option value="">— Vyberte —</option>
+                {IML_APPROVAL_STATUSES.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+                {legacyApprovalStatus && (
+                  <option value={legacyApprovalStatus}>{legacyApprovalStatus}</option>
+                )}
+              </select>
             </Field>
             <Field label="Datum schválení" error={err.approval_date}>
               <input
@@ -407,46 +420,56 @@ export default function ProductFormSections({
                 className={inputCls}
               />
             </Field>
-            <Field label="Formát š (mm)" error={err.format_width_mm}>
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                value={form.format_width_mm}
-                onChange={(e) => setField("format_width_mm", e.target.value)}
-                className={inputCls}
-                placeholder="např. 45"
-              />
-            </Field>
-            <Field label="Formát v (mm)" error={err.format_height_mm}>
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                value={form.format_height_mm}
-                onChange={(e) => setField("format_height_mm", e.target.value)}
-                className={inputCls}
-                placeholder="např. 30"
-              />
-            </Field>
-            {formatPreview && (
-              <div className="sm:col-span-2">
-                <p className="text-xs text-gray-500">
-                  Formát: <span className="font-medium text-gray-700">{formatPreview}</span>
-                </p>
+            <Field
+              label="Formát"
+              error={err.format_width_mm || err.format_height_mm}
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.format_width_mm}
+                    onChange={(e) => setField("format_width_mm", e.target.value)}
+                    className="w-24 rounded-lg border border-gray-300 px-3 py-2"
+                    placeholder="š"
+                    aria-label="Šířka v mm"
+                  />
+                  <span className="text-sm text-gray-500">mm</span>
+                </div>
+                <span className="text-gray-400">×</span>
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    value={form.format_height_mm}
+                    onChange={(e) => setField("format_height_mm", e.target.value)}
+                    className="w-24 rounded-lg border border-gray-300 px-3 py-2"
+                    placeholder="v"
+                    aria-label="Výška v mm"
+                  />
+                  <span className="text-sm text-gray-500">mm</span>
+                </div>
               </div>
-            )}
-            <Field label="Počet barev" error={err.color_count} hint="1–8, informativní pro tiskárnu">
-              <input
-                type="number"
-                min={1}
-                max={8}
-                step={1}
+              {formatPreview && (
+                <p className="mt-1.5 text-xs text-gray-500">
+                  Náhled: <span className="font-medium text-gray-700">{formatPreview}</span>
+                </p>
+              )}
+            </Field>
+            <Field label="Počet barev" error={err.color_count} hint="Informativní pro tiskárnu">
+              <select
                 value={form.color_count}
                 onChange={(e) => setField("color_count", e.target.value)}
                 className={inputCls}
-                placeholder="1–8"
-              />
+              >
+                <option value="">— Vyberte —</option>
+                {IML_COLOR_COUNT_OPTIONS.map((n) => (
+                  <option key={n} value={String(n)}>{n}</option>
+                ))}
+              </select>
             </Field>
             <Field label="Etiketa" error={err.label_type}>
               <select
