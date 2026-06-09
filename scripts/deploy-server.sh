@@ -119,15 +119,21 @@ if [[ "$SKIP_MIGRATE" -eq 0 ]]; then
   fi
 fi
 
-echo "==> SQL: modul Makety (db:makety-migrate)"
+echo "==> SQL: modul Makety (tabulky + work_type + queue_position)"
 set +e
 npm run db:makety-migrate
 makety_migrate_exit=$?
+npm run db:makety-work-type
+makety_work_type_exit=$?
+npm run db:makety-queue
+makety_queue_exit=$?
 set -e
-if [[ "$makety_migrate_exit" -ne 0 ]]; then
-  echo "Upozornění: db:makety-migrate skončil s kódem $makety_migrate_exit."
-  echo "  Na serveru spusťte ručně: npm run db:makety-migrate"
-  echo "  nebo deploy s: --apply-sql 20260601_makety_module.sql"
+if [[ "$makety_migrate_exit" -ne 0 || "$makety_work_type_exit" -ne 0 || "$makety_queue_exit" -ne 0 ]]; then
+  echo "Upozornění: některá makety migrace skončila chybou (migrate=$makety_migrate_exit work_type=$makety_work_type_exit queue=$makety_queue_exit)."
+  echo "  Na serveru spusťte ručně:"
+  echo "    npm run db:makety-migrate"
+  echo "    npm run db:makety-work-type"
+  echo "    npm run db:makety-queue"
   echo ""
 fi
 
