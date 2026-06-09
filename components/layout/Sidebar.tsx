@@ -44,6 +44,7 @@ import {
   ClipboardList,
   Printer,
   BriefcaseBusiness,
+  Briefcase,
   Layers,
 } from "lucide-react";
 import {
@@ -444,6 +445,20 @@ const navItems: NavItem[] = [
   { href: "/contracts", icon: FileText, label: "Evidence smluv", module: "contracts" },
   { href: "/planovani", icon: CalendarDays, label: "Plánování výroby", module: "planovani" },
   { href: "/vyroba", icon: Factory, label: "Výroba", module: "vyroba" },
+  {
+    href: "/crm",
+    icon: Briefcase,
+    label: "CRM",
+    module: "crm",
+    subItems: [
+      { href: "/crm/companies", label: "Firmy" },
+      { href: "/crm/deals", label: "Obchody" },
+      { href: "/crm/deals/kanban", label: "Pipeline" },
+      { href: "/crm/activities", label: "Aktivity" },
+      { href: "/crm/reminders", label: "Připomenutí" },
+    ],
+    isActive: (p) => p.startsWith("/crm"),
+  },
   {
     href: "/iml",
     icon: Package,

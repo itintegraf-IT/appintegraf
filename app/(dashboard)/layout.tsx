@@ -35,6 +35,7 @@ export default async function DashboardLayout({
     makety,
     personalistika,
     materialy,
+    crm,
   } =
     await getLayoutAccess(userId);
 
@@ -52,6 +53,7 @@ export default async function DashboardLayout({
     makety,
     personalistika,
     materialy,
+    crm,
   };
 
   return (

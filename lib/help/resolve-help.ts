@@ -13,6 +13,7 @@ const PATH_PREFIX_MAP: { prefix: string; key: string }[] = [
   { prefix: "/contracts", key: "contracts" },
   { prefix: "/planovani", key: "planovani" },
   { prefix: "/vyroba", key: "vyroba" },
+  { prefix: "/crm", key: "crm" },
   { prefix: "/iml", key: "iml" },
   { prefix: "/materialy", key: "materialy" },
   { prefix: "/help", key: "dashboard" },

@@ -16,6 +16,7 @@ export const BACKUP_MODULE_IDS = [
   "kiosk",
   "training",
   "audit",
+  "crm",
 ] as const;
 
 export type BackupModuleId = (typeof BACKUP_MODULE_IDS)[number];

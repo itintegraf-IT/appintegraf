@@ -934,6 +934,17 @@ model users {
   makety_comments_authored                                       makety_comments[]             @relation("makety_comments_author")
   notifications                                                  notifications[]
   iml_product_files_uploaded                                     iml_product_files[]           @relation("iml_product_files_uploader")
+  crm_companies_owned                                            crm_companies[]               @relation("crm_company_owner")
+  crm_deals_owned                                                crm_deals[]                   @relation("crm_deal_owner")
+  crm_activities_owned                                           crm_activities[]              @relation("crm_activity_owner")
+  crm_activities_assigned                                        crm_activities[]              @relation("crm_activity_assignee")
+  crm_notes_authored                                             crm_notes[]                   @relation("crm_note_author")
+  crm_attachments_uploaded                                       crm_attachments[]             @relation("crm_attachment_uploader")
+  crm_audit_log                                                  crm_audit_log[]
+  crm_notifications                                              crm_notifications[]
+  crm_graph_sync_state                                           crm_graph_sync_state?
+  crm_graph_accounts                                             crm_graph_accounts[]
+  crm_ai_usage                                                   crm_ai_usage[]
   roles                                                          roles?                        @relation(fields: [role_id], references: [id], onUpdate: NoAction, map: "fk_users_role")
 
   @@index([is_active], map: "idx_active")
@@ -1647,4 +1658,305 @@ model rate_limit_hits {
 
   @@unique([key, window_start], map: "uq_rate_limit_key_window")
   @@index([window_start], map: "idx_rate_limit_window")
+}
+
+// ─── Modul CRM (obchodní vztahy, pipeline, aktivity) ───────────────────────────
+
+enum crm_deal_stage {
+  LEAD
+  QUALIFIED
+  NABIDKA
+  JEDNANI
+  WON
+  LOST
+  CANCELLED
+}
+
+enum crm_activity_type {
+  CALL
+  MEETING
+  EMAIL
+  REMINDER
+  NOTE
+}
+
+enum crm_parent_type {
+  COMPANY
+  CONTACT
+  DEAL
+}
+
+enum crm_audit_action {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+model crm_companies {
+  id         String   @id @default(cuid()) @db.VarChar(30)
+  name       String   @db.VarChar(255)
+  ico        String?  @unique @db.VarChar(20)
+  dic        String?  @db.VarChar(20)
+  address    String?  @db.Text
+  segment    String?  @db.VarChar(100)
+  tags       Json?
+  owner_id   Int?
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt @db.Timestamp(0)
+
+  owner    users?         @relation("crm_company_owner", fields: [owner_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  contacts crm_contacts[]
+  deals    crm_deals[]
+
+  @@index([name], map: "idx_crm_companies_name")
+  @@index([owner_id], map: "idx_crm_companies_owner")
+  @@map("crm_companies")
+}
+
+model crm_contacts {
+  id                String   @id @default(cuid()) @db.VarChar(30)
+  company_id        String   @db.VarChar(30)
+  first_name        String   @db.VarChar(100)
+  last_name         String   @db.VarChar(100)
+  role              String?  @db.VarChar(100)
+  email             String?  @unique @db.VarChar(255)
+  phone             String?  @db.VarChar(50)
+  is_decision_maker Boolean  @default(false)
+  created_at        DateTime @default(now()) @db.Timestamp(0)
+  updated_at        DateTime @updatedAt @db.Timestamp(0)
+
+  company       crm_companies     @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  deal_contacts crm_deal_contacts[]
+
+  @@index([company_id], map: "idx_crm_contacts_company")
+  @@map("crm_contacts")
+}
+
+model crm_deal_categories {
+  id         String   @id @default(cuid()) @db.VarChar(30)
+  code       String   @unique @db.VarChar(50)
+  label      String   @db.VarChar(100)
+  color      String   @db.VarChar(20)
+  active     Boolean  @default(true)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @updatedAt @db.Timestamp(0)
+
+  deals crm_deals[]
+
+  @@map("crm_deal_categories")
+}
+
+model crm_lost_reasons {
+  id     String  @id @default(cuid()) @db.VarChar(30)
+  code   String  @unique @db.VarChar(50)
+  label  String  @db.VarChar(100)
+  active Boolean @default(true)
+
+  @@map("crm_lost_reasons")
+}
+
+model crm_deals {
+  id          String         @id @default(cuid()) @db.VarChar(30)
+  number      String         @unique @db.VarChar(50)
+  company_id  String         @db.VarChar(30)
+  owner_id    Int
+  title       String         @db.VarChar(255)
+  stage       crm_deal_stage @default(LEAD)
+  value       Decimal        @db.Decimal(12, 2)
+  probability Int            @default(10)
+  close_date  DateTime?      @db.DateTime(0)
+  lost_reason String?        @db.VarChar(100)
+  category_id String?        @db.VarChar(30)
+  created_at  DateTime       @default(now()) @db.Timestamp(0)
+  updated_at  DateTime       @updatedAt @db.Timestamp(0)
+
+  company       crm_companies        @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  owner         users                @relation("crm_deal_owner", fields: [owner_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  category      crm_deal_categories? @relation(fields: [category_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  deal_contacts crm_deal_contacts[]
+
+  @@index([company_id], map: "idx_crm_deals_company")
+  @@index([owner_id], map: "idx_crm_deals_owner")
+  @@index([stage], map: "idx_crm_deals_stage")
+  @@index([category_id], map: "idx_crm_deals_category")
+  @@index([close_date], map: "idx_crm_deals_close_date")
+  @@map("crm_deals")
+}
+
+model crm_deal_contacts {
+  deal_id      String  @db.VarChar(30)
+  contact_id   String  @db.VarChar(30)
+  role_in_deal String? @db.VarChar(100)
+
+  deal    crm_deals    @relation(fields: [deal_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  contact crm_contacts @relation(fields: [contact_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([deal_id, contact_id])
+  @@index([contact_id], map: "idx_crm_deal_contacts_contact")
+  @@map("crm_deal_contacts")
+}
+
+model crm_activities {
+  id               String            @id @default(cuid()) @db.VarChar(30)
+  parent_type      crm_parent_type
+  parent_id        String            @db.VarChar(30)
+  type             crm_activity_type
+  date             DateTime          @db.DateTime(0)
+  duration         Int?
+  note             String?           @db.Text
+  outcome          String?           @db.Text
+  next_action_date DateTime?         @db.DateTime(0)
+  owner_id         Int
+  assignee_id      Int?
+  external_id      String?           @unique @db.VarChar(255)
+  external_source  String?           @db.VarChar(50)
+  completed_at     DateTime?         @db.DateTime(0)
+  created_at       DateTime          @default(now()) @db.Timestamp(0)
+  updated_at       DateTime          @updatedAt @db.Timestamp(0)
+
+  owner    users  @relation("crm_activity_owner", fields: [owner_id], references: [id], onDelete: Restrict, onUpdate: NoAction)
+  assignee users? @relation("crm_activity_assignee", fields: [assignee_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([parent_type, parent_id], map: "idx_crm_activities_parent")
+  @@index([owner_id], map: "idx_crm_activities_owner")
+  @@index([assignee_id], map: "idx_crm_activities_assignee")
+  @@index([date], map: "idx_crm_activities_date")
+  @@map("crm_activities")
+}
+
+model crm_notes {
+  id          String          @id @default(cuid()) @db.VarChar(30)
+  parent_type crm_parent_type
+  parent_id   String          @db.VarChar(30)
+  content     String          @db.Text
+  author_id   Int?
+  mentions    Json?
+  created_at  DateTime        @default(now()) @db.Timestamp(0)
+
+  author users? @relation("crm_note_author", fields: [author_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([parent_type, parent_id], map: "idx_crm_notes_parent")
+  @@index([author_id], map: "idx_crm_notes_author")
+  @@map("crm_notes")
+}
+
+model crm_attachments {
+  id          String          @id @default(cuid()) @db.VarChar(30)
+  parent_type crm_parent_type
+  parent_id   String          @db.VarChar(30)
+  file_name   String          @db.VarChar(255)
+  path        String          @db.VarChar(500)
+  size        Int
+  mime        String          @db.VarChar(100)
+  uploaded_by Int?
+  created_at  DateTime        @default(now()) @db.Timestamp(0)
+
+  uploader users? @relation("crm_attachment_uploader", fields: [uploaded_by], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([parent_type, parent_id], map: "idx_crm_attachments_parent")
+  @@map("crm_attachments")
+}
+
+model crm_audit_log {
+  id          String           @id @default(cuid()) @db.VarChar(30)
+  user_id     Int?
+  entity_type String           @db.VarChar(50)
+  entity_id   String           @db.VarChar(30)
+  action      crm_audit_action
+  diff        Json
+  created_at  DateTime         @default(now()) @db.Timestamp(0)
+
+  user users? @relation(fields: [user_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+
+  @@index([entity_type, entity_id], map: "idx_crm_audit_entity")
+  @@index([user_id], map: "idx_crm_audit_user")
+  @@index([created_at], map: "idx_crm_audit_created")
+  @@map("crm_audit_log")
+}
+
+model crm_notifications {
+  id         String    @id @default(cuid()) @db.VarChar(30)
+  user_id    Int
+  type       String    @db.VarChar(50)
+  payload    Json
+  read_at    DateTime? @db.DateTime(0)
+  created_at DateTime  @default(now()) @db.Timestamp(0)
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, read_at], map: "idx_crm_notifications_user_read")
+  @@map("crm_notifications")
+}
+
+model crm_ai_insights {
+  id             String    @id @default(cuid()) @db.VarChar(30)
+  entity_type    String    @db.VarChar(50)
+  entity_id      String    @db.VarChar(30)
+  insight_type   String    @db.VarChar(50)
+  content        String    @db.Text
+  model          String    @db.VarChar(50)
+  tokens         Int
+  created_at     DateTime  @default(now()) @db.Timestamp(0)
+  invalidated_at DateTime? @db.DateTime(0)
+
+  @@index([entity_type, entity_id, insight_type], map: "idx_crm_ai_insights_entity")
+  @@index([invalidated_at], map: "idx_crm_ai_insights_invalidated")
+  @@map("crm_ai_insights")
+}
+
+model crm_ai_usage {
+  id         String   @id @default(cuid()) @db.VarChar(30)
+  user_id    Int
+  action     String   @db.VarChar(50)
+  tokens     Int      @default(0)
+  model      String?  @db.VarChar(50)
+  created_at DateTime @default(now()) @db.Timestamp(0)
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([user_id, action, created_at], map: "idx_crm_ai_usage_user_action")
+  @@index([created_at], map: "idx_crm_ai_usage_created")
+  @@map("crm_ai_usage")
+}
+
+model crm_graph_sync_state {
+  id             String    @id @default(cuid()) @db.VarChar(30)
+  user_id        Int       @unique
+  inbox_delta    String?   @db.Text
+  sent_delta     String?   @db.Text
+  last_sync_at   DateTime? @db.DateTime(0)
+  last_error_at  DateTime? @db.DateTime(0)
+  last_error_msg String?   @db.Text
+  error_count    Int       @default(0)
+  backoff_until  DateTime? @db.DateTime(0)
+  enabled        Boolean   @default(true)
+  created_at     DateTime  @default(now()) @db.Timestamp(0)
+  updated_at     DateTime  @updatedAt @db.Timestamp(0)
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([backoff_until], map: "idx_crm_graph_sync_backoff")
+  @@index([last_sync_at], map: "idx_crm_graph_sync_last")
+  @@map("crm_graph_sync_state")
+}
+
+model crm_graph_accounts {
+  id                  String   @id @default(cuid()) @db.VarChar(30)
+  user_id             Int
+  provider            String   @db.VarChar(50)
+  provider_account_id String   @db.VarChar(255)
+  access_token        String?  @db.Text
+  refresh_token       String?  @db.Text
+  expires_at          Int?
+  token_type          String?  @db.VarChar(50)
+  scope               String?  @db.Text
+  created_at          DateTime @default(now()) @db.Timestamp(0)
+  updated_at          DateTime @updatedAt @db.Timestamp(0)
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@unique([provider, provider_account_id], map: "uq_crm_graph_accounts_provider")
+  @@index([user_id], map: "idx_crm_graph_accounts_user")
+  @@map("crm_graph_accounts")
 }

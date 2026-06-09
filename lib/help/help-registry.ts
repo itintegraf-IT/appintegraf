@@ -5,6 +5,7 @@ import {
   Laptop,
   ClipboardList,
   BriefcaseBusiness,
+  Briefcase,
   FileText,
   CalendarDays,
   Factory,
@@ -342,6 +343,34 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       { label: "Kompletní dokumentace", href: "/help/dokumentace-kompletni-vyrobaceniny" },
       { label: "Návrh modulu", href: "/help/navrh-modul-vyroba" },
       { label: "Řešení tisku", href: "/help/vyroba-tisk" },
+    ],
+  },
+
+  crm: {
+    key: "crm",
+    module: "crm",
+    icon: Briefcase,
+    title: "CRM",
+    path: "/crm",
+    intro:
+      "Interní CRM pro obchodní tým — firmy, kontakty zákazníků, obchodní případy, pipeline, aktivity a připomenutí.",
+    features: [
+      "Přehled pipeline a forecast na dashboardu modulu.",
+      "Firmy s ARES lookupem a segmentací.",
+      "Kontakty navázané na firmy.",
+      "Obchody — tabulka, kanban pipeline, AI shrnutí dealu.",
+      "Aktivity a připomenutí (hovory, schůzky, e-maily).",
+      "Admin: kategorie dealů, důvody prohry, audit, GDPR.",
+    ],
+    quickSteps: [
+      "Otevřete CRM z postranního menu.",
+      "Založte firmu (IČO → ARES doplní údaje).",
+      "Přidejte kontakty a vytvořte obchodní případ.",
+      "Sledujte pipeline v kanbanu a zapisujte aktivity.",
+    ],
+    tips: [
+      "Oprávnění read = prohlížeč, write = obchodník, admin = správa číselníků.",
+      "Správa uživatelů probíhá v administraci APPIntegraf.",
     ],
   },
 
