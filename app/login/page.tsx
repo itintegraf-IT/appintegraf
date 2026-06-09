@@ -1,8 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
-import { useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TotpCodeInput } from "@/components/auth/TotpCodeInput";
 import { TotpEnrollStep } from "@/components/auth/TotpEnrollStep";
@@ -18,8 +17,13 @@ function LoginForm() {
   const [loginChallenge, setLoginChallenge] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/";
+  const [callbackUrl, setCallbackUrl] = useState("/");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cb = params.get("callbackUrl");
+    if (cb) setCallbackUrl(cb);
+  }, []);
 
   async function completeSignIn(
     creds: Record<string, string>
@@ -464,9 +468,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <Suspense fallback={<div style={{ height: 200 }} />}>
-          <LoginForm />
-        </Suspense>
+        <LoginForm />
       </div>
     </div>
   );
