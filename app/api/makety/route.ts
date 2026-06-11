@@ -107,7 +107,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const queue_position = await nextQueuePositionForAssignee(work_type, assignee_user_id);
+    const isMaketaPlotr = work_type === "maketa";
+    const queue_position = isMaketaPlotr
+      ? null
+      : await nextQueuePositionForAssignee(work_type, assignee_user_id);
 
     const created = await prisma.makety.create({
       data: {
@@ -122,6 +125,7 @@ export async function POST(req: NextRequest) {
         assignee_user_id,
         created_by: userId,
         work_type,
+        status: isMaketaPlotr ? "awaiting_quote" : "open",
       },
     });
 

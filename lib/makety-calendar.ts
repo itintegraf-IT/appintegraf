@@ -7,6 +7,7 @@ import {
   hasMaketyVyrobaAccess,
 } from "@/lib/auth-utils";
 import { sortMaketyProductionQueueByAssignee } from "@/lib/makety-queue";
+import { MAKETY_PRODUCTION_QUEUE_STATUSES } from "@/lib/makety-status";
 import { type MaketyWorkType } from "@/lib/makety-work-type";
 
 function isMissingMaketyTableError(err: unknown): boolean {
@@ -133,8 +134,10 @@ export async function fetchMaketyForCalendarRange(params: {
     if (workType) where.work_type = workType;
   } else if (mode === "vyroba") {
     where.work_type = "maketa";
+    where.status = { in: [...MAKETY_PRODUCTION_QUEUE_STATUSES] };
   } else if (mode === "grafika") {
     where.work_type = "grafika";
+    where.status = { in: [...MAKETY_PRODUCTION_QUEUE_STATUSES] };
   }
 
   try {

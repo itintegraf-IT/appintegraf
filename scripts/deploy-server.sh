@@ -127,13 +127,16 @@ npm run db:makety-work-type
 makety_work_type_exit=$?
 npm run db:makety-queue
 makety_queue_exit=$?
+npm run db:makety-quote
+makety_quote_exit=$?
 set -e
-if [[ "$makety_migrate_exit" -ne 0 || "$makety_work_type_exit" -ne 0 || "$makety_queue_exit" -ne 0 ]]; then
-  echo "Upozornění: některá makety migrace skončila chybou (migrate=$makety_migrate_exit work_type=$makety_work_type_exit queue=$makety_queue_exit)."
+if [[ "$makety_migrate_exit" -ne 0 || "$makety_work_type_exit" -ne 0 || "$makety_queue_exit" -ne 0 || "$makety_quote_exit" -ne 0 ]]; then
+  echo "Upozornění: některá makety migrace skončila chybou (migrate=$makety_migrate_exit work_type=$makety_work_type_exit queue=$makety_queue_exit quote=$makety_quote_exit)."
   echo "  Na serveru spusťte ručně:"
   echo "    npm run db:makety-migrate"
   echo "    npm run db:makety-work-type"
   echo "    npm run db:makety-queue"
+  echo "    npm run db:makety-quote"
   echo ""
 fi
 

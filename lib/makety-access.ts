@@ -133,7 +133,42 @@ export async function userCanEditMaketa(userId: number, maketaId: number): Promi
   if (!row) return false;
   if (row.status === "done" || row.status === "cancelled") return false;
   const workType = (row.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
-  return canZadatMaketyWork(userId, workType);
+  if (!(await canZadatMaketyWork(userId, workType))) return false;
+  if (workType === "maketa") {
+    return row.status === "awaiting_quote" || row.status === "quote_submitted";
+  }
+  return true;
+}
+
+/** Výrobce odešle kalkulaci ceny (jen maketa, stav awaiting_quote). */
+export async function userCanSubmitMaketaQuote(userId: number, maketaId: number): Promise<boolean> {
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId },
+    select: {
+      id: true,
+      work_type: true,
+      status: true,
+      assignee_user_id: true,
+    },
+  });
+  if (!row) return false;
+  if (row.work_type !== "maketa" || row.status !== "awaiting_quote") return false;
+  if (row.assignee_user_id === userId) return true;
+  if (await canViewAllMaketyTypes(userId)) return true;
+  return false;
+}
+
+/** Zadavatel schválí / zamítne nabídku (stav quote_submitted). */
+export async function userCanApproveMaketaQuote(userId: number, maketaId: number): Promise<boolean> {
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId },
+    select: { id: true, work_type: true, status: true, created_by: true },
+  });
+  if (!row) return false;
+  if (row.work_type !== "maketa" || row.status !== "quote_submitted") return false;
+  if (await canViewAllMaketyTypes(userId)) return true;
+  if (row.created_by !== userId) return false;
+  return canZadatMaketyWork(userId, "maketa");
 }
 
 /** Smazání – zadavatel u své aktivní zakázky, nebo admin modulu / globální admin. */

@@ -13,8 +13,12 @@ import {
   userCanEditMaketa,
   userCanDeleteMaketa,
   userCanCompleteMaketa,
+  userCanSubmitMaketaQuote,
+  userCanApproveMaketaQuote,
   canManageMaketyQueue,
 } from "@/lib/makety-access";
+import { MaketaQuoteForm } from "./MaketaQuoteForm";
+import { MaketaApprovalPanel } from "./MaketaApprovalPanel";
 import { MaketyDetailPrioritySelect } from "./MaketyDetailPrioritySelect";
 import { DeleteMaketaButton } from "./DeleteMaketaButton";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
@@ -67,10 +71,23 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
   const canEdit = await userCanEditMaketa(userId, id);
   const canDelete = await userCanDeleteMaketa(userId, id);
   const canComplete = await userCanCompleteMaketa(userId, id);
+  const canSubmitQuote = await userCanSubmitMaketaQuote(userId, id);
+  const canApproveQuote = await userCanApproveMaketaQuote(userId, id);
   const isArchived = maketa.status === "done" || maketa.status === "cancelled";
   const canManagePriority =
     (await canManageMaketyQueue(userId)) && !isArchived;
   const workType = (maketa.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+  const quotePriceFormatted =
+    maketa.quote_price != null
+      ? new Intl.NumberFormat("cs-CZ", { style: "currency", currency: "CZK" }).format(
+          Number(maketa.quote_price)
+        )
+      : null;
+  const showApprovedQuote =
+    workType === "maketa" &&
+    maketa.quote_price != null &&
+    maketa.status !== "awaiting_quote" &&
+    maketa.status !== "quote_submitted";
 
   return (
     <div className="space-y-6">
@@ -154,11 +171,41 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
             </dd>
           </div>
           <div className="sm:col-span-2">
-            <dt className="text-xs font-medium uppercase text-gray-500">Popis</dt>
+            <dt className="text-xs font-medium uppercase text-gray-500">Popis zadání</dt>
             <dd className="mt-1 whitespace-pre-wrap text-sm text-gray-900">{maketa.body}</dd>
           </div>
+          {showApprovedQuote && quotePriceFormatted && (
+            <>
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">Schválená cena</dt>
+                <dd className="mt-1 text-sm font-medium text-gray-900">{quotePriceFormatted}</dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-medium uppercase text-gray-500">Popis výroby (výrobce)</dt>
+                <dd className="mt-1 whitespace-pre-wrap text-sm text-gray-900">
+                  {maketa.quote_production_description ?? "—"}
+                </dd>
+              </div>
+            </>
+          )}
         </dl>
       </div>
+
+      {workType === "maketa" && canSubmitQuote && (
+        <MaketaQuoteForm maketaId={id} rejectionReason={maketa.rejection_reason} />
+      )}
+
+      {workType === "maketa" &&
+        canApproveQuote &&
+        maketa.status === "quote_submitted" &&
+        quotePriceFormatted &&
+        maketa.quote_production_description && (
+          <MaketaApprovalPanel
+            maketaId={id}
+            quotePrice={quotePriceFormatted}
+            quoteProductionDescription={maketa.quote_production_description}
+          />
+        )}
 
       {!isArchived && (
         <MaketaFilesPanel
