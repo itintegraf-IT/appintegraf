@@ -1,7 +1,34 @@
 import { prisma } from "@/lib/db";
 import { collectMaketaNotifyUserIds } from "@/lib/makety-recipients";
 
-export type MaketaNotifyKind = "assigned" | "deadline_changed" | "done" | "comment";
+export type MaketaNotifyKind =
+  | "assigned"
+  | "deadline_changed"
+  | "done"
+  | "comment"
+  | "quote_submitted"
+  | "quote_approved"
+  | "quote_rejected";
+
+async function notifyMaketaUser(
+  userId: number,
+  params: {
+    maketaId: number;
+    title: string;
+    message: string;
+    type: string;
+  }
+): Promise<void> {
+  await prisma.notifications.create({
+    data: {
+      user_id: userId,
+      title: params.title,
+      message: params.message,
+      type: params.type,
+      link: `/makety/${params.maketaId}`,
+    },
+  });
+}
 
 export async function notifyMaketaRecipients(params: {
   maketaId: number;
@@ -20,12 +47,18 @@ export async function notifyMaketaRecipients(params: {
     deadline_changed: "Změna termínu makety",
     done: "Maketa dokončena",
     comment: "Nový komentář k maketě",
+    quote_submitted: "Nabídka k maketě",
+    quote_approved: "Maketa schválena",
+    quote_rejected: "Nabídka zamítnuta",
   };
   const messageByKind: Record<MaketaNotifyKind, string> = {
     assigned: `Byla vám přidělena maketa${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`,
     deadline_changed: `U makety${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""} byl změněn termín.`,
     done: `Maketa${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""} byla označena jako hotová.`,
     comment: `U makety${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""} byl přidán komentář.`,
+    quote_submitted: `Výrobce odeslal nabídku k maketě${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`,
+    quote_approved: `Zadavatel schválil maketu do výroby${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`,
+    quote_rejected: `Zadavatel zamítl nabídku k maketě${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`,
   };
 
   const type = `makety_${params.kind}`;
@@ -41,6 +74,36 @@ export async function notifyMaketaRecipients(params: {
       },
     });
   }
+}
+
+export async function notifyMaketaCreator(params: {
+  maketaId: number;
+  creatorUserId: number;
+  title: string;
+  message: string;
+  type: string;
+}): Promise<void> {
+  await notifyMaketaUser(params.creatorUserId, {
+    maketaId: params.maketaId,
+    title: params.title,
+    message: params.message,
+    type: params.type,
+  });
+}
+
+export async function notifyMaketaQuoteSubmitted(params: {
+  maketaId: number;
+  creatorUserId: number;
+  orderNumber: string | null;
+  bodyPreview: string;
+}): Promise<void> {
+  await notifyMaketaCreator({
+    maketaId: params.maketaId,
+    creatorUserId: params.creatorUserId,
+    title: "Nabídka k maketě",
+    message: `Výrobce odeslal cenu a popis výroby${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}. ${params.bodyPreview.slice(0, 150)}`,
+    type: "makety_quote_submitted",
+  });
 }
 
 export async function notifyMaketaDone(params: {

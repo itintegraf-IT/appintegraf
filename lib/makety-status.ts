@@ -1,11 +1,24 @@
-export type MaketaStatus = "open" | "in_progress" | "done" | "cancelled";
+export type MaketaStatus =
+  | "awaiting_quote"
+  | "quote_submitted"
+  | "open"
+  | "in_progress"
+  | "done"
+  | "cancelled";
 
 export type MaketaPriority = "normal" | "high" | "urgent";
 
+/** Stavy zakázky ve frontě výroby (po schválení ceny). */
+export const MAKETY_PRODUCTION_QUEUE_STATUSES = ["open", "in_progress"] as const;
+
 export function maketaStatusLabel(status: string): string {
   switch (status) {
+    case "awaiting_quote":
+      return "Čeká na kalkulaci";
+    case "quote_submitted":
+      return "Čeká na schválení";
     case "open":
-      return "Nová";
+      return "Schváleno / ve frontě";
     case "in_progress":
       return "Ve výrobě";
     case "done":
@@ -19,6 +32,10 @@ export function maketaStatusLabel(status: string): string {
 
 export function maketaStatusBadgeClass(status: string): string {
   switch (status) {
+    case "awaiting_quote":
+      return "bg-sky-100 text-sky-800";
+    case "quote_submitted":
+      return "bg-indigo-100 text-indigo-800";
     case "done":
       return "bg-green-100 text-green-800";
     case "in_progress":
@@ -59,4 +76,8 @@ export function parseMaketaPriority(raw: string | null | undefined): MaketaPrior
   const p = (raw ?? "normal").toLowerCase();
   if (p === "urgent" || p === "high") return p;
   return "normal";
+}
+
+export function isMaketaPreApprovalStatus(status: string): boolean {
+  return status === "awaiting_quote" || status === "quote_submitted";
 }

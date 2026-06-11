@@ -14,7 +14,9 @@ export type MaketyQueueRow = {
   assignee_user_id: number | null;
 };
 
-const ACTIVE_STATUSES = ["open", "in_progress"] as const;
+import { MAKETY_PRODUCTION_QUEUE_STATUSES } from "@/lib/makety-status";
+
+const ACTIVE_STATUSES = MAKETY_PRODUCTION_QUEUE_STATUSES;
 
 export function prioritySortKey(priority: string): number {
   switch (priority) {

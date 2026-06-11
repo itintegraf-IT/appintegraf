@@ -39,6 +39,12 @@ export async function POST(
   if (maketa.status === "in_progress") {
     return NextResponse.json({ success: true, alreadyStarted: true });
   }
+  if (maketa.status !== "open") {
+    return NextResponse.json(
+      { error: "Výrobu lze zahájit až po schválení nabídky zadavatelem" },
+      { status: 400 }
+    );
+  }
 
   await prisma.makety.update({
     where: { id },

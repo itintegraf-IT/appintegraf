@@ -22,7 +22,14 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const STATUS_ORDER = ["open", "in_progress", "done", "cancelled"] as const;
+const STATUS_ORDER = [
+  "awaiting_quote",
+  "quote_submitted",
+  "open",
+  "in_progress",
+  "done",
+  "cancelled",
+] as const;
 type MaketaStatus = (typeof STATUS_ORDER)[number];
 
 function applyTermToWhere(
@@ -65,13 +72,9 @@ export default async function MaketyListPage({
   const canWriteGrafika = await canZadatMaketyWork(userId, "grafika");
   const canModuleAdmin = await canViewAllMaketyTypes(userId);
   const params = await searchParams;
-  const selectedStatus: MaketaStatus | "" =
-    params.status === "open" ||
-    params.status === "in_progress" ||
-    params.status === "done" ||
-    params.status === "cancelled"
-      ? params.status
-      : "";
+  const selectedStatus: MaketaStatus | "" = STATUS_ORDER.includes(params.status as MaketaStatus)
+    ? (params.status as MaketaStatus)
+    : "";
   const selectedTerm =
     params.term === "overdue" || params.term === "today" || params.term === "week"
       ? params.term
