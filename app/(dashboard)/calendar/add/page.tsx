@@ -47,7 +47,6 @@ export default function AddCalendarPage() {
     start_date: formatDateTimeLocalForInput(defaultStart),
     end_date: formatDateTimeLocalForInput(defaultEnd),
     event_type: DEFAULT_EVENT_TYPE,
-    department_id: "",
     deputy_id: "",
     is_private: false,
     is_all_day: false,
@@ -152,7 +151,6 @@ export default function AddCalendarPage() {
           start_date: startDate,
           end_date: endDate,
           event_type: form.event_type,
-          department_id: form.department_id || null,
           deputy_id: form.deputy_id || null,
           is_private: form.is_private,
           location: form.location,
@@ -344,19 +342,6 @@ export default function AddCalendarPage() {
               )}
             </div>
           )}
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Oddělení</label>
-            <select
-              value={form.department_id}
-              onChange={(e) => setForm({ ...form, department_id: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            >
-              <option value="">—</option>
-              {departments.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Místo</label>
             <input

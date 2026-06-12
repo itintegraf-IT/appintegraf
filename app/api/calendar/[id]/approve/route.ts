@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { sendCalendarApprovalEmail } from "@/lib/email";
 import {
   formatApproverAssignmentNote,
+  resolveApproverDepartmentId,
   resolveDepartmentCalendarApprover,
 } from "@/lib/calendar-approver-resolution";
 import { dismissNotificationsUpdate } from "@/lib/notifications-dismiss";
@@ -39,6 +40,7 @@ export async function POST(
           first_name: true,
           last_name: true,
           department_id: true,
+          user_secondary_departments: { select: { department_id: true } },
         },
       },
       users_deputy: { select: { id: true, first_name: true, last_name: true } },
@@ -69,8 +71,7 @@ export async function POST(
     ? `${event.users.first_name} ${event.users.last_name}`
     : "Žadatel";
 
-  const departmentId =
-    event.department_id ?? event.users?.department_id ?? null;
+  const departmentId = event.users ? resolveApproverDepartmentId(event.users) : null;
 
   const isDeputy = event.deputy_id === userId;
   const pendingFinalApproval = event.calendar_approvals.find(
