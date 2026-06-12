@@ -22,6 +22,15 @@ export function calendarApproverTierLabel(tier: CalendarApproverTier): string {
   return TIER_LABELS[tier];
 }
 
+/** Oddělení pro lookup v tabulce Schvalovatelé kalendáře (hlavní → první sekundární). */
+export function resolveApproverDepartmentId(user: {
+  department_id: number | null;
+  user_secondary_departments?: Array<{ department_id: number }>;
+}): number | null {
+  if (user.department_id != null) return user.department_id;
+  return user.user_secondary_departments?.[0]?.department_id ?? null;
+}
+
 /**
  * Uživatel je v daném termínu „nepřítomen“ (má kolidující událost mimo firmu).
  */

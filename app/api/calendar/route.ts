@@ -16,6 +16,7 @@ import {
   notifyCalendarInvitees,
 } from "@/lib/calendar-participant-sync";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
+import { resolveApproverDepartmentId } from "@/lib/calendar-approver-resolution";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
@@ -75,7 +76,6 @@ export async function POST(req: NextRequest) {
       start_date,
       end_date,
       event_type = "jine",
-      department_id = null,
       deputy_id = null,
       is_private = false,
       location = "",
@@ -225,13 +225,16 @@ export async function POST(req: NextRequest) {
 
     const creator = await prisma.users.findUnique({
       where: { id: userId },
-      select: { first_name: true, last_name: true, department_id: true },
+      select: {
+        first_name: true,
+        last_name: true,
+        department_id: true,
+        user_secondary_departments: { select: { department_id: true } },
+      },
     });
     const creatorName = creator ? `${creator.first_name} ${creator.last_name}` : "Uživatel";
 
-    const resolvedDeptId = department_id
-      ? parseInt(department_id, 10)
-      : creator?.department_id ?? null;
+    const resolvedDeptId = creator ? resolveApproverDepartmentId(creator) : null;
 
     const titleTrim = String(title).trim();
     const descTrim = description ? String(description).trim() : "";

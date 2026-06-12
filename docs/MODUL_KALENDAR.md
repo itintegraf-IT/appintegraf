@@ -219,6 +219,7 @@ Barvu server **nepřijímá** – vždy nastaví `getColorForEventType(event_typ
 - **Připomínka:** `remind_before_minutes` = `null` nebo jedna z hodnot: `15`, `30`, `60`, `120`, `1440`. Volitelné `reminder_notify_in_app`, `reminder_notify_email` (výchozí true; pokud je připomínka zvolena, alespoň jeden kanál musí být zapnutý).
 - **Pozvánky:** `participant_user_ids` = pole ID uživatelů (bez autora a bez zástupu; API duplicitní / neplatné hodnoty odfiltruje).
 - **Služební cesta:** u `event_type = "sluzebni_cesta"` je povinný `description` (kam a proč jedete), aby schvalovatel viděl kontext.
+- **Oddělení pro schvalování:** klient neposílá `department_id`; server ho odvodí z profilu tvůrce (hlavní oddělení, jinak první sekundární) a uloží do `calendar_events.department_id` pro audit.
 
 ```json
 {
@@ -227,7 +228,6 @@ Barvu server **nepřijímá** – vždy nastaví `getColorForEventType(event_typ
   "start_date": "2026-03-16T09:00:00",
   "end_date": "2026-03-16T10:00:00",
   "event_type": "dovolena|osobni|schuzka_mimo_firmu|schuzka_nachod|schuzka_praha|sluzebni_cesta|lekar|nemoc|vzdelavani|jine",
-  "department_id": 1,
   "deputy_id": 5,
   "is_public": false,
   "location": "Místo",
@@ -260,7 +260,7 @@ Stejná pole jako u vytvoření kromě opakování (úprava jedné instance; bar
 | end_date | DateTime | Konec |
 | event_type | String? | dovolena, osobni, schuzka_mimo_firmu, schuzka_nachod, schuzka_praha, sluzebni_cesta, lekar, nemoc, vzdelavani, jine |
 | created_by | Int | FK users |
-| department_id | Int? | FK departments |
+| department_id | Int? | FK departments – interně z profilu žadatele (hlavní oddělení, jinak první sekundární); ve formuláři se nevybírá |
 | deputy_id | Int? | FK users (zástup; povinné u Dovolená, Osobní) |
 | is_public | Boolean? | Veřejná událost |
 | color | String? | Barva v mřížce (#hex) – u nových/uložených událostí odpovídá typu (`lib/calendar-event-colors.ts`) |
@@ -283,27 +283,29 @@ U typů **Dovolená** a **Osobní** je pole **Zástup** povinné. Workflow:
 ```mermaid
 flowchart TD
   A[Vytvoření události<br/>requires_approval=true] --> B[approval_status = pending]
-  B -->|POST /api/calendar/:id/approve<br/>approve by deputy| C{Existuje vedoucí oddělení<br/>a není stejný jako zástup?}
+  B -->|POST /api/calendar/:id/approve<br/>approve by deputy| C{Existuje finální schvalovatel<br/>dle tabulky Schvalovatelé kalendáře<br/>a není stejný jako zástup?}
   B -->|POST /api/calendar/:id/approve<br/>reject by deputy + comment| R[approval_status = rejected]
 
   C -->|ANO| D[approval_status = deputy_approved<br/>notifikace vedoucímu]
   C -->|NE| E[approval_status = approved]
 
-  D -->|POST /api/calendar/:id/approve<br/>approve by manager| E
-  D -->|POST /api/calendar/:id/approve<br/>reject by manager + comment| R
+  D -->|POST /api/calendar/:id/approve<br/>approve by finální schvalovatel| E
+  D -->|POST /api/calendar/:id/approve<br/>reject by finální schvalovatel + comment| R
 ```
 
 Pravidla:
 
 - `pending` schvaluje pouze uživatel v `deputy_id`.
-- `deputy_approved` schvaluje pouze vedoucí oddělení žadatele (`departments.manager_id` přes `event.department_id` nebo `creator.department_id`).
+- **Zástupci** se nabízejí z oddělení, kde je žadatel členem (hlavní + sekundární) – `GET /api/calendar/deputies`.
+- Po schválení zástupem se finální schvalovatel vybere z administrace **Schvalovatelé kalendáře** podle oddělení žadatele z profilu (hlavní oddělení, při absenci první sekundární): primární → sekundární → terciární → vedoucí oddělení (fallback).
+- `deputy_approved` schvaluje přiřazený finální schvalovatel (primární / sekundární / terciární / vedoucí).
 - `reject` vyžaduje povinný `comment`.
-- Pokud vedoucí oddělení není určen, nebo je stejný jako zástup, schválení zástupem přechází rovnou do `approved`.
-2. **deputy_approved** – zástup schválil; vedoucí oddělení žadatele dostane notifikaci
-3. **approved** – vedoucí schválil (definitivní); nebo zástup schválil a oddělení nemá vedoucího
-4. **rejected** – zamítnuto zástupem nebo vedoucím
+- Pokud finální schvalovatel není určen, nebo je stejný jako zástup, schválení zástupem přechází rovnou do `approved`.
+2. **deputy_approved** – zástup schválil; finální schvalovatel dostane notifikaci
+3. **approved** – finální schvalovatel schválil (definitivní); nebo zástup schválil a schvalovatel není k dispozici
+4. **rejected** – zamítnuto zástupem nebo finálním schvalovatelem
 
-- API: `GET /api/calendar/deputies` – seznam možných zástupců
+- API: `GET /api/calendar/deputies` – seznam možných zástupců (z oddělení členství žadatele)
 - API: `POST /api/calendar/[id]/approve` – schválení/zamítnutí (zástup nebo vedoucí)
 - **Dashboard** – sekce „Události ke schválení“ a „Notifikace“ (nepřečtené)
 
