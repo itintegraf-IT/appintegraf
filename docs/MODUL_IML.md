@@ -402,12 +402,12 @@ Na hlavní stránce IML (`/iml`):
 
 **Složka nebo ZIP (IMLEXport) – doporučený postup**
 
-- **Složka** (doporučeno): výběr celé složky exportu v prohlížeči – bez nutnosti vytvářet ZIP; max. **500 MB** celkem
-- **ZIP** (volitelně): archiv se stejnou strukturou; max. 500 MB
+- **Složka** (doporučeno): výběr celé složky exportu v prohlížeči – bez nutnosti vytvářet ZIP; **bez celkového limitu** (soubory se při importu nahrávají postupně po dávkách cca 100 MB)
+- **ZIP** (volitelně): archiv se stejnou strukturou; max. **500 MB** (jeden požadavek)
 - Kořen: `products.csv` (nebo první `.csv`) + rekurzivní podsložky se soubory
 - **Rychlý náhled (složka):** při mapování a konfliktech se nahraje jen `products.csv` + seznam cest souborů (`previewMode=light`); PDF a obrázky až při **Spustit import**
 - Cesty ze složky se normalizují (společný kořen např. `IMLEXport/` se odstraní, aby odpovídaly struktuře ZIP)
-- API: `POST /api/iml/products/import/preview` (náhled, konflikty), `POST /api/iml/products/import/execute` (zápis včetně všech souborů)
+- API: `POST /api/iml/products/import/preview` (náhled, konflikty); u složky `POST /api/iml/products/import/session` → `POST /api/iml/products/import/batch` (opakovaně) → `POST /api/iml/products/import/execute` (se `sessionId`); u ZIP jeden `POST /api/iml/products/import/execute` s archivem
 - Automatické mapování sloupců z IMLEXportu: `code` → `ig_code`, `name` → `client_name`, `contractor` → `customer_name`, `material` / `note` → `production_notes`, `print` → `print_note`
 - **Konflikty** existujícího `ig_code`: před importem náhled; akce **přepsat** (metadata z CSV) nebo **přeskočit** (metadata beze změny, soubory z ZIP se k produktu přiřadí)
 - **Pojmenování souborů v ZIP** (bez ohledu na podsložku):
@@ -479,8 +479,10 @@ Uživatelé mohou rozšířit databázi o vlastní pole u produktů a objednáve
 | `/api/iml/products/[id]/pdf` | GET, POST, DELETE | PDF produktu |
 | `/api/iml/products/export` | GET | Export CSV/Excel |
 | `/api/iml/products/import` | POST | Import z CSV/Excel (bez příloh) |
-| `/api/iml/products/import/preview` | POST | Náhled ZIP importu (CSV + soubory, konflikty) |
-| `/api/iml/products/import/execute` | POST | Provedení ZIP importu (CSV + soubory) |
+| `/api/iml/products/import/preview` | POST | Náhled importu (light preview ze složky nebo celý ZIP) |
+| `/api/iml/products/import/session` | POST / DELETE | Relace pro postupné nahrávání složky |
+| `/api/iml/products/import/batch` | POST | Jedna dávka souborů do relace (max. cca 100 MB) |
+| `/api/iml/products/import/execute` | POST | Provedení importu (ZIP v těle, nebo `sessionId` po dávkách) |
 | `/api/iml/orders` | GET, POST | Seznam, vytvoření |
 | `/api/iml/orders/[id]` | GET, PUT, DELETE | Detail, úprava, smazání |
 | `/api/iml/orders/export` | GET | Export CSV/Excel |

@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
       // Musí být vyšší než nejvyšší aplikační limit (IML ZIP import = 500 MB).
       bodySizeLimit: "500mb",
     },
-    // Proxy + route handler sdílí buffer těla (složka / ZIP import až 500 MB).
+    // ZIP až 500 MB; dávky složky až cca 100 MB (IML_PRODUCT_IMPORT_BATCH_MAX_BYTES).
     proxyClientMaxBodySize: "500mb",
   },
 };

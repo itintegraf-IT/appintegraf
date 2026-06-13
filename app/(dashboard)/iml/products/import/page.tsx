@@ -14,15 +14,20 @@ import {
 import {
   appendFolderFilesToFormData,
   buildLightPreviewFormData,
+  cancelFolderImportSession,
   estimateFormDataBytes,
+  executeFolderImportInBatches,
   findProductsCsvInFileList,
   formatImportSize,
   postFormDataWithProgress,
   sumFileListBytes,
-  validateImportSizeClient,
+  validateZipImportSizeClient,
   type UploadProgressState,
 } from "@/lib/iml-product-import-client";
-import { IML_PRODUCT_IMPORT_MAX_MB } from "@/lib/iml-product-import-limits";
+import {
+  IML_PRODUCT_IMPORT_BATCH_MAX_MB,
+  IML_PRODUCT_IMPORT_MAX_MB,
+} from "@/lib/iml-product-import-limits";
 
 const TARGET_FIELDS = [
   { key: "ig_code", label: "Kód IG (IMLEXport: code)", required: false },
@@ -122,6 +127,7 @@ export default function ImlProductsImportPage() {
   const [uploadProgress, setUploadProgress] = useState<UploadProgressState | null>(null);
   const [error, setError] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const importSessionIdRef = useRef<string | null>(null);
   const [result, setResult] = useState<ExecuteResult | null>(null);
   const [legacyResult, setLegacyResult] = useState<{ imported: number; errors: string[] } | null>(
     null
@@ -210,12 +216,21 @@ export default function ImlProductsImportPage() {
         ? "Importuji produkty na serveru…"
         : "Zpracovávám náhled na serveru…";
     }
-    return `Nahrávám data… ${formatImportSize(uploadProgress.loaded)} / ${formatImportSize(uploadProgress.total)} (${uploadProgress.percent} %)`;
+    const batchLabel =
+      uploadProgress.batchIndex && uploadProgress.batchCount
+        ? `Dávka ${uploadProgress.batchIndex}/${uploadProgress.batchCount} · `
+        : "";
+    return `${batchLabel}Nahrávám data… ${formatImportSize(uploadProgress.loaded)} / ${formatImportSize(uploadProgress.total)} (${uploadProgress.percent} %)`;
   }, [uploadProgress, loading, step]);
 
   const cancelUpload = () => {
+    const sessionId = importSessionIdRef.current;
+    importSessionIdRef.current = null;
     abortRef.current?.abort();
     abortRef.current = null;
+    if (sessionId) {
+      void cancelFolderImportSession(sessionId);
+    }
     setLoading(false);
     setUploadProgress(null);
     setError("Nahrávání zrušeno");
@@ -229,10 +244,12 @@ export default function ImlProductsImportPage() {
     ) => {
       const files = source?.folderFiles ?? folderFiles;
       const zip = source?.zipFile !== undefined ? source.zipFile : zipFile;
-      const sizeErr = validateImportSizeClient(files ?? null, zip);
-      if (sizeErr) {
-        setError(sizeErr);
-        return;
+      if (zip) {
+        const sizeErr = validateZipImportSizeClient(zip);
+        if (sizeErr) {
+          setError(sizeErr);
+          return;
+        }
       }
       if (!files?.length && !zip) {
         setError("Vyberte složku nebo ZIP");
@@ -316,11 +333,6 @@ export default function ImlProductsImportPage() {
       return;
     }
     const files = Array.from(list);
-    const sizeErr = validateImportSizeClient(files, null);
-    if (sizeErr) {
-      setError(sizeErr);
-      return;
-    }
     const firstPath =
       (files[0] as File & { webkitRelativePath?: string }).webkitRelativePath || "";
     const rootName = firstPath.split("/")[0] || "složka";
@@ -344,7 +356,7 @@ export default function ImlProductsImportPage() {
       setError("Očekáván soubor .zip");
       return;
     }
-    const sizeErr = validateImportSizeClient(null, f);
+    const sizeErr = validateZipImportSizeClient(f);
     if (sizeErr) {
       setError(sizeErr);
       return;
@@ -391,40 +403,76 @@ export default function ImlProductsImportPage() {
     setByCode((prev) => ({ ...prev, [code]: action }));
   };
 
+  const applyExecuteResult = (data: Record<string, unknown>) => {
+    setResult({
+      created: (data.created as number) ?? 0,
+      updated: (data.updated as number) ?? 0,
+      skipped: (data.skipped as number) ?? 0,
+      imported: (data.imported as number) ?? 0,
+      errors: (data.errors as string[]) ?? [],
+      files: (data.files as ExecuteResult["files"]) ?? {
+        printAttached: 0,
+        previewAttached: 0,
+        skippedNoProduct: 0,
+        errors: [],
+      },
+    });
+    setStep("done");
+  };
+
   const handleExecute = async () => {
     if (!hasImportSource) return;
-    const sizeErr = validateImportSizeClient(folderFiles, zipFile);
-    if (sizeErr) {
-      setError(sizeErr);
-      return;
+    if (zipFile) {
+      const sizeErr = validateZipImportSizeClient(zipFile);
+      if (sizeErr) {
+        setError(sizeErr);
+        return;
+      }
     }
 
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
+    importSessionIdRef.current = null;
 
     setLoading(true);
     setUploadProgress(null);
     setError("");
     setResult(null);
     try {
-      const formData = buildExecuteFormData();
-      const totalBytes = estimateFormDataBytes(folderFiles, zipFile);
+      let ok: boolean;
+      let data: Record<string, unknown>;
 
-      const { ok, data } = await postFormDataWithProgress(
-        "/api/iml/products/import/execute",
-        formData,
-        {
+      if (folderFiles?.length) {
+        ({ ok, data } = await executeFolderImportInBatches(folderFiles, {
+          mapping,
+          resolutions: { default: defaultAction, byCode },
           signal: controller.signal,
           timeoutMs: 600_000,
-          onProgress: (p) => {
-            setUploadProgress({
-              ...p,
-              total: p.total || totalBytes,
-            });
+          onSessionCreated: (id) => {
+            importSessionIdRef.current = id;
           },
-        }
-      );
+          onProgress: setUploadProgress,
+        }));
+        importSessionIdRef.current = null;
+      } else {
+        const formData = buildExecuteFormData();
+        const totalBytes = estimateFormDataBytes(folderFiles, zipFile);
+        ({ ok, data } = await postFormDataWithProgress(
+          "/api/iml/products/import/execute",
+          formData,
+          {
+            signal: controller.signal,
+            timeoutMs: 600_000,
+            onProgress: (p) => {
+              setUploadProgress({
+                ...p,
+                total: p.total || totalBytes,
+              });
+            },
+          }
+        ));
+      }
 
       if (!ok) {
         throw new Error(
@@ -432,20 +480,7 @@ export default function ImlProductsImportPage() {
         );
       }
 
-      setResult({
-        created: (data.created as number) ?? 0,
-        updated: (data.updated as number) ?? 0,
-        skipped: (data.skipped as number) ?? 0,
-        imported: (data.imported as number) ?? 0,
-        errors: (data.errors as string[]) ?? [],
-        files: (data.files as ExecuteResult["files"]) ?? {
-          printAttached: 0,
-          previewAttached: 0,
-          skippedNoProduct: 0,
-          errors: [],
-        },
-      });
-      setStep("done");
+      applyExecuteResult(data);
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       setError(err instanceof Error ? err.message : "Chyba při importu");
@@ -453,6 +488,7 @@ export default function ImlProductsImportPage() {
       setLoading(false);
       setUploadProgress(null);
       abortRef.current = null;
+      importSessionIdRef.current = null;
     }
   };
 
@@ -560,8 +596,9 @@ export default function ImlProductsImportPage() {
               Vyberte složku s exportem (bez zabalení do ZIP)
             </p>
             <p className="mb-4 text-xs text-gray-500">
-              Náhled CSV je rychlý (nahraje se jen products.csv). Plné soubory se odešlou až při
-              „Spustit import“. Max. {IML_PRODUCT_IMPORT_MAX_MB} MB celkem.
+              Náhled CSV je rychlý (nahraje se jen products.csv). Při „Spustit import“ se soubory
+              nahrávají postupně po dávkách (cca {IML_PRODUCT_IMPORT_BATCH_MAX_MB} MB) – velikost
+              složky není omezena.
             </p>
             <input
               ref={folderInputRef}
@@ -595,7 +632,9 @@ export default function ImlProductsImportPage() {
           </div>
           <div className="text-center">
             <FileArchive className="mx-auto mb-2 h-8 w-8 text-gray-400" />
-            <p className="mb-2 text-xs text-gray-600">ZIP archiv (volitelné)</p>
+            <p className="mb-2 text-xs text-gray-600">
+              ZIP archiv (volitelně, max. {IML_PRODUCT_IMPORT_MAX_MB} MB)
+            </p>
             <input
               ref={zipInputRef}
               type="file"

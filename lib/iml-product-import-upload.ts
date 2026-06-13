@@ -9,6 +9,8 @@ import {
 } from "@/lib/iml-product-import-zip";
 import { normalizeFolderPathPrefixes } from "@/lib/iml-product-import-paths";
 import {
+  IML_PRODUCT_IMPORT_BATCH_MAX_BYTES,
+  IML_PRODUCT_IMPORT_BATCH_MAX_MB,
   IML_PRODUCT_IMPORT_MAX_BYTES,
   IML_PRODUCT_IMPORT_MAX_MB,
 } from "@/lib/iml-product-import-limits";
@@ -78,12 +80,52 @@ export function isLightPreviewMode(formData: FormData): boolean {
   return formData.get("previewMode") === "light";
 }
 
-export function assertTotalSizeWithinLimit(totalBytes: number): void {
+export function assertZipSizeWithinLimit(totalBytes: number): void {
   if (totalBytes > IML_PRODUCT_IMPORT_MAX_BYTES) {
     throw new Error(
-      `Import je příliš velký (max ${IML_PRODUCT_IMPORT_MAX_MB} MB celkem). Použijte menší výběr souborů.`
+      `ZIP import je příliš velký (max ${IML_PRODUCT_IMPORT_MAX_MB} MB). Použijte složku s postupným nahráváním.`
     );
   }
+}
+
+export function assertBatchSizeWithinLimit(batchBytes: number): void {
+  if (batchBytes > IML_PRODUCT_IMPORT_BATCH_MAX_BYTES) {
+    throw new Error(
+      `Dávka importu je příliš velká (max ${IML_PRODUCT_IMPORT_BATCH_MAX_MB} MB na jeden požadavek).`
+    );
+  }
+}
+
+export async function appendFilesToImportDir(
+  dir: string,
+  files: File[],
+  paths: string[]
+): Promise<{ written: number; bytes: number }> {
+  if (files.length === 0) {
+    throw new Error("Prázdná dávka souborů");
+  }
+
+  let batchBytes = 0;
+  for (const f of files) batchBytes += f.size;
+  assertBatchSizeWithinLimit(batchBytes);
+
+  const normalizedPaths = normalizeFolderPathPrefixes(paths);
+  if (normalizedPaths.length !== files.length) {
+    throw new Error("Počet cest neodpovídá počtu souborů v dávce");
+  }
+
+  let written = 0;
+  let bytes = 0;
+  for (let i = 0; i < files.length; i++) {
+    const rel = sanitizeImportRelativePath(normalizedPaths[i] ?? files[i].name);
+    const buf = Buffer.from(await files[i].arrayBuffer());
+    const dest = path.join(dir, rel);
+    await mkdir(path.dirname(dest), { recursive: true });
+    await writeFile(dest, buf);
+    written++;
+    bytes += buf.length;
+  }
+  return { written, bytes };
 }
 
 export async function writeFilesToTemp(files: File[], paths: string[]): Promise<string> {
@@ -92,20 +134,9 @@ export async function writeFilesToTemp(files: File[], paths: string[]): Promise<
   }
 
   const dir = await mkdtemp(path.join(tmpdir(), "iml-import-"));
-  let total = 0;
 
   try {
-    const normalizedPaths = normalizeFolderPathPrefixes(paths);
-    for (let i = 0; i < files.length; i++) {
-      const rel = sanitizeImportRelativePath(normalizedPaths[i] ?? files[i].name);
-      const buf = Buffer.from(await files[i].arrayBuffer());
-      total += buf.length;
-      assertTotalSizeWithinLimit(total);
-
-      const dest = path.join(dir, rel);
-      await mkdir(path.dirname(dest), { recursive: true });
-      await writeFile(dest, buf);
-    }
+    await appendFilesToImportDir(dir, files, paths);
     return dir;
   } catch (e) {
     await cleanupTempDir(dir);
@@ -120,16 +151,13 @@ export async function prepareImportTempDir(formData: FormData): Promise<{
   const folderFiles = getFolderFilesFromFormData(formData);
   if (folderFiles.length > 0) {
     const paths = getFolderPathsFromFormData(formData, folderFiles);
-    let total = 0;
-    for (const f of folderFiles) total += f.size;
-    assertTotalSizeWithinLimit(total);
     const tempDir = await writeFilesToTemp(folderFiles, paths);
     return { tempDir, source: "folder" };
   }
 
   const zip = formData.get("zip");
   if (zip instanceof File && zip.size > 0) {
-    assertTotalSizeWithinLimit(zip.size);
+    assertZipSizeWithinLimit(zip.size);
     const name = zip.name.toLowerCase();
     if (!name.endsWith(".zip")) {
       throw new Error("Očekáván soubor .zip");

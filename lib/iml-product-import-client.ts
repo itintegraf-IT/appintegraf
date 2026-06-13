@@ -1,4 +1,5 @@
 import {
+  IML_PRODUCT_IMPORT_BATCH_MAX_BYTES,
   IML_PRODUCT_IMPORT_MAX_BYTES,
   IML_PRODUCT_IMPORT_MAX_MB,
 } from "@/lib/iml-product-import-limits";
@@ -11,6 +12,8 @@ export type UploadProgressState = {
   loaded: number;
   total: number;
   percent: number;
+  batchIndex?: number;
+  batchCount?: number;
 };
 
 export function getFileRelativePath(file: File): string {
@@ -78,13 +81,185 @@ export function formatImportSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export function validateImportSizeClient(files: File[] | null, zip: File | null): string | null {
-  const total =
-    files && files.length > 0 ? sumFileListBytes(files) : (zip?.size ?? 0);
-  if (total > IML_PRODUCT_IMPORT_MAX_BYTES) {
-    return `Celková velikost ${formatImportSize(total)} přesahuje limit ${IML_PRODUCT_IMPORT_MAX_MB} MB`;
+/** Kontrola velikosti ZIP (složka nemá celkový limit – nahrává se po dávkách). */
+export function validateZipImportSizeClient(zip: File | null): string | null {
+  if (!zip) return null;
+  if (zip.size > IML_PRODUCT_IMPORT_MAX_BYTES) {
+    return `Velikost ZIP ${formatImportSize(zip.size)} přesahuje limit ${IML_PRODUCT_IMPORT_MAX_MB} MB – použijte složku`;
   }
   return null;
+}
+
+/** @deprecated Použijte validateZipImportSizeClient – složka nemá celkový limit. */
+export function validateImportSizeClient(files: File[] | null, zip: File | null): string | null {
+  if (files && files.length > 0) return null;
+  return validateZipImportSizeClient(zip);
+}
+
+export function getPathsForFiles(files: File[]): string[] {
+  return normalizeFolderPathPrefixes(files.map(getFileRelativePath));
+}
+
+export function chunkFolderFilesForBatchUpload(
+  files: File[],
+  maxBatchBytes: number = IML_PRODUCT_IMPORT_BATCH_MAX_BYTES
+): File[][] {
+  const batches: File[][] = [];
+  let current: File[] = [];
+  let currentSize = 0;
+
+  for (const file of files) {
+    if (file.size > maxBatchBytes) {
+      if (current.length > 0) {
+        batches.push(current);
+        current = [];
+        currentSize = 0;
+      }
+      batches.push([file]);
+      continue;
+    }
+    if (currentSize + file.size > maxBatchBytes && current.length > 0) {
+      batches.push(current);
+      current = [];
+      currentSize = 0;
+    }
+    current.push(file);
+    currentSize += file.size;
+  }
+
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
+export async function createFolderImportSession(
+  signal?: AbortSignal
+): Promise<string> {
+  const res = await fetch("/api/iml/products/import/session", {
+    method: "POST",
+    signal,
+  });
+  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok) {
+    throw new Error(
+      typeof data.error === "string" ? data.error : "Chyba při vytváření relace importu"
+    );
+  }
+  const sessionId = data.sessionId;
+  if (typeof sessionId !== "string" || !sessionId) {
+    throw new Error("Server nevrátil identifikátor relace importu");
+  }
+  return sessionId;
+}
+
+export async function cancelFolderImportSession(
+  sessionId: string,
+  signal?: AbortSignal
+): Promise<void> {
+  await fetch(
+    `/api/iml/products/import/session?sessionId=${encodeURIComponent(sessionId)}`,
+    { method: "DELETE", signal }
+  );
+}
+
+export async function executeFolderImportInBatches(
+  files: File[],
+  options: {
+    mapping: ColumnMappingClient;
+    resolutions: { default: string; byCode: Record<string, string> };
+    signal?: AbortSignal;
+    onSessionCreated?: (sessionId: string) => void;
+    onProgress?: (state: UploadProgressState) => void;
+    timeoutMs?: number;
+  }
+): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+  const batches = chunkFolderFilesForBatchUpload(files);
+  const totalBytes = sumFileListBytes(files);
+  let sessionId: string | null = null;
+  let uploadedBytes = 0;
+
+  try {
+    sessionId = await createFolderImportSession(options.signal);
+    options.onSessionCreated?.(sessionId);
+
+    for (let i = 0; i < batches.length; i++) {
+      const batch = batches[i];
+      const batchBytes = sumFileListBytes(batch);
+      const formData = new FormData();
+      formData.append("sessionId", sessionId);
+      for (const file of batch) {
+        formData.append("files", file);
+      }
+      formData.append("paths", JSON.stringify(getPathsForFiles(batch)));
+
+      const batchBaseBytes = uploadedBytes;
+      const { ok, status, data } = await postFormDataWithProgress(
+        "/api/iml/products/import/batch",
+        formData,
+        {
+          signal: options.signal,
+          timeoutMs: options.timeoutMs ?? 600_000,
+          onProgress: (p) => {
+            const batchLoaded =
+              p.phase === "processing"
+                ? batchBytes
+                : p.total > 0
+                  ? (p.loaded / p.total) * batchBytes
+                  : 0;
+            const loaded = Math.min(totalBytes, batchBaseBytes + batchLoaded);
+            options.onProgress?.({
+              phase: p.phase,
+              loaded,
+              total: totalBytes,
+              percent: totalBytes > 0 ? Math.round((loaded / totalBytes) * 100) : 0,
+              batchIndex: i + 1,
+              batchCount: batches.length,
+            });
+          },
+        }
+      );
+
+      if (!ok) {
+        if (sessionId) {
+          await cancelFolderImportSession(sessionId, options.signal).catch(() => undefined);
+          sessionId = null;
+        }
+        return { ok, status, data };
+      }
+
+      uploadedBytes += batchBytes;
+      options.onProgress?.({
+        phase: "uploading",
+        loaded: uploadedBytes,
+        total: totalBytes,
+        percent: totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 100,
+        batchIndex: i + 1,
+        batchCount: batches.length,
+      });
+    }
+
+    const execForm = new FormData();
+    execForm.append("sessionId", sessionId);
+    execForm.append("mapping", JSON.stringify(options.mapping));
+    execForm.append("resolutions", JSON.stringify(options.resolutions));
+    sessionId = null;
+
+    return postFormDataWithProgress("/api/iml/products/import/execute", execForm, {
+      signal: options.signal,
+      timeoutMs: options.timeoutMs ?? 600_000,
+      onProgress: (p) => {
+        options.onProgress?.({
+          ...p,
+          batchIndex: batches.length,
+          batchCount: batches.length,
+        });
+      },
+    });
+  } catch (e) {
+    if (sessionId) {
+      await cancelFolderImportSession(sessionId).catch(() => undefined);
+    }
+    throw e;
+  }
 }
 
 export function estimateFormDataBytes(files: File[] | null, zip: File | null): number {

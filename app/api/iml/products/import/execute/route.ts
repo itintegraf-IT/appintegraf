@@ -8,6 +8,8 @@ import {
   type ImportResolutions,
 } from "@/lib/iml-product-import-parse";
 import { runProductImportExecuteOnDir } from "@/lib/iml-product-import-run";
+import { takeImportSessionDir } from "@/lib/iml-product-import-session";
+import { cleanupTempDir } from "@/lib/backup/zip-read";
 import { withImportTempDir } from "@/lib/iml-product-import-upload";
 
 export async function POST(req: NextRequest) {
@@ -42,9 +44,27 @@ export async function POST(req: NextRequest) {
       ? (JSON.parse(resolutionsStr) as ImportResolutions)
       : { default: "skip", byCode: {} };
 
-    const result = await withImportTempDir(formData, (tempDir) =>
-      runProductImportExecuteOnDir(tempDir, mapping!, resolutions, userId, editorName)
-    );
+    const sessionId = String(formData.get("sessionId") || "");
+    let result;
+
+    if (sessionId) {
+      const tempDir = takeImportSessionDir(sessionId, userId);
+      try {
+        result = await runProductImportExecuteOnDir(
+          tempDir,
+          mapping!,
+          resolutions,
+          userId,
+          editorName
+        );
+      } finally {
+        await cleanupTempDir(tempDir);
+      }
+    } else {
+      result = await withImportTempDir(formData, (tempDir) =>
+        runProductImportExecuteOnDir(tempDir, mapping!, resolutions, userId, editorName)
+      );
+    }
 
     return NextResponse.json({
       success: true,
