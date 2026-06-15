@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import { ensureProductThumbnailFromPdf } from "@/lib/iml-product-thumbnail";
 
 /**
  * Verzovaný PDF endpoint pro iml_product_files.
@@ -202,6 +203,12 @@ export async function POST(
         file_size: result.file_size,
       },
     });
+
+    try {
+      await ensureProductThumbnailFromPdf(id, buffer, userId, { onlyIfMissing: true });
+    } catch (thumbErr) {
+      console.warn("IML product PDF thumbnail generation failed:", thumbErr);
+    }
 
     return NextResponse.json({ success: true, file: result });
   } catch (e) {

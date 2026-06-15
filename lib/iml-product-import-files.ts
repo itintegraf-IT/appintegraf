@@ -4,6 +4,10 @@ import { prisma } from "@/lib/db";
 import { logImlAudit } from "@/lib/iml-audit";
 import type { ClassifiedZipFile } from "@/lib/iml-product-import-zip";
 import { pdfBufferToJpeg } from "@/lib/iml-product-preview-pdf-server";
+import {
+  ensureProductThumbnailFromPdf,
+  saveProductPreviewImage,
+} from "@/lib/iml-product-thumbnail";
 
 export const MAX_PDF_SIZE = 50 * 1024 * 1024;
 export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
@@ -94,22 +98,7 @@ export async function attachProductPreviewImage(
   buffer: Buffer,
   userId: number
 ): Promise<void> {
-  if (buffer.length > MAX_IMAGE_SIZE) {
-    throw new Error(`Obrázek je příliš velký (max ${MAX_IMAGE_SIZE / 1024 / 1024} MB)`);
-  }
-
-  await prisma.iml_products.update({
-    where: { id: productId },
-    data: { image_data: Buffer.from(buffer) },
-  });
-
-  await logImlAudit({
-    userId,
-    action: "update",
-    tableName: "iml_products",
-    recordId: productId,
-    newValues: { image_uploaded: true, import: true },
-  });
+  await saveProductPreviewImage(productId, buffer, userId, "import");
 }
 
 async function loadPreviewBuffer(
@@ -177,6 +166,13 @@ export async function importFilesFromExtractedDir(
         const buf = await readFile(absPath);
         await attachProductPdf(productId, buf, file.basename, userId);
         result.printAttached++;
+        try {
+          await ensureProductThumbnailFromPdf(productId, buf, userId, {
+            onlyIfMissing: true,
+          });
+        } catch {
+          /* miniatura z PDF není kritická pro import */
+        }
       } else if (file.kind === "preview") {
         const buf = await loadPreviewBuffer(file, absPath);
         await attachProductPreviewImage(productId, buf, userId);

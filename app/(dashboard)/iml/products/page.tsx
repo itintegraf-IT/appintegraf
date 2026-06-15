@@ -12,6 +12,7 @@ export default async function ImlProductsPage() {
   const userId = parseInt(session.user.id, 10);
   const canRead = await hasModuleAccess(userId, "iml", "read");
   const canWrite = await hasModuleAccess(userId, "iml", "write");
+  const canAdmin = await hasModuleAccess(userId, "iml", "admin");
 
   if (!canRead) redirect("/iml");
 
@@ -33,6 +34,14 @@ export default async function ImlProductsPage() {
             <ArrowLeft className="h-4 w-4" />
             Přehled IML
           </Link>
+          {canAdmin && (
+            <Link
+              href="/iml/settings?tab=maintenance"
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+            >
+              Doplnit miniatury…
+            </Link>
+          )}
           {canWrite && (
             <>
               <Link

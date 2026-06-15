@@ -11,6 +11,7 @@ export default async function ImlSettingsPage() {
 
   const userId = parseInt(session.user.id, 10);
   const canWrite = await hasModuleAccess(userId, "iml", "write");
+  const canAdmin = await hasModuleAccess(userId, "iml", "admin");
 
   if (!canWrite) redirect("/iml");
 
@@ -36,7 +37,7 @@ export default async function ImlSettingsPage() {
         </Link>
       </div>
 
-      <ImlSettingsClient canWrite={canWrite} />
+      <ImlSettingsClient canWrite={canWrite} canAdmin={canAdmin} />
     </>
   );
 }

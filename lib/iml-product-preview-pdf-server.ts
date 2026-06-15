@@ -62,6 +62,10 @@ export async function pdfBufferToJpeg(
   }
 }
 
+export async function isPdfThumbnailGenerationAvailable(): Promise<boolean> {
+  return (await importOptionalCanvas()) !== null;
+}
+
 async function importOptionalCanvas(): Promise<{
   createCanvas: (w: number, h: number) => {
     getContext: (type: "2d") => CanvasRenderingContext2D | null;

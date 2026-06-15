@@ -359,6 +359,9 @@ app/api/iml/
 ### 6.2 Produkty
 
 - Seznam s filtry (zákazník, stav), vyhledávání podle kódu/názvu
+- Sloupec náhledu ve výchozím stavu **skrytý** (volitelně zapnutelný); zobrazuje jen uložené JPEG/PNG, ne PDF
+- Při nahrání PDF nebo importu tiskových dat se automaticky generuje miniatura (~256 px) do `image_data`, pokud chybí
+- **IML admin:** záložka Nastavení → **Údržba** – doplnění miniatur u existujících produktů (backfill z PDF po dávkách)
 - Detail – náhled obrázku, PDF, všechny sekce z požadavků
 - CRUD – včetně uploadu obrázku (JPG, PNG, WebP) a PDF
 - Sekce: Identifikace, Výseky a montáže, Materiály a tisk, Schvalování, Metadata, Vlastní pole
@@ -483,6 +486,7 @@ Uživatelé mohou rozšířit databázi o vlastní pole u produktů a objednáve
 | `/api/iml/products/import/session` | POST / DELETE | Relace pro postupné nahrávání složky |
 | `/api/iml/products/import/batch` | POST | Jedna dávka souborů do relace (max. cca 100 MB) |
 | `/api/iml/products/import/execute` | POST | Provedení importu (ZIP v těle, nebo `sessionId` po dávkách) |
+| `/api/iml/products/thumbnails/backfill` | GET, POST | Stav / dávkové doplnění miniatur z PDF (IML admin) |
 | `/api/iml/orders` | GET, POST | Seznam, vytvoření |
 | `/api/iml/orders/[id]` | GET, PUT, DELETE | Detail, úprava, smazání |
 | `/api/iml/orders/export` | GET | Export CSV/Excel |

@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Search, Eye, Pencil, Trash2, FileText, ImageOff } from "lucide-react";
+import { Search, Eye, Pencil, Trash2, FileText, ImageOff, ImageIcon } from "lucide-react";
 import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
-import { ProductPdfThumbnail } from "./_components/ProductPdfThumbnail";
+
+const SHOW_THUMBNAILS_STORAGE_KEY = "iml-products-show-thumbnails";
 
 type Product = {
   id: number;
@@ -22,6 +23,40 @@ type Customer = { id: number; name: string };
 
 type Props = { canWrite: boolean; canRead?: boolean };
 
+function ProductListThumbnail({ product }: { product: Product }) {
+  if (product.has_image) {
+    return (
+      /* eslint-disable-next-line @next/next/no-img-element */
+      <img
+        src={`/api/iml/products/${product.id}/image`}
+        alt=""
+        className="h-10 w-10 rounded border border-gray-200 bg-white object-contain"
+        loading="lazy"
+      />
+    );
+  }
+
+  if (product.has_pdf) {
+    return (
+      <div
+        className="flex h-10 w-10 items-center justify-center rounded border border-dashed border-gray-200 bg-gray-50 text-gray-400"
+        title="Bez miniatury – otevřete detail nebo spusťte doplnění miniatur"
+      >
+        <FileText className="h-4 w-4" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex h-10 w-10 items-center justify-center rounded border border-dashed border-gray-200 bg-gray-50 text-gray-300"
+      title="Bez obrázku"
+    >
+      <ImageOff className="h-4 w-4" />
+    </div>
+  );
+}
+
 export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -29,6 +64,28 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const [search, setSearch] = useState("");
   const [filterCustomer, setFilterCustomer] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [showThumbnails, setShowThumbnails] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(SHOW_THUMBNAILS_STORAGE_KEY);
+      setShowThumbnails(stored === "1");
+    } catch {
+      setShowThumbnails(false);
+    }
+  }, []);
+
+  const toggleShowThumbnails = () => {
+    setShowThumbnails((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SHOW_THUMBNAILS_STORAGE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -76,10 +133,12 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     }
   };
 
+  const colCount = showThumbnails ? 7 : 6;
+
   return (
     <div className="space-y-4">
       {canRead && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <a
             href={buildExportUrl("csv")}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
@@ -94,6 +153,19 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
           >
             Export Excel
           </a>
+          <button
+            type="button"
+            onClick={toggleShowThumbnails}
+            className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm ${
+              showThumbnails
+                ? "border-red-300 bg-red-50 text-red-800"
+                : "border-gray-300 text-gray-700 hover:bg-gray-50"
+            }`}
+            title="Zobrazit sloupec s miniatury (JPEG/PNG z databáze, ne PDF)"
+          >
+            <ImageIcon className="h-4 w-4" />
+            {showThumbnails ? "Skrýt náhledy" : "Zobrazit náhledy"}
+          </button>
         </div>
       )}
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -144,9 +216,11 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
         <table className="w-full">
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
-              <th className="w-14 px-3 py-3 text-left text-sm font-semibold text-gray-700">
-                <span className="sr-only">Náhled</span>
-              </th>
+              {showThumbnails && (
+                <th className="w-14 px-3 py-3 text-left text-sm font-semibold text-gray-700">
+                  Náhled
+                </th>
+              )}
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kód IG</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Název / Klient</th>
               <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Zákazník</th>
@@ -158,44 +232,24 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={colCount} className="px-4 py-8 text-center text-gray-500">
                   Načítání…
                 </td>
               </tr>
             ) : products.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                <td colSpan={colCount} className="px-4 py-8 text-center text-gray-500">
                   Žádné produkty
                 </td>
               </tr>
             ) : (
               products.map((p) => (
                 <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-3 py-2">
-                    {p.has_image ? (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={`/api/iml/products/${p.id}/image`}
-                        alt=""
-                        className="h-10 w-10 rounded border border-gray-200 bg-white object-contain"
-                        loading="lazy"
-                      />
-                    ) : p.has_pdf ? (
-                      <div
-                        className="h-10 w-10 overflow-hidden rounded border border-gray-200 bg-white"
-                        title="Náhled z PDF"
-                      >
-                        <ProductPdfThumbnail productId={p.id} maxHeight={40} className="[&_canvas]:max-h-10 [&_canvas]:max-w-10 [&_canvas]:object-contain" />
-                      </div>
-                    ) : (
-                      <div
-                        className="flex h-10 w-10 items-center justify-center rounded border border-dashed border-gray-200 bg-gray-50 text-gray-300"
-                        title="Bez obrázku"
-                      >
-                        <ImageOff className="h-4 w-4" />
-                      </div>
-                    )}
-                  </td>
+                  {showThumbnails && (
+                    <td className="px-3 py-2">
+                      <ProductListThumbnail product={p} />
+                    </td>
+                  )}
                   <td className="px-4 py-3 font-mono text-sm">{p.ig_code ?? "-"}</td>
                   <td className="px-4 py-3">{p.client_name ?? p.ig_short_name ?? "-"}</td>
                   <td className="px-4 py-3 text-gray-600">{p.iml_customers?.name ?? "-"}</td>
