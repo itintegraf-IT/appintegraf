@@ -8,9 +8,11 @@ import {
   type ImportResolutions,
 } from "@/lib/iml-product-import-parse";
 import { runProductImportExecuteOnDir } from "@/lib/iml-product-import-run";
-import { takeImportSessionDir } from "@/lib/iml-product-import-session";
+import { takeImportSessionDir, peekImportSession } from "@/lib/iml-product-import-session";
 import { cleanupTempDir } from "@/lib/backup/zip-read";
 import { withImportTempDir } from "@/lib/iml-product-import-upload";
+
+export const maxDuration = 600;
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -48,6 +50,16 @@ export async function POST(req: NextRequest) {
     let result;
 
     if (sessionId) {
+      const stats = peekImportSession(sessionId, userId);
+      if (stats.fileCount === 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Relace neobsahuje žádné nahrané soubory. Nahrávání dávek pravděpodobně selhalo – zkontrolujte nginx client_max_body_size (min. 100M) a logy serveru.",
+          },
+          { status: 400 }
+        );
+      }
       const tempDir = takeImportSessionDir(sessionId, userId);
       try {
         result = await runProductImportExecuteOnDir(

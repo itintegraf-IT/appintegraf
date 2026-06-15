@@ -73,6 +73,17 @@ export async function appendImportSessionBatch(
   };
 }
 
+export function peekImportSession(
+  sessionId: string,
+  userId: number
+): { fileCount: number; totalBytes: number } {
+  const session = getSessionForUser(sessionId, userId);
+  return {
+    fileCount: session.fileCount,
+    totalBytes: session.totalBytes,
+  };
+}
+
 export function takeImportSessionDir(sessionId: string, userId: number): string {
   const session = getSessionForUser(sessionId, userId);
   sessions.delete(sessionId);

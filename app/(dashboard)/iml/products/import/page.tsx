@@ -18,6 +18,7 @@ import {
   estimateFormDataBytes,
   executeFolderImportInBatches,
   findProductsCsvInFileList,
+  formatImportApiError,
   formatImportSize,
   postFormDataWithProgress,
   sumFileListBytes,
@@ -442,9 +443,11 @@ export default function ImlProductsImportPage() {
     try {
       let ok: boolean;
       let data: Record<string, unknown>;
+      let status = 0;
+      let responseText: string | undefined;
 
       if (folderFiles?.length) {
-        ({ ok, data } = await executeFolderImportInBatches(folderFiles, {
+        ({ ok, data, status, responseText } = await executeFolderImportInBatches(folderFiles, {
           mapping,
           resolutions: { default: defaultAction, byCode },
           signal: controller.signal,
@@ -458,7 +461,7 @@ export default function ImlProductsImportPage() {
       } else {
         const formData = buildExecuteFormData();
         const totalBytes = estimateFormDataBytes(folderFiles, zipFile);
-        ({ ok, data } = await postFormDataWithProgress(
+        ({ ok, data, status, responseText } = await postFormDataWithProgress(
           "/api/iml/products/import/execute",
           formData,
           {
@@ -475,9 +478,7 @@ export default function ImlProductsImportPage() {
       }
 
       if (!ok) {
-        throw new Error(
-          typeof data.error === "string" ? data.error : "Chyba při importu"
-        );
+        throw new Error(formatImportApiError(status, data, responseText));
       }
 
       applyExecuteResult(data);

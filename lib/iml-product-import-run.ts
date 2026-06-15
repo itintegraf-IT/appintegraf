@@ -231,25 +231,31 @@ export async function runProductImportExecuteOnDir(
       }
 
       if (isConflict && action === "overwrite" && existingId) {
-        const { sku: _s, ...updateData } = data;
-        await prisma.iml_products.update({
-          where: { id: existingId },
-          data: {
-            ...updateData,
-            sku: sku ?? undefined,
-          },
-        });
-        await logImlAudit({
-          userId,
-          action: "update",
-          tableName: "iml_products",
-          recordId: existingId,
-          newValues: { ig_code: data.ig_code, client_name: data.client_name, import: true },
-        });
-        if (codeKey) codeToProductId.set(codeKey, existingId);
-        existingByCode.set(codeKey, existingId);
-        if (sku) existingBySku.set(sku, existingId);
-        updated++;
+        try {
+          const { sku: _s, ...updateData } = data;
+          await prisma.iml_products.update({
+            where: { id: existingId },
+            data: {
+              ...updateData,
+              sku: sku ?? undefined,
+            },
+          });
+          await logImlAudit({
+            userId,
+            action: "update",
+            tableName: "iml_products",
+            recordId: existingId,
+            newValues: { ig_code: data.ig_code, client_name: data.client_name, import: true },
+          });
+          if (codeKey) codeToProductId.set(codeKey, existingId);
+          existingByCode.set(codeKey, existingId);
+          if (sku) existingBySku.set(sku, existingId);
+          updated++;
+        } catch (e) {
+          errors.push(
+            `Řádek ${i + 2}: ${e instanceof Error ? e.message : "Chyba při přepsání"}`
+          );
+        }
         continue;
       }
 

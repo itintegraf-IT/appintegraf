@@ -100,6 +100,46 @@ export function getPathsForFiles(files: File[]): string[] {
   return normalizeFolderPathPrefixes(files.map(getFileRelativePath));
 }
 
+export function sortFolderFilesForImport(files: File[]): File[] {
+  const csv = findProductsCsvInFileList(files);
+  if (!csv) return files;
+  const rest = files.filter((f) => f !== csv.file);
+  return [csv.file, ...rest];
+}
+
+export function formatImportApiError(
+  status: number,
+  data: Record<string, unknown>,
+  responseText?: string
+): string {
+  if (typeof data.error === "string" && data.error.trim()) {
+    return data.error;
+  }
+  if (status === 413) {
+    return `Požadavek byl odmítnut (413) – reverse proxy má pravděpodobně malý client_max_body_size. Pro dávkový import složky nastavte alespoň ${IML_PRODUCT_IMPORT_BATCH_MAX_BYTES / 1024 / 1024}M u location pro aplikaci a proveďte reload nginx.`;
+  }
+  if (status === 404) {
+    return "API importu nebylo nalezeno (404) – na serveru pravděpodobně neběží aktuální verze aplikace.";
+  }
+  if (status === 401) return "Neautorizováno – přihlaste se znovu.";
+  if (status === 403) return "Nemáte oprávnění importovat produkty.";
+  const plain =
+    responseText && !responseText.trimStart().startsWith("{")
+      ? responseText.replace(/\s+/g, " ").trim().slice(0, 180)
+      : "";
+  if (status >= 500) {
+    return plain
+      ? `Chyba serveru (${status}): ${plain}`
+      : `Chyba serveru (${status}) – zkontrolujte logy aplikace (pm2 logs).`;
+  }
+  if (status > 0) {
+    return plain
+      ? `Chyba při importu (HTTP ${status}): ${plain}`
+      : `Chyba při importu (HTTP ${status})`;
+  }
+  return "Chyba při importu";
+}
+
 export function chunkFolderFilesForBatchUpload(
   files: File[],
   maxBatchBytes: number = IML_PRODUCT_IMPORT_BATCH_MAX_BYTES
@@ -171,8 +211,13 @@ export async function executeFolderImportInBatches(
     onProgress?: (state: UploadProgressState) => void;
     timeoutMs?: number;
   }
-): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
-  const batches = chunkFolderFilesForBatchUpload(files);
+): Promise<{
+  ok: boolean;
+  status: number;
+  data: Record<string, unknown>;
+  responseText?: string;
+}> {
+  const batches = chunkFolderFilesForBatchUpload(sortFolderFilesForImport(files));
   const totalBytes = sumFileListBytes(files);
   let sessionId: string | null = null;
   let uploadedBytes = 0;
@@ -192,7 +237,12 @@ export async function executeFolderImportInBatches(
       formData.append("paths", JSON.stringify(getPathsForFiles(batch)));
 
       const batchBaseBytes = uploadedBytes;
-      const { ok, status, data } = await postFormDataWithProgress(
+      const {
+        ok,
+        status,
+        data,
+        responseText,
+      } = await postFormDataWithProgress(
         "/api/iml/products/import/batch",
         formData,
         {
@@ -223,7 +273,7 @@ export async function executeFolderImportInBatches(
           await cancelFolderImportSession(sessionId, options.signal).catch(() => undefined);
           sessionId = null;
         }
-        return { ok, status, data };
+        return { ok, status, data, responseText };
       }
 
       uploadedBytes += batchBytes;
@@ -275,7 +325,12 @@ export function postFormDataWithProgress(
     signal?: AbortSignal;
     timeoutMs?: number;
   }
-): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+): Promise<{
+  ok: boolean;
+  status: number;
+  data: Record<string, unknown>;
+  responseText: string;
+}> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const timeoutMs = options?.timeoutMs ?? 600_000;
@@ -320,6 +375,7 @@ export function postFormDataWithProgress(
         ok: xhr.status >= 200 && xhr.status < 300,
         status: xhr.status,
         data,
+        responseText: xhr.responseText,
       });
     });
 

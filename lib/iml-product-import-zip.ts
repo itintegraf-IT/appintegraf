@@ -102,37 +102,33 @@ export function classifyFile(relativePath: string): ClassifiedZipFile {
 export async function findCsvInExtractedDir(
   rootDir: string
 ): Promise<ParsedCsvFromZip> {
-  const entries = await readdir(rootDir, { withFileTypes: true });
-  let csvPath: string | null = null;
+  const csvCandidates: string[] = [];
 
-  const productsCsv = entries.find(
-    (e) => e.isFile() && normalizeBasename(e.name).toLowerCase() === "products.csv"
-  );
-  if (productsCsv) {
-    csvPath = path.join(rootDir, productsCsv.name);
-  } else {
-    const anyCsv = entries.find((e) => e.isFile() && isCsvPath(e.name));
-    if (anyCsv) csvPath = path.join(rootDir, anyCsv.name);
-  }
-
-  if (!csvPath) {
+  async function walk(dir: string) {
+    const entries = await readdir(dir, { withFileTypes: true });
     for (const e of entries) {
-      if (!e.isDirectory()) continue;
-      const sub = path.join(rootDir, e.name);
-      const subEntries = await readdir(sub, { withFileTypes: true });
-      const subCsv = subEntries.find((f) => f.isFile() && isCsvPath(f.name));
-      if (subCsv) {
-        csvPath = path.join(sub, subCsv.name);
-        break;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        await walk(full);
+        continue;
       }
+      if (!e.isFile() || !isCsvPath(e.name)) continue;
+      csvCandidates.push(full);
     }
   }
 
-  if (!csvPath) {
+  await walk(rootDir);
+
+  if (csvCandidates.length === 0) {
     throw new Error(
-      "V archivu nebyl nalezen CSV soubor (očekáván products.csv v kořeni ZIP)"
+      "V exportu nebyl nalezen CSV soubor (očekáván products.csv nebo jiný .csv)"
     );
   }
+
+  const productsCsv = csvCandidates.find(
+    (p) => normalizeBasename(p).toLowerCase() === "products.csv"
+  );
+  const csvPath = productsCsv ?? csvCandidates[0];
 
   const buf = await readFile(csvPath);
   const rel = path.relative(rootDir, csvPath).replace(/\\/g, "/");
