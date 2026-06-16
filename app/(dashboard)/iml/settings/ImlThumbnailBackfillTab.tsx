@@ -188,8 +188,10 @@ export function ImlThumbnailBackfillTab() {
         <div className="flex gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
-            Na serveru není dostupný balíček <code className="text-xs">canvas</code> – konverze PDF
-            na JPEG nebude fungovat. Nainstalujte závislost a restartujte aplikaci (PM2).
+            Na serveru není dostupný balíček <code className="text-xs">@napi-rs/canvas</code> –
+            konverze PDF na JPEG nebude fungovat. Na serveru spusťte{" "}
+            <code className="text-xs">npm install</code> v adresáři aplikace a{" "}
+            <code className="text-xs">pm2 restart appintegraf</code>.
           </p>
         </div>
       )}

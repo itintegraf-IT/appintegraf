@@ -415,7 +415,7 @@ Na hlavní stránce IML (`/iml`):
 - **Konflikty** existujícího `ig_code`: před importem náhled; akce **přepsat** (metadata z CSV) nebo **přeskočit** (metadata beze změny, soubory z ZIP se k produktu přiřadí)
 - **Pojmenování souborů v ZIP** (bez ohledu na podsložku):
   - **Tisková data:** PDF, název začíná kódem produktu (`04-03-002-…pdf`) → `iml_product_files` (verzované PDF, max 50 MB)
-  - **Náhled:** JPG/PNG/WebP/GIF, nebo název začíná `softproof` / `softproof-` / `softproof_` (volitelně PDF softproof → JPEG na serveru, pokud je nainstalován `canvas`) → `iml_products.image_data` (max 5 MB)
+  - **Náhled:** JPG/PNG/WebP/GIF, nebo název začíná `softproof` / `softproof-` / `softproof_` (volitelně PDF softproof → JPEG na serveru přes `@napi-rs/canvas`) → `iml_products.image_data` (max 5 MB)
 - Ignorováno: `products.csv`, skryté soubory, nepodporované přípony; soubory bez rozpoznaného kódu se v reportu označí
 
 **CSV / Excel bez ZIP (zpětná kompatibilita)**

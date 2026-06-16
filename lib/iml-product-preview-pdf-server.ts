@@ -1,6 +1,6 @@
 /**
- * Převod první stránky PDF na JPEG na serveru (import produktů).
- * Vyžaduje volitelný balíček `canvas`; bez něj vrátí null.
+ * Převod první stránky PDF na JPEG na serveru (import / miniatury produktů).
+ * Používá @napi-rs/canvas (prebuilt binárky, bez libcairo na serveru).
  */
 export async function pdfBufferToJpeg(
   pdfBuffer: Buffer,
@@ -53,7 +53,9 @@ export async function pdfBufferToJpeg(
         } as Parameters<typeof page.render>[0])
         .promise;
 
-      return canvas.toBuffer("image/jpeg", { quality: jpegQuality });
+      const quality = Math.min(100, Math.max(1, Math.round(jpegQuality * 100)));
+      const encoded = await canvas.encode("jpeg", quality);
+      return Buffer.from(encoded);
     } finally {
       await pdf.destroy();
     }
@@ -66,22 +68,17 @@ export async function isPdfThumbnailGenerationAvailable(): Promise<boolean> {
   return (await importOptionalCanvas()) !== null;
 }
 
+type NapiCanvas = {
+  getContext: (type: "2d") => CanvasRenderingContext2D | null;
+  encode: (mime: "jpeg" | "png", quality?: number) => Promise<Uint8Array>;
+};
+
 async function importOptionalCanvas(): Promise<{
-  createCanvas: (w: number, h: number) => {
-    getContext: (type: "2d") => CanvasRenderingContext2D | null;
-    toBuffer: (mime: string, opts?: { quality?: number }) => Buffer;
-  };
+  createCanvas: (w: number, h: number) => NapiCanvas;
 } | null> {
   try {
-    const mod = await import(
-      /* webpackIgnore: true */ "canvas"
-    );
-    return mod as {
-      createCanvas: (w: number, h: number) => {
-        getContext: (type: "2d") => CanvasRenderingContext2D | null;
-        toBuffer: (mime: string, opts?: { quality?: number }) => Buffer;
-      };
-    };
+    const mod = await import("@napi-rs/canvas");
+    return mod as { createCanvas: (w: number, h: number) => NapiCanvas };
   } catch {
     return null;
   }
