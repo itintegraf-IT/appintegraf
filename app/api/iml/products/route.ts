@@ -93,15 +93,53 @@ export async function GET(req: NextRequest) {
     where.item_status = status;
   }
 
-  const products = await prisma.iml_products.findMany({
-    where,
-    orderBy: { id: "desc" },
-    take: 200,
-    select: {
-      ...productListSelect,
-      iml_customers: { select: { id: true, name: true } },
-    },
-  });
+  const pageParam = searchParams.get("page");
+  const perPageParam = searchParams.get("per_page");
+  const paginated = pageParam !== null || perPageParam !== null;
+
+  const listSelect = {
+    ...productListSelect,
+    iml_customers: { select: { id: true, name: true } },
+  } as const;
+
+  let products: Awaited<ReturnType<typeof prisma.iml_products.findMany>>;
+  let total: number | undefined;
+  let page: number | undefined;
+  let perPage: number | null | undefined;
+  let totalPages: number | undefined;
+
+  if (!paginated) {
+    products = await prisma.iml_products.findMany({
+      where,
+      orderBy: { id: "desc" },
+      take: 200,
+      select: listSelect,
+    });
+  } else {
+    page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+    const perPageRaw = perPageParam ?? "25";
+    if (perPageRaw === "all") {
+      perPage = null;
+    } else {
+      const parsed = parseInt(perPageRaw, 10);
+      perPage = parsed === 50 || parsed === 100 ? parsed : 25;
+    }
+    const skip = perPage ? (page - 1) * perPage : 0;
+
+    const [rows, count] = await Promise.all([
+      prisma.iml_products.findMany({
+        where,
+        orderBy: { id: "desc" },
+        skip: perPage ? skip : 0,
+        take: perPage ?? undefined,
+        select: listSelect,
+      }),
+      prisma.iml_products.count({ where }),
+    ]);
+    products = rows;
+    total = count;
+    totalPages = perPage ? Math.max(1, Math.ceil(count / perPage)) : 1;
+  }
 
   // Efektivní flagy bez stahování blobů: jen OCTET_LENGTH > 0.
   let flagsById = new Map<number, { has_image: boolean; has_pdf: boolean }>();
@@ -139,7 +177,17 @@ export async function GET(req: NextRequest) {
     has_pdf: flagsById.get(p.id)?.has_pdf ?? false,
   }));
 
-  return NextResponse.json({ products: productsWithFlags });
+  if (!paginated) {
+    return NextResponse.json({ products: productsWithFlags });
+  }
+
+  return NextResponse.json({
+    products: productsWithFlags,
+    total: total ?? productsWithFlags.length,
+    page: page ?? 1,
+    perPage: perPage ?? total ?? productsWithFlags.length,
+    totalPages: totalPages ?? 1,
+  });
 }
 
 export async function POST(req: NextRequest) {

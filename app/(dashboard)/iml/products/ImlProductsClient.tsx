@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { Search, Eye, Pencil, Trash2, FileText, ImageOff, ImageIcon } from "lucide-react";
 import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
 
 const SHOW_THUMBNAILS_STORAGE_KEY = "iml-products-show-thumbnails";
+const PER_PAGE_STORAGE_KEY = "iml-products-per-page";
+
+type PerPageOption = "25" | "50" | "100" | "all";
 
 type Product = {
   id: number;
@@ -22,6 +25,11 @@ type Product = {
 type Customer = { id: number; name: string };
 
 type Props = { canWrite: boolean; canRead?: boolean };
+
+function parseStoredPerPage(value: string | null): PerPageOption {
+  if (value === "50" || value === "100" || value === "all") return value;
+  return "25";
+}
 
 function ProductListThumbnail({ product }: { product: Product }) {
   if (product.has_image) {
@@ -65,6 +73,11 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const [filterCustomer, setFilterCustomer] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [showThumbnails, setShowThumbnails] = useState(false);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState<PerPageOption>("25");
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const filterSnapshot = useRef({ search: "", filterCustomer: "", filterStatus: "" });
 
   useEffect(() => {
     try {
@@ -72,6 +85,11 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
       setShowThumbnails(stored === "1");
     } catch {
       setShowThumbnails(false);
+    }
+    try {
+      setPerPage(parseStoredPerPage(localStorage.getItem(PER_PAGE_STORAGE_KEY)));
+    } catch {
+      setPerPage("25");
     }
   }, []);
 
@@ -87,16 +105,30 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     });
   };
 
+  const handlePerPageChange = (value: PerPageOption) => {
+    setPerPage(value);
+    setPage(1);
+    try {
+      localStorage.setItem(PER_PAGE_STORAGE_KEY, value);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const fetchProducts = async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (search) params.set("search", search);
     if (filterCustomer) params.set("customer_id", filterCustomer);
     if (filterStatus) params.set("status", filterStatus);
+    params.set("page", String(page));
+    params.set("per_page", perPage);
     const res = await fetch(`/api/iml/products?${params}`);
     if (res.ok) {
       const data = await res.json();
       setProducts(data.products ?? []);
+      setTotal(typeof data.total === "number" ? data.total : (data.products?.length ?? 0));
+      setTotalPages(typeof data.totalPages === "number" ? data.totalPages : 1);
     }
     setLoading(false);
   };
@@ -109,9 +141,22 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   }, []);
 
   useEffect(() => {
+    const filtersChanged =
+      filterSnapshot.current.search !== search ||
+      filterSnapshot.current.filterCustomer !== filterCustomer ||
+      filterSnapshot.current.filterStatus !== filterStatus;
+
+    if (filtersChanged) {
+      filterSnapshot.current = { search, filterCustomer, filterStatus };
+      if (page !== 1) {
+        setPage(1);
+        return;
+      }
+    }
+
     const t = setTimeout(() => fetchProducts(), 300);
     return () => clearTimeout(t);
-  }, [search, filterCustomer, filterStatus]);
+  }, [search, filterCustomer, filterStatus, page, perPage]);
 
   const buildExportUrl = (format: string) => {
     const params = new URLSearchParams();
@@ -134,6 +179,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   };
 
   const colCount = showThumbnails ? 7 : 6;
+  const showPageNav = perPage !== "all" && totalPages > 1;
 
   return (
     <div className="space-y-4">
@@ -171,7 +217,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-200 p-4">
         <form
-          onSubmit={(e) => { e.preventDefault(); fetchProducts(); }}
+          onSubmit={(e) => { e.preventDefault(); setPage(1); }}
           className="flex flex-wrap gap-3"
         >
           <div className="relative min-w-[200px] flex-1">
@@ -310,6 +356,52 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
           </tbody>
         </table>
       </div>
+      {!loading && total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 p-4">
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Počet na stránku:</span>
+            <select
+              value={perPage}
+              onChange={(e) => handlePerPageChange(e.target.value as PerPageOption)}
+              className="rounded border border-gray-300 px-2 py-1 text-sm"
+            >
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="all">Vše</option>
+            </select>
+          </label>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {perPage === "all" ? (
+              <span className="text-sm text-gray-600">
+                Zobrazeno všech {total} produktů
+              </span>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="rounded border px-3 py-1 text-sm disabled:pointer-events-none disabled:opacity-50 hover:bg-gray-50"
+                >
+                  Předchozí
+                </button>
+                <span className="text-sm text-gray-600">
+                  Stránka {page} / {totalPages} ({total} produktů)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={!showPageNav || page >= totalPages}
+                  className="rounded border px-3 py-1 text-sm disabled:pointer-events-none disabled:opacity-50 hover:bg-gray-50"
+                >
+                  Další
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
     </div>
   );
