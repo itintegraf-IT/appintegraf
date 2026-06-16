@@ -527,6 +527,10 @@ Uživatelé mohou rozšířit databázi o vlastní pole u produktů a objednáve
 - **Plánování výroby** – potenciální propojení: objednávka → blok výroby
 - **Kontakty** – `iml_customers` je samostatná evidence
 
+### 11.4 Vyčištění katalogu produktů (údržba)
+
+Destruktivní reset všech produktů včetně PDF a položek objednávek/poptávek: viz [IML_WIPE_PRODUCTS.md](./IML_WIPE_PRODUCTS.md) a skript `scripts/wipe-iml-products.sh` (pouze ručně na serveru, vždy po záloze DB).
+
 ---
 
 ## 12. Fáze implementace
