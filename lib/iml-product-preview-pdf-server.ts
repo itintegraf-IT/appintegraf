@@ -109,7 +109,7 @@ export async function probeCanvasAvailability(): Promise<CanvasLoadDiagnostics> 
 }
 
 type NapiCanvas = {
-  getContext: (type: "2d") => CanvasRenderingContext2D | null;
+  getContext: (type: "2d") => unknown;
   encode: (mime: "jpeg" | "png", quality?: number) => Promise<Uint8Array>;
 };
 
@@ -131,9 +131,9 @@ async function importOptionalCanvas(): Promise<NapiCanvasModule | null> {
   const errors: string[] = [];
 
   try {
-    const mod = (await import("@napi-rs/canvas")) as NapiCanvasModule;
+    const mod = await import("@napi-rs/canvas");
     lastCanvasLoadError = null;
-    return mod;
+    return mod as unknown as NapiCanvasModule;
   } catch (e) {
     errors.push(`import: ${formatLoadError(e)}`);
   }
