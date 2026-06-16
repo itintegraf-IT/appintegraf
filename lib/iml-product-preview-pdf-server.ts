@@ -77,8 +77,12 @@ async function importOptionalCanvas(): Promise<{
   createCanvas: (w: number, h: number) => NapiCanvas;
 } | null> {
   try {
-    const mod = await import("@napi-rs/canvas");
-    return mod as { createCanvas: (w: number, h: number) => NapiCanvas };
+    // createRequire obchází statickou analýzu bundleru (nativní .node binding).
+    const { createRequire } = await import("node:module");
+    const require = createRequire(import.meta.url);
+    return require("@napi-rs/canvas") as {
+      createCanvas: (w: number, h: number) => NapiCanvas;
+    };
   } catch {
     return null;
   }
