@@ -2,8 +2,6 @@
  * Převod první stránky PDF na JPEG na serveru (import / miniatury produktů).
  * Používá @napi-rs/canvas (prebuilt binárky, bez libcairo na serveru).
  */
-import { createRequire } from "node:module";
-import { join } from "node:path";
 
 export async function pdfBufferToJpeg(
   pdfBuffer: Buffer,
@@ -53,7 +51,7 @@ export async function pdfBufferToJpeg(
           canvas,
           canvasContext: ctx,
           viewport,
-        } as Parameters<typeof page.render>[0])
+        } as unknown as Parameters<typeof page.render>[0])
         .promise;
 
       const quality = Math.min(100, Math.max(1, Math.round(jpegQuality * 100)));
@@ -122,31 +120,14 @@ function formatLoadError(e: unknown): string {
   return String(e);
 }
 
-function requireCanvasFromAppRoot(): NapiCanvasModule {
-  const appRequire = createRequire(join(process.cwd(), "package.json"));
-  return appRequire("@napi-rs/canvas") as NapiCanvasModule;
-}
-
 async function importOptionalCanvas(): Promise<NapiCanvasModule | null> {
-  const errors: string[] = [];
-
   try {
     const mod = await import("@napi-rs/canvas");
     lastCanvasLoadError = null;
     return mod as unknown as NapiCanvasModule;
   } catch (e) {
-    errors.push(`import: ${formatLoadError(e)}`);
+    lastCanvasLoadError = formatLoadError(e);
+    console.error("[iml] @napi-rs/canvas unavailable:", lastCanvasLoadError);
+    return null;
   }
-
-  try {
-    const mod = requireCanvasFromAppRoot();
-    lastCanvasLoadError = null;
-    return mod;
-  } catch (e) {
-    errors.push(`require(cwd): ${formatLoadError(e)}`);
-  }
-
-  lastCanvasLoadError = errors.join("; ");
-  console.error("[iml] @napi-rs/canvas unavailable:", lastCanvasLoadError);
-  return null;
 }
