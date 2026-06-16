@@ -102,7 +102,9 @@ export async function GET(req: NextRequest) {
     iml_customers: { select: { id: true, name: true } },
   } as const;
 
-  let products: Awaited<ReturnType<typeof prisma.iml_products.findMany>>;
+  type ProductListRow = Prisma.iml_productsGetPayload<{ select: typeof listSelect }>;
+
+  let products: ProductListRow[];
   let total: number | undefined;
   let page: number | undefined;
   let perPage: number | null | undefined;
