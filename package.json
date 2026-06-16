@@ -27,7 +27,8 @@
     "db:makety-work-type": "node scripts/run-makety-work-type-migration.mjs",
     "db:makety-queue": "node scripts/run-makety-queue-migration.mjs",
     "db:makety-quote": "node scripts/run-makety-quote-migration.mjs",
-    "iml:backfill-thumbnails": "node scripts/iml-backfill-product-thumbnails.mjs"
+    "iml:backfill-thumbnails": "node scripts/iml-backfill-product-thumbnails.mjs",
+    "verify:canvas": "node scripts/verify-canvas.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -72,6 +73,9 @@
     "tailwind-merge": "^3.5.0",
     "unzipper": "^0.12.3",
     "xlsx": "^0.18.5"
+  },
+  "optionalDependencies": {
+    "@napi-rs/canvas-linux-x64-gnu": "0.1.80"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

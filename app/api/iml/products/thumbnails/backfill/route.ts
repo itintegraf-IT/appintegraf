@@ -4,8 +4,8 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import {
   backfillProductThumbnailsFromPdf,
   countProductsNeedingThumbnail,
-  isPdfThumbnailGenerationAvailable,
 } from "@/lib/iml-product-thumbnail";
+import { probeCanvasAvailability } from "@/lib/iml-product-preview-pdf-server";
 
 export const maxDuration = 300;
 
@@ -31,14 +31,15 @@ export async function GET() {
   if ("error" in access) return access.error;
 
   try {
-    const [remaining, canvasAvailable] = await Promise.all([
+    const [remaining, canvas] = await Promise.all([
       countProductsNeedingThumbnail(),
-      isPdfThumbnailGenerationAvailable(),
+      probeCanvasAvailability(),
     ]);
     return NextResponse.json({
       success: true,
       remaining,
-      canvasAvailable,
+      canvasAvailable: canvas.available,
+      canvasError: canvas.error,
     });
   } catch (e) {
     console.error("IML thumbnail backfill status error:", e);

@@ -8,6 +8,7 @@ const BATCH_LIMIT = 50;
 type BackfillStatus = {
   remaining: number;
   canvasAvailable: boolean;
+  canvasError?: string | null;
 };
 
 type BatchResult = {
@@ -43,6 +44,7 @@ export function ImlThumbnailBackfillTab() {
       setStatus({
         remaining: (data.remaining as number) ?? 0,
         canvasAvailable: Boolean(data.canvasAvailable),
+        canvasError: typeof data.canvasError === "string" ? data.canvasError : null,
       });
     } catch (e) {
       setStatusError(e instanceof Error ? e.message : "Chyba při načtení stavu");
@@ -189,9 +191,18 @@ export function ImlThumbnailBackfillTab() {
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
             Na serveru není dostupný balíček <code className="text-xs">@napi-rs/canvas</code> –
-            konverze PDF na JPEG nebude fungovat. Na serveru spusťte{" "}
-            <code className="text-xs">npm install</code> v adresáři aplikace a{" "}
+            konverze PDF na JPEG nebude fungovat. Na serveru v{" "}
+            <code className="text-xs">/var/www/appintegraf</code> spusťte{" "}
+            <code className="text-xs">npm install --legacy-peer-deps</code> a{" "}
             <code className="text-xs">pm2 restart appintegraf</code>.
+            {status.canvasError ? (
+              <>
+                <br />
+                <span className="mt-1 block text-xs opacity-90">
+                  Detail: {status.canvasError}
+                </span>
+              </>
+            ) : null}
           </p>
         </div>
       )}

@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "unzipper",
     "archiver",
     "@napi-rs/canvas",
+    "@napi-rs/canvas-linux-x64-gnu",
     "pdfjs-dist",
   ],
   /** Pomalejší Windows / první kompilace chunků ve vývoji s `next dev --webpack`. */

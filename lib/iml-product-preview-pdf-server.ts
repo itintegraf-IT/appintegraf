@@ -2,6 +2,9 @@
  * Převod první stránky PDF na JPEG na serveru (import / miniatury produktů).
  * Používá @napi-rs/canvas (prebuilt binárky, bez libcairo na serveru).
  */
+import { createRequire } from "node:module";
+import { join } from "node:path";
+
 export async function pdfBufferToJpeg(
   pdfBuffer: Buffer,
   opts?: { maxSide?: number; jpegQuality?: number }
@@ -64,8 +67,45 @@ export async function pdfBufferToJpeg(
   }
 }
 
+export type CanvasLoadDiagnostics = {
+  available: boolean;
+  error: string | null;
+};
+
+let lastCanvasLoadError: string | null = null;
+
+export function getCanvasLoadDiagnostics(): CanvasLoadDiagnostics {
+  return {
+    available: lastCanvasLoadError === null,
+    error: lastCanvasLoadError,
+  };
+}
+
 export async function isPdfThumbnailGenerationAvailable(): Promise<boolean> {
-  return (await importOptionalCanvas()) !== null;
+  const mod = await importOptionalCanvas();
+  return mod !== null;
+}
+
+export async function probeCanvasAvailability(): Promise<CanvasLoadDiagnostics> {
+  const mod = await importOptionalCanvas();
+  if (mod) {
+    try {
+      const canvas = mod.createCanvas(1, 1);
+      if (typeof canvas.encode !== "function") {
+        lastCanvasLoadError = "createCanvas nevrátil očekávané API (encode)";
+        return { available: false, error: lastCanvasLoadError };
+      }
+      lastCanvasLoadError = null;
+      return { available: true, error: null };
+    } catch (e) {
+      lastCanvasLoadError = e instanceof Error ? e.message : String(e);
+      return { available: false, error: lastCanvasLoadError };
+    }
+  }
+  return {
+    available: false,
+    error: lastCanvasLoadError ?? "Modul @napi-rs/canvas se nepodařilo načíst",
+  };
 }
 
 type NapiCanvas = {
@@ -73,17 +113,40 @@ type NapiCanvas = {
   encode: (mime: "jpeg" | "png", quality?: number) => Promise<Uint8Array>;
 };
 
-async function importOptionalCanvas(): Promise<{
+type NapiCanvasModule = {
   createCanvas: (w: number, h: number) => NapiCanvas;
-} | null> {
+};
+
+function formatLoadError(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  return String(e);
+}
+
+function requireCanvasFromAppRoot(): NapiCanvasModule {
+  const appRequire = createRequire(join(process.cwd(), "package.json"));
+  return appRequire("@napi-rs/canvas") as NapiCanvasModule;
+}
+
+async function importOptionalCanvas(): Promise<NapiCanvasModule | null> {
+  const errors: string[] = [];
+
   try {
-    // createRequire obchází statickou analýzu bundleru (nativní .node binding).
-    const { createRequire } = await import("node:module");
-    const require = createRequire(import.meta.url);
-    return require("@napi-rs/canvas") as {
-      createCanvas: (w: number, h: number) => NapiCanvas;
-    };
-  } catch {
-    return null;
+    const mod = (await import("@napi-rs/canvas")) as NapiCanvasModule;
+    lastCanvasLoadError = null;
+    return mod;
+  } catch (e) {
+    errors.push(`import: ${formatLoadError(e)}`);
   }
+
+  try {
+    const mod = requireCanvasFromAppRoot();
+    lastCanvasLoadError = null;
+    return mod;
+  } catch (e) {
+    errors.push(`require(cwd): ${formatLoadError(e)}`);
+  }
+
+  lastCanvasLoadError = errors.join("; ");
+  console.error("[iml] @napi-rs/canvas unavailable:", lastCanvasLoadError);
+  return null;
 }
