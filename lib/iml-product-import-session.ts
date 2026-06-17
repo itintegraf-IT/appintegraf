@@ -1,4 +1,6 @@
 import { randomUUID } from "crypto";
+import { existsSync } from "fs";
+import { mkdir, readFile, rm, writeFile } from "fs/promises";
 import { mkdtemp } from "fs/promises";
 import { tmpdir } from "os";
 import path from "path";
@@ -6,6 +8,7 @@ import { cleanupTempDir } from "@/lib/backup/zip-read";
 import { appendFilesToImportDir } from "@/lib/iml-product-import-upload";
 
 const SESSION_TTL_MS = 4 * 60 * 60 * 1000;
+const SESSION_REGISTRY_DIR = path.join(tmpdir(), "iml-import-sessions");
 
 type ImportSession = {
   id: string;
@@ -16,43 +19,105 @@ type ImportSession = {
   totalBytes: number;
 };
 
-const sessions = new Map<string, ImportSession>();
+const globalForSessions = globalThis as typeof globalThis & {
+  __imlImportSessions?: Map<string, ImportSession>;
+};
 
-function purgeExpiredSessions(): void {
-  const now = Date.now();
-  for (const [id, session] of sessions) {
-    if (now - session.createdAt > SESSION_TTL_MS) {
-      void cleanupTempDir(session.tempDir).finally(() => sessions.delete(id));
+function getSessionMap(): Map<string, ImportSession> {
+  if (!globalForSessions.__imlImportSessions) {
+    globalForSessions.__imlImportSessions = new Map();
+  }
+  return globalForSessions.__imlImportSessions;
+}
+
+function sessionMetaPath(id: string): string {
+  return path.join(SESSION_REGISTRY_DIR, `${id}.json`);
+}
+
+async function persistSession(session: ImportSession): Promise<void> {
+  await mkdir(SESSION_REGISTRY_DIR, { recursive: true });
+  await writeFile(sessionMetaPath(session.id), JSON.stringify(session), "utf-8");
+  getSessionMap().set(session.id, session);
+}
+
+async function loadSession(id: string): Promise<ImportSession | null> {
+  const cached = getSessionMap().get(id);
+  if (cached) return cached;
+
+  try {
+    const raw = await readFile(sessionMetaPath(id), "utf-8");
+    const session = JSON.parse(raw) as ImportSession;
+    if (!existsSync(session.tempDir)) {
+      await rm(sessionMetaPath(id), { force: true }).catch(() => undefined);
+      return null;
     }
+    getSessionMap().set(id, session);
+    return session;
+  } catch {
+    return null;
   }
 }
 
-function getSessionForUser(sessionId: string, userId: number): ImportSession {
-  purgeExpiredSessions();
-  const session = sessions.get(sessionId);
+async function removeSessionRecord(session: ImportSession): Promise<void> {
+  getSessionMap().delete(session.id);
+  await rm(sessionMetaPath(session.id), { force: true }).catch(() => undefined);
+}
+
+async function purgeExpiredSessions(): Promise<void> {
+  const now = Date.now();
+  for (const [id, session] of getSessionMap()) {
+    if (now - session.createdAt > SESSION_TTL_MS) {
+      await removeSessionRecord(session);
+      await cleanupTempDir(session.tempDir).catch(() => undefined);
+      getSessionMap().delete(id);
+    }
+  }
+
+  try {
+    const { readdir } = await import("fs/promises");
+    const entries = await readdir(SESSION_REGISTRY_DIR).catch(() => [] as string[]);
+    for (const entry of entries) {
+      if (!entry.endsWith(".json")) continue;
+      const session = await loadSession(entry.replace(/\.json$/, ""));
+      if (!session) continue;
+      if (now - session.createdAt > SESSION_TTL_MS) {
+        await removeSessionRecord(session);
+        await cleanupTempDir(session.tempDir).catch(() => undefined);
+        getSessionMap().delete(session.id);
+      }
+    }
+  } catch {
+    /* registry dir may not exist yet */
+  }
+}
+
+async function getSessionForUser(sessionId: string, userId: number): Promise<ImportSession> {
+  await purgeExpiredSessions();
+  const session = await loadSession(sessionId);
   if (!session || session.userId !== userId) {
     throw new Error("Neplatná nebo expirovaná relace importu");
   }
   if (Date.now() - session.createdAt > SESSION_TTL_MS) {
-    sessions.delete(sessionId);
-    void cleanupTempDir(session.tempDir);
+    await removeSessionRecord(session);
+    await cleanupTempDir(session.tempDir).catch(() => undefined);
     throw new Error("Relace importu vypršela – začněte znovu");
   }
   return session;
 }
 
 export async function createImportSession(userId: number): Promise<string> {
-  purgeExpiredSessions();
+  await purgeExpiredSessions();
   const tempDir = await mkdtemp(path.join(tmpdir(), "iml-import-session-"));
   const id = randomUUID();
-  sessions.set(id, {
+  const session: ImportSession = {
     id,
     userId,
     tempDir,
     createdAt: Date.now(),
     fileCount: 0,
     totalBytes: 0,
-  });
+  };
+  await persistSession(session);
   return id;
 }
 
@@ -62,10 +127,11 @@ export async function appendImportSessionBatch(
   files: File[],
   paths: string[]
 ): Promise<{ fileCount: number; totalBytes: number; batchBytes: number }> {
-  const session = getSessionForUser(sessionId, userId);
+  const session = await getSessionForUser(sessionId, userId);
   const { written, bytes } = await appendFilesToImportDir(session.tempDir, files, paths);
   session.fileCount += written;
   session.totalBytes += bytes;
+  await persistSession(session);
   return {
     fileCount: session.fileCount,
     totalBytes: session.totalBytes,
@@ -73,26 +139,26 @@ export async function appendImportSessionBatch(
   };
 }
 
-export function peekImportSession(
+export async function peekImportSession(
   sessionId: string,
   userId: number
-): { fileCount: number; totalBytes: number } {
-  const session = getSessionForUser(sessionId, userId);
+): Promise<{ fileCount: number; totalBytes: number }> {
+  const session = await getSessionForUser(sessionId, userId);
   return {
     fileCount: session.fileCount,
     totalBytes: session.totalBytes,
   };
 }
 
-export function takeImportSessionDir(sessionId: string, userId: number): string {
-  const session = getSessionForUser(sessionId, userId);
-  sessions.delete(sessionId);
+export async function takeImportSessionDir(sessionId: string, userId: number): Promise<string> {
+  const session = await getSessionForUser(sessionId, userId);
+  await removeSessionRecord(session);
   return session.tempDir;
 }
 
 export async function cancelImportSession(sessionId: string, userId: number): Promise<void> {
-  const session = sessions.get(sessionId);
+  const session = await loadSession(sessionId);
   if (!session || session.userId !== userId) return;
-  sessions.delete(sessionId);
-  await cleanupTempDir(session.tempDir);
+  await removeSessionRecord(session);
+  await cleanupTempDir(session.tempDir).catch(() => undefined);
 }

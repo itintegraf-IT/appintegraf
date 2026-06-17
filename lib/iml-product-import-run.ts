@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { logImlAudit } from "@/lib/iml-audit";
 import {
   buildProductPayload,
+  buildCustomerByNameMap,
   normalizeProductCode,
   resolveRowAction,
   type ColumnMapping,
@@ -78,7 +79,8 @@ export async function runProductImportPreviewCore(
         i,
         mapping,
         new Map(),
-        ""
+        "",
+        headers
       );
       if (!built.ok) continue;
       const code = normalizeProductCode(built.payload.igCode);
@@ -106,7 +108,8 @@ export async function runProductImportPreviewCore(
         i,
         mapping,
         new Map(),
-        ""
+        "",
+        headers
       );
       if (!built.ok) continue;
       const code = normalizeProductCode(built.payload.igCode);
@@ -171,14 +174,12 @@ export async function runProductImportExecuteOnDir(
   let updated = 0;
   let skipped = 0;
 
-  const { dataRows } = await findCsvInExtractedDir(tempDir);
+  const { headers, dataRows } = await findCsvInExtractedDir(tempDir);
 
   const customers = await prisma.iml_customers.findMany({
     select: { id: true, name: true },
   });
-  const customerByName = new Map(
-    customers.map((c) => [c.name.toLowerCase(), c.id])
-  );
+  const customerByName = buildCustomerByNameMap(customers);
 
   const existingAll = await prisma.iml_products.findMany({
       select: { id: true, ig_code: true, sku: true },
@@ -198,7 +199,8 @@ export async function runProductImportExecuteOnDir(
         i,
         mapping,
         customerByName,
-        editorName
+        editorName,
+        headers
       );
       if (!built.ok) {
         errors.push(built.error);

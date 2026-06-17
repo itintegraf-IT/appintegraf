@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   Boxes,
   CircleCheckBig,
@@ -20,6 +21,12 @@ import { MaterialSelect } from "../../_components/MaterialSelect";
 import ProductPantoneEditor, {
   type ProductColorRow,
 } from "./ProductPantoneEditor";
+import ProductCmykToggles from "./ProductCmykToggles";
+import {
+  defaultProductCmykFlags,
+  hasValidPantoneRows,
+  type ProductCmykFlags,
+} from "@/lib/iml-print-colors-summary";
 
 export type ProductFormState = {
   customer_id: string;
@@ -79,6 +86,8 @@ type Props = {
    */
   colors?: ProductColorRow[];
   onColorsChange?: (colors: ProductColorRow[]) => void;
+  cmykFlags?: ProductCmykFlags;
+  onCmykChange?: (flags: ProductCmykFlags) => void;
 };
 
 const inputCls = "w-full rounded-lg border border-gray-300 px-3 py-2";
@@ -100,6 +109,8 @@ export default function ProductFormSections({
   errors,
   colors,
   onColorsChange,
+  cmykFlags,
+  onCmykChange,
 }: Props) {
   const err = errors ?? {};
   const formatPreview = formatProductFormatFromMm(
@@ -111,6 +122,30 @@ export default function ProductFormSections({
     !(IML_APPROVAL_STATUSES as readonly string[]).includes(form.approval_status)
       ? form.approval_status
       : null;
+
+  const hasPantone = colors ? hasValidPantoneRows(colors) : false;
+  const prevHasPantoneRef = useRef<boolean | null>(null);
+
+  useEffect(() => {
+    if (!onCmykChange || colors === undefined) return;
+
+    if (prevHasPantoneRef.current === null) {
+      prevHasPantoneRef.current = hasPantone;
+      if (hasPantone) {
+        onCmykChange({ c: false, m: false, y: false, k: false });
+      }
+      return;
+    }
+
+    if (hasPantone === prevHasPantoneRef.current) return;
+
+    if (hasPantone) {
+      onCmykChange({ c: false, m: false, y: false, k: false });
+    } else {
+      onCmykChange(defaultProductCmykFlags());
+    }
+    prevHasPantoneRef.current = hasPantone;
+  }, [hasPantone, onCmykChange, colors]);
 
   const tabs: TabDef[] = [
     {
@@ -347,9 +382,16 @@ export default function ProductFormSections({
             icon: <Droplets className="h-4 w-4" />,
             content: (
               <TabShell
-                title="Barvy (Pantone)"
-                subtitle="Seznam barev s pokrytím v % a orientační spotřebou dle počtu etiket na TA"
+                title="Barvy"
+                subtitle="Procesní CMYK a Pantone barvy s pokrytím v %"
               >
+                {cmykFlags !== undefined && onCmykChange && (
+                  <ProductCmykToggles
+                    flags={cmykFlags}
+                    onChange={onCmykChange}
+                    hasPantone={hasPantone}
+                  />
+                )}
                 <ProductPantoneEditor
                   colors={colors}
                   onChange={onColorsChange}

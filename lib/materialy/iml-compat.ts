@@ -74,6 +74,7 @@ export function toImlPantoneShape(m: PantoneRow) {
     pantone_code: m.code,
     description: m.description,
     hex_color: m.hex_color ?? null,
+    hex: m.hex_color ?? null,
     cmyk_c: m.cmyk_c ?? null,
     cmyk_m: m.cmyk_m ?? null,
     cmyk_y: m.cmyk_y ?? null,

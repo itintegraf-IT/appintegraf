@@ -5,6 +5,7 @@ import {
 } from "@/lib/iml/product-format";
 import { IML_LABEL_TYPES } from "@/lib/iml-constants";
 import { findMaterialForImlLegacyId } from "@/lib/materialy/iml-compat";
+import { cmykFlagsToDb, type ProductCmykFlags } from "@/lib/iml-print-colors-summary";
 
 const VALID_LABEL_TYPES = new Set(IML_LABEL_TYPES.map((t) => t.value));
 
@@ -81,6 +82,24 @@ function parseColorCount(val: unknown): number | null {
   return n;
 }
 
+function parseBoolDefaultTrue(val: unknown): boolean {
+  if (val === undefined || val === null) return true;
+  if (typeof val === "boolean") return val;
+  const s = String(val).trim().toLowerCase();
+  if (s === "false" || s === "0") return false;
+  if (s === "true" || s === "1") return true;
+  return true;
+}
+
+export function parseCmykFlagsFromBody(body: Record<string, unknown>): ProductCmykFlags {
+  return {
+    c: parseBoolDefaultTrue(body.cmyk_c_enabled),
+    m: parseBoolDefaultTrue(body.cmyk_m_enabled),
+    y: parseBoolDefaultTrue(body.cmyk_y_enabled),
+    k: parseBoolDefaultTrue(body.cmyk_k_enabled),
+  };
+}
+
 function parseLabelType(val: unknown): string | null {
   if (val == null || val === "") return null;
   const s = String(val).trim();
@@ -139,6 +158,7 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
     approval_date: parseApprovalDate(body.approval_date),
     color_count: parseColorCount(body.color_count),
     print_colors_text: str(body.print_colors_text),
+    ...cmykFlagsToDb(parseCmykFlagsFromBody(body)),
     label_type: parseLabelType(body.label_type),
     realization_log: str(body.realization_log),
     internal_note: str(body.internal_note),

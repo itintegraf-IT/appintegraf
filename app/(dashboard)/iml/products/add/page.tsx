@@ -12,6 +12,11 @@ import ProductFormSections, {
   type CustomerOption,
 } from "../_components/ProductFormSections";
 import type { ProductColorRow } from "../_components/ProductPantoneEditor";
+import {
+  cmykFlagsToDb,
+  defaultProductCmykFlags,
+  type ProductCmykFlags,
+} from "@/lib/iml-print-colors-summary";
 
 export default function ImlProductAddPage() {
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
@@ -21,6 +26,7 @@ export default function ImlProductAddPage() {
   const [form, setForm] = useState<ProductFormState>(emptyProductForm);
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
   const [colors, setColors] = useState<ProductColorRow[]>([]);
+  const [cmykFlags, setCmykFlags] = useState<ProductCmykFlags>(defaultProductCmykFlags);
 
   const setField = <K extends keyof ProductFormState>(k: K, v: ProductFormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -74,6 +80,7 @@ export default function ImlProductAddPage() {
           pieces_per_pallet: form.pieces_per_pallet ? parseInt(form.pieces_per_pallet, 10) : null,
           stock_quantity: form.stock_quantity ? parseInt(form.stock_quantity, 10) : null,
           custom_data: Object.keys(customData).length > 0 ? customData : undefined,
+          ...cmykFlagsToDb(cmykFlags),
           colors: colors
             .filter(
               (c) =>
@@ -169,6 +176,8 @@ export default function ImlProductAddPage() {
             customers={customers}
             colors={colors}
             onColorsChange={setColors}
+            cmykFlags={cmykFlags}
+            onCmykChange={setCmykFlags}
           />
 
           <CustomFieldsFormSection

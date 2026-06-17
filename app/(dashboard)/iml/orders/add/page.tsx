@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Search } from "lucide-react";
 import { CustomFieldsFormSection } from "../../_components/CustomFieldsFormSection";
+import { filterProductsByQuery } from "@/lib/iml-product-search";
+
+const EMPTY_PICKER = { product_id: "", quantity: "0", unit_price: "" };
 
 type Customer = { id: number; name: string };
 type Product = {
@@ -46,11 +49,9 @@ export default function ImlOrderAddPage() {
     notes: "",
   });
   const [selectedItems, setSelectedItems] = useState<SelectedOrderItem[]>([]);
-  const [picker, setPicker] = useState<{ product_id: string; quantity: string; unit_price: string }>({
-    product_id: "",
-    quantity: "1",
-    unit_price: "",
-  });
+  const [picker, setPicker] = useState<{ product_id: string; quantity: string; unit_price: string }>(
+    EMPTY_PICKER
+  );
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
 
   useEffect(() => {
@@ -109,17 +110,10 @@ export default function ImlOrderAddPage() {
     loadProductsForCustomer(cid);
   }, [form.customer_id, loadProductsForCustomer]);
 
-  const filteredProducts = useMemo(() => {
-    const q = debouncedSearch.trim().toLowerCase();
-    if (q.length < 3) return products;
-    return products.filter(
-      (p) =>
-        (p.ig_code?.toLowerCase().includes(q) ?? false) ||
-        (p.ig_short_name?.toLowerCase().includes(q) ?? false) ||
-        (p.client_name?.toLowerCase().includes(q) ?? false) ||
-        (p.client_code?.toLowerCase().includes(q) ?? false)
-    );
-  }, [products, debouncedSearch]);
+  const filteredProducts = useMemo(
+    () => filterProductsByQuery(products, debouncedSearch),
+    [products, debouncedSearch]
+  );
 
   const productById = useMemo(() => {
     const m = new Map<number, Product>();
@@ -137,10 +131,19 @@ export default function ImlOrderAddPage() {
     [filteredProducts, selectedProductIds]
   );
 
+  const pickerQuantity = parseInt(picker.quantity, 10);
+  const canAddPickerItem =
+    !!picker.product_id && Number.isFinite(pickerQuantity) && pickerQuantity > 0;
+
   const addSelectedItem = () => {
     const pid = parseInt(picker.product_id, 10);
     if (!pid) {
       setError("Vyberte produkt.");
+      return;
+    }
+    const qty = parseInt(picker.quantity, 10);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      setError("Zadejte množství větší než 0.");
       return;
     }
     const exists = selectedItems.some((row) => row.product_id === pid);
@@ -148,15 +151,16 @@ export default function ImlOrderAddPage() {
       setError("Produkt už je v položkách objednávky.");
       return;
     }
+    setError("");
     setSelectedItems((prev) => [
       ...prev,
       {
         product_id: pid,
-        quantity: picker.quantity.trim() || "1",
+        quantity: String(qty),
         unit_price: picker.unit_price.trim(),
       },
     ]);
-    setPicker((prev) => ({ ...prev, product_id: "", quantity: "1", unit_price: "" }));
+    setPicker(EMPTY_PICKER);
   };
 
   const setItemField = (
@@ -191,8 +195,17 @@ export default function ImlOrderAddPage() {
       })
       .filter(Boolean) as { product_id: number; quantity: number; unit_price: number | null }[];
 
+    const invalidQty = selectedItems.some((row) => {
+      if (!row.product_id) return false;
+      const q = parseInt(row.quantity, 10);
+      return !Number.isFinite(q) || q <= 0;
+    });
+    if (invalidQty) {
+      setError("Každá položka musí mít množství větší než 0.");
+      return;
+    }
     if (orderItems.length === 0) {
-      setError("Zadejte množství u alespoň jednoho produktu.");
+      setError("Přidejte alespoň jednu položku s množstvím větším než 0.");
       return;
     }
 
@@ -291,7 +304,7 @@ export default function ImlOrderAddPage() {
               onChange={(e) => {
                 setForm({ ...form, customer_id: e.target.value });
                 setSelectedItems([]);
-                setPicker({ product_id: "", quantity: "1", unit_price: "" });
+                setPicker(EMPTY_PICKER);
               }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             >
@@ -408,7 +421,7 @@ export default function ImlOrderAddPage() {
                 <Search className="h-4 w-4 text-gray-400" />
                 <input
                   type="search"
-                  placeholder="Filtrovat od 3 znaků (kód / název)…"
+                  placeholder="Filtrovat podle kódu nebo názvu…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="min-w-[240px] flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm"
@@ -435,7 +448,8 @@ export default function ImlOrderAddPage() {
                   <label className="mb-1 block text-xs font-medium text-gray-700">Množství</label>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
+                    placeholder="0"
                     value={picker.quantity}
                     onChange={(e) => setPicker((prev) => ({ ...prev, quantity: e.target.value }))}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-right"
@@ -455,7 +469,8 @@ export default function ImlOrderAddPage() {
                   <button
                     type="button"
                     onClick={addSelectedItem}
-                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    disabled={!canAddPickerItem}
+                    className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Přidat položku
                   </button>
@@ -501,7 +516,7 @@ export default function ImlOrderAddPage() {
                           <td className="px-3 py-2 text-right">
                             <input
                               type="number"
-                              min="1"
+                              min="0"
                               value={row.quantity}
                               onChange={(e) => setItemField(index, "quantity", e.target.value)}
                               placeholder="0"

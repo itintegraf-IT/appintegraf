@@ -11,6 +11,8 @@ import {
   type IncomingProductColor,
 } from "@/lib/iml-product-colors";
 import { parseImlProductBodyForSave } from "@/lib/iml/parse-product-body";
+import { applyPrintColorsSummaryOnSave } from "@/lib/iml-product-save-colors";
+import { toImlProductCreateData } from "@/lib/iml/product-prisma-payload";
 
 const productListSelect = {
   id: true,
@@ -227,7 +229,6 @@ export async function POST(req: NextRequest) {
     }
 
     const customDataForPrisma = data.custom_data;
-    const createPayload = { ...data, custom_data: customDataForPrisma, last_edited_by: editorName };
 
     // Volitelné barvy – pokud jsou v body, uložíme je spolu s produktem v jedné transakci.
     const incomingColors = Array.isArray(body.colors)
@@ -243,9 +244,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    applyPrintColorsSummaryOnSave(
+      data,
+      body as Record<string, unknown>,
+      colorsValidation?.ok ? colorsValidation.prepared : null
+    );
+
+    const createPayload = toImlProductCreateData({
+      ...data,
+      custom_data: customDataForPrisma,
+      last_edited_by: editorName,
+    });
+
     const productId = await prisma.$transaction(async (tx) => {
       const created = await tx.iml_products.create({
-        data: createPayload as Parameters<typeof tx.iml_products.create>[0]["data"],
+        data: createPayload,
       });
       if (colorsValidation && colorsValidation.ok) {
         const res = await replaceProductColorsInTx(tx, created.id, colorsValidation.prepared, true);

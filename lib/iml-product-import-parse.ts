@@ -31,14 +31,14 @@ export type ImportResolutions = {
   byCode: Record<string, ConflictResolution>;
 };
 
+const IML_EXPORT_MERGE_HEADERS = ["note", "material", "treatment", "realization"] as const;
+
 const AUTO_MAP: Record<string, string> = {
   code: "ig_code",
   name: "client_name",
   contractor: "customer_name",
-  material: "production_notes",
   print: "print_note",
-  note: "production_notes",
-  type: "item_status",
+  type: "label_shape_code",
 };
 
 export function autoMapHeaders(headers: string[]): ColumnMapping {
@@ -62,6 +62,12 @@ export function validateMapping(mapping: ColumnMapping | null): string | null {
     return "Mapování musí obsahovat alespoň pole ig_code, client_name nebo ig_short_name";
   }
   return null;
+}
+
+export function detectCsvDelimiter(firstLine: string): string {
+  const semi = (firstLine.match(/;/g) || []).length;
+  const comma = (firstLine.match(/,/g) || []).length;
+  return semi > comma ? ";" : ",";
 }
 
 export function parseCsvLine(line: string, delimiter: string): string[] {
@@ -90,18 +96,71 @@ export function parseCsvLine(line: string, delimiter: string): string[] {
   return result;
 }
 
+/** Record-oriented CSV parser (podporuje víceřádková quoted pole). */
+export function parseCsvRecords(text: string, delimiter: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        current += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === delimiter) {
+      row.push(current.trim());
+      current = "";
+    } else if (c === "\r") {
+      continue;
+    } else if (c === "\n") {
+      row.push(current.trim());
+      current = "";
+      if (row.some((cell) => cell.trim())) {
+        rows.push(row);
+      }
+      row = [];
+    } else {
+      current += c;
+    }
+  }
+
+  row.push(current.trim());
+  if (row.some((cell) => cell.trim())) {
+    rows.push(row);
+  }
+
+  return rows;
+}
+
 export function parseCsvText(text: string): { headers: string[]; dataRows: string[][] } {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim());
-  if (lines.length < 1) {
+  const normalized = text.replace(/^\uFEFF/, "");
+  if (!normalized.trim()) {
     return { headers: [], dataRows: [] };
   }
-  const delimiter = lines[0].includes(";") ? ";" : ",";
-  const headers = parseCsvLine(lines[0], delimiter).map((h, i) =>
-    h ? String(h) : `Sloupec ${i + 1}`
-  );
-  const dataRows = lines
+
+  const firstLineEnd = normalized.search(/\r?\n/);
+  const firstLine = firstLineEnd === -1 ? normalized : normalized.slice(0, firstLineEnd);
+  const delimiter = detectCsvDelimiter(firstLine);
+  const allRows = parseCsvRecords(normalized, delimiter);
+
+  if (allRows.length === 0) {
+    return { headers: [], dataRows: [] };
+  }
+
+  const headers = allRows[0].map((h, i) => (h ? String(h) : `Sloupec ${i + 1}`));
+  const dataRows = allRows
     .slice(1)
-    .map((l) => parseCsvLine(l, delimiter))
     .filter((r) => r.some((c) => c != null && String(c).trim()));
   return { headers, dataRows };
 }
@@ -120,6 +179,24 @@ export function parseExcelBuffer(buf: Buffer): { headers: string[]; dataRows: st
   return { headers, dataRows };
 }
 
+export function normalizeCustomerNameKey(name: string): string {
+  return name
+    .trim()
+    .toLowerCase()
+    .replace(/[\u00b4\u2018\u2019\u201a\u201b\u2032\u2035`']/g, "'")
+    .replace(/\s+/g, " ");
+}
+
+export function buildCustomerByNameMap(
+  customers: Array<{ id: number; name: string }>
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const c of customers) {
+    map.set(normalizeCustomerNameKey(c.name), c.id);
+  }
+  return map;
+}
+
 export function normalizeProductCode(code: string): string {
   return code.trim().toUpperCase();
 }
@@ -131,16 +208,63 @@ export function rowGetter(row: string[], mapping: ColumnMapping) {
   };
 }
 
+export function getImlExportColumnValue(
+  row: string[],
+  headers: string[] | undefined,
+  columnName: string
+): string {
+  if (!headers) return "";
+  const idx = headers.findIndex((h) => h.trim().toLowerCase() === columnName);
+  if (idx < 0 || row[idx] == null) return "";
+  return String(row[idx]).trim();
+}
+
+export function mergeImlExportProductionNotes(
+  row: string[],
+  headers: string[] | undefined,
+  explicitNotes: string
+): string | null {
+  const parts: string[] = [];
+  if (explicitNotes.trim()) parts.push(explicitNotes.trim());
+
+  if (headers) {
+    for (const key of IML_EXPORT_MERGE_HEADERS) {
+      const val = getImlExportColumnValue(row, headers, key);
+      if (val) parts.push(val);
+    }
+  }
+
+  if (parts.length === 0) return null;
+  return parts.join(" · ");
+}
+
+export function imlExportNoteHeuristics(noteText: string): {
+  hasPrintSample: boolean;
+  hasPrintProof: boolean;
+} {
+  const lower = noteText.toLowerCase();
+  return {
+    hasPrintProof: /n[aá]tisk|natisk/.test(lower),
+    hasPrintSample: /vzork/.test(lower),
+  };
+}
+
 export async function buildProductPayload(
   row: string[],
   rowIndex: number,
   mapping: ColumnMapping,
   customerByName: Map<string, number>,
-  editorName: string
+  editorName: string,
+  headers?: string[]
 ): Promise<{ ok: true; payload: ProductImportRowPayload } | { ok: false; error: string }> {
   const get = rowGetter(row, mapping);
   const igCode = normalizeProductCode(get("ig_code"));
   const clientName = get("client_name") || get("ig_short_name");
+  const hasIgCodeMapping = typeof mapping.ig_code === "number";
+
+  if (hasIgCodeMapping && !igCode) {
+    return { ok: false, error: `Řádek ${rowIndex + 2}: Chybí ig_code` };
+  }
   if (!igCode && !clientName) {
     return { ok: false, error: `Řádek ${rowIndex + 2}: Chybí ig_code nebo client_name` };
   }
@@ -151,7 +275,7 @@ export async function buildProductPayload(
   const customerName = get("customer_name");
   let customerId: number | null = null;
   if (customerName) {
-    customerId = customerByName.get(customerName.toLowerCase()) ?? null;
+    customerId = customerByName.get(normalizeCustomerNameKey(customerName)) ?? null;
   }
 
   let materialFields: Awaited<ReturnType<typeof enrichProductMaterialFields>>;
@@ -209,6 +333,20 @@ export async function buildProductPayload(
     if (!Number.isNaN(d.getTime())) approvalDate = d;
   }
 
+  const noteColumnText = getImlExportColumnValue(row, headers, "note");
+  const printColumnText = getImlExportColumnValue(row, headers, "print");
+  const noteHeuristics = imlExportNoteHeuristics(`${noteColumnText} ${printColumnText}`);
+  const explicitPrintSample =
+    get("has_print_sample").toLowerCase() === "ano" || get("has_print_sample") === "1";
+  const explicitPrintProof =
+    get("has_print_proof").toLowerCase() === "ano" || get("has_print_proof") === "1";
+
+  const productionNotes = mergeImlExportProductionNotes(
+    row,
+    headers,
+    get("production_notes")
+  );
+
   const data: Prisma.iml_productsUncheckedCreateInput = {
     customer_id: customerId,
     ig_code: igCode ? normalizeProductCode(igCode) : null,
@@ -236,12 +374,10 @@ export async function buildProductPayload(
     paper_material_id: materialFields.paper_material_id,
     lacquer_material_id: materialFields.lacquer_material_id,
     print_note: get("print_note") || null,
-    has_print_sample:
-      get("has_print_sample").toLowerCase() === "ano" || get("has_print_sample") === "1",
-    has_print_proof:
-      get("has_print_proof").toLowerCase() === "ano" || get("has_print_proof") === "1",
+    has_print_sample: explicitPrintSample || noteHeuristics.hasPrintSample,
+    has_print_proof: explicitPrintProof || noteHeuristics.hasPrintProof,
     ean_code: get("ean_code") || null,
-    production_notes: get("production_notes") || null,
+    production_notes: productionNotes,
     approval_status: get("approval_status") || null,
     approval_date: approvalDate,
     color_count: colorCount,

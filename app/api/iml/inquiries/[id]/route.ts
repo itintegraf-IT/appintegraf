@@ -5,6 +5,7 @@ import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { parseOrderCustomData } from "@/lib/iml-order-utils";
+import { validateLineItemQuantities } from "@/lib/iml-line-item-quantity";
 
 export async function GET(
   _req: NextRequest,
@@ -94,6 +95,13 @@ export async function PUT(
     const nextNotes = notes !== undefined ? (notes ? String(notes).trim() : null) : existing.notes;
     const parsedCustom =
       custom_data !== undefined ? parseOrderCustomData(custom_data) : undefined;
+
+    if (Array.isArray(items)) {
+      const qtyError = validateLineItemQuantities(items);
+      if (qtyError) {
+        return NextResponse.json({ error: qtyError }, { status: 400 });
+      }
+    }
 
     await prisma.$transaction(async (tx: PrismaTransactionClient) => {
       await tx.iml_inquiries.update({

@@ -5,12 +5,16 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { CustomFieldsFormSection } from "../../_components/CustomFieldsFormSection";
+import ImlProductCombobox from "../../_components/ImlProductCombobox";
+
+const EMPTY_ITEM = { product_id: "", quantity: "0", unit_price: "" };
 
 type Customer = { id: number; name: string };
 type Product = {
   id: number;
   ig_code: string | null;
   ig_short_name: string | null;
+  client_code: string | null;
   client_name: string | null;
 };
 
@@ -52,7 +56,7 @@ export default function ImlInquiryAddPage() {
   }, [form.customer_id]);
 
   const addItem = () => {
-    setItems([...items, { product_id: "", quantity: "1", unit_price: "" }]);
+    setItems([...items, { ...EMPTY_ITEM }]);
   };
 
   const removeItem = (i: number) => {
@@ -71,13 +75,30 @@ export default function ImlInquiryAddPage() {
     setLoading(true);
 
     try {
-      const payloadItems = items
-        .filter((it) => it.product_id && parseInt(it.quantity, 10) > 0)
+      const withProduct = items.filter((it) => it.product_id);
+      const zeroQty = withProduct.some((it) => {
+        const q = parseInt(it.quantity, 10);
+        return !Number.isFinite(q) || q <= 0;
+      });
+      if (zeroQty) {
+        setError("Každá položka s produktem musí mít množství větší než 0.");
+        setLoading(false);
+        return;
+      }
+
+      const payloadItems = withProduct
+        .filter((it) => parseInt(it.quantity, 10) > 0)
         .map((it) => ({
           product_id: parseInt(it.product_id, 10),
           quantity: parseInt(it.quantity, 10),
           unit_price: it.unit_price ? parseFloat(it.unit_price) : null,
         }));
+
+      if (payloadItems.length === 0) {
+        setError("Přidejte alespoň jednu položku s množstvím větším než 0.");
+        setLoading(false);
+        return;
+      }
 
       const res = await fetch("/api/iml/inquiries", {
         method: "POST",
@@ -226,21 +247,15 @@ export default function ImlInquiryAddPage() {
                   key={i}
                   className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3"
                 >
-                  <select
+                  <ImlProductCombobox
+                    products={products}
                     value={it.product_id}
-                    onChange={(e) => updateItem(i, "product_id", e.target.value)}
-                    className="min-w-[200px] rounded-lg border border-gray-300 px-3 py-2"
-                  >
-                    <option value="">— Produkt —</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.ig_code ?? p.id} – {p.client_name ?? p.ig_short_name ?? "-"}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(v) => updateItem(i, "product_id", v)}
+                  />
                   <input
                     type="number"
-                    min="1"
+                    min="0"
+                    placeholder="Množství"
                     value={it.quantity}
                     onChange={(e) => updateItem(i, "quantity", e.target.value)}
                     className="w-24 rounded-lg border border-gray-300 px-3 py-2"

@@ -6,6 +6,7 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { hasImlSupervisorOverride } from "@/lib/iml-permissions";
 import { parseOrderCustomData, validateOrderItemsProductStatus } from "@/lib/iml-order-utils";
+import { validateLineItemQuantities } from "@/lib/iml-line-item-quantity";
 
 export async function GET(
   _req: NextRequest,
@@ -106,6 +107,13 @@ export async function PUT(
 
     const allowNonActive =
       bodySupervisorOverride === true && (await hasImlSupervisorOverride(userId));
+
+    if (Array.isArray(items)) {
+      const qtyError = validateLineItemQuantities(items);
+      if (qtyError) {
+        return NextResponse.json({ error: qtyError }, { status: 400 });
+      }
+    }
 
     let totalSum = 0;
 

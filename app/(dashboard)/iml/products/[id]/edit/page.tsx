@@ -12,6 +12,12 @@ import ProductFormSections, {
   type CustomerOption,
 } from "../../_components/ProductFormSections";
 import type { ProductColorRow } from "../../_components/ProductPantoneEditor";
+import {
+  cmykFlagsFromProduct,
+  cmykFlagsToDb,
+  defaultProductCmykFlags,
+  type ProductCmykFlags,
+} from "@/lib/iml-print-colors-summary";
 import { parseProductFormatToMm } from "@/lib/iml/product-format";
 
 type ProductColorResp = {
@@ -40,6 +46,7 @@ export default function ImlProductEditPage() {
   const [form, setForm] = useState<ProductFormState>(emptyProductForm);
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
   const [colors, setColors] = useState<ProductColorRow[]>([]);
+  const [cmykFlags, setCmykFlags] = useState<ProductCmykFlags>(defaultProductCmykFlags);
   const [hasImage, setHasImage] = useState(false);
   const [hasPdf, setHasPdf] = useState(false);
 
@@ -124,6 +131,14 @@ export default function ImlProductEditPage() {
             }));
             setColors(rows);
           }
+          setCmykFlags(
+            cmykFlagsFromProduct({
+              cmyk_c_enabled: p.cmyk_c_enabled as boolean | undefined,
+              cmyk_m_enabled: p.cmyk_m_enabled as boolean | undefined,
+              cmyk_y_enabled: p.cmyk_y_enabled as boolean | undefined,
+              cmyk_k_enabled: p.cmyk_k_enabled as boolean | undefined,
+            })
+          );
           if (p.custom_data && typeof p.custom_data === "object") {
             const cd = p.custom_data as Record<string, unknown>;
             const init: Record<string, string | number | boolean> = {};
@@ -180,6 +195,7 @@ export default function ImlProductEditPage() {
           pieces_per_pallet: form.pieces_per_pallet ? parseInt(form.pieces_per_pallet, 10) : null,
           stock_quantity: form.stock_quantity ? parseInt(form.stock_quantity, 10) : null,
           custom_data: Object.keys(customData).length > 0 ? customData : null,
+          ...cmykFlagsToDb(cmykFlags),
           colors: colors
             .filter(
               (c) =>
@@ -254,6 +270,8 @@ export default function ImlProductEditPage() {
             customers={customers}
             colors={colors}
             onColorsChange={setColors}
+            cmykFlags={cmykFlags}
+            onCmykChange={setCmykFlags}
           />
 
           <CustomFieldsFormSection

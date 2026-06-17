@@ -518,7 +518,11 @@ export default function ImlProductsImportPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Import produktů (složka / ZIP)</h1>
           <p className="mt-1 text-gray-600">
-            Složka z IMLEXportu (doporučeno) nebo ZIP: products.csv, tisková data a náhledy
+            Složka z IMLEXportu (doporučeno) nebo ZIP: products.csv, tisková data a náhledy.
+            Kódy produktů: formát <code className="rounded bg-gray-100 px-1">NN-NN-NNN</code> nebo
+            6místné (<code className="rounded bg-gray-100 px-1">498056</code>). CSV s oddělovačem{" "}
+            <code className="rounded bg-gray-100 px-1">,</code> nebo{" "}
+            <code className="rounded bg-gray-100 px-1">;</code>.
           </p>
         </div>
         <Link
@@ -855,7 +859,9 @@ function MappingPanel({
         <h3 className="mb-2 text-sm font-semibold text-gray-700">Mapování sloupců CSV</h3>
         <p className="mb-4 text-xs text-gray-500">
           Sloupec <code className="rounded bg-gray-100 px-1">code</code> z IMLEXportu se mapuje na
-          Kód IG. Povinné: alespoň Kód IG, Název u klienta nebo Zkrácený název.
+          Kód IG (podporováno <code className="rounded bg-gray-100 px-1">06-02-001</code> i{" "}
+          <code className="rounded bg-gray-100 px-1">498056</code>). Povinné: alespoň Kód IG,
+          Název u klienta nebo Zkrácený název.
         </p>
         <div className="grid gap-6 lg:grid-cols-2">
           <div>

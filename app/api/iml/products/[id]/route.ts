@@ -11,6 +11,8 @@ import {
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
 import { parseImlProductBodyForSave } from "@/lib/iml/parse-product-body";
+import { applyPrintColorsSummaryOnSave } from "@/lib/iml-product-save-colors";
+import { toImlProductUpdateData } from "@/lib/iml/product-prisma-payload";
 
 export async function GET(
   _req: NextRequest,
@@ -113,9 +115,6 @@ export async function PUT(
       }
     }
 
-    const customDataForPrisma = data.custom_data;
-    const updatePayload = { ...data, custom_data: customDataForPrisma, last_edited_by: editorName };
-
     const incomingColors = Array.isArray(body.colors)
       ? (body.colors as IncomingProductColor[])
       : null;
@@ -129,10 +128,33 @@ export async function PUT(
       );
     }
 
+    applyPrintColorsSummaryOnSave(
+      data,
+      body as Record<string, unknown>,
+      colorsValidation?.ok ? colorsValidation.prepared : null
+    );
+
+    const customDataForPrisma = data.custom_data;
+    const updatePayload = toImlProductUpdateData(
+      {
+        ...data,
+        custom_data: customDataForPrisma,
+        last_edited_by: editorName,
+      },
+      {
+        customer_id: existing.customer_id,
+        foil_id: existing.foil_id,
+        foil_material_id: existing.foil_material_id,
+        color_material_id: existing.color_material_id,
+        paper_material_id: existing.paper_material_id,
+        lacquer_material_id: existing.lacquer_material_id,
+      }
+    );
+
     await prisma.$transaction(async (tx) => {
       await tx.iml_products.update({
         where: { id },
-        data: updatePayload as Parameters<typeof tx.iml_products.update>[0]["data"],
+        data: updatePayload,
       });
       if (colorsValidation && colorsValidation.ok) {
         const res = await replaceProductColorsInTx(tx, id, colorsValidation.prepared, true);

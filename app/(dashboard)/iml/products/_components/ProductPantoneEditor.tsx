@@ -55,7 +55,18 @@ export default function ProductPantoneEditor({ colors, onChange, labelsPerSheet 
     try {
       const r = await fetch("/api/iml/pantone-colors");
       const data = await r.json();
-      setCatalog(data.colors ?? []);
+      const raw = (data.colors ?? data.pantone_colors ?? []) as Array<
+        PantoneCatalogItem & { hex_color?: string | null }
+      >;
+      setCatalog(
+        raw.map((item) => ({
+          id: item.id,
+          code: item.code,
+          name: item.name,
+          hex: item.hex ?? item.hex_color ?? null,
+          is_active: item.is_active,
+        }))
+      );
     } catch {
       // tichý fail – uživatel stále může psát ručně a onBlur/validate to zachytí
     } finally {

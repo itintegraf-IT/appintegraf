@@ -9,6 +9,18 @@ import {
 /** Kód produktu ve stylu IMLEXport: 04-03-002 */
 export const PRODUCT_CODE_REGEX = /^(\d{2}-\d{2}-\d{3})/i;
 
+/** Kód produktu ve stylu Alimpex: 499073 (6 číslic na začátku názvu) */
+export const PRODUCT_CODE_SIX_DIGIT_REGEX = /^(\d{6})(?:[-_.]|$)/;
+
+/** Extrahuje kód z názvu souboru bez přípony (NN-NN-NNN nebo 6 číslic). */
+export function extractProductCodeFromBasename(baseNoExt: string): string | null {
+  const dashed = baseNoExt.match(PRODUCT_CODE_REGEX);
+  if (dashed) return dashed[1].toUpperCase();
+  const sixDigit = baseNoExt.match(PRODUCT_CODE_SIX_DIGIT_REGEX);
+  if (sixDigit) return sixDigit[1].toUpperCase();
+  return null;
+}
+
 export type ZipFileKind = "print" | "preview" | "unknown";
 
 export type ClassifiedZipFile = {
@@ -74,16 +86,40 @@ export function extractProductCodeFromFilename(basename: string): {
 
   if (/^softproof[-_]/.test(baseNoExt) || baseNoExt.startsWith("softproof")) {
     const after = baseNoExt.replace(/^softproof[-_]?/i, "");
-    const m = after.match(PRODUCT_CODE_REGEX);
-    return { kind: "preview", code: m ? m[1].toUpperCase() : null };
+    const code = extractProductCodeFromBasename(after);
+    return { kind: "preview", code };
   }
 
-  const m = baseNoExt.match(PRODUCT_CODE_REGEX);
-  if (m) {
-    return { kind: "print", code: m[1].toUpperCase() };
+  const code = extractProductCodeFromBasename(baseNoExt);
+  if (code) {
+    return { kind: "print", code };
   }
 
   return { kind: "unknown", code: null };
+}
+
+/** Softproof s placeholder kódem (0x-0x-00x) zdědí kód z tiskového PDF ve stejné složce. */
+export function resolvePreviewCodesFromSiblings(
+  files: ClassifiedZipFile[]
+): ClassifiedZipFile[] {
+  const byDir = new Map<string, ClassifiedZipFile[]>();
+  for (const file of files) {
+    const slash = file.relativePath.lastIndexOf("/");
+    const dir = slash >= 0 ? file.relativePath.slice(0, slash) : "";
+    const bucket = byDir.get(dir) ?? [];
+    bucket.push(file);
+    byDir.set(dir, bucket);
+  }
+
+  return files.map((file) => {
+    if (file.productCode || file.kind !== "preview") return file;
+    const slash = file.relativePath.lastIndexOf("/");
+    const dir = slash >= 0 ? file.relativePath.slice(0, slash) : "";
+    const siblings = byDir.get(dir) ?? [];
+    const printSibling = siblings.find((s) => s.kind === "print" && s.productCode);
+    if (!printSibling?.productCode) return file;
+    return { ...file, productCode: printSibling.productCode };
+  });
 }
 
 export function classifyFile(relativePath: string): ClassifiedZipFile {
@@ -155,7 +191,7 @@ export function classifyMediaFromPaths(paths: string[]): ClassifiedZipFile[] {
     if (!MEDIA_EXT.has(ext)) continue;
     out.push(classifyFile(rel));
   }
-  return out;
+  return resolvePreviewCodesFromSiblings(out);
 }
 
 export async function walkMediaFiles(rootDir: string): Promise<ClassifiedZipFile[]> {
@@ -181,7 +217,7 @@ export async function walkMediaFiles(rootDir: string): Promise<ClassifiedZipFile
   }
 
   await walk(rootDir, "");
-  return out;
+  return resolvePreviewCodesFromSiblings(out);
 }
 
 export function summarizeFileIndex(

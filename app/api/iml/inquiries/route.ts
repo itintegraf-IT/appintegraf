@@ -4,6 +4,7 @@ import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { parseOrderCustomData } from "@/lib/iml-order-utils";
+import { validateLineItemQuantities } from "@/lib/iml-line-item-quantity";
 
 function genInquiryNumber(): string {
   const d = new Date();
@@ -100,6 +101,10 @@ export async function POST(req: NextRequest) {
     }
 
     const inquiryItems = Array.isArray(items) ? items : [];
+    const qtyError = validateLineItemQuantities(inquiryItems);
+    if (qtyError) {
+      return NextResponse.json({ error: qtyError }, { status: 400 });
+    }
 
     const inquiry = await prisma.$transaction(async (tx: PrismaTransactionClient) => {
       const created = await tx.iml_inquiries.create({

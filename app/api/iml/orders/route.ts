@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import { validateLineItemQuantities } from "@/lib/iml-line-item-quantity";
 import { hasImlSupervisorOverride } from "@/lib/iml-permissions";
 import { buildOrderListMeta } from "@/lib/iml-orders-list-meta";
 import {
@@ -148,6 +149,10 @@ export async function POST(req: NextRequest) {
     }
 
     const orderItemsRaw = Array.isArray(items) ? items : [];
+    const qtyError = validateLineItemQuantities(orderItemsRaw);
+    if (qtyError) {
+      return NextResponse.json({ error: qtyError }, { status: 400 });
+    }
     const itemsByProduct = new Map<number, { product_id: number; quantity: number; unit_price: number | null }>();
     for (const it of orderItemsRaw) {
       const productId = parseInt(it.product_id, 10);

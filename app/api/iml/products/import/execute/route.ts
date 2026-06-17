@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
     let result;
 
     if (sessionId) {
-      const stats = peekImportSession(sessionId, userId);
+      const stats = await peekImportSession(sessionId, userId);
       if (stats.fileCount === 0) {
         return NextResponse.json(
           {
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      const tempDir = takeImportSessionDir(sessionId, userId);
+      const tempDir = await takeImportSessionDir(sessionId, userId);
       try {
         result = await runProductImportExecuteOnDir(
           tempDir,
