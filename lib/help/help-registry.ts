@@ -77,7 +77,7 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     quickSteps: [
       "Z dashboardu se prokliknete do libovolného modulu pomocí dlaždic nebo levého menu.",
       "Pro vyhledávání napříč moduly použijte horní pole „Vyhledat…“.",
-      "Sledujte zvonek – červená tečka znamená novou notifikaci ke schválení/přečtení.",
+      "Sledujte zvonek – červený badge = nepřečtené notifikace, oranžový = události ke schválení v kalendáři.",
       "Pokud potřebujete pomoc v konkrétním modulu, otevřete tuto nápovědu na jeho stránce – obsah se přizpůsobí.",
       "Své údaje (jméno, e-mail, heslo) měníte v Profilu, vzhled a předvolby v Nastavení.",
     ],

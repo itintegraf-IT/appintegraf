@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { Bell } from "lucide-react";
+import { Bell, CalendarClock } from "lucide-react";
 
 type Notification = {
   id: number;
@@ -49,7 +49,6 @@ export function NotificationsDropdown() {
 
   const handleNotificationClick = (id: number) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-    setUnreadCount((prev) => Math.max(0, prev - 1));
     void markAsRead(id);
     setOpen(false);
   };
@@ -94,6 +93,12 @@ export function NotificationsDropdown() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const ariaParts: string[] = [];
+  if (unreadCount > 0) ariaParts.push(`${unreadCount} nepřečtených notifikací`);
+  if (pendingApprovalsCount > 0) {
+    ariaParts.push(`${pendingApprovalsCount} událostí ke schválení`);
+  }
+
   return (
     <div className="relative" ref={ref}>
       <button
@@ -101,7 +106,7 @@ export function NotificationsDropdown() {
         onClick={() => setOpen(!open)}
         className="relative rounded-lg p-2 hover:bg-[var(--accent)]"
         style={{ color: "var(--foreground)" }}
-        aria-label="Notifikace"
+        aria-label={ariaParts.length > 0 ? ariaParts.join(", ") : "Notifikace"}
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
@@ -110,6 +115,15 @@ export function NotificationsDropdown() {
             style={{ background: "var(--destructive)", color: "white" }}
           >
             {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
+        )}
+        {pendingApprovalsCount > 0 && (
+          <span
+            className="absolute bottom-0.5 left-0.5 flex h-4 w-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] font-medium"
+            style={{ background: "#d97706", color: "white" }}
+            title={`${pendingApprovalsCount} událostí ke schválení`}
+          >
+            {pendingApprovalsCount > 9 ? "9+" : pendingApprovalsCount}
           </span>
         )}
       </button>
@@ -130,22 +144,31 @@ export function NotificationsDropdown() {
               Notifikace
             </p>
           </div>
+
+          {pendingApprovalsCount > 0 && (
+            <Link
+              href="/"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm hover:bg-amber-100 dark:border-amber-900 dark:bg-amber-950/40 dark:hover:bg-amber-950/60"
+              style={{ color: "var(--foreground)" }}
+            >
+              <CalendarClock className="h-4 w-4 shrink-0 text-amber-600" aria-hidden />
+              <span>
+                <span className="font-medium">
+                  {pendingApprovalsCount === 1
+                    ? "1 událost ke schválení"
+                    : `${pendingApprovalsCount} událostí ke schválení`}
+                </span>
+                <span className="mt-0.5 block text-xs text-amber-800 dark:text-amber-200">
+                  Otevřít na dashboardu
+                </span>
+              </span>
+            </Link>
+          )}
+
           {notifications.length === 0 ? (
             <div className="px-4 py-6 text-center text-sm" style={{ color: "var(--muted-foreground)" }}>
-              {pendingApprovalsCount > 0 ? (
-                <>
-                  <p>Žádné systémové notifikace.</p>
-                  <Link
-                    href="/calendar?scope=mine"
-                    onClick={() => setOpen(false)}
-                    className="mt-2 inline-block text-xs font-medium text-blue-600 hover:text-blue-700"
-                  >
-                    Máte {pendingApprovalsCount} událostí ke schválení
-                  </Link>
-                </>
-              ) : (
-                "Žádné notifikace"
-              )}
+              {pendingApprovalsCount > 0 ? "Žádné další notifikace" : "Žádné notifikace"}
             </div>
           ) : (
             <div className="py-1">

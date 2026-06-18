@@ -46,11 +46,10 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  const unreadCount = unreadNotificationsCount + pendingApprovalsCount;
-
   return NextResponse.json({
     notifications,
-    unreadCount,
+    /** Badge zvonečku – pouze nepřečtené notifikace (schválení kalendáře zvlášť). */
+    unreadCount: unreadNotificationsCount,
     unreadNotificationsCount,
     pendingApprovalsCount,
   });
