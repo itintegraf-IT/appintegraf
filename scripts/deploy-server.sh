@@ -151,6 +151,17 @@ if [[ "$stitky_migrate_exit" -ne 0 ]]; then
   echo ""
 fi
 
+echo "==> SQL: IML CMYK přepínače (db:iml-cmyk-flags)"
+set +e
+npm run db:iml-cmyk-flags
+iml_cmyk_exit=$?
+set -e
+if [[ "$iml_cmyk_exit" -ne 0 ]]; then
+  echo "Upozornění: db:iml-cmyk-flags skončil s kódem $iml_cmyk_exit."
+  echo "  Na serveru spusťte ručně: npm run db:iml-cmyk-flags"
+  echo ""
+fi
+
 if [[ "$DO_PLANOVANI" -eq 1 ]]; then
   echo "==> SQL upgrade plánování (db:planovani-upgrade)"
   npm run db:planovani-upgrade
