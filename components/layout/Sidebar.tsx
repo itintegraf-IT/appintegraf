@@ -45,6 +45,7 @@ import {
   Printer,
   BriefcaseBusiness,
   Layers,
+  Tags,
 } from "lucide-react";
 import {
   Tooltip,
@@ -439,6 +440,7 @@ const navItems: NavItem[] = [
   },
   { href: "/calendar", icon: Calendar, label: "Kalendář", module: "calendar" },
   { href: "/ukoly", icon: ClipboardList, label: "Úkoly", module: "ukoly" },
+  { href: "/stitky", icon: Tags, label: "Štítky výroba", module: "stitky" },
   { href: "/makety", icon: Printer, label: "Makety a grafika", module: "makety" },
   { href: "/personalistika", icon: BriefcaseBusiness, label: "Personalistika", module: "personalistika" },
   { href: "/contracts", icon: FileText, label: "Evidence smluv", module: "contracts" },

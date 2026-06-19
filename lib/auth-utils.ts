@@ -6,6 +6,7 @@ import {
   roleHasMaketyZadavatelMaketaFromDecoded,
   roleMaketyGrantsModuleAccess,
 } from "@/lib/makety-module-access-flags";
+import { roleStitkyGrantsModuleAccess } from "@/lib/stitky-module-access-flags";
 
 export type ModuleAccess = "read" | "write" | "admin";
 
@@ -22,7 +23,7 @@ function parseModuleAccessJson(raw: string): unknown {
 /**
  * Načte role uživatele včetně module_access (user_roles nebo fallback na users.role_id)
  */
-async function getUserRoles(userId: number) {
+export async function getUserRoles(userId: number) {
   const userRoles = await prisma.user_roles.findMany({
     where: { user_id: userId },
     include: { roles: true },
@@ -102,6 +103,7 @@ export async function hasModuleAccess(
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
       const record = decoded as Record<string, unknown>;
       if (module === "makety" && roleMaketyGrantsModuleAccess(record, access)) return true;
+      if (module === "stitky" && roleStitkyGrantsModuleAccess(record, access)) return true;
 
       const perm = record[module];
       if (perm === true) return true;
@@ -357,6 +359,7 @@ export async function getLayoutAccess(userId: number): Promise<{
   makety: boolean;
   personalistika: boolean;
   materialy: boolean;
+  stitky: boolean;
 }> {
   const roles = await getUserRoles(userId);
   type RoleItem = (typeof roles)[number];
@@ -366,6 +369,10 @@ export async function getLayoutAccess(userId: number): Promise<{
     if (admin) return true;
     if (module === "makety" && (await hasMaketyVyrobaAccess(userId))) return true;
     if (module === "makety" && (await hasMaketyGrafikaAccess(userId))) return true;
+    if (module === "stitky") {
+      const { canReadStitky } = await import("@/lib/stitky/access");
+      return canReadStitky(userId);
+    }
     return hasModuleAccessFromRoles(roles, module, "read");
   };
 
@@ -383,6 +390,7 @@ export async function getLayoutAccess(userId: number): Promise<{
     makety,
     personalistika,
     materialy,
+    stitky,
   ] = await Promise.all([
     checkModule("contacts"),
     checkModule("equipment"),
@@ -397,6 +405,7 @@ export async function getLayoutAccess(userId: number): Promise<{
     checkModule("makety"),
     checkModule("personalistika"),
     checkModule("materialy"),
+    checkModule("stitky"),
   ]);
 
   return {
@@ -414,6 +423,7 @@ export async function getLayoutAccess(userId: number): Promise<{
     makety,
     personalistika,
     materialy,
+    stitky,
   };
 }
 
@@ -436,6 +446,7 @@ function hasModuleAccessFromRoles(
     if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
       const record = decoded as Record<string, unknown>;
       if (module === "makety" && roleMaketyGrantsModuleAccess(record, access)) return true;
+      if (module === "stitky" && roleStitkyGrantsModuleAccess(record, access)) return true;
 
       const perm = record[module];
       if (perm === true) return true;

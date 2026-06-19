@@ -939,6 +939,9 @@ model users {
   makety_created                                                 makety[]                      @relation("makety_creator")
   makety_quotes_submitted                                        makety[]                      @relation("makety_quote_submitter")
   makety_comments_authored                                       makety_comments[]             @relation("makety_comments_author")
+  stitky_orders_created                                          stitky_orders[]               @relation("stitky_orders_creator")
+  stitky_orders_changed                                          stitky_orders[]               @relation("stitky_orders_changed")
+  stitky_user_roles                                              stitky_user_roles[]
   notifications                                                  notifications[]
   iml_product_files_uploaded                                     iml_product_files[]           @relation("iml_product_files_uploader")
   roles                                                          roles?                        @relation(fields: [role_id], references: [id], onUpdate: NoAction, map: "fk_users_role")
@@ -1658,4 +1661,70 @@ model rate_limit_hits {
 
   @@unique([key, window_start], map: "uq_rate_limit_key_window")
   @@index([window_start], map: "idx_rate_limit_window")
+}
+
+model stitky_templates {
+  key           String         @id @db.VarChar(50)
+  sheet_key     String         @db.VarChar(50)
+  row_start     Int            @default(2)
+  row_step      Int            @default(7)
+  row_end       Int            @default(49)
+  col_start     Int            @default(1)
+  col_step      Int            @default(4)
+  col_end       Int            @default(6)
+  layout_status String         @default("ready") @db.VarChar(20)
+  component_key String         @default("standard") @db.VarChar(50)
+  sort_order    Int            @default(0)
+  stitky_orders stitky_orders[]
+}
+
+model stitky_orders {
+  id              Int                 @id @default(autoincrement())
+  order_number    String              @unique(map: "uq_stitky_order_number") @db.VarChar(50)
+  template_key    String              @db.VarChar(50)
+  status          String              @default("DRAFT") @db.VarChar(30)
+  notes           String?             @db.Text
+  created_by      Int
+  last_changed_by Int?
+  created_at      DateTime            @default(now()) @db.Timestamp(0)
+  updated_at      DateTime            @default(now()) @updatedAt @db.Timestamp(0)
+  rows            stitky_label_rows[]
+  template        stitky_templates    @relation(fields: [template_key], references: [key], onUpdate: Cascade)
+  users_creator   users               @relation("stitky_orders_creator", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stitky_orders_creator_fk")
+  users_changed   users?              @relation("stitky_orders_changed", fields: [last_changed_by], references: [id], onUpdate: NoAction, map: "stitky_orders_changed_fk")
+
+  @@index([status], map: "idx_stitky_orders_status")
+  @@index([created_by], map: "idx_stitky_orders_created_by")
+  @@index([template_key], map: "idx_stitky_orders_template")
+}
+
+model stitky_label_rows {
+  id           Int           @id @default(autoincrement())
+  order_id     Int
+  row_index    Int           @db.TinyInt
+  quantity     Int?
+  pack_size    Int?
+  text1        String?       @db.VarChar(500)
+  text2        String?       @db.VarChar(500)
+  text3        String?       @db.VarChar(500)
+  prefix       String?       @db.VarChar(50)
+  range_from   String?       @db.VarChar(20)
+  range_to     String?       @db.VarChar(20)
+  barcode_type String?       @db.VarChar(50)
+  order        stitky_orders @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stitky_label_rows_order_fk")
+
+  @@unique([order_id, row_index], map: "uq_stitky_row_order_index")
+}
+
+model stitky_user_roles {
+  user_id Int
+  role    String @db.VarChar(20)
+  users   users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stitky_user_roles_user_fk")
+
+  @@id([user_id, role])
+}
+
+model stitky_settings {
+  key   String @id @db.VarChar(50)
+  value String @db.Text
 }

@@ -215,6 +215,11 @@ export async function POST(req: NextRequest) {
       // ignore
     }
 
+    if (!isAdminRole) {
+      const { syncStitkyUserRolesFromModuleAccess } = await import("@/lib/stitky/sync-user-roles");
+      await syncStitkyUserRolesFromModuleAccess(user.id, module_access as Record<string, string>);
+    }
+
     let activationEmailed: boolean | null = null;
     if (useActivation) {
       try {

@@ -27,6 +27,7 @@
     "db:makety-work-type": "node scripts/run-makety-work-type-migration.mjs",
     "db:makety-queue": "node scripts/run-makety-queue-migration.mjs",
     "db:makety-quote": "node scripts/run-makety-quote-migration.mjs",
+    "db:stitky-migrate": "node scripts/run-stitky-migration.mjs",
     "iml:backfill-thumbnails": "node scripts/iml-backfill-product-thumbnails.mjs",
     "verify:canvas": "node scripts/verify-canvas.mjs"
   },
@@ -49,6 +50,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "archiver": "^8.0.0",
     "bcryptjs": "^3.0.3",
+    "bwip-js": "^4.11.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

@@ -140,6 +140,17 @@ if [[ "$makety_migrate_exit" -ne 0 || "$makety_work_type_exit" -ne 0 || "$makety
   echo ""
 fi
 
+echo "==> SQL: modul Štítky (db:stitky-migrate)"
+set +e
+npm run db:stitky-migrate
+stitky_migrate_exit=$?
+set -e
+if [[ "$stitky_migrate_exit" -ne 0 ]]; then
+  echo "Upozornění: db:stitky-migrate skončil s kódem $stitky_migrate_exit."
+  echo "  Na serveru spusťte ručně: npm run db:stitky-migrate"
+  echo ""
+fi
+
 if [[ "$DO_PLANOVANI" -eq 1 ]]; then
   echo "==> SQL upgrade plánování (db:planovani-upgrade)"
   npm run db:planovani-upgrade
