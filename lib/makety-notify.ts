@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { sendMaketaEmail } from "@/lib/email";
 import { collectMaketaNotifyUserIds } from "@/lib/makety-recipients";
 
 export type MaketaNotifyKind =
@@ -9,6 +10,36 @@ export type MaketaNotifyKind =
   | "quote_submitted"
   | "quote_approved"
   | "quote_rejected";
+
+type UserEmailRow = {
+  email: string | null;
+  first_name: string;
+  last_name: string;
+};
+
+async function sendMaketaEmailsToUsers(
+  users: UserEmailRow[],
+  params: {
+    subject: string;
+    intro: string;
+    bodyPreview: string;
+    orderNumber: string | null;
+    maketaId: number;
+  }
+): Promise<void> {
+  for (const u of users) {
+    if (!u.email) continue;
+    await sendMaketaEmail({
+      toEmail: u.email,
+      toName: `${u.first_name} ${u.last_name}`.trim() || "Uživateli",
+      subject: params.subject,
+      intro: params.intro,
+      bodyPreview: params.bodyPreview,
+      orderNumber: params.orderNumber,
+      maketaId: params.maketaId,
+    });
+  }
+}
 
 async function notifyMaketaUser(
   userId: number,
@@ -62,18 +93,33 @@ export async function notifyMaketaRecipients(params: {
   };
 
   const type = `makety_${params.kind}`;
+  const title = titleByKind[params.kind];
+  const intro = messageByKind[params.kind];
 
   for (const uid of ids) {
     await prisma.notifications.create({
       data: {
         user_id: uid,
-        title: titleByKind[params.kind],
-        message: `${messageByKind[params.kind]} ${params.bodyPreview.slice(0, 200)}`,
+        title,
+        message: `${intro} ${params.bodyPreview.slice(0, 200)}`,
         type,
         link: linkPath,
       },
     });
   }
+
+  const users = await prisma.users.findMany({
+    where: { id: { in: ids } },
+    select: { email: true, first_name: true, last_name: true },
+  });
+
+  await sendMaketaEmailsToUsers(users, {
+    subject: `${title} – INTEGRAF`,
+    intro,
+    bodyPreview: params.bodyPreview,
+    orderNumber: params.orderNumber,
+    maketaId: params.maketaId,
+  });
 }
 
 export async function notifyMaketaCreator(params: {
@@ -82,12 +128,30 @@ export async function notifyMaketaCreator(params: {
   title: string;
   message: string;
   type: string;
+  orderNumber?: string | null;
+  bodyPreview?: string;
 }): Promise<void> {
   await notifyMaketaUser(params.creatorUserId, {
     maketaId: params.maketaId,
     title: params.title,
     message: params.message,
     type: params.type,
+  });
+
+  const creator = await prisma.users.findUnique({
+    where: { id: params.creatorUserId },
+    select: { email: true, first_name: true, last_name: true },
+  });
+  if (!creator?.email || params.bodyPreview === undefined) return;
+
+  await sendMaketaEmail({
+    toEmail: creator.email,
+    toName: `${creator.first_name} ${creator.last_name}`.trim() || "Uživateli",
+    subject: `${params.title} – INTEGRAF`,
+    intro: params.message,
+    bodyPreview: params.bodyPreview,
+    orderNumber: params.orderNumber ?? null,
+    maketaId: params.maketaId,
   });
 }
 
@@ -97,12 +161,15 @@ export async function notifyMaketaQuoteSubmitted(params: {
   orderNumber: string | null;
   bodyPreview: string;
 }): Promise<void> {
+  const intro = `Výrobce odeslal cenu a popis výroby${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`;
   await notifyMaketaCreator({
     maketaId: params.maketaId,
     creatorUserId: params.creatorUserId,
     title: "Nabídka k maketě",
-    message: `Výrobce odeslal cenu a popis výroby${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}. ${params.bodyPreview.slice(0, 150)}`,
+    message: `${intro} ${params.bodyPreview.slice(0, 150)}`,
     type: "makety_quote_submitted",
+    orderNumber: params.orderNumber,
+    bodyPreview: params.bodyPreview,
   });
 }
 
@@ -120,15 +187,31 @@ export async function notifyMaketaDone(params: {
     select: { first_name: true, last_name: true },
   });
   const doneByName = doneBy ? `${doneBy.first_name} ${doneBy.last_name}`.trim() : "Uživatel";
-  const message = `${doneByName} označil/a maketu jako hotovou${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`;
+  const intro = `${doneByName} označil/a maketu jako hotovou${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`;
 
   await prisma.notifications.create({
     data: {
       user_id: params.creatorUserId,
       title: "Maketa dokončena",
-      message,
+      message: intro,
       type: "makety_done",
       link: `/makety/${params.maketaId}`,
     },
+  });
+
+  const creator = await prisma.users.findUnique({
+    where: { id: params.creatorUserId },
+    select: { email: true, first_name: true, last_name: true },
+  });
+  if (!creator?.email) return;
+
+  await sendMaketaEmail({
+    toEmail: creator.email,
+    toName: `${creator.first_name} ${creator.last_name}`.trim() || "Uživateli",
+    subject: "Maketa dokončena – INTEGRAF",
+    intro,
+    bodyPreview: params.bodyPreview,
+    orderNumber: params.orderNumber,
+    maketaId: params.maketaId,
   });
 }
