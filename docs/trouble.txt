@@ -1,0 +1,389 @@
+================================================================
+IT HELPDESK – ZNALOSTNÍ BÁZE
+Časté problémy a jejich řešení pro firemní uživatele
+================================================================
+
+
+KATEGORIE: WINDOWS 11 / FIREMNÍ PC / NOTEBOOK
+----------------------------------------------------------------
+
+PROBLÉM: Počítač je pomalý nebo zamrzá
+MOŽNÉ PŘÍČINY: Příliš mnoho spuštěných aplikací, plný disk, aktualizace nebo antivir na pozadí,
+               firemní agenti (monitoring, backup).
+ŘEŠENÍ:
+  1. Restartuj počítač.
+  2. Ctrl + Shift + Esc → Správce úloh → záložka Procesy → ukonči zbytečné procesy.
+  3. Zkontroluj volné místo na disku C: (mělo by být alespoň 10 % kapacity).
+  4. Spusť Windows Update a nainstaluj čekající aktualizace.
+  5. Pokud VPN zpomaluje práci, odhlás se při místní práci.
+  6. Pokud na pozadí běží neznámé procesy, kontaktuj IT.
+TIP: Počítač nikdy nevypínej přes tlačítko – vždy používej Start → Vypnout.
+
+PROBLÉM: Nelze se přihlásit do Windows / firemní domény
+MOŽNÉ PŘÍČINY: Špatné heslo, zapnutý Caps Lock / Num Lock, problém s doménou, vypršení hesla.
+ŘEŠENÍ:
+  1. Zkontroluj jazyk klávesnice a stav Caps Lock / Num Lock.
+  2. Ověř formát přihlášení: DOMENA\uzivatel nebo uzivatel@firma.cz.
+  3. Ujisti se, že jsi připojen k síti (LAN / VPN) – domény nelze ověřit offline.
+  4. Restartuj počítač.
+  5. Kontaktuj IT – účet může být zablokován po více špatných pokusech.
+
+PROBLÉM: Zablokovaný účet Active Directory (AD)
+MOŽNÉ PŘÍČINY: Opakované chybné heslo, vypršení platnosti hesla.
+ŘEŠENÍ:
+  1. Počkej dle firemní politiky (obvykle 15–30 minut) a zkus znovu.
+  2. Použij self-service portál pro reset hesla (pokud je k dispozici).
+  3. Kontaktuj IT pro okamžité odblokování.
+TIP: Firemní heslo nelze resetovat svépomocí bez self-service portálu – vždy kontaktuj IT.
+
+PROBLÉM: Obrazovka je černá / monitor nic nezobrazuje
+ŘEŠENÍ:
+  1. Zkontroluj, zda je monitor zapnutý (kontrolka svítí).
+  2. Zkontroluj, zda jsou kabely (HDMI / DisplayPort / napájení) pevně zastrčeny.
+  3. Zkus stisknout klávesu nebo pohnout myší – počítač může být v režimu spánku.
+  4. Pokud je více monitorů, stiskni Win + P a vyber správný režim zobrazení.
+  5. Tvrdý restart: podrž tlačítko napájení 5 sekund, pak znovu zapni.
+
+PROBLÉM: Program nereaguje / zasekl se
+ŘEŠENÍ:
+  1. Vyčkej 1–2 minuty – program se může jen načítat.
+  2. Ctrl + Shift + Esc → Správce úloh → najdi program (zobrazí se „Neodpovídá") → Ukončit úlohu.
+  3. Program znovu otevři.
+  4. Pokud problém přetrvává opakovaně, kontaktuj IT.
+TIP: Nestiskej Ctrl+Alt+Del opakovaně – počítač to nezrychlí.
+
+PROBLÉM: Nefungují firemní aplikace (ERP, CRM, interní systémy)
+ŘEŠENÍ:
+  1. Zkontroluj, zda jsi připojen k VPN.
+  2. Restartuj aplikaci.
+  3. Odhlás se a znovu přihlas.
+  4. Vymaž cache prohlížeče (pokud jde o webovou aplikaci): Ctrl + Shift + Delete.
+  5. Zkontroluj, zda je server dostupný – zeptej se kolegy, zda mu aplikace funguje.
+  6. Kontaktuj IT s popisem chybové hlášky.
+
+PROBLÉM: Problém s aktualizacemi Windows (WSUS / Intune)
+PŘÍZNAKY: Čekající aktualizace se nespustí, chybová hláška při aktualizaci.
+ŘEŠENÍ:
+  1. Restartuj počítač – většina aktualizací se dokončí po restartu.
+  2. Připoj se k VPN – firemní aktualizace se stahují ze serverů dostupných přes VPN.
+  3. Nastavení → Windows Update → Vyhledat aktualizace.
+  4. Pokud chyba přetrvává, kontaktuj IT (může jít o problém s firemní politikou).
+
+PROBLÉM: USB klíčenka / zařízení není rozpoznáno
+ŘEŠENÍ:
+  1. Zkus zapojit do jiného USB portu (zkus i port vzadu na počítači).
+  2. Bezpečně odstraň zařízení (ikona v systémové liště) a znovu zapoj.
+  3. Zkontroluj, zda zařízení funguje na jiném počítači.
+  4. U firemního šifrovaného USB zkontroluj, zda máš nainstalovaný správný software
+     (BitLocker To Go nebo VeraCrypt).
+
+PROBLÉM: Nefunguje zvuk / mikrofon
+ŘEŠENÍ:
+  1. Zkontroluj, zda není zvuk ztlumený (ikona reproduktoru v pravém dolním rohu).
+  2. Klikni pravým na ikonu reproduktoru → Nastavení zvuku → zkontroluj výstupní zařízení.
+  3. Zkus odpojit a znovu zapojit sluchátka / headset.
+  4. Restartuj počítač.
+  5. Pro mikrofon: Nastavení → Soukromí a zabezpečení → Mikrofon → ověř přístup aplikací.
+  6. Pokud problém přetrvává: klikni pravým na ikonu zvuku → Poradce při potížích.
+
+PROBLÉM: Microsoft Teams nefunguje / padá / nejde spustit
+ŘEŠENÍ:
+  1. Zavři Teams úplně: klikni pravým na ikonu Teams v systémové liště → Ukončit.
+  2. Spusť Teams znovu.
+  3. Pokud nereaguje: Správce úloh → najdi všechny procesy „Teams" → Ukončit úlohu.
+  4. Vymaž cache: Win + R → %appdata%\Microsoft\Teams → smaž obsah složky Cache a tmp.
+  5. Restartuj počítač.
+  6. Pokud problém přetrvává, přeinstaluj Teams: Nastavení → Aplikace → Microsoft Teams →
+     Odinstalovat, pak znovu nainstaluj.
+TIP: Webová verze teams.microsoft.com funguje jako záloha, pokud desktopová aplikace selhává.
+
+PROBLÉM: OneDrive nesynchronizuje soubory
+ŘEŠENÍ:
+  1. Zkontroluj ikonu OneDrive v systémové liště – červený křížek nebo žlutý vykřičník = chyba.
+  2. Klikni na ikonu OneDrive → zobrazí se popis chyby a možnost opravy.
+  3. Zkontroluj, zda máš dostatek místa v OneDrive (ikona → Nastavení → záložka Účet).
+  4. Pozastavení a obnovení synchronizace: ikona OneDrive → Pozastavit → Obnovit.
+  5. Restart OneDrive: klikni pravým na ikonu → Ukončit OneDrive, pak spusť přes Start.
+TIP: Soubory s názvy obsahujícími znaky < > : " / \ | ? * OneDrive nesynchronizuje –
+     přejmenuj je.
+
+PROBLÉM: Outlook nefunguje / e-maily se neposílají nebo nepřicházejí
+ŘEŠENÍ:
+  1. Zkontroluj připojení v pravém dolním rohu Outlooku: „Připojeno k: Microsoft Exchange".
+  2. Zavři a znovu spusť Outlook.
+  3. Zkontroluj složku Pošta k odeslání – uvízlé e-maily blokují ostatní odesílání.
+  4. Oprava profilu: Soubor → Informace o účtu → Nastavení účtu → vyber účet → Opravit.
+  5. Restartuj počítač.
+TIP: Pokud Outlook hlásí „Potřebujete heslo", kontaktuj IT – pravděpodobně vypršelo heslo
+     nebo se změnilo MFA.
+
+PROBLÉM: Nelze otevřít soubor
+MOŽNÉ PŘÍČINY: Chybí aplikace pro daný formát, poškozený soubor, chybí přístupová práva.
+ŘEŠENÍ:
+  1. Zkontroluj příponu souboru (.pdf, .docx, .xlsx…) a zda máš nainstalovanou správnou aplikaci.
+  2. Zkus soubor otevřít pravým klikem → Otevřít pomocí → vyber aplikaci.
+  3. Pokud jde o soubor ze sdíleného disku, ověř, zda máš k němu přístupová práva.
+  4. Kontaktuj IT pro přidělení přístupu nebo instalaci aplikace.
+
+PROBLÉM: Podezření na virus / malware
+PŘÍZNAKY: Pomalý PC, vyskakovací okna, neznámé programy, podezřelé chování.
+ŘEŠENÍ:
+  1. Neotevírej žádné přílohy ani neznámé odkazy.
+  2. Spusť firemní antivir nebo Windows Defender: Start → Zabezpečení systému Windows →
+     Ochrana před viry → Úplná kontrola.
+  3. Okamžitě kontaktuj IT – nepokoušej se problém řešit sám.
+  4. Neinstaluj žádné aplikace bez souhlasu IT.
+
+
+KATEGORIE: SÍŤ / VPN / INFRASTRUKTURA
+----------------------------------------------------------------
+
+PROBLÉM: Nefunguje internet / připojení k síti
+ŘEŠENÍ:
+  1. Zkontroluj, zda svítí kontrolka na LAN kabelu nebo Wi-Fi ikona v systémové liště.
+  2. Zkus otevřít intranet nebo interní systém – pokud funguje, jde jen o výpadek internetu.
+  3. Restartuj síťový adaptér: Nastavení → Síť a Internet → Rozšířená nastavení sítě →
+     Zakázat / Povolit adaptér.
+  4. Zkontroluj, zda mají problém i kolegové – může jít o výpadek celé sítě.
+  5. V případě přetrvávání: Příkazový řádek (cmd) jako správce →
+       ipconfig /release
+       ipconfig /renew
+  6. Kontaktuj IT.
+TIP: Nikdy nerestartuj firemní router nebo switch bez souhlasu IT.
+
+PROBLÉM: Nelze se připojit k VPN
+ŘEŠENÍ:
+  1. Zkontroluj, zda máš funkční internetové připojení.
+  2. Ověř přihlašovací jméno a heslo – VPN může mít jiné heslo než Windows.
+  3. Zkontroluj MFA – potvrzení v aplikaci Microsoft Authenticator nebo SMS.
+  4. Zavři VPN klienta a spusť jako správce (pravým → Spustit jako správce).
+  5. Zkontroluj, zda nevypršelo heslo k firemnímu účtu.
+  6. Restartuj počítač a zkus znovu.
+  7. Kontaktuj IT se screenshotem nebo popisem chybové hlášky.
+
+PROBLÉM: Pomalu se načítají stránky / pomalé připojení
+ŘEŠENÍ:
+  1. Restartuj router (pokud je to firemní router, kontaktuj IT).
+  2. Zkontroluj, zda někdo na síti nestahuje velké soubory (stream, zálohy).
+  3. Zkus změnit DNS na zařízení:
+       Preferovaný DNS: 8.8.8.8
+       Alternativní DNS: 1.1.1.1
+  4. Zkontroluj, zda VPN nezpomaluje připojení – zkus bez VPN (pokud to firemní politika povoluje).
+
+PROBLÉM: Nelze přistupovat ke sdílenému disku / složce
+ŘEŠENÍ:
+  1. Ověř, zda jsi připojen k VPN nebo firemní síti.
+  2. Zkus přejít přímo: Win + R → zadej \\nazev-serveru\slozka.
+  3. Odhlás se a znovu přihlas – může jít o problém s obnovením přihlašovacích údajů.
+  4. Pokud disk chybí v Průzkumníku, kontaktuj IT – může být nutné disk znovu namapovat.
+  5. Pokud dostáváš „Přístup odepřen", požádej IT nebo nadřízeného o přidělení oprávnění.
+
+PROBLÉM: Internet funguje, ale firemní služby jsou nedostupné
+MOŽNÁ PŘÍČINA: Nejsi připojen k VPN.
+ŘEŠENÍ:
+  1. Připoj se k VPN.
+  2. Restartuj aplikaci.
+  3. Pokud stále nefunguje, kontaktuj IT.
+
+PROBLÉM: Problémy s Wi-Fi ve firmě
+ŘEŠENÍ:
+  1. Ujisti se, že se připojeješ ke správné síti (Corp / firemní, nikoliv Guest).
+  2. Zapomenuté a znovu přidané připojení: klikni na síť → Zapomenout → připoj se znovu.
+  3. Pokud síť vyžaduje certifikát nebo firemní přihlášení (RADIUS / 802.1X), kontaktuj IT.
+  4. Restartuj Wi-Fi adaptér.
+
+
+KATEGORIE: TISKÁRNY
+----------------------------------------------------------------
+
+PROBLÉM: Tiskárna netiskne / tisková úloha uvízla
+ŘEŠENÍ:
+  1. Zkontroluj, zda je tiskárna zapnutá a bez chybového stavu (červená/blikající kontrolka).
+  2. Nastavení → Bluetooth a zařízení → Tiskárny → klikni na svou tiskárnu → Otevřít frontu tisku.
+  3. Ve frontě tisku zruš všechny úlohy (pravým → Zrušit).
+  4. Pokud fronta nejde vyčistit, restart služby:
+       Win + R → services.msc → Print Spooler → klikni pravým → Restartovat.
+  5. Restartuj tiskárnu (vypni a zapni).
+  6. Zkus odeslat tisk znovu.
+TIP: Pokud tiskárna říká „Offline", klikni pravým na tiskárnu v Nastavení a vyber
+     „Použít tiskárnu online".
+
+PROBLÉM: Tiskne se jiná tiskárna / špatná výchozí tiskárna
+ŘEŠENÍ:
+  1. Nastavení → Bluetooth a zařízení → Tiskárny → klikni na správnou tiskárnu →
+     Nastavit jako výchozí.
+  2. Při tisku zkontroluj výběr tiskárny v dialogu tisku.
+  3. Pokud se výchozí tiskárna neustále mění, kontaktuj IT (může to řídit firemní politika GPO).
+
+PROBLÉM: Tiskárna tiskne prázdné stránky nebo špatné barvy
+ŘEŠENÍ:
+  1. Zkontroluj hladinu inkoustu / toneru – v ovladači nebo na displeji tiskárny.
+  2. Spusť čištění tiskové hlavy (v nastavení tiskárny: Údržba → Čištění hlavy).
+  3. Proveď kalibraci tiskárny z ovladače.
+  4. Zkontroluj, zda je papír správný typ a formát.
+  5. Proveď testovací tisk přímo z ovladače tiskárny.
+
+PROBLÉM: Tiskárna není vidět / chybí v seznamu
+ŘEŠENÍ:
+  1. Zkontroluj síťové připojení tiskárny (kabel nebo Wi-Fi).
+  2. Ověř, zda jsi připojen k VPN (pokud pracuješ vzdáleně).
+  3. Nastavení → Přidat tiskárnu → vyhledej tiskárnu automaticky.
+  4. Kontaktuj IT – v doménové síti se tiskárny přidávají centrálně (GPO).
+
+PROBLÉM: Tiskárna vyžaduje PIN (Secure Print)
+ŘEŠENÍ:
+  1. Jdi fyzicky k tiskárně a na displeji zadej PIN, který sis nastavil při odesílání tisku.
+  2. Pokud PIN neznáš, znovu pošli tisk s novým PINem.
+  3. Kontaktuj IT, pokud nevíš, jak Secure Print nastavit.
+
+PROBLÉM: Zaseknutý papír v tiskárně
+ŘEŠENÍ:
+  1. Vypni tiskárnu a počkej 30 sekund.
+  2. Otevři všechna přístupová dvířka (vstup papíru, výstup, zadní kryt).
+  3. Vytahuj papír pomalu a rovnoměrně – nikdy netrhej, mohly by zůstat útržky.
+  4. Zkontroluj, zda v tiskárně nezůstaly žádné kousky papíru.
+  5. Zavři dvířka, zapni tiskárnu a zkus tisk znovu.
+TIP: Papír vkládej do zásobníku zarovnaný a nepřeplňuj zásobník nad značku maxima.
+
+
+KATEGORIE: MOBILNÍ ZAŘÍZENÍ – ANDROID
+----------------------------------------------------------------
+
+PROBLÉM: Telefon je pomalý
+ŘEŠENÍ:
+  1. Restartuj telefon.
+  2. Vymaž cache aplikací: Nastavení → Aplikace → vyber aplikaci → Úložiště → Vymazat mezipaměť.
+  3. Odinstaluj nepoužívané aplikace.
+  4. Zkontroluj aktualizace systému i aplikací.
+  5. Pokud je telefon firemní a problém přetrvává, kontaktuj IT.
+
+PROBLÉM: Nelze nainstalovat aplikaci (Google Play)
+ŘEŠENÍ:
+  1. Zkontroluj volné místo v telefonu: Nastavení → Úložiště.
+  2. Vymaž cache Google Play: Nastavení → Aplikace → Google Play → Úložiště → Vymazat mezipaměť.
+  3. Restartuj telefon a zkus znovu.
+  4. Firemní aplikace se instalují přes MDM portál – kontaktuj IT.
+
+PROBLÉM: Nelze přidat firemní e-mail (Outlook / Exchange)
+ŘEŠENÍ:
+  1. Zkontroluj internetové připojení.
+  2. Přihlas se firemním účtem (uzivatel@firma.cz).
+  3. Dokonči MFA ověření v aplikaci Microsoft Authenticator.
+  4. Zařízení musí být zaregistrováno v MDM (Intune) – kontaktuj IT.
+  5. Kontaktuj IT s popisem chybové hlášky.
+
+PROBLÉM: Telefon se zablokoval (MDM / firemní správa)
+ŘEŠENÍ:
+  1. Nevkládej PIN opakovaně – po určitém počtu pokusů se může zařízení továrně resetovat.
+  2. Kontaktuj IT okamžitě – správce může odemknout zařízení vzdáleně.
+  3. Pokud víš, že heslo je správné, počkej 30 minut a zkus znovu.
+TIP: Firemní telefony spravované MDM nesmí být resetovány bez vědomí IT – hrozí ztráta dat.
+
+PROBLÉM: Zařízení není compliant (MDM – Intune)
+PŘÍZNAKY: Blokovaný přístup do Outlooku, Teams nebo firemních aplikací.
+ŘEŠENÍ:
+  1. Aktualizuj operační systém Android na nejnovější dostupnou verzi.
+  2. Nastav PIN / heslo / biometrii (pokud není nastavena).
+  3. Zapni šifrování zařízení (Nastavení → Zabezpečení).
+  4. Kontaktuj IT pro kontrolu compliance politiky.
+
+PROBLÉM: Android se nepřipojí k firemní Wi-Fi
+ŘEŠENÍ:
+  1. Nastavení → Wi-Fi → podržení prstu na názvu sítě → Zapomenout síť.
+  2. Připoj se znovu a zadej přihlašovací údaje.
+  3. Pokud síť vyžaduje certifikát (EAP/802.1X), kontaktuj IT – certifikát se instaluje přes MDM.
+  4. Zkontroluj, zda je telefon zaregistrovaný v systému správy zařízení.
+
+
+KATEGORIE: MOBILNÍ ZAŘÍZENÍ – iPhone / iOS
+----------------------------------------------------------------
+
+PROBLÉM: Nefunguje firemní e-mail na iPhone
+ŘEŠENÍ:
+  1. Zkontroluj připojení k internetu (Wi-Fi nebo mobilní data).
+  2. Nastavení → Mail → Účty – ověř, zda je účet aktivní.
+  3. Zkus účet odebrat a znovu přidat:
+       Nastavení → Mail → Účty → Přidat účet → Microsoft Exchange nebo Outlook.
+  4. Dokonči MFA ověření v aplikaci Microsoft Authenticator.
+  5. Ověř u IT, zda je pro tvé zařízení povolen přístup (Exchange ActiveSync nebo Modern Auth).
+
+PROBLÉM: iPhone nejde aktualizovat nebo nelze nainstalovat aplikaci
+ŘEŠENÍ:
+  1. Zkontroluj volné místo: Nastavení → Obecné → Úložiště iPhone.
+  2. Připoj se k Wi-Fi – aktualizace přes mobilní data mohou být omezeny.
+  3. Restartuj iPhone a zkus znovu.
+  4. U firemních zařízení spravovaných MDM mohou být aktualizace a aplikace řízeny IT – kontaktuj je.
+
+PROBLÉM: iPhone se nepřipojí k firemní Wi-Fi
+ŘEŠENÍ:
+  1. Nastavení → Wi-Fi → klikni na (i) u firemní sítě → Zapomenout na tuto síť.
+  2. Připoj se znovu a zadej správné přihlašovací údaje.
+  3. Zkontroluj, zda datum a čas jsou správně nastaveny: Nastavení → Obecné → Datum a čas.
+  4. Pokud síť vyžaduje certifikát, kontaktuj IT – certifikát se instaluje přes konfigurační profil.
+TIP: Firemní Wi-Fi s certifikátem nelze nastavit svépomocí – vždy vyžaduje zásah IT.
+
+PROBLÉM: iPhone (iOS) nereaguje / je pomalý / přehřívá se
+ŘEŠENÍ:
+  1. Zavři všechny aplikace na pozadí (přejeď zdola nahoru, podrž a zavři).
+  2. Restartuj iPhone (tlačítko napájení + Vypnout).
+  3. Zkontroluj úložiště: Nastavení → Obecné → Úložiště iPhone – smaž nepotřebné aplikace a fotky.
+  4. Při přehřívání na nabíjení: zkontroluj kabel a nabíječku (používej originální nebo certifikované).
+  5. Kontaktuj IT, pokud je zařízení firemní.
+
+PROBLÉM: Nejde App Store / nelze se přihlásit Apple ID
+ŘEŠENÍ:
+  1. Zkontroluj internetové připojení.
+  2. Odhlás se a znovu přihlas k Apple ID: Nastavení → [Tvoje jméno] → Odhlásit se.
+  3. Restartuj iPhone.
+  4. U firemních zařízení (DEP / MDM) je App Store řízen IT – kontaktuj je.
+
+
+KATEGORIE: ÚČTY, BEZPEČNOST A PŘÍSTUPY
+----------------------------------------------------------------
+
+PROBLÉM: Zapomenuté firemní heslo
+ŘEŠENÍ:
+  1. Použij self-service portál pro reset hesla (pokud je ve firmě k dispozici).
+  2. Ověř identitu přes MFA (SMS nebo Authenticator).
+  3. Kontaktuj IT pro ruční reset.
+TIP: Nikdy nesdílej heslo s nikým – ani s IT oddělením.
+
+PROBLÉM: Dvoufaktorové ověření (MFA) nefunguje
+ŘEŠENÍ:
+  1. Zkontroluj, zda máš v telefonu nainstalovanou aplikaci Microsoft Authenticator.
+  2. Ověř, zda má telefon správně nastavený čas (automatická synchronizace musí být zapnutá).
+  3. Pokud kód nevychází, otevři Authenticator a klikni na ikonu obnovení u účtu.
+  4. Pokud nedostáváš SMS, ověř signál / mobilní data.
+  5. Zkus alternativní metodu ověření (SMS místo Authenticatoru nebo naopak).
+  6. Kontaktuj IT pro reset MFA metody.
+TIP: Nikdy nesdílej MFA kód s nikým – ani s IT oddělením. IT kód k přihlášení nepotřebuje.
+
+PROBLÉM: Přístup odepřen (Access Denied) k souboru / aplikaci / systému
+MOŽNÁ PŘÍČINA: Chybí přístupová práva nebo role.
+ŘEŠENÍ:
+  1. Ověř, zda jsi přihlášen správným firemním účtem.
+  2. Zkontroluj, zda jsi připojen k VPN.
+  3. Požádej svého nadřízeného nebo IT o přidělení oprávnění.
+  4. Vytvoř ticket v helpdesku se zdůvodněním potřeby přístupu.
+
+PROBLÉM: Chybí licence / přístup k aplikaci (Office, Adobe, jiný SW)
+ŘEŠENÍ:
+  1. Zkontroluj, zda jsi přihlášen správným firemním účtem v aplikaci.
+  2. Restartuj aplikaci.
+  3. Odhlás se a znovu přihlas: Soubor → Účet → Odhlásit se, pak znovu přihlásit.
+  4. Kontaktuj IT o přiřazení licence.
+
+PROBLÉM: Podezření na phishing / podvodný e-mail / útok
+PŘÍZNAKY: Neočekávaný e-mail s přílohou, žádost o heslo, podezřelý odkaz, neznámý odesílatel.
+ŘEŠENÍ:
+  1. Neotevírej přílohy ani neznámé odkazy.
+  2. Nesděluj žádné přihlašovací údaje – IT ani banky hesla nezasílají e-mailem.
+  3. Označ e-mail jako phishing (tlačítko v Outlooku nebo přeposlání na IT).
+  4. Okamžitě kontaktuj IT oddělení.
+  5. Pokud jsi omylem klikl na odkaz nebo zadal heslo – IHNED kontaktuj IT.
+
+
+================================================================
+Celkem problémů: 30
+Verze: 2.0 – sloučeno a rozšířeno
+================================================================

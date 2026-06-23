@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, Printer, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound, Layers } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, Printer, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound, Layers, Tags } from "lucide-react";
 import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
 import { TotpAdminPanel } from "@/components/admin/TotpAdminPanel";
 import {
@@ -21,6 +21,13 @@ import {
   MAKETY_ZADAVATEL_GRAFIKA_LABEL,
   MAKETY_ZADAVATEL_MAKETA_LABEL,
 } from "@/lib/makety-module-label";
+import {
+  hasStitkyMistrFlag,
+  hasStitkyTiskarFlag,
+  isStitkyModuleEnabled,
+  normalizeStitkyModuleAccessForSave,
+  stitkyBaseLevelFromAccess,
+} from "@/lib/stitky-module-access-flags";
 
 const AVAILABLE_MODULES = [
   { key: "contacts", label: "Kontakty", icon: Users },
@@ -34,6 +41,7 @@ const AVAILABLE_MODULES = [
   { key: "iml", label: "IML", icon: Package },
   { key: "materialy", label: "Katalog materiálů", icon: Layers },
   { key: "ukoly", label: "Úkoly", icon: ClipboardList },
+  { key: "stitky", label: "Štítky výroba", icon: Tags },
   { key: "makety", label: "Makety a grafika", icon: Printer },
   { key: "personalistika", label: "Personalistika", icon: BriefcaseBusiness },
 ] as const;
@@ -60,6 +68,12 @@ function getPermissionOptions(moduleKey: string) {
 
 const MAKETY_BASE_OPTIONS = [
   { value: "read", label: "Účastník (vidí své zakázky)" },
+  { value: "admin", label: "Admin modulu" },
+] as const;
+
+const STITKY_BASE_OPTIONS = [
+  { value: "read", label: "Prohlížení" },
+  { value: "write", label: "Zadavatel" },
   { value: "admin", label: "Admin modulu" },
 ] as const;
 
@@ -186,6 +200,8 @@ export function AdminUserForm({ user }: { user?: User }) {
       if (visible) {
         if (moduleKey === "makety") {
           next.makety = maketyBaseLevelFromAccess(next) || "read";
+        } else if (moduleKey === "stitky") {
+          next.stitky = stitkyBaseLevelFromAccess(next) || "read";
         } else {
           next[moduleKey] = "read";
         }
@@ -197,6 +213,10 @@ export function AdminUserForm({ user }: { user?: User }) {
           delete next.makety_grafika;
           delete next.makety_zadavatel_maketa;
           delete next.makety_zadavatel_grafika;
+        }
+        if (moduleKey === "stitky") {
+          delete next.stitky_tiskar;
+          delete next.stitky_mistr;
         }
       }
       return { ...prev, module_access: next };
@@ -277,6 +297,43 @@ export function AdminUserForm({ user }: { user?: User }) {
           hasMaketyZadavatelMaketaFlag(next))
       ) {
         next.makety = "read";
+      }
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setStitkyBaseLevel = (level: string) => {
+    setForm((prev) => ({
+      ...prev,
+      module_access: { ...prev.module_access, stitky: level },
+    }));
+  };
+
+  const setStitkyTiskarFlag = (checked: boolean) => {
+    setForm((prev) => {
+      const next: ModuleAccessMap = { ...prev.module_access };
+      if (checked) next.stitky_tiskar = "1";
+      else delete next.stitky_tiskar;
+      if (
+        !stitkyBaseLevelFromAccess(next) &&
+        (checked || hasStitkyMistrFlag(next))
+      ) {
+        next.stitky = "read";
+      }
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setStitkyMistrFlag = (checked: boolean) => {
+    setForm((prev) => {
+      const next: ModuleAccessMap = { ...prev.module_access };
+      if (checked) next.stitky_mistr = "1";
+      else delete next.stitky_mistr;
+      if (
+        !stitkyBaseLevelFromAccess(next) &&
+        (checked || hasStitkyTiskarFlag(next))
+      ) {
+        next.stitky = "read";
       }
       return { ...prev, module_access: next };
     });
@@ -376,17 +433,23 @@ export function AdminUserForm({ user }: { user?: User }) {
     try {
       const url = isEdit ? `/api/admin/users/${user!.id}` : "/api/admin/users";
       const method = isEdit ? "PUT" : "POST";
-      const moduleAccess = isMaketyModuleEnabled(form.module_access)
-        ? normalizeMaketyModuleAccessForSave(form.module_access)
-        : (() => {
-            const next = { ...form.module_access };
-            delete next.makety;
-            delete next.makety_vyroba;
-            delete next.makety_grafika;
-            delete next.makety_zadavatel_maketa;
-            delete next.makety_zadavatel_grafika;
-            return next;
-          })();
+      let moduleAccess = { ...form.module_access };
+      if (isMaketyModuleEnabled(moduleAccess)) {
+        moduleAccess = normalizeMaketyModuleAccessForSave(moduleAccess);
+      } else {
+        delete moduleAccess.makety;
+        delete moduleAccess.makety_vyroba;
+        delete moduleAccess.makety_grafika;
+        delete moduleAccess.makety_zadavatel_maketa;
+        delete moduleAccess.makety_zadavatel_grafika;
+      }
+      if (isStitkyModuleEnabled(moduleAccess)) {
+        moduleAccess = normalizeStitkyModuleAccessForSave(moduleAccess);
+      } else {
+        delete moduleAccess.stitky;
+        delete moduleAccess.stitky_tiskar;
+        delete moduleAccess.stitky_mistr;
+      }
 
       const body: Record<string, unknown> = {
         ...form,
@@ -800,11 +863,19 @@ export function AdminUserForm({ user }: { user?: User }) {
           {AVAILABLE_MODULES.map((mod) => {
             const Icon = mod.icon;
             const isMakety = mod.key === "makety";
+            const isStitky = mod.key === "stitky";
             const level = isMakety
               ? maketyBaseLevelFromAccess(form.module_access) ||
                 (isMaketyModuleEnabled(form.module_access) ? "read" : "")
-              : (form.module_access[mod.key] ?? "");
-            const isVisible = isMakety ? isMaketyModuleEnabled(form.module_access) : !!level;
+              : isStitky
+                ? stitkyBaseLevelFromAccess(form.module_access) ||
+                  (isStitkyModuleEnabled(form.module_access) ? "read" : "")
+                : (form.module_access[mod.key] ?? "");
+            const isVisible = isMakety
+              ? isMaketyModuleEnabled(form.module_access)
+              : isStitky
+                ? isStitkyModuleEnabled(form.module_access)
+                : !!level;
             return (
               <div
                 key={mod.key}
@@ -878,6 +949,47 @@ export function AdminUserForm({ user }: { user?: User }) {
                             className="rounded"
                           />
                           <span>{MAKETY_ZADAVATEL_GRAFIKA_LABEL}</span>
+                        </label>
+                      </div>
+                    )}
+                  </>
+                ) : isStitky ? (
+                  <>
+                    <select
+                      value={isVisible ? level || "read" : ""}
+                      onChange={(e) => setStitkyBaseLevel(e.target.value)}
+                      disabled={!isVisible || isAdminRoleSelected}
+                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      title="Základní úroveň v modulu"
+                    >
+                      <option value="">—</option>
+                      {STITKY_BASE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    {isVisible && (
+                      <div className="flex flex-wrap items-center gap-4 text-sm">
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hasStitkyTiskarFlag(form.module_access)}
+                            onChange={(e) => setStitkyTiskarFlag(e.target.checked)}
+                            disabled={isAdminRoleSelected}
+                            className="rounded"
+                          />
+                          <span>Tiskař</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hasStitkyMistrFlag(form.module_access)}
+                            onChange={(e) => setStitkyMistrFlag(e.target.checked)}
+                            disabled={isAdminRoleSelected}
+                            className="rounded"
+                          />
+                          <span>Mistr</span>
                         </label>
                       </div>
                     )}

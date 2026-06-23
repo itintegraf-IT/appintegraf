@@ -1,0 +1,42 @@
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  body {
+    background: white !important;
+  }
+
+  /* Skrýt dashboard chrome */
+  header,
+  aside,
+  nav,
+  .stitky-no-print {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .stitky-preview-root {
+    margin: 0;
+    padding: 0;
+  }
+
+  .stitky-print-page {
+    box-shadow: none !important;
+    margin: 0 !important;
+    page-break-after: always;
+  }
+
+  .stitky-print-page:last-child {
+    page-break-after: auto;
+  }
+
+  .stitky-label-box {
+    border-color: #999 !important;
+  }
+}

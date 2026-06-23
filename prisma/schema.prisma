@@ -491,17 +491,59 @@ model equipment_requests {
   approval_requested_at DateTime?                    @db.Timestamp(0)
   processed_by          Int?
   processed_at          DateTime?                    @db.Timestamp(0)
+  requester_user_id     Int?
   created_at            DateTime                     @default(now()) @db.Timestamp(0)
   updated_at            DateTime                     @default(now()) @db.Timestamp(0)
   users                 users?                       @relation("equipment_requests_processed", fields: [processed_by], references: [id], onUpdate: NoAction, map: "equipment_requests_ibfk_1")
   users_it              users?                       @relation("equipment_requests_it", fields: [it_response_by], references: [id], onUpdate: NoAction)
   users_approval        users?                       @relation("equipment_requests_approval", fields: [approval_requested_to], references: [id], onUpdate: NoAction)
+  users_requester       users?                       @relation("equipment_requests_requester", fields: [requester_user_id], references: [id], onUpdate: NoAction)
 
   @@index([approval_requested_to], map: "idx_approval_requested_to")
   @@index([created_at], map: "idx_created")
   @@index([priority], map: "idx_priority")
   @@index([status], map: "idx_status")
   @@index([processed_by], map: "processed_by")
+  @@index([requester_user_id], map: "idx_requester_user_id")
+}
+
+model helpdesk_tickets {
+  id              Int                @id @default(autoincrement())
+  ticket_number   String             @unique @db.VarChar(20)
+  subject         String             @db.VarChar(255)
+  description     String             @db.Text
+  category        helpdesk_category  @default(jine)
+  priority        helpdesk_priority  @default(stredni)
+  status          helpdesk_status    @default(novy)
+  requester_id    Int
+  assigned_to_id  Int?
+  resolved_at     DateTime?          @db.Timestamp(0)
+  closed_at       DateTime?          @db.Timestamp(0)
+  resolution_note String?            @db.Text
+  created_at      DateTime           @default(now()) @db.Timestamp(0)
+  updated_at      DateTime           @default(now()) @db.Timestamp(0)
+  users_requester users              @relation("helpdesk_tickets_requester", fields: [requester_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_assigned  users?             @relation("helpdesk_tickets_assigned", fields: [assigned_to_id], references: [id], onUpdate: NoAction)
+  comments        helpdesk_comments[]
+
+  @@index([requester_id], map: "idx_helpdesk_requester")
+  @@index([assigned_to_id], map: "idx_helpdesk_assigned")
+  @@index([status], map: "idx_helpdesk_status")
+  @@index([created_at], map: "idx_helpdesk_created")
+}
+
+model helpdesk_comments {
+  id          Int              @id @default(autoincrement())
+  ticket_id   Int
+  author_id   Int
+  body        String           @db.Text
+  is_internal Boolean          @default(false)
+  created_at  DateTime         @default(now()) @db.Timestamp(0)
+  ticket      helpdesk_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       users            @relation("helpdesk_comments_author", fields: [author_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([ticket_id], map: "idx_helpdesk_comments_ticket")
+  @@index([author_id], map: "idx_helpdesk_comments_author")
 }
 
 model equipment_transfers {
@@ -912,6 +954,10 @@ model users {
   equipment_requests                                             equipment_requests[]          @relation("equipment_requests_processed")
   equipment_requests_approval                                    equipment_requests[]          @relation("equipment_requests_approval")
   equipment_requests_it                                          equipment_requests[]          @relation("equipment_requests_it")
+  equipment_requests_requester                                   equipment_requests[]          @relation("equipment_requests_requester")
+  helpdesk_tickets_requester                                     helpdesk_tickets[]            @relation("helpdesk_tickets_requester")
+  helpdesk_tickets_assigned                                      helpdesk_tickets[]            @relation("helpdesk_tickets_assigned")
+  helpdesk_comments_authored                                     helpdesk_comments[]           @relation("helpdesk_comments_author")
   equipment_transfers_equipment_transfers_from_user_idTousers    equipment_transfers[]         @relation("equipment_transfers_from_user_idTousers")
   equipment_transfers_equipment_transfers_to_user_idTousers      equipment_transfers[]         @relation("equipment_transfers_to_user_idTousers")
   equipment_transfers_equipment_transfers_transferred_byTousers  equipment_transfers[]         @relation("equipment_transfers_transferred_byTousers")
@@ -939,6 +985,9 @@ model users {
   makety_created                                                 makety[]                      @relation("makety_creator")
   makety_quotes_submitted                                        makety[]                      @relation("makety_quote_submitter")
   makety_comments_authored                                       makety_comments[]             @relation("makety_comments_author")
+  stitky_orders_created                                          stitky_orders[]               @relation("stitky_orders_creator")
+  stitky_orders_changed                                          stitky_orders[]               @relation("stitky_orders_changed")
+  stitky_user_roles                                              stitky_user_roles[]
   notifications                                                  notifications[]
   iml_product_files_uploaded                                     iml_product_files[]           @relation("iml_product_files_uploader")
   roles                                                          roles?                        @relation(fields: [role_id], references: [id], onUpdate: NoAction, map: "fk_users_role")
@@ -998,6 +1047,28 @@ enum equipment_requests_status {
   zam_tnuto        @map("zamítnuto")
   odlo_eno         @map("odloženo")
   vy__zeno         @map("vyřízeno")
+}
+
+enum helpdesk_category {
+  hardware
+  software
+  pristup
+  sit
+  jine
+}
+
+enum helpdesk_priority {
+  nizka
+  stredni
+  vysoka
+}
+
+enum helpdesk_status {
+  novy
+  prirazeno
+  resi_se
+  vyreseno
+  uzavreno
 }
 
 enum questions_correct_answer {
@@ -1658,4 +1729,70 @@ model rate_limit_hits {
 
   @@unique([key, window_start], map: "uq_rate_limit_key_window")
   @@index([window_start], map: "idx_rate_limit_window")
+}
+
+model stitky_templates {
+  key           String         @id @db.VarChar(50)
+  sheet_key     String         @db.VarChar(50)
+  row_start     Int            @default(2)
+  row_step      Int            @default(7)
+  row_end       Int            @default(49)
+  col_start     Int            @default(1)
+  col_step      Int            @default(4)
+  col_end       Int            @default(6)
+  layout_status String         @default("ready") @db.VarChar(20)
+  component_key String         @default("standard") @db.VarChar(50)
+  sort_order    Int            @default(0)
+  stitky_orders stitky_orders[]
+}
+
+model stitky_orders {
+  id              Int                 @id @default(autoincrement())
+  order_number    String              @unique(map: "uq_stitky_order_number") @db.VarChar(50)
+  template_key    String              @db.VarChar(50)
+  status          String              @default("DRAFT") @db.VarChar(30)
+  notes           String?             @db.Text
+  created_by      Int
+  last_changed_by Int?
+  created_at      DateTime            @default(now()) @db.Timestamp(0)
+  updated_at      DateTime            @default(now()) @updatedAt @db.Timestamp(0)
+  rows            stitky_label_rows[]
+  template        stitky_templates    @relation(fields: [template_key], references: [key], onUpdate: Cascade)
+  users_creator   users               @relation("stitky_orders_creator", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stitky_orders_creator_fk")
+  users_changed   users?              @relation("stitky_orders_changed", fields: [last_changed_by], references: [id], onUpdate: NoAction, map: "stitky_orders_changed_fk")
+
+  @@index([status], map: "idx_stitky_orders_status")
+  @@index([created_by], map: "idx_stitky_orders_created_by")
+  @@index([template_key], map: "idx_stitky_orders_template")
+}
+
+model stitky_label_rows {
+  id           Int           @id @default(autoincrement())
+  order_id     Int
+  row_index    Int           @db.TinyInt
+  quantity     Int?
+  pack_size    Int?
+  text1        String?       @db.VarChar(500)
+  text2        String?       @db.VarChar(500)
+  text3        String?       @db.VarChar(500)
+  prefix       String?       @db.VarChar(50)
+  range_from   String?       @db.VarChar(20)
+  range_to     String?       @db.VarChar(20)
+  barcode_type String?       @db.VarChar(50)
+  order        stitky_orders @relation(fields: [order_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stitky_label_rows_order_fk")
+
+  @@unique([order_id, row_index], map: "uq_stitky_row_order_index")
+}
+
+model stitky_user_roles {
+  user_id Int
+  role    String @db.VarChar(20)
+  users   users  @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stitky_user_roles_user_fk")
+
+  @@id([user_id, role])
+}
+
+model stitky_settings {
+  key   String @id @db.VarChar(50)
+  value String @db.Text
 }

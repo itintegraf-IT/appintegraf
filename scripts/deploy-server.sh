@@ -67,6 +67,16 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+if [[ "$ROOT" == *appintegraf-test* && "$DEPLOY_BRANCH" == "main" && "$PM2_NAME" == "appintegraf" ]]; then
+  echo "CHYBA: Spouštíte produkční deploy v test adresáři ($ROOT)." >&2
+  echo "  Tím by se přepsala větev test kódem z main a restartoval by se špatný PM2 proces." >&2
+  echo "  Použijte:" >&2
+  echo "    DEPLOY_BRANCH=test PM2_APP_NAME=appintegraf-test ./scripts/deploy-server.sh" >&2
+  echo "  nebo:" >&2
+  echo "    ./scripts/deploy-server.sh --branch test --pm2-name appintegraf-test" >&2
+  exit 1
+fi
+
 echo "==> Nasazení: větev=$DEPLOY_BRANCH | PM2 proces=$PM2_NAME | adresář=$ROOT"
 
 echo "==> Git: package-lock.json – zahodit lokální změny (po npm install na serveru často přepsán)"
@@ -137,6 +147,39 @@ if [[ "$makety_migrate_exit" -ne 0 || "$makety_work_type_exit" -ne 0 || "$makety
   echo "    npm run db:makety-work-type"
   echo "    npm run db:makety-queue"
   echo "    npm run db:makety-quote"
+  echo ""
+fi
+
+echo "==> SQL: Požadavky + Helpdesk (db:pozadavky-migrate)"
+set +e
+npm run db:pozadavky-migrate
+pozadavky_migrate_exit=$?
+set -e
+if [[ "$pozadavky_migrate_exit" -ne 0 ]]; then
+  echo "Upozornění: db:pozadavky-migrate skončil s kódem $pozadavky_migrate_exit."
+  echo "  Na serveru spusťte ručně: npm run db:pozadavky-migrate"
+  echo ""
+fi
+
+echo "==> SQL: modul Štítky (db:stitky-migrate)"
+set +e
+npm run db:stitky-migrate
+stitky_migrate_exit=$?
+set -e
+if [[ "$stitky_migrate_exit" -ne 0 ]]; then
+  echo "Upozornění: db:stitky-migrate skončil s kódem $stitky_migrate_exit."
+  echo "  Na serveru spusťte ručně: npm run db:stitky-migrate"
+  echo ""
+fi
+
+echo "==> SQL: IML CMYK přepínače (db:iml-cmyk-flags)"
+set +e
+npm run db:iml-cmyk-flags
+iml_cmyk_exit=$?
+set -e
+if [[ "$iml_cmyk_exit" -ne 0 ]]; then
+  echo "Upozornění: db:iml-cmyk-flags skončil s kódem $iml_cmyk_exit."
+  echo "  Na serveru spusťte ručně: npm run db:iml-cmyk-flags"
   echo ""
 fi
 

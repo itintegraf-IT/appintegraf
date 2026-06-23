@@ -12,6 +12,7 @@ export const APP_MODULE_KEYS = [
   "iml",
   "materialy",
   "ukoly",
+  "stitky",
   "makety",
   "personalistika",
 ] as const;

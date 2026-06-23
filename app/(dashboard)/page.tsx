@@ -24,13 +24,15 @@ import {
   ChevronRight,
   Bell,
   Package,
+  Tags,
 } from "lucide-react";
+import { canReadStitky, canWriteStitkyOrder } from "@/lib/stitky/access";
 
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
 
-  const [stats, contactsRead, equipmentRead, calendarRead, kioskRead, trainingRead, trainingWrite, contactsWrite, equipmentWrite, kioskWrite, imlRead, imlWrite, pendingEvents, notifications, contractsExpiring90] =
+  const [stats, contactsRead, equipmentRead, calendarRead, kioskRead, trainingRead, trainingWrite, contactsWrite, equipmentWrite, kioskWrite, imlRead, imlWrite, stitkyRead, stitkyWrite, pendingEvents, notifications, contractsExpiring90] =
     await Promise.all([
       Promise.all([
         prisma.users.count({ where: { is_active: true } }),
@@ -54,6 +56,8 @@ export default async function DashboardPage() {
       hasModuleAccess(userId, "kiosk", "write"),
       hasModuleAccess(userId, "iml", "read"),
       hasModuleAccess(userId, "iml", "write"),
+      userId > 0 ? canReadStitky(userId) : Promise.resolve(false),
+      userId > 0 ? canWriteStitkyOrder(userId) : Promise.resolve(false),
       (async () => {
         if (userId === 0) return [];
         const canReadCalendar = await hasModuleAccess(userId, "calendar", "read");
@@ -126,9 +130,10 @@ export default async function DashboardPage() {
     { href: "/calendar", icon: Calendar, label: "Kalendář", desc: "Kalendář událostí s workflow schvalováním", show: calendarRead },
     { href: "/phone-list", icon: Phone, label: "Telefonní seznam", desc: "Kontakty zaměstnanců", show: true },
     { href: "/public/phone-list", icon: Phone, label: "Veřejný telefonní seznam", desc: "Bez přihlášení", show: true },
-    { href: "/public/equipment-request", icon: ClipboardList, label: "Požadavek na techniku", desc: "Veřejný formulář", show: true },
+    { href: "/pozadavky", icon: ClipboardList, label: "IT požadavky", desc: "Technika a helpdesk IT servis", show: true },
     { href: "/kiosk", icon: Tv, label: "Kiosk Monitory", desc: "Správa prezentací pro monitory", show: kioskRead },
     { href: "/iml", icon: Package, label: "IML", desc: "Zákazníci, produkty a objednávky", show: imlRead },
+    { href: "/stitky", icon: Tags, label: "Štítky výroba", desc: "Zadávání a tisk výrobních štítků", show: stitkyRead },
     { href: "/training", icon: GraduationCap, label: "IT Bezpečnostní školení", desc: "Testy a vzdělávání zaměstnanců", show: trainingRead },
   ];
 
@@ -136,6 +141,7 @@ export default async function DashboardPage() {
     { href: "/contacts/add", icon: UserPlus, label: "Přidat kontakt", show: contactsWrite },
     { href: "/equipment/add", icon: Laptop, label: "Přidat vybavení", show: equipmentWrite },
     { href: "/iml/customers/add", icon: Package, label: "Nový zákazník IML", show: imlWrite },
+    { href: "/stitky/new", icon: Tags, label: "Nová zakázka štítků", show: stitkyWrite },
     { href: "/kiosk/create", icon: PlusCircle, label: "Nová prezentace", show: kioskWrite },
     { href: "/calendar/add", icon: CalendarPlus, label: "Nová událost", show: calendarRead },
     { href: "/training/create-test", icon: FileText, label: "Nový test", show: trainingWrite },

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { findActiveDepartment } from "@/lib/equipment-departments";
 import { prisma } from "@/lib/db";
 
 /** GET ?name=IT – zkontroluje, zda je přihlášený uživatel v oddělení */
@@ -16,9 +17,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Chybí parametr name" }, { status: 400 });
   }
 
-  const dept = await prisma.departments.findFirst({
-    where: { name, is_active: true },
-  });
+  const dept = await findActiveDepartment(name);
   if (!dept) {
     return NextResponse.json({ inDepartment: false });
   }

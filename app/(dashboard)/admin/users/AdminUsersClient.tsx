@@ -19,9 +19,11 @@ import {
   Layers,
   FileText,
   Printer,
+  Tags,
 } from "lucide-react";
 import { APP_MODULE_KEYS } from "@/lib/app-modules";
 import { isMaketyModuleEnabled } from "@/lib/makety-module-access-flags";
+import { isStitkyModuleEnabled, stitkyRoleSummary } from "@/lib/stitky-module-access-flags";
 
 const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
   contacts: Users,
@@ -35,6 +37,7 @@ const MODULE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   kiosk: Tv,
   training: GraduationCap,
   ukoly: ClipboardList,
+  stitky: Tags,
   makety: Printer,
   personalistika: BriefcaseBusiness,
 };
@@ -51,12 +54,14 @@ const MODULE_LABELS: Record<string, string> = {
   kiosk: "Kiosk Monitory",
   training: "IT Školení",
   ukoly: "Úkoly",
+  stitky: "Štítky výroba",
   makety: "Makety a grafika",
   personalistika: "Personalistika",
 };
 
 function isModuleVisible(key: string, moduleAccess: Record<string, string>): boolean {
   if (key === "makety") return isMaketyModuleEnabled(moduleAccess);
+  if (key === "stitky") return isStitkyModuleEnabled(moduleAccess);
   return !!moduleAccess[key];
 }
 
@@ -175,6 +180,13 @@ export function AdminUsersClient() {
                   <td className="px-4 py-3">
                     <div>{u.roles?.name ?? "-"}</div>
                     <div className="text-xs text-gray-500">Úkoly: {ukolyRoleLabel(u.module_access?.ukoly)}</div>
+                    {(u.module_access?.stitky ||
+                      u.module_access?.stitky_tiskar ||
+                      u.module_access?.stitky_mistr) && (
+                      <div className="text-xs text-gray-500">
+                        Štítky: {stitkyRoleSummary(u.module_access ?? {})}
+                      </div>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {(() => {

@@ -43,6 +43,10 @@ DEPLOY_BRANCH=test PM2_APP_NAME=appintegraf-test ./scripts/deploy-server.sh
 ./scripts/deploy-server.sh --branch test --pm2-name appintegraf-test
 ```
 
+**Důležité:** V adresáři `/var/www/appintegraf-test` **nikdy** nespouštějte `./scripts/deploy-server.sh` bez parametrů — výchozí režim je produkce (`main` + PM2 `appintegraf`). Tím by se test adresář přepsal kódem z `main` a restartoval by se špatný proces. Skript tuto chybu od verze s deploy guardem odmítne.
+
+Po deployi ověřte `pm2 status`: restart musí být **`appintegraf-test`** (port 3011), ne `appintegraf` (produkce).
+
 ### Co skript po `git pull` ověří
 
 - aktuální větev je **`main`**;

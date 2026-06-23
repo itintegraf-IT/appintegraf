@@ -6,6 +6,7 @@ import bcrypt from "bcryptjs";
 import { validatePassword } from "@/lib/password-policy";
 import { logAuthAudit } from "@/lib/auth-audit";
 import { parseStoredModuleAccess } from "@/lib/app-modules";
+import { syncStitkyUserRolesFromModuleAccess } from "@/lib/stitky/sync-user-roles";
 
 export async function GET(
   _req: NextRequest,
@@ -253,6 +254,12 @@ export async function PUT(
       await prisma.user_roles.create({
         data: { user_id: id, role_id: roleIdNum, module_access: moduleAccessJson },
       });
+    }
+
+    if (!isAdminRole) {
+      await syncStitkyUserRolesFromModuleAccess(id, module_access);
+    } else {
+      await prisma.stitky_user_roles.deleteMany({ where: { user_id: id } });
     }
 
     return NextResponse.json({ success: true });
