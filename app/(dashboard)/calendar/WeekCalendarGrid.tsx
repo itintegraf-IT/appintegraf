@@ -456,16 +456,6 @@ export function WeekCalendarGrid({
           startMs: sliceStart.getTime(),
           endMs: sliceEnd.getTime(),
         });
-        if (hasCalendarDeputyBlock(e)) {
-          items.push({
-            id: `${pairId}-deputy`,
-            eventId: e.id,
-            pairId,
-            kind: "deputy",
-            startMs: sliceStart.getTime(),
-            endMs: sliceEnd.getTime(),
-          });
-        }
       }
       map.set(dayStr, layoutWeekDayColumns(items));
     }
@@ -892,25 +882,23 @@ export function WeekCalendarGrid({
                 ))}
                 {/* Události - absolutní pozicování */}
                 {(isGlobalMode
-                  ? timedEvents.flatMap((e) => {
-                      const onlyFirst =
-                        requiresDeputy(e.event_type) &&
-                        formatDateYmdPrague(new Date(e.start_date)) !==
-                          formatDateYmdPrague(new Date(e.end_date));
-                      const slice = getEventSliceForDay(e, d, {
-                        onlyFirstDayOfMultiDay: onlyFirst,
-                      });
-                      if (!slice) return [];
-                      const pairId = `ev-${e.id}`;
-                      const kinds: Array<"owner" | "deputy"> = ["owner"];
-                      if (hasCalendarDeputyBlock(e)) kinds.push("deputy");
-                      return kinds.map((kind) => ({
-                        e,
-                        kind,
-                        slice,
-                        layoutId: `${pairId}-${kind}`,
-                      }));
-                    })
+                  ? timedEvents
+                      .map((e) => {
+                        const onlyFirst =
+                          requiresDeputy(e.event_type) &&
+                          formatDateYmdPrague(new Date(e.start_date)) !==
+                            formatDateYmdPrague(new Date(e.end_date));
+                        const slice = getEventSliceForDay(e, d, {
+                          onlyFirstDayOfMultiDay: onlyFirst,
+                        });
+                        if (!slice) return null;
+                        return {
+                          e,
+                          slice,
+                          layoutId: `ev-${e.id}-owner`,
+                        };
+                      })
+                      .filter(Boolean)
                   : timedEvents
                       .map((e) => {
                         const onlyFirst =
@@ -921,20 +909,19 @@ export function WeekCalendarGrid({
                           onlyFirstDayOfMultiDay: onlyFirst,
                         });
                         if (!slice) return null;
-                        return { e, kind: "owner" as const, slice, layoutId: `ev-${e.id}-owner` };
+                        return { e, slice, layoutId: `ev-${e.id}-owner` };
                       })
                       .filter(Boolean)
                 ).map((item) => {
                   if (!item) return null;
-                  const { e, kind, slice, layoutId } = item;
+                  const { e, slice, layoutId } = item;
                   const dayLayout = timedLayoutByDay.get(dayKey);
                   const layout = dayLayout?.get(layoutId);
                   const column = layout?.column ?? 0;
                   const columnCount = layout?.columnCount ?? 1;
                   const widthPct = 100 / columnCount;
                   const leftPct = column * widthPct;
-                  const barColor =
-                    kind === "deputy" ? CALENDAR_DEPUTY_BLOCK_COLOR : e.color ?? "#DC2626";
+                  const barColor = e.color ?? "#DC2626";
                   const canDrag = e.created_by === userId && !isModuleCalendarTask(e);
                   const href = calendarGridItemHref(e);
                   const tooltip = calendarEventTooltipTitle(e, eventMetaMode);
@@ -950,11 +937,7 @@ export function WeekCalendarGrid({
                   };
 
                   if (isGlobalMode) {
-                    const lines =
-                      kind === "deputy"
-                        ? buildCalendarGlobalDeputyBlock(e, { allDay: false })
-                        : buildCalendarGlobalOwnerBlock(e, { allDay: false });
-                    if (!lines) return null;
+                    const lines = buildCalendarGlobalOwnerBlock(e, { allDay: false });
                     return (
                       <div
                         key={`${layoutId}-${d.toISOString()}`}
