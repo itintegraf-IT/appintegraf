@@ -135,6 +135,8 @@ cd /var/www/appintegraf-test
 DEPLOY_BRANCH=test PM2_APP_NAME=appintegraf-test ./scripts/deploy-server.sh
 ```
 
+**Varování:** Bez `DEPLOY_BRANCH=test` a `PM2_APP_NAME=appintegraf-test` skript nasadí **produkční** větev `main` a restartuje PM2 proces `appintegraf`. V test adresáři to rozbije aplikaci na portu 3011 (starý proces + nový build). Deploy skript tuto kombinaci v `appintegraf-test` adresáři odmítne.
+
 **Proměnné skriptu:**
 
 | Proměnná / přepínač | Default | Význam |
@@ -300,6 +302,8 @@ Pokud používáte pouze firewall na úrovni routeru/VPS poskytovatele, otevřet
 cd /var/www/appintegraf-test
 DEPLOY_BRANCH=test PM2_APP_NAME=appintegraf-test ./scripts/deploy-server.sh
 ```
+
+Po dokončení: `pm2 status` — `appintegraf-test` musí mít čerstvý uptime (restart proběhl). Produkční `appintegraf` se nemění.
 
 ---
 

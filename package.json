@@ -29,6 +29,7 @@
     "db:makety-quote": "node scripts/run-makety-quote-migration.mjs",
     "db:stitky-migrate": "node scripts/run-stitky-migration.mjs",
     "db:iml-cmyk-flags": "node scripts/run-iml-cmyk-flags-migration.mjs",
+    "db:pozadavky-migrate": "node scripts/run-pozadavky-migration.mjs",
     "iml:backfill-thumbnails": "node scripts/iml-backfill-product-thumbnails.mjs",
     "verify:canvas": "node scripts/verify-canvas.mjs"
   },
