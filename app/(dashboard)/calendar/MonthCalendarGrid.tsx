@@ -15,13 +15,10 @@ import type { Holiday } from "./lib/holidays";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import { isAllDayEvent, allDayEventDisplayDates } from "./lib/event-types";
 import {
-  buildCalendarGlobalDeputyBlock,
   buildCalendarGlobalOwnerBlock,
   buildEventMetaLines,
   calendarEventTooltipTitle,
-  CALENDAR_DEPUTY_BLOCK_COLOR,
   getCalendarEventPrimaryLabel,
-  hasCalendarDeputyBlock,
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
 import { CalendarGlobalEventBlock } from "./CalendarGlobalEventBlock";
@@ -204,25 +201,18 @@ export function MonthCalendarGrid({
                           const end = new Date(e.end_date);
                           const allDay = isAllDayEvent(start, end);
                           const ownerLines = buildCalendarGlobalOwnerBlock(e, { allDay });
-                          const deputyLines = buildCalendarGlobalDeputyBlock(e, { allDay });
-                          const items = [
-                            { key: "owner", lines: ownerLines, color: line },
-                            ...(deputyLines
-                              ? [{ key: "deputy", lines: deputyLines, color: CALENDAR_DEPUTY_BLOCK_COLOR }]
-                              : []),
-                          ];
-                          return items.map(({ key, lines, color }) => (
+                          return [
                             <CalendarGlobalEventBlock
-                              key={`${calendarGridItemKey(e)}-${day.toDateString()}-${key}`}
-                              lines={lines}
-                              color={color}
+                              key={`${calendarGridItemKey(e)}-${day.toDateString()}-owner`}
+                              lines={ownerLines}
+                              color={line}
                               href={calendarGridItemHref(e)}
                               title={calendarEventTooltipTitle(e, eventMetaMode)}
                               compact
                               onClick={(ev) => ev.stopPropagation()}
                               className="w-full"
-                            />
-                          ));
+                            />,
+                          ];
                         }
 
                         const primaryMeta = eventMetaPrimaryLine(e, eventMetaMode);
