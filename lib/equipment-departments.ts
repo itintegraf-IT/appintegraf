@@ -1,9 +1,24 @@
 import { prisma } from "@/lib/db";
 
-export async function isInDepartment(userId: number, departmentName: string): Promise<boolean> {
-  const dept = await prisma.departments.findFirst({
-    where: { name: departmentName, is_active: true },
+const activeDepartmentFilter = { is_active: { not: false } } as const;
+
+/** Najde aktivní oddělení podle názvu nebo kódu (např. „IT“ → „IT oddělení“ s code IT). */
+export async function findActiveDepartment(nameOrCode: string) {
+  const term = nameOrCode.trim();
+  if (!term) return null;
+
+  const byName = await prisma.departments.findFirst({
+    where: { name: term, ...activeDepartmentFilter },
   });
+  if (byName) return byName;
+
+  return prisma.departments.findFirst({
+    where: { code: term, ...activeDepartmentFilter },
+  });
+}
+
+export async function isInDepartment(userId: number, departmentName: string): Promise<boolean> {
+  const dept = await findActiveDepartment(departmentName);
   if (!dept) return false;
   const inMain = await prisma.users.findFirst({
     where: { id: userId, department_id: dept.id },
@@ -16,10 +31,7 @@ export async function isInDepartment(userId: number, departmentName: string): Pr
 }
 
 export async function getDepartmentMembers(departmentName: string) {
-  const dept = await prisma.departments.findFirst({
-    where: { name: departmentName, is_active: true },
-    select: { id: true },
-  });
+  const dept = await findActiveDepartment(departmentName);
   if (!dept) return [];
 
   const primary = await prisma.users.findMany({
