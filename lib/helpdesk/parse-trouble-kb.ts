@@ -31,7 +31,7 @@ function collapseWs(text: string): string {
 
 function parseEntryBlock(block: string): TroubleEntry | null {
   const problemMatch = block.match(
-    /PROBLÉM:\s*(.+?)(?=\n(?:MOŽNÉ PŘÍČINY:|MOŽNÁ PŘÍČINA:|PŘÍZNAKY:|ŘEŠENÍ:)|\s*$)/s
+    /PROBLÉM:\s*([\s\S]+?)(?=\n(?:MOŽNÉ PŘÍČINY:|MOŽNÁ PŘÍČINA:|PŘÍZNAKY:|ŘEŠENÍ:)|\s*$)/
   );
   if (!problemMatch) return null;
 
@@ -40,7 +40,7 @@ function parseEntryBlock(block: string): TroubleEntry | null {
   );
   const symptomsMatch = block.match(/PŘÍZNAKY:\s*([\s\S]*?)(?=\nŘEŠENÍ:|\s*$)/);
   const solutionMatch = block.match(/ŘEŠENÍ:\s*([\s\S]*?)(?=\nTIP:|\s*$)/);
-  const tipMatch = block.match(/TIP:\s*(.+?)$/s);
+  const tipMatch = block.match(/TIP:\s*([\s\S]+?)$/);
 
   const solutionSteps = solutionMatch ? parseSolutionSteps(solutionMatch[1]) : [];
   if (solutionSteps.length === 0) return null;
