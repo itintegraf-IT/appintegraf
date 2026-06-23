@@ -2,22 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { isInDepartment } from "@/lib/equipment-departments";
 import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
-
-async function isInDepartment(userId: number, departmentName: string): Promise<boolean> {
-  const dept = await prisma.departments.findFirst({
-    where: { name: departmentName, is_active: true },
-  });
-  if (!dept) return false;
-  const inMain = await prisma.users.findFirst({
-    where: { id: userId, department_id: dept.id },
-  });
-  if (inMain) return true;
-  const inSecondary = await prisma.user_secondary_departments.findFirst({
-    where: { user_id: userId, department_id: dept.id },
-  });
-  return !!inSecondary;
-}
 
 /** GET – detail požadavku */
 export async function GET(

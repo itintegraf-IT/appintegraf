@@ -15,7 +15,8 @@ Po finálním rozhodnutí je požadavek označen jako schválený nebo zamítnut
 
 | Role | Zdroj | Přístup | Co dělá |
 |---|---|---|---|
-| **Žadatel** | kdokoli | Veřejná stránka `/public/equipment-request` – bez přihlášení | Vyplní a odešle požadavek |
+| **Žadatel (externí)** | kdokoli bez účtu | Veřejná stránka `/public/equipment-request` | Vyplní a odešle požadavek ručně |
+| **Žadatel (přihlášený)** | zaměstnanec s účtem | `/pozadavky` → záložka Technika | Předvyplněný profil, `POST /api/equipment/requests`, přehled „Moje požadavky“ |
 | **IT** | Uživatel s oprávněním `equipment:write` (Editor/Admin modulu), zároveň člen **oddělení „IT"** (hlavní nebo sekundární) | Záložka `Majetek → Požadavky` | Doplní technické stanovisko a vybere schvalovatele z Vedení |
 | **Vedení** | Uživatel s oprávněním `equipment:write`, zároveň člen **oddělení „Vedení"** (hlavní nebo sekundární) | Záložka `Majetek → Požadavky` | Schválí nebo zamítne požadavek (pouze ten, který mu byl IT přímo přidělen) |
 
@@ -53,15 +54,25 @@ Klíčová pole pro schvalování:
 | `admin_response` | text | Stanovisko vedení (schválení/zamítnutí) |
 | `processed_by` | FK → users | Kdo z Vedení rozhodl |
 | `processed_at` | datum | Kdy |
+| `requester_user_id` | FK → users (volitelné) | Vazba na přihlášeného žadatele (interní formulář) |
 
 ## Workflow krok za krokem
 
 ### 1. Žadatel odešle požadavek
 
-- Veřejný formulář `/public/equipment-request` (nepotřebuje přihlášení).
+**Veřejný přístup (bez přihlášení):**
+
+- Formulář `/public/equipment-request`
 - API: `POST /api/public/equipment-request`
 - Vyplňuje: jméno, e-mail, telefon (volitelné), oddělení, pozice, typ techniky, popis, priorita.
-- Validace serveru: povinná pole (jméno, e-mail, typ, popis) + formát e-mailu.
+
+**Interní přístup (přihlášený uživatel):**
+
+- Stránka `/pozadavky` → záložka **Technika**
+- API: `POST /api/equipment/requests` – data žadatele se berou ze serveru z profilu uživatele
+- Pole `requester_user_id` propojí požadavek s účtem; žadatel vidí stav v sekci „Moje požadavky“ (`GET /api/equipment/requests/mine`)
+
+**Společné po vytvoření:**
 - Vytvoří se záznam se **stavem `nov_`**.
 - Současně odchází **notifikace všem uživatelům s admin oprávněním pro modul Majetek** (`getUsersWithModuleAdmin("equipment")`). Notifikace směřuje na `/equipment` a má typ `equipment_request`.
 

@@ -130,7 +130,7 @@ export default async function DashboardPage() {
     { href: "/calendar", icon: Calendar, label: "Kalendář", desc: "Kalendář událostí s workflow schvalováním", show: calendarRead },
     { href: "/phone-list", icon: Phone, label: "Telefonní seznam", desc: "Kontakty zaměstnanců", show: true },
     { href: "/public/phone-list", icon: Phone, label: "Veřejný telefonní seznam", desc: "Bez přihlášení", show: true },
-    { href: "/public/equipment-request", icon: ClipboardList, label: "Požadavek na techniku", desc: "Veřejný formulář", show: true },
+    { href: "/pozadavky", icon: ClipboardList, label: "IT požadavky", desc: "Technika a helpdesk IT servis", show: true },
     { href: "/kiosk", icon: Tv, label: "Kiosk Monitory", desc: "Správa prezentací pro monitory", show: kioskRead },
     { href: "/iml", icon: Package, label: "IML", desc: "Zákazníci, produkty a objednávky", show: imlRead },
     { href: "/stitky", icon: Tags, label: "Štítky výroba", desc: "Zadávání a tisk výrobních štítků", show: stitkyRead },

@@ -491,17 +491,59 @@ model equipment_requests {
   approval_requested_at DateTime?                    @db.Timestamp(0)
   processed_by          Int?
   processed_at          DateTime?                    @db.Timestamp(0)
+  requester_user_id     Int?
   created_at            DateTime                     @default(now()) @db.Timestamp(0)
   updated_at            DateTime                     @default(now()) @db.Timestamp(0)
   users                 users?                       @relation("equipment_requests_processed", fields: [processed_by], references: [id], onUpdate: NoAction, map: "equipment_requests_ibfk_1")
   users_it              users?                       @relation("equipment_requests_it", fields: [it_response_by], references: [id], onUpdate: NoAction)
   users_approval        users?                       @relation("equipment_requests_approval", fields: [approval_requested_to], references: [id], onUpdate: NoAction)
+  users_requester       users?                       @relation("equipment_requests_requester", fields: [requester_user_id], references: [id], onUpdate: NoAction)
 
   @@index([approval_requested_to], map: "idx_approval_requested_to")
   @@index([created_at], map: "idx_created")
   @@index([priority], map: "idx_priority")
   @@index([status], map: "idx_status")
   @@index([processed_by], map: "processed_by")
+  @@index([requester_user_id], map: "idx_requester_user_id")
+}
+
+model helpdesk_tickets {
+  id              Int                @id @default(autoincrement())
+  ticket_number   String             @unique @db.VarChar(20)
+  subject         String             @db.VarChar(255)
+  description     String             @db.Text
+  category        helpdesk_category  @default(jine)
+  priority        helpdesk_priority  @default(stredni)
+  status          helpdesk_status    @default(novy)
+  requester_id    Int
+  assigned_to_id  Int?
+  resolved_at     DateTime?          @db.Timestamp(0)
+  closed_at       DateTime?          @db.Timestamp(0)
+  resolution_note String?            @db.Text
+  created_at      DateTime           @default(now()) @db.Timestamp(0)
+  updated_at      DateTime           @default(now()) @db.Timestamp(0)
+  users_requester users              @relation("helpdesk_tickets_requester", fields: [requester_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_assigned  users?             @relation("helpdesk_tickets_assigned", fields: [assigned_to_id], references: [id], onUpdate: NoAction)
+  comments        helpdesk_comments[]
+
+  @@index([requester_id], map: "idx_helpdesk_requester")
+  @@index([assigned_to_id], map: "idx_helpdesk_assigned")
+  @@index([status], map: "idx_helpdesk_status")
+  @@index([created_at], map: "idx_helpdesk_created")
+}
+
+model helpdesk_comments {
+  id          Int              @id @default(autoincrement())
+  ticket_id   Int
+  author_id   Int
+  body        String           @db.Text
+  is_internal Boolean          @default(false)
+  created_at  DateTime         @default(now()) @db.Timestamp(0)
+  ticket      helpdesk_tickets @relation(fields: [ticket_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users       users            @relation("helpdesk_comments_author", fields: [author_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([ticket_id], map: "idx_helpdesk_comments_ticket")
+  @@index([author_id], map: "idx_helpdesk_comments_author")
 }
 
 model equipment_transfers {
@@ -912,6 +954,10 @@ model users {
   equipment_requests                                             equipment_requests[]          @relation("equipment_requests_processed")
   equipment_requests_approval                                    equipment_requests[]          @relation("equipment_requests_approval")
   equipment_requests_it                                          equipment_requests[]          @relation("equipment_requests_it")
+  equipment_requests_requester                                   equipment_requests[]          @relation("equipment_requests_requester")
+  helpdesk_tickets_requester                                     helpdesk_tickets[]            @relation("helpdesk_tickets_requester")
+  helpdesk_tickets_assigned                                      helpdesk_tickets[]            @relation("helpdesk_tickets_assigned")
+  helpdesk_comments_authored                                     helpdesk_comments[]           @relation("helpdesk_comments_author")
   equipment_transfers_equipment_transfers_from_user_idTousers    equipment_transfers[]         @relation("equipment_transfers_from_user_idTousers")
   equipment_transfers_equipment_transfers_to_user_idTousers      equipment_transfers[]         @relation("equipment_transfers_to_user_idTousers")
   equipment_transfers_equipment_transfers_transferred_byTousers  equipment_transfers[]         @relation("equipment_transfers_transferred_byTousers")
@@ -1001,6 +1047,28 @@ enum equipment_requests_status {
   zam_tnuto        @map("zamítnuto")
   odlo_eno         @map("odloženo")
   vy__zeno         @map("vyřízeno")
+}
+
+enum helpdesk_category {
+  hardware
+  software
+  pristup
+  sit
+  jine
+}
+
+enum helpdesk_priority {
+  nizka
+  stredni
+  vysoka
+}
+
+enum helpdesk_status {
+  novy
+  prirazeno
+  resi_se
+  vyreseno
+  uzavreno
 }
 
 enum questions_correct_answer {

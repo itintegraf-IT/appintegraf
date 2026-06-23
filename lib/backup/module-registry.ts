@@ -54,6 +54,8 @@ export const BACKUP_MODULES: Record<BackupModuleId, BackupModuleDef> = {
       prisma("equipment_assignments"),
       prisma("equipment_transfers"),
       prisma("equipment_requests"),
+      prisma("helpdesk_tickets"),
+      prisma("helpdesk_comments"),
     ],
   },
   calendar: {
