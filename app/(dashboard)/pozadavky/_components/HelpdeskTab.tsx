@@ -9,6 +9,12 @@ import {
   HELPDESK_STATUS_LABELS,
 } from "@/lib/helpdesk/labels";
 import { safeJson } from "@/lib/safe-json-response";
+import {
+  HelpdeskAttachmentsPanel,
+  HelpdeskPendingFilesPicker,
+  uploadHelpdeskCommentFiles,
+  uploadHelpdeskTicketFiles,
+} from "./HelpdeskAttachmentsPanel";
 
 type Member = { id: number; first_name: string; last_name: string; email: string };
 
@@ -54,6 +60,8 @@ export function HelpdeskTab() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [internalComment, setInternalComment] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [pendingCommentFiles, setPendingCommentFiles] = useState<File[]>([]);
   const [actionLoading, setActionLoading] = useState(false);
 
   const [form, setForm] = useState({
@@ -155,8 +163,19 @@ export function HelpdeskTab() {
 
       setSuccess(String(data.message ?? "Ticket vytvořen"));
       setForm({ subject: "", description: "", category: "jine", priority: "stredni" });
-      await refresh();
+
       const ticket = data.ticket as Ticket | undefined;
+      if (ticket?.id && pendingFiles.length > 0) {
+        const uploadErrors = await uploadHelpdeskTicketFiles(ticket.id, pendingFiles);
+        setPendingFiles([]);
+        if (uploadErrors.length > 0) {
+          setError(`Ticket vytvořen, ale některé přílohy se nepodařilo nahrát: ${uploadErrors.join("; ")}`);
+        }
+      } else {
+        setPendingFiles([]);
+      }
+
+      await refresh();
       if (ticket?.id) setExpandedId(ticket.id);
     } catch {
       setError("Chyba při vytváření ticketu");
@@ -217,15 +236,33 @@ export function HelpdeskTab() {
       body: JSON.stringify({ body: commentText, is_internal: internalComment }),
     });
 
+    const data = await safeJson(res);
+
     if (res.ok) {
+      const comment = data.comment as { id: number } | undefined;
+      if (comment?.id && pendingCommentFiles.length > 0) {
+        const uploadErrors = await uploadHelpdeskCommentFiles(
+          expandedId,
+          comment.id,
+          pendingCommentFiles
+        );
+        if (uploadErrors.length > 0) {
+          setError(`Komentář odeslán, ale přílohy selhaly: ${uploadErrors.join("; ")}`);
+        }
+      }
       setCommentText("");
       setInternalComment(false);
+      setPendingCommentFiles([]);
       loadDetail(expandedId);
     }
     setActionLoading(false);
   };
 
-  const renderTicketCard = (ticket: Ticket, showRequester = false) => (
+  const renderTicketCard = (ticket: Ticket, showRequester = false) => {
+    const ticketOpen = detail?.status !== "uzavreno";
+    const canUploadAttachments = ticketOpen && detail?.id === ticket.id;
+
+    return (
     <div
       key={ticket.id}
       className={`rounded-xl border bg-white shadow-sm ${
@@ -276,6 +313,12 @@ export function HelpdeskTab() {
                 </div>
               )}
 
+              <HelpdeskAttachmentsPanel
+                ticketId={detail.id}
+                canUpload={canUploadAttachments}
+                canDelete={canUploadAttachments}
+              />
+
               {detail.comments.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-gray-900">Komentáře</p>
@@ -290,37 +333,51 @@ export function HelpdeskTab() {
                         {new Date(c.created_at).toLocaleString("cs-CZ")}
                       </p>
                       <p className="mt-1 text-gray-800 whitespace-pre-wrap">{c.body}</p>
+                      <HelpdeskAttachmentsPanel
+                        ticketId={detail.id}
+                        commentId={c.id}
+                        canUpload={false}
+                        canDelete={canUploadAttachments}
+                        compact
+                      />
                     </div>
                   ))}
                 </div>
               )}
 
-              <form onSubmit={handleComment} className="space-y-2">
-                <textarea
-                  value={commentText}
-                  onChange={(e) => setCommentText(e.target.value)}
-                  rows={2}
-                  placeholder="Napsat komentář…"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                />
-                {canManage && (
-                  <label className="flex items-center gap-2 text-sm text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={internalComment}
-                      onChange={(e) => setInternalComment(e.target.checked)}
-                    />
-                    Interní poznámka (nevidí žadatel)
-                  </label>
-                )}
-                <button
-                  type="submit"
-                  disabled={actionLoading || !commentText.trim()}
-                  className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
-                >
-                  Odeslat komentář
-                </button>
-              </form>
+              {detail.status !== "uzavreno" && (
+                <form onSubmit={handleComment} className="space-y-2">
+                  <textarea
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    rows={2}
+                    placeholder="Napsat komentář…"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <HelpdeskPendingFilesPicker
+                    files={pendingCommentFiles}
+                    onChange={setPendingCommentFiles}
+                    label="Přílohy ke komentáři"
+                  />
+                  {canManage && (
+                    <label className="flex items-center gap-2 text-sm text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={internalComment}
+                        onChange={(e) => setInternalComment(e.target.checked)}
+                      />
+                      Interní poznámka (nevidí žadatel)
+                    </label>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={actionLoading || !commentText.trim()}
+                    className="rounded-lg border border-gray-300 px-4 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    Odeslat komentář
+                  </button>
+                </form>
+              )}
 
               {canManage && (
                 <div className="rounded-lg border border-gray-200 p-4 space-y-3">
@@ -400,6 +457,7 @@ export function HelpdeskTab() {
       )}
     </div>
   );
+  };
 
   return (
     <div className="space-y-8">
@@ -461,6 +519,9 @@ export function HelpdeskTab() {
                 rows={4}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2"
               />
+            </div>
+            <div className="sm:col-span-2">
+              <HelpdeskPendingFilesPicker files={pendingFiles} onChange={setPendingFiles} />
             </div>
           </div>
 
