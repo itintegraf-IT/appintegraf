@@ -34,6 +34,15 @@ Helpdesk je dostupný na `/pozadavky` → záložka **Helpdesk**. Veřejný form
 
 - `helpdesk_tickets` – hlavní tabulka (číslo ticketu `HD-ROK-#####`)
 - `helpdesk_comments` – vlákno komunikace (`is_internal` pro poznámky jen pro IT)
+- `file_uploads` – přílohy ticketu (`module=helpdesk`, `record_id=ticket.id`) a komentáře (`module=helpdesk_comment`, `record_id=comment.id`); soubory na disku v `public/uploads/helpdesk/`
+
+## Přílohy
+
+- **Ticket** – při založení (fronta před odesláním) i později v detailu
+- **Komentář** – fronta před odesláním komentáře
+- Typy: PDF, obrázky, log/txt/csv, ZIP, Word, Excel · max. 20 MB · max. 20 souborů na ticket/komentář
+- Uzavřený ticket (`uzavreno`): přílohy jen ke čtení
+- Přílohy interních komentářů vidí pouze IT
 
 ## API
 
@@ -44,6 +53,10 @@ Helpdesk je dostupný na `/pozadavky` → záložka **Helpdesk**. Veřejný form
 | `/api/helpdesk/tickets/mine` | GET | Tickety aktuálního uživatele |
 | `/api/helpdesk/tickets/[id]` | GET, PATCH | Detail, změna stavu, uzavření |
 | `/api/helpdesk/tickets/[id]/comments` | POST | Komentář |
+| `/api/helpdesk/tickets/[id]/files` | GET, POST | Přílohy ticketu |
+| `/api/helpdesk/tickets/[id]/files/[fileId]` | DELETE | Smazání přílohy ticketu |
+| `/api/helpdesk/tickets/[id]/comments/[commentId]/files` | GET, POST | Přílohy komentáře |
+| `/api/helpdesk/tickets/[id]/comments/[commentId]/files/[fileId]` | DELETE | Smazání přílohy komentáře |
 | `/api/helpdesk/context` | GET | Kontext UI (`canManageHelpdesk`, členové IT) |
 
 ## Notifikace
