@@ -1,10 +1,12 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { BackLink } from "@/components/navigation/BackLink";
+import { PreserveReturnToLink } from "@/components/navigation/PreserveReturnToLink";
 
 export default async function ImlOrderDetailPage({
   params,
@@ -78,20 +80,16 @@ export default async function ImlOrderDetailPage({
             Export XML
           </a>
           {canWrite && (
-            <Link
+            <PreserveReturnToLink
               href={`/iml/orders/${order.id}/edit`}
               className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
             >
               Upravit
-            </Link>
+            </PreserveReturnToLink>
           )}
-          <Link
-            href="/iml/orders"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Zpět
-          </Link>
+          <Suspense fallback={<Link href="/iml/orders" className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50">Zpět</Link>}>
+            <BackLink fallbackHref="/iml/orders" />
+          </Suspense>
         </div>
       </div>
 

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { BackLink } from "@/components/navigation/BackLink";
+import { useReturnTo } from "@/lib/navigation/use-return-to";
 
 type DeptOption = { id: number; name: string; code: string | null };
 
@@ -27,6 +28,7 @@ type ContactData = {
 
 export function ContactForm({ contact }: { contact?: ContactData }) {
   const router = useRouter();
+  const { backHref: listBackHref } = useReturnTo("/contacts");
   const isEdit = !!contact?.id;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -359,13 +361,9 @@ export function ContactForm({ contact }: { contact?: ContactData }) {
         >
           {loading ? "Ukládám…" : isEdit ? "Uložit" : "Přidat"}
         </button>
-        <Link
-          href={isEdit ? `/contacts/${contact!.id}` : "/contacts"}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-6 py-2 font-medium text-gray-700 hover:bg-gray-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Zpět
-        </Link>
+        <BackLink
+          fallbackHref={isEdit ? `/contacts/${contact!.id}` : listBackHref}
+        />
       </div>
     </form>
   );

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
@@ -39,5 +40,9 @@ export default async function ImlInquiryDetailPage({
   const initial = JSON.parse(JSON.stringify(inquiry)) as InquiryDetailPayload;
   const canWrite = await hasModuleAccess(userId, "iml", "write");
 
-  return <InquiryDetailClient initial={initial} canWrite={canWrite} />;
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Načítání…</div>}>
+      <InquiryDetailClient initial={initial} canWrite={canWrite} />
+    </Suspense>
+  );
 }

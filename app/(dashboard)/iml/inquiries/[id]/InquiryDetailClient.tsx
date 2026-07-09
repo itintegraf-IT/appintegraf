@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { Pencil } from "lucide-react";
+import { BackLink } from "@/components/navigation/BackLink";
+import { PreserveReturnToLink } from "@/components/navigation/PreserveReturnToLink";
 
 type ProductMini = {
   ig_code: string | null;
@@ -109,21 +111,15 @@ export function InquiryDetailClient({ initial, canWrite }: Props) {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/iml/inquiries"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Seznam
-          </Link>
+          <BackLink fallbackHref="/iml/inquiries">Seznam</BackLink>
           {canWrite && !initial.converted_order_id && (
-            <Link
+            <PreserveReturnToLink
               href={`/iml/inquiries/${initial.id}/edit`}
               className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
             >
               <Pencil className="h-4 w-4" />
               Upravit
-            </Link>
+            </PreserveReturnToLink>
           )}
           {canWrite && !initial.converted_order_id && (
             <button

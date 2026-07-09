@@ -35,22 +35,48 @@ const IML_EXPORT_MERGE_HEADERS = ["note", "material", "treatment", "realization"
 
 const AUTO_MAP: Record<string, string> = {
   code: "ig_code",
+  kod: "ig_code",
   name: "client_name",
+  nazev: "client_name",
   contractor: "customer_name",
+  zakaznik: "customer_name",
   print: "print_note",
   type: "label_shape_code",
+  produkt: "label_shape_code",
+  "nastroj cislo": "die_cut_tool_code",
+  nastroj: "die_cut_tool_code",
+  vysek: "die_cut_tool_code",
+  vyrez: "die_cut_tool_code",
 };
+
+/** Normalizace hlavičky pro auto-map (malá písmena, bez diakritiky). */
+export function normalizeHeaderKey(header: string): string {
+  return header
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/g, " ");
+}
 
 export function autoMapHeaders(headers: string[]): ColumnMapping {
   const mapping: ColumnMapping = {};
   headers.forEach((h, i) => {
-    const key = h.trim().toLowerCase();
+    const key = normalizeHeaderKey(h);
     const target = AUTO_MAP[key];
     if (target && mapping[target] === undefined) {
       mapping[target] = i;
     }
   });
   return mapping;
+}
+
+export function validatePatchMapping(mapping: ColumnMapping | null): string | null {
+  if (!mapping) return "Chybí mapování sloupců";
+  if (typeof mapping.ig_code !== "number") {
+    return "Mapování musí obsahovat pole ig_code (Kód IG)";
+  }
+  return null;
 }
 
 export function validateMapping(mapping: ColumnMapping | null): string | null {
@@ -177,6 +203,17 @@ export function parseExcelBuffer(buf: Buffer): { headers: string[]; dataRows: st
     .slice(1)
     .filter((r) => r.some((c) => c != null && String(c).trim()));
   return { headers, dataRows };
+}
+
+export function parseSpreadsheetFromBuffer(
+  buf: Buffer,
+  filename: string
+): { headers: string[]; dataRows: string[][] } {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith(".xlsx") || lower.endsWith(".xls")) {
+    return parseExcelBuffer(buf);
+  }
+  return parseCsvText(buf.toString("utf-8"));
 }
 
 export function normalizeCustomerNameKey(name: string): string {

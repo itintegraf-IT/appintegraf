@@ -3,7 +3,8 @@
 import { useState, useEffect, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
+import { BackLink } from "@/components/navigation/BackLink";
 import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
 import ImlProductCombobox from "../../../_components/ImlProductCombobox";
 
@@ -204,13 +205,7 @@ export default function ImlInquiryEditPage({
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Upravit poptávku {form.inquiry_number}</h1>
         </div>
-        <Link
-          href={`/iml/inquiries/${id}`}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Zpět
-        </Link>
+        <BackLink fallbackHref={`/iml/inquiries/${id}`} />
       </div>
 
       <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">

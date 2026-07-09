@@ -3,6 +3,14 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, Pencil, Trash2 } from "lucide-react";
+import { useListFilters } from "@/lib/navigation/use-list-filters";
+import { withReturnTo } from "@/lib/navigation/return-to";
+
+const INQUIRY_LIST_FILTER_DEFAULTS = {
+  search: "",
+  customer_id: "",
+  status: "",
+};
 
 type InquiryRow = {
   id: number;
@@ -19,12 +27,18 @@ type Customer = { id: number; name: string };
 type Props = { canWrite: boolean };
 
 export function ImlInquiriesClient({ canWrite }: Props) {
+  const { filters, setFilter, listHref } = useListFilters({
+    defaults: INQUIRY_LIST_FILTER_DEFAULTS,
+    resetPageOnChange: ["search", "customer_id", "status"],
+  });
+
+  const search = filters.search;
+  const filterCustomer = filters.customer_id;
+  const filterStatus = filters.status;
+
   const [rows, setRows] = useState<InquiryRow[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterCustomer, setFilterCustomer] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [search, setSearch] = useState("");
 
   const fetchRows = async () => {
     setLoading(true);
@@ -53,7 +67,7 @@ export function ImlInquiriesClient({ canWrite }: Props) {
   }, [filterCustomer, filterStatus, search]);
 
   const handleDelete = async (id: number, num: string) => {
-    if (!confirm(`Opravdu smazat poptávku „${num}“?`)) return;
+    if (!confirm(`Opravdu smazat poptávku „${num}"?`)) return;
     const res = await fetch(`/api/iml/inquiries/${id}`, { method: "DELETE" });
     if (res.ok) {
       fetchRows();
@@ -77,12 +91,12 @@ export function ImlInquiriesClient({ canWrite }: Props) {
             type="search"
             placeholder="Hledat číslo / poznámku…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => setFilter("search", e.target.value)}
             className="min-w-[200px] rounded-lg border border-gray-300 px-3 py-2 text-sm"
           />
           <select
             value={filterCustomer}
-            onChange={(e) => setFilterCustomer(e.target.value)}
+            onChange={(e) => setFilter("customer_id", e.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Všichni zákazníci</option>
@@ -94,7 +108,7 @@ export function ImlInquiriesClient({ canWrite }: Props) {
           </select>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => setFilter("status", e.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Všechny stavy</option>
@@ -152,7 +166,7 @@ export function ImlInquiriesClient({ canWrite }: Props) {
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-1">
                       <Link
-                        href={`/iml/inquiries/${q.id}`}
+                        href={withReturnTo(`/iml/inquiries/${q.id}`, listHref)}
                         className="rounded p-2 text-gray-600 hover:bg-gray-100"
                         title="Detail"
                       >
@@ -160,7 +174,7 @@ export function ImlInquiriesClient({ canWrite }: Props) {
                       </Link>
                       {canWrite && !q.converted_order_id && (
                         <Link
-                          href={`/iml/inquiries/${q.id}/edit`}
+                          href={withReturnTo(`/iml/inquiries/${q.id}/edit`, listHref)}
                           className="rounded p-2 text-gray-600 hover:bg-gray-100"
                           title="Upravit"
                         >

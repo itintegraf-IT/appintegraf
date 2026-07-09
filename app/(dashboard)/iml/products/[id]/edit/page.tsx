@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { BackLink } from "@/components/navigation/BackLink";
+import { useReturnTo } from "@/lib/navigation/use-return-to";
 import { ProductFilesUpload } from "../../_components/ProductFilesUpload";
 import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
 import ProductFormSections, {
@@ -39,6 +40,7 @@ export default function ImlProductEditPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
+  const { withPreservedReturnTo } = useReturnTo(`/iml/products/${id}`);
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -243,13 +245,7 @@ export default function ImlProductEditPage() {
           <h1 className="text-2xl font-bold text-gray-900">Upravit produkt</h1>
           <p className="mt-1 text-gray-600">{form.ig_code || form.ig_short_name || "Produkt"}</p>
         </div>
-        <Link
-          href={`/iml/products/${id}`}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Zpět
-        </Link>
+        <BackLink fallbackHref={`/iml/products/${id}`} />
       </div>
 
       <div className="space-y-6">
@@ -289,7 +285,7 @@ export default function ImlProductEditPage() {
               {loading ? "Ukládám…" : "Uložit"}
             </button>
             <Link
-              href={`/iml/products/${id}`}
+              href={withPreservedReturnTo(`/iml/products/${id}`)}
               className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
             >
               Zrušit

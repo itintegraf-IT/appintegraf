@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { auth } from "@/auth";
@@ -526,6 +527,7 @@ export default async function ImlCustomerDetailPage({
   ];
 
   return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Načítání…</div>}>
     <CustomerDetailView
       title={customer.name}
       customerId={customer.id}
@@ -534,6 +536,7 @@ export default async function ImlCustomerDetailPage({
       sections={sections}
       legacyShippingAddress={customer.shipping_address}
     />
+    </Suspense>
   );
 }
 

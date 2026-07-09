@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
-import { ArrowLeft, Search } from "lucide-react";
+import { Search } from "lucide-react";
+import { BackLink } from "@/components/navigation/BackLink";
 import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
 import { filterProductsByQuery } from "@/lib/iml-product-search";
 
@@ -40,7 +41,6 @@ export default function ImlOrderEditPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [supervisor, setSupervisor] = useState(false);
@@ -321,13 +321,7 @@ export default function ImlOrderEditPage() {
           <h1 className="text-2xl font-bold text-gray-900">Upravit objednávku</h1>
           <p className="mt-1 text-gray-600">{form.order_number}</p>
         </div>
-        <Link
-          href={`/iml/orders/${id}`}
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Zpět
-        </Link>
+        <BackLink fallbackHref={`/iml/orders/${id}`} />
       </div>
 
       <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
