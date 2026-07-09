@@ -20,6 +20,7 @@ import {
   Upload,
 } from "lucide-react";
 import { ContactSearchAutocomplete } from "@/components/contacts/ContactSearchAutocomplete";
+import type { EmailSourceLabel, MergedEmailRow } from "@/lib/merge-user-emails";
 import { withReturnTo } from "@/lib/navigation/return-to";
 
 type Contact = {
