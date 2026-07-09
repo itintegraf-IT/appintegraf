@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { BackLink } from "@/components/navigation/BackLink";
-import { useReturnTo } from "@/lib/navigation/use-return-to";
 import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
 import { filterProductsByQuery } from "@/lib/iml-product-search";
 
@@ -42,7 +41,7 @@ export default function ImlOrderEditPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  const { withPreservedReturnTo } = useReturnTo(`/iml/orders/${id}`);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [supervisor, setSupervisor] = useState(false);
   const [loading, setLoading] = useState(false);
