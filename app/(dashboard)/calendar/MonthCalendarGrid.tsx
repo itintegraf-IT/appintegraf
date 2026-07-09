@@ -25,6 +25,7 @@ import {
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
 import { CalendarGlobalEventBlock } from "./CalendarGlobalEventBlock";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type CalendarEvent = {
   id: number;
@@ -66,6 +67,90 @@ function eventMetaPrimaryLine(e: CalendarEvent, eventMetaMode: CalendarEventMeta
     eventMetaMode
   );
   return extra[0] ?? null;
+}
+
+function formatDayHeading(day: Date): string {
+  return day.toLocaleDateString("cs-CZ", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+}
+
+function renderMonthDayEventBlocks(
+  day: Date,
+  dayEvents: CalendarEvent[],
+  eventMetaMode: CalendarEventMetaMode
+): React.ReactNode[] {
+  return dayEvents.flatMap((e) => {
+    const line = e.color ?? "#DC2626";
+    const isGlobal = eventMetaMode !== "hidden";
+
+    if (isGlobal && e.ukoly_task_id == null) {
+      const start = new Date(e.start_date);
+      const end = new Date(e.end_date);
+      const allDay = isAllDayEvent(start, end);
+      const ownerLines = buildCalendarGlobalOwnerBlock(e, { allDay });
+      const deputyLines = buildCalendarGlobalDeputyBlock(e, { allDay });
+      const items = [
+        { key: "owner", lines: ownerLines, color: line },
+        ...(deputyLines
+          ? [{ key: "deputy", lines: deputyLines, color: CALENDAR_DEPUTY_BLOCK_COLOR }]
+          : []),
+      ];
+      return items.map(({ key, lines, color }) => (
+        <CalendarGlobalEventBlock
+          key={`${calendarGridItemKey(e)}-${day.toDateString()}-${key}`}
+          lines={lines}
+          color={color}
+          href={calendarGridItemHref(e)}
+          title={calendarEventTooltipTitle(e, eventMetaMode)}
+          compact
+          onClick={(ev) => ev.stopPropagation()}
+          className="w-full"
+        />
+      ));
+    }
+
+    const primaryMeta = eventMetaPrimaryLine(e, eventMetaMode);
+    const pendingApproval = e.approval_status === "pending" && e.deputy_id;
+    const deputyApproved = e.approval_status === "deputy_approved";
+    const isApproved = e.approval_status === "approved";
+    return [
+      <Link
+        key={`${calendarGridItemKey(e)}-${day.toDateString()}`}
+        href={calendarGridItemHref(e)}
+        onClick={(ev) => ev.stopPropagation()}
+        title={calendarEventTooltipTitle(e, eventMetaMode)}
+        className="block w-full min-h-[1.4rem] truncate border-l-4 pl-0.5 pr-0.5 py-0.5 text-left text-[10px] font-medium leading-tight hover:opacity-90"
+        style={{
+          borderLeftColor: line,
+          backgroundColor: `${line}20`,
+          color: line,
+        }}
+      >
+        <span className="block truncate">{getCalendarEventPrimaryLabel(e)}</span>
+        {primaryMeta && (
+          <span className="block truncate text-[9px] font-normal leading-tight opacity-80">
+            {primaryMeta}
+          </span>
+        )}
+        {pendingApproval && (
+          <span className="ml-0.5 rounded bg-amber-500/80 px-0.5 text-white">!</span>
+        )}
+        {deputyApproved && (
+          <span className="ml-0.5 rounded bg-blue-600 px-0.5 text-white">•</span>
+        )}
+        {isApproved && <span className="ml-0.5 rounded bg-red-600 px-0.5 text-white">✓</span>}
+      </Link>,
+    ];
+  });
+}
+
+function overflowEventsTooltip(events: CalendarEvent[]): string {
+  return events
+    .map((e) => getCalendarEventPrimaryLabel(e))
+    .join("\n");
 }
 
 export function MonthCalendarGrid({
@@ -195,85 +280,33 @@ export function MonthCalendarGrid({
                       </div>
                     ))}
                     <div className="mt-1 space-y-0.5">
-                      {dayEvents.slice(0, 3).flatMap((e) => {
-                        const line = e.color ?? "#DC2626";
-                        const isGlobal = eventMetaMode !== "hidden";
-
-                        if (isGlobal && e.ukoly_task_id == null) {
-                          const start = new Date(e.start_date);
-                          const end = new Date(e.end_date);
-                          const allDay = isAllDayEvent(start, end);
-                          const ownerLines = buildCalendarGlobalOwnerBlock(e, { allDay });
-                          const deputyLines = buildCalendarGlobalDeputyBlock(e, { allDay });
-                          const items = [
-                            { key: "owner", lines: ownerLines, color: line },
-                            ...(deputyLines
-                              ? [{ key: "deputy", lines: deputyLines, color: CALENDAR_DEPUTY_BLOCK_COLOR }]
-                              : []),
-                          ];
-                          return items.map(({ key, lines, color }) => (
-                            <CalendarGlobalEventBlock
-                              key={`${calendarGridItemKey(e)}-${day.toDateString()}-${key}`}
-                              lines={lines}
-                              color={color}
-                              href={calendarGridItemHref(e)}
-                              title={calendarEventTooltipTitle(e, eventMetaMode)}
-                              compact
-                              onClick={(ev) => ev.stopPropagation()}
-                              className="w-full"
-                            />
-                          ));
-                        }
-
-                        const primaryMeta = eventMetaPrimaryLine(e, eventMetaMode);
-                        const pendingApproval =
-                          e.approval_status === "pending" && e.deputy_id;
-                        const deputyApproved =
-                          e.approval_status === "deputy_approved";
-                        const isApproved = e.approval_status === "approved";
-                        return [
-                          <Link
-                            key={`${calendarGridItemKey(e)}-${day.toDateString()}`}
-                            href={calendarGridItemHref(e)}
-                            onClick={(ev) => ev.stopPropagation()}
-                            title={calendarEventTooltipTitle(e, eventMetaMode)}
-                            className="block w-full min-h-[1.4rem] truncate border-l-4 pl-0.5 pr-0.5 py-0.5 text-left text-[10px] font-medium leading-tight hover:opacity-90"
-                            style={{
-                              borderLeftColor: line,
-                              backgroundColor: `${line}20`,
-                              color: line,
-                            }}
-                          >
-                            <span className="block truncate">
-                              {getCalendarEventPrimaryLabel(e)}
-                            </span>
-                            {primaryMeta && (
-                              <span className="block truncate text-[9px] font-normal leading-tight opacity-80">
-                                {primaryMeta}
-                              </span>
-                            )}
-                            {pendingApproval && (
-                              <span className="ml-0.5 rounded bg-amber-500/80 px-0.5 text-white">
-                                !
-                              </span>
-                            )}
-                            {deputyApproved && (
-                              <span className="ml-0.5 rounded bg-blue-600 px-0.5 text-white">
-                                •
-                              </span>
-                            )}
-                            {isApproved && (
-                              <span className="ml-0.5 rounded bg-red-600 px-0.5 text-white">
-                                ✓
-                              </span>
-                            )}
-                          </Link>,
-                        ];
-                      })}
+                      {renderMonthDayEventBlocks(day, dayEvents.slice(0, 3), eventMetaMode)}
                       {dayEvents.length > 3 && (
-                        <span className="block truncate px-1 text-[10px] text-gray-500">
-                          +{dayEvents.length - 3} dalších
-                        </span>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={(ev) => ev.stopPropagation()}
+                              title={`${overflowEventsTooltip(dayEvents.slice(3))}\n\nKlikněte pro zobrazení`}
+                              className="block w-full truncate rounded px-1 text-left text-[10px] font-medium text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                            >
+                              +{dayEvents.length - 3} dalších
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            align="start"
+                            className="w-80 p-3"
+                            onClick={(ev) => ev.stopPropagation()}
+                            onOpenAutoFocus={(ev) => ev.preventDefault()}
+                          >
+                            <p className="mb-2 text-sm font-semibold capitalize text-gray-900">
+                              {formatDayHeading(day)}
+                            </p>
+                            <div className="max-h-72 space-y-1 overflow-y-auto">
+                              {renderMonthDayEventBlocks(day, dayEvents, eventMetaMode)}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       )}
                     </div>
                   </div>
