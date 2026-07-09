@@ -1,11 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { auth } from "@/auth";
 import { canViewContactVizitka, hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { buildOutlookContactSignatureHtml, getContactSignatureAssetBaseUrl } from "@/lib/contact-signature-html";
 import { prisma } from "@/lib/db";
 import { mergeUserEmails } from "@/lib/merge-user-emails";
-import { ArrowLeft, Mail, Phone, Building2, Pencil, QrCode } from "lucide-react";
+import { Mail, Phone, Building2, Pencil, QrCode } from "lucide-react";
+import { BackLink } from "@/components/navigation/BackLink";
+import { PreserveReturnToLink } from "@/components/navigation/PreserveReturnToLink";
 import { ContactDetailTabs } from "../ContactDetailTabs";
 import { ContactVizitkaTab } from "../ContactVizitkaTab";
 
@@ -95,21 +98,21 @@ export default async function ContactViewPage({
         </div>
         <div className="flex gap-2">
           {canWrite && (
-            <Link
+            <PreserveReturnToLink
               href={`/contacts/${id}/edit`}
               className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
             >
               <Pencil className="h-4 w-4" />
               Upravit
-            </Link>
+            </PreserveReturnToLink>
           )}
-          <Link
-            href="/contacts"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Zpět
-          </Link>
+          <Suspense fallback={
+            <Link href="/contacts" className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50">
+              Zpět
+            </Link>
+          }>
+            <BackLink fallbackHref="/contacts" />
+          </Suspense>
         </div>
       </div>
 

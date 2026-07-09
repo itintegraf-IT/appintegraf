@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
@@ -313,6 +314,7 @@ export default async function ImlProductDetailPage({
   );
 
   return (
+    <Suspense fallback={<div className="p-8 text-center text-gray-500">Načítání…</div>}>
     <ProductDetailView
       title={title}
       subtitle={subtitle}
@@ -321,6 +323,7 @@ export default async function ImlProductDetailPage({
       hasPdf={hasPdf}
       sections={sections}
     />
+    </Suspense>
   );
 }
 

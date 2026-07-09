@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
@@ -72,7 +73,9 @@ export default async function ImlCustomersPage() {
         </div>
       </div>
 
-      <ImlCustomersClient canWrite={canWrite} />
+      <Suspense fallback={<div className="p-8 text-center text-gray-500">Načítání…</div>}>
+        <ImlCustomersClient canWrite={canWrite} />
+      </Suspense>
     </>
   );
 }

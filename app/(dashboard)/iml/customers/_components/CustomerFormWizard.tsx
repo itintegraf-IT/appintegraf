@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Info } from "lucide-react";
+import { useReturnTo } from "@/lib/navigation/use-return-to";
 import CustomerFormSections, {
   emptyCustomerForm,
   type CustomerFormErrors,
@@ -170,6 +171,7 @@ export default function CustomerFormWizard({
   initialAttachments = EMPTY_ATTACHMENTS,
 }: Props) {
   const router = useRouter();
+  const { backHref: listBackHref, withPreservedReturnTo } = useReturnTo("/iml/customers");
   const isEdit = mode === "edit" && Boolean(customerId);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(isEdit);
@@ -386,7 +388,9 @@ export default function CustomerFormWizard({
     }
   };
 
-  const backHref = isEdit ? `/iml/customers/${customerId}` : "/iml/customers";
+  const backHref = isEdit
+    ? withPreservedReturnTo(`/iml/customers/${customerId}`)
+    : listBackHref;
   const title = isEdit ? "Upravit zákazníka" : "Přidat zákazníka";
   const isRootCustomer = parentId == null;
   const hqUncheckLocked = draft.isHeadquarters && draft.branches.length > 0;

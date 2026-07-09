@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Info } from "lucide-react";
+import { Info } from "lucide-react";
+import { BackLink } from "@/components/navigation/BackLink";
+import { useReturnTo } from "@/lib/navigation/use-return-to";
 import { Tabs, type TabDef } from "../../_components/Tabs";
 import {
   SectionShell,
@@ -44,6 +46,7 @@ export default function CustomerDetailView({
   legacyShippingAddress?: string | null;
 }) {
   const [mode, setMode] = useViewMode("customerDetail");
+  const { withPreservedReturnTo } = useReturnTo("/iml/customers");
   const visible = sections.filter((s) => !s.hidden);
 
   const tabDefs: TabDef[] = visible.map((s) => ({
@@ -74,19 +77,13 @@ export default function CustomerDetailView({
           <ViewToggle mode={mode} onChange={setMode} />
           {canWrite && (
             <Link
-              href={`/iml/customers/${customerId}/edit`}
+              href={withPreservedReturnTo(`/iml/customers/${customerId}/edit`)}
               className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
             >
               Upravit
             </Link>
           )}
-          <Link
-            href="/iml/customers"
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Zpět
-          </Link>
+          <BackLink fallbackHref="/iml/customers" />
         </div>
       </div>
 

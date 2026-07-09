@@ -3,6 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Eye, Pencil, Trash2 } from "lucide-react";
+import { useListFilters } from "@/lib/navigation/use-list-filters";
+import { withReturnTo } from "@/lib/navigation/return-to";
+
+const CUSTOMER_LIST_FILTER_DEFAULTS = {
+  search: "",
+};
 
 type Customer = {
   id: number;
@@ -18,9 +24,14 @@ type Customer = {
 type Props = { canWrite: boolean };
 
 export function ImlCustomersClient({ canWrite }: Props) {
+  const { filters, setFilter, listHref } = useListFilters({
+    defaults: CUSTOMER_LIST_FILTER_DEFAULTS,
+  });
+
+  const search = filters.search;
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
 
   const fetchCustomers = async () => {
     setLoading(true);
@@ -63,7 +74,7 @@ export function ImlCustomersClient({ canWrite }: Props) {
               type="text"
               placeholder="Hledat podle názvu, e-mailu, kontaktu…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setFilter("search", e.target.value)}
               className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3"
             />
           </div>
@@ -116,7 +127,7 @@ export function ImlCustomersClient({ canWrite }: Props) {
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-1">
                       <Link
-                        href={`/iml/customers/${c.id}`}
+                        href={withReturnTo(`/iml/customers/${c.id}`, listHref)}
                         className="rounded p-2 text-gray-600 hover:bg-gray-100"
                         title="Detail"
                       >
@@ -125,7 +136,7 @@ export function ImlCustomersClient({ canWrite }: Props) {
                       {canWrite && (
                         <>
                           <Link
-                            href={`/iml/customers/${c.id}/edit`}
+                            href={withReturnTo(`/iml/customers/${c.id}/edit`, listHref)}
                             className="rounded p-2 text-gray-600 hover:bg-gray-100"
                             title="Upravit"
                           >

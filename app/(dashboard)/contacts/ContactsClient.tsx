@@ -20,7 +20,7 @@ import {
   Upload,
 } from "lucide-react";
 import { ContactSearchAutocomplete } from "@/components/contacts/ContactSearchAutocomplete";
-import type { EmailSourceLabel, MergedEmailRow } from "@/lib/merge-user-emails";
+import { withReturnTo } from "@/lib/navigation/return-to";
 
 type Contact = {
   id: number;
@@ -169,6 +169,10 @@ export function ContactsClient({
     params.set("page", String(p));
     return `/contacts?${params}`;
   };
+
+  const listHref = searchParams.toString()
+    ? `/contacts?${searchParams.toString()}`
+    : "/contacts";
 
   return (
     <>
@@ -321,12 +325,12 @@ export function ContactsClient({
                       <td className="px-4 py-3 font-mono text-sm">{c.qr_code ?? "-"}</td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex justify-end gap-1">
-                          <Link href={`/contacts/${c.id}`} className="rounded p-2 text-gray-600 hover:bg-gray-100" title="Zobrazit">
+                          <Link href={withReturnTo(`/contacts/${c.id}`, listHref)} className="rounded p-2 text-gray-600 hover:bg-gray-100" title="Zobrazit">
                             <Eye className="h-4 w-4" />
                           </Link>
                           {canWrite && (
                             <>
-                              <Link href={`/contacts/${c.id}/edit`} className="rounded p-2 text-gray-600 hover:bg-gray-100" title="Upravit">
+                              <Link href={withReturnTo(`/contacts/${c.id}/edit`, listHref)} className="rounded p-2 text-gray-600 hover:bg-gray-100" title="Upravit">
                                 <Pencil className="h-4 w-4" />
                               </Link>
                               <button
@@ -375,10 +379,10 @@ export function ContactsClient({
                     )}
                   </div>
                   <div className="mt-4 flex gap-2">
-                    <Link href={`/contacts/${c.id}`} className="rounded bg-gray-100 px-2 py-1 text-sm hover:bg-gray-200">Zobrazit</Link>
+                    <Link href={withReturnTo(`/contacts/${c.id}`, listHref)} className="rounded bg-gray-100 px-2 py-1 text-sm hover:bg-gray-200">Zobrazit</Link>
                     {canWrite && (
                       <>
-                        <Link href={`/contacts/${c.id}/edit`} className="rounded bg-red-100 px-2 py-1 text-sm text-red-600 hover:bg-red-200">Upravit</Link>
+                        <Link href={withReturnTo(`/contacts/${c.id}/edit`, listHref)} className="rounded bg-red-100 px-2 py-1 text-sm text-red-600 hover:bg-red-200">Upravit</Link>
                         <button
                           type="button"
                           onClick={() => handleDelete(c.id, `${c.first_name} ${c.last_name}`)}

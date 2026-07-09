@@ -24,7 +24,7 @@ export default async function ImlImportsPage() {
       href: "/iml/products/import",
       icon: Package,
       label: "Import produktů",
-      description: "CSV, Excel – drag & drop mapování",
+      description: "Složka/ZIP z IMLEXportu nebo doplnění polí z CSV/Excel",
     },
     {
       href: "/iml/orders/import",

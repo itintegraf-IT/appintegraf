@@ -4,6 +4,13 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, Pencil, Trash2, Download, Printer } from "lucide-react";
 import { ImlVariableExportModal } from "./ImlVariableExportModal";
+import { useListFilters } from "@/lib/navigation/use-list-filters";
+import { withReturnTo } from "@/lib/navigation/return-to";
+
+const ORDER_LIST_FILTER_DEFAULTS = {
+  customer_id: "",
+  status: "",
+};
 
 type ListMeta = {
   total_qty: number;
@@ -38,11 +45,16 @@ function shortCustomerName(name: string | null | undefined): string {
 }
 
 export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
+  const { filters, setFilter, listHref } = useListFilters({
+    defaults: ORDER_LIST_FILTER_DEFAULTS,
+  });
+
+  const filterCustomer = filters.customer_id;
+  const filterStatus = filters.status;
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filterCustomer, setFilterCustomer] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
   const [bulkExportOpen, setBulkExportOpen] = useState(false);
   const [singleExport, setSingleExport] = useState<{ id: number; order_number: string } | null>(null);
 
@@ -96,7 +108,7 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
         >
           <select
             value={filterCustomer}
-            onChange={(e) => setFilterCustomer(e.target.value)}
+            onChange={(e) => setFilter("customer_id", e.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Všichni zákazníci</option>
@@ -108,7 +120,7 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
           </select>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => setFilter("status", e.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Všechny stavy</option>
@@ -249,7 +261,7 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
                     <td className="px-2 py-2 text-right align-middle">
                       <div className="flex flex-wrap justify-end gap-0.5">
                         <Link
-                          href={`/iml/orders/${o.id}`}
+                          href={withReturnTo(`/iml/orders/${o.id}`, listHref)}
                           className="rounded p-2 text-gray-600 hover:bg-gray-100"
                           title="Detail"
                         >
@@ -281,7 +293,7 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
                         {canWrite && (
                           <>
                             <Link
-                              href={`/iml/orders/${o.id}/edit`}
+                              href={withReturnTo(`/iml/orders/${o.id}/edit`, listHref)}
                               className="rounded p-2 text-gray-600 hover:bg-gray-100"
                               title="Upravit"
                             >

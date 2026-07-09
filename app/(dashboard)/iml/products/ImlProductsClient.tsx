@@ -1,12 +1,22 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, Eye, Pencil, Trash2, FileText, ImageOff, ImageIcon } from "lucide-react";
 import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
+import { useListFilters } from "@/lib/navigation/use-list-filters";
+import { withReturnTo } from "@/lib/navigation/return-to";
 
 const SHOW_THUMBNAILS_STORAGE_KEY = "iml-products-show-thumbnails";
 const PER_PAGE_STORAGE_KEY = "iml-products-per-page";
+
+const PRODUCT_LIST_FILTER_DEFAULTS = {
+  search: "",
+  customer_id: "",
+  status: "",
+  page: "1",
+  per_page: "",
+};
 
 type PerPageOption = "25" | "50" | "100" | "all";
 
@@ -66,18 +76,24 @@ function ProductListThumbnail({ product }: { product: Product }) {
 }
 
 export function ImlProductsClient({ canWrite, canRead = true }: Props) {
+  const { filters, setFilter, setFilters, listHref } = useListFilters({
+    defaults: PRODUCT_LIST_FILTER_DEFAULTS,
+    resetPageOnChange: ["search", "customer_id", "status", "per_page"],
+  });
+
+  const search = filters.search;
+  const filterCustomer = filters.customer_id;
+  const filterStatus = filters.status;
+  const page = parseInt(filters.page || "1", 10) || 1;
+  const perPage = (filters.per_page || "25") as PerPageOption;
+
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [filterCustomer, setFilterCustomer] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
   const [showThumbnails, setShowThumbnails] = useState(false);
-  const [page, setPage] = useState(1);
-  const [perPage, setPerPage] = useState<PerPageOption>("25");
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
-  const filterSnapshot = useRef({ search: "", filterCustomer: "", filterStatus: "" });
+  const [perPageBootstrapped, setPerPageBootstrapped] = useState(false);
 
   useEffect(() => {
     try {
@@ -86,12 +102,20 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     } catch {
       setShowThumbnails(false);
     }
-    try {
-      setPerPage(parseStoredPerPage(localStorage.getItem(PER_PAGE_STORAGE_KEY)));
-    } catch {
-      setPerPage("25");
-    }
   }, []);
+
+  useEffect(() => {
+    if (perPageBootstrapped || filters.per_page) return;
+    try {
+      const stored = parseStoredPerPage(localStorage.getItem(PER_PAGE_STORAGE_KEY));
+      if (stored !== "25") {
+        setFilters({ per_page: stored });
+      }
+    } catch {
+      /* ignore */
+    }
+    setPerPageBootstrapped(true);
+  }, [perPageBootstrapped, filters.per_page, setFilters]);
 
   const toggleShowThumbnails = () => {
     setShowThumbnails((prev) => {
@@ -106,13 +130,12 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   };
 
   const handlePerPageChange = (value: PerPageOption) => {
-    setPerPage(value);
-    setPage(1);
     try {
       localStorage.setItem(PER_PAGE_STORAGE_KEY, value);
     } catch {
       /* ignore */
     }
+    setFilters({ per_page: value === "25" ? "" : value, page: "1" });
   };
 
   const fetchProducts = async () => {
@@ -141,19 +164,6 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   }, []);
 
   useEffect(() => {
-    const filtersChanged =
-      filterSnapshot.current.search !== search ||
-      filterSnapshot.current.filterCustomer !== filterCustomer ||
-      filterSnapshot.current.filterStatus !== filterStatus;
-
-    if (filtersChanged) {
-      filterSnapshot.current = { search, filterCustomer, filterStatus };
-      if (page !== 1) {
-        setPage(1);
-        return;
-      }
-    }
-
     const t = setTimeout(() => fetchProducts(), 300);
     return () => clearTimeout(t);
   }, [search, filterCustomer, filterStatus, page, perPage]);
@@ -217,7 +227,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
       <div className="border-b border-gray-200 p-4">
         <form
-          onSubmit={(e) => { e.preventDefault(); setPage(1); }}
+          onSubmit={(e) => { e.preventDefault(); setFilter("page", "1"); }}
           className="flex flex-wrap gap-3"
         >
           <div className="relative min-w-[200px] flex-1">
@@ -226,13 +236,13 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
               type="text"
               placeholder="Hledat podle kódu, názvu, SKU…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setFilter("search", e.target.value)}
               className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3"
             />
           </div>
           <select
             value={filterCustomer}
-            onChange={(e) => setFilterCustomer(e.target.value)}
+            onChange={(e) => setFilter("customer_id", e.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Všichni zákazníci</option>
@@ -242,7 +252,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
           </select>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => setFilter("status", e.target.value)}
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Všechny stavy</option>
@@ -323,7 +333,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
                   <td className="px-4 py-3 text-right">
                     <div className="flex justify-end gap-1">
                       <Link
-                        href={`/iml/products/${p.id}`}
+                        href={withReturnTo(`/iml/products/${p.id}`, listHref)}
                         className="rounded p-2 text-gray-600 hover:bg-gray-100"
                         title="Detail"
                       >
@@ -332,7 +342,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
                       {canWrite && (
                         <>
                           <Link
-                            href={`/iml/products/${p.id}/edit`}
+                            href={withReturnTo(`/iml/products/${p.id}/edit`, listHref)}
                             className="rounded p-2 text-gray-600 hover:bg-gray-100"
                             title="Upravit"
                           >
@@ -380,7 +390,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
               <>
                 <button
                   type="button"
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  onClick={() => setFilter("page", String(Math.max(1, page - 1)))}
                   disabled={page <= 1}
                   className="rounded border px-3 py-1 text-sm disabled:pointer-events-none disabled:opacity-50 hover:bg-gray-50"
                 >
@@ -391,7 +401,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
                 </span>
                 <button
                   type="button"
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  onClick={() => setFilter("page", String(Math.min(totalPages, page + 1)))}
                   disabled={!showPageNav || page >= totalPages}
                   className="rounded border px-3 py-1 text-sm disabled:pointer-events-none disabled:opacity-50 hover:bg-gray-50"
                 >
