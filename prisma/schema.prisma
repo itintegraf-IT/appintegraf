@@ -558,6 +558,7 @@ model equipment_requests {
   users_it              users?                       @relation("equipment_requests_it", fields: [it_response_by], references: [id], onUpdate: NoAction)
   users_approval        users?                       @relation("equipment_requests_approval", fields: [approval_requested_to], references: [id], onUpdate: NoAction)
   users_requester       users?                       @relation("equipment_requests_requester", fields: [requester_user_id], references: [id], onUpdate: NoAction)
+  workflow_log          equipment_request_workflow_log[]
 
   @@index([approval_requested_to], map: "idx_approval_requested_to")
   @@index([created_at], map: "idx_created")
@@ -565,6 +566,24 @@ model equipment_requests {
   @@index([status], map: "idx_status")
   @@index([processed_by], map: "processed_by")
   @@index([requester_user_id], map: "idx_requester_user_id")
+}
+
+model equipment_request_workflow_log {
+  id               Int                               @id @default(autoincrement())
+  request_id       Int
+  action           equipment_request_workflow_action
+  actor_user_id    Int
+  from_user_id     Int?
+  to_user_id       Int?
+  comment          String?                           @db.Text
+  created_at       DateTime                          @default(now()) @db.Timestamp(0)
+  equipment_requests equipment_requests              @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users_actor      users                             @relation("equipment_workflow_actor", fields: [actor_user_id], references: [id], onUpdate: NoAction)
+  users_from       users?                            @relation("equipment_workflow_from", fields: [from_user_id], references: [id], onUpdate: NoAction)
+  users_to         users?                            @relation("equipment_workflow_to", fields: [to_user_id], references: [id], onUpdate: NoAction)
+
+  @@index([request_id], map: "idx_equipment_workflow_request")
+  @@index([created_at], map: "idx_equipment_workflow_created")
 }
 
 model helpdesk_tickets {
@@ -1021,6 +1040,9 @@ model users {
   equipment_requests_approval                                    equipment_requests[]          @relation("equipment_requests_approval")
   equipment_requests_it                                          equipment_requests[]          @relation("equipment_requests_it")
   equipment_requests_requester                                   equipment_requests[]          @relation("equipment_requests_requester")
+  equipment_workflow_log_actor                                   equipment_request_workflow_log[] @relation("equipment_workflow_actor")
+  equipment_workflow_log_from                                    equipment_request_workflow_log[] @relation("equipment_workflow_from")
+  equipment_workflow_log_to                                      equipment_request_workflow_log[] @relation("equipment_workflow_to")
   helpdesk_tickets_requester                                     helpdesk_tickets[]            @relation("helpdesk_tickets_requester")
   helpdesk_tickets_assigned                                      helpdesk_tickets[]            @relation("helpdesk_tickets_assigned")
   helpdesk_comments_authored                                     helpdesk_comments[]           @relation("helpdesk_comments_author")
@@ -1113,6 +1135,11 @@ enum equipment_requests_status {
   zam_tnuto        @map("zamítnuto")
   odlo_eno         @map("odloženo")
   vy__zeno         @map("vyřízeno")
+}
+
+enum equipment_request_workflow_action {
+  reassign     @map("reassign")
+  return_to_it @map("return_to_it")
 }
 
 enum helpdesk_category {

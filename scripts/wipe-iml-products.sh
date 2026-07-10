@@ -9,14 +9,14 @@
 #   ./scripts/wipe-iml-products.sh --dry-run    # jen výpis počtů, bez mazání
 #   ./scripts/wipe-iml-products.sh --skip-backup  # nouze (nedoporučeno)
 #
-# SQL: prisma/migrations/manual/20260616_wipe_iml_products.sql
+# SQL: prisma/manual-migrations/20260616_wipe_iml_products.sql
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-SQL_FILE="prisma/migrations/manual/20260616_wipe_iml_products.sql"
+SQL_FILE="prisma/manual-migrations/20260616_wipe_iml_products.sql"
 DRY_RUN=0
 SKIP_BACKUP=0
 BACKUP_DIR="${BACKUP_DIR:-$ROOT/backups}"

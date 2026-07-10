@@ -3,6 +3,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { isInDepartment } from "@/lib/equipment-departments";
+import {
+  validateVedeniApprover,
+  workflowLogInclude,
+} from "@/lib/equipment-request-approver";
 import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
 
 /** GET – detail požadavku */
@@ -30,6 +34,7 @@ export async function GET(
     include: {
       users_it: { select: { id: true, first_name: true, last_name: true } },
       users_approval: { select: { id: true, first_name: true, last_name: true } },
+      workflow_log: workflowLogInclude,
     },
   });
 
@@ -69,42 +74,14 @@ export async function PATCH(
   const body = await req.json().catch(() => ({}));
   const { it_response, approval_requested_to } = body;
 
-  if (!it_response || typeof it_response !== "string" || !it_response.trim()) {
-    return NextResponse.json({ error: "Vyplňte stanovisko" }, { status: 400 });
-  }
-
   const approvalTo = approval_requested_to != null ? parseInt(String(approval_requested_to), 10) : null;
   if (!approvalTo || isNaN(approvalTo)) {
     return NextResponse.json({ error: "Vyberte příjemce ke schválení" }, { status: 400 });
   }
 
-  // Ověření, že vybraný uživatel skutečně patří do oddělení Vedení (primární nebo sekundární)
-  const vedeni = await prisma.departments.findFirst({
-    where: { name: "Vedení", is_active: true },
-    select: { id: true },
-  });
-  if (!vedeni) {
-    return NextResponse.json(
-      { error: "Oddělení „Vedení“ není v systému nalezeno" },
-      { status: 400 }
-    );
-  }
-  const approverOk = await prisma.users.findFirst({
-    where: {
-      id: approvalTo,
-      is_active: true,
-      OR: [
-        { department_id: vedeni.id },
-        { user_secondary_departments: { some: { department_id: vedeni.id } } },
-      ],
-    },
-    select: { id: true },
-  });
-  if (!approverOk) {
-    return NextResponse.json(
-      { error: "Vybraný schvalovatel není členem oddělení Vedení" },
-      { status: 400 }
-    );
+  const validationError = await validateVedeniApprover(approvalTo);
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
   }
 
   const existing = await prisma.equipment_requests.findUnique({ where: { id } });
@@ -115,12 +92,26 @@ export async function PATCH(
     return NextResponse.json({ error: "Požadavek již byl zpracován" }, { status: 400 });
   }
 
+  const hasExistingItResponse = !!existing.it_response?.trim();
+  const newItResponse = it_response != null ? String(it_response).trim() : "";
+
+  if (!hasExistingItResponse) {
+    if (!newItResponse) {
+      return NextResponse.json({ error: "Vyplňte stanovisko" }, { status: 400 });
+    }
+  }
+
+  const finalItResponse = newItResponse || existing.it_response?.trim() || "";
+  if (!finalItResponse) {
+    return NextResponse.json({ error: "Vyplňte stanovisko" }, { status: 400 });
+  }
+
   const equipmentLink = `/equipment?tab=requests&id=${id}`;
 
   await prisma.equipment_requests.update({
     where: { id },
     data: {
-      it_response: String(it_response).trim(),
+      it_response: finalItResponse,
       it_response_by: userId,
       it_response_at: new Date(),
       approval_requested_to: approvalTo,
