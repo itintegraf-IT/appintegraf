@@ -53,6 +53,11 @@ export function NotificationsDropdown() {
     setOpen(false);
   };
 
+  const dismissInvite = async (id: number) => {
+    setActionError(null);
+    await markAsRead(id);
+  };
+
   const respondToInvite = async (id: number, action: "approve" | "reject", reason?: string) => {
     setActionLoading((prev) => ({ ...prev, [id]: action }));
     setActionError(null);
@@ -68,6 +73,12 @@ export function NotificationsDropdown() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(data?.error || "Nepodařilo se zpracovat pozvánku");
+      }
+      if (data?.action === "dismissed") {
+        setRejectOpenFor(null);
+        setRejectReason("");
+        fetchNotifications();
+        return;
       }
       setRejectOpenFor(null);
       setRejectReason("");
@@ -227,27 +238,51 @@ export function NotificationsDropdown() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={() => respondToInvite(n.id, "approve")}
-                            disabled={!!actionLoading[n.id]}
-                            className="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-60"
-                          >
-                            {actionLoading[n.id] === "approve" ? "Schvaluji…" : "Schválit"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRejectOpenFor(n.id);
-                              setActionError(null);
-                              setRejectReason("");
-                            }}
-                            disabled={!!actionLoading[n.id]}
-                            className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-60"
-                          >
-                            Zamítnout
-                          </button>
+                        <div className="space-y-2">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => respondToInvite(n.id, "approve")}
+                              disabled={!!actionLoading[n.id]}
+                              className="rounded bg-green-600 px-2 py-1 text-xs text-white hover:bg-green-700 disabled:opacity-60"
+                            >
+                              {actionLoading[n.id] === "approve" ? "Schvaluji…" : "Schválit"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRejectOpenFor(n.id);
+                                setActionError(null);
+                                setRejectReason("");
+                              }}
+                              disabled={!!actionLoading[n.id]}
+                              className="rounded bg-red-600 px-2 py-1 text-xs text-white hover:bg-red-700 disabled:opacity-60"
+                            >
+                              Zamítnout
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => dismissInvite(n.id)}
+                              disabled={!!actionLoading[n.id]}
+                              className="rounded border px-2 py-1 text-xs"
+                              style={{ borderColor: "var(--border)" }}
+                            >
+                              Ignorovat
+                            </button>
+                            {n.link && (
+                              <Link
+                                href={n.link}
+                                onClick={() => setOpen(false)}
+                                className="rounded border px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                                style={{ borderColor: "var(--border)" }}
+                              >
+                                Detail
+                              </Link>
+                            )}
+                          </div>
+                          {actionError && rejectOpenFor !== n.id && (
+                            <p className="text-xs text-red-600">{actionError}</p>
+                          )}
                         </div>
                       )}
                       {actionError && rejectOpenFor === n.id && (

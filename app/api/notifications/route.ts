@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { dismissStaleCalendarInviteNotifications } from "@/lib/calendar-invite-notifications";
 
 /** GET – seznam notifikací přihlášeného uživatele */
 export async function GET(req: NextRequest) {
@@ -12,6 +13,8 @@ export async function GET(req: NextRequest) {
   const userId = parseInt(session.user.id, 10);
   const { searchParams } = new URL(req.url);
   const unreadOnly = searchParams.get("unread") === "true";
+
+  await dismissStaleCalendarInviteNotifications(userId);
 
   const where: { user_id: number; read_at?: null } = { user_id: userId };
   if (unreadOnly) {

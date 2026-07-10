@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { Send, Check, X, ChevronDown, CheckCircle2 } from "lucide-react";
+import { Send, Check, X, ChevronDown, CheckCircle2, ArrowRightLeft, Undo2 } from "lucide-react";
 
 const STATUS_LABELS: Record<string, string> = {
   nov_: "Nový",
@@ -26,6 +26,16 @@ const PRIORITY_LABELS: Record<string, string> = {
   n_zk_: "Nízká",
   st_edn_: "Střední",
   vysok_: "Vysoká",
+};
+
+type WorkflowLogEntry = {
+  id: number;
+  action: string;
+  comment: string | null;
+  created_at: string;
+  users_actor: { id: number; first_name: string; last_name: string } | null;
+  users_from: { id: number; first_name: string; last_name: string } | null;
+  users_to: { id: number; first_name: string; last_name: string } | null;
 };
 
 type Request = {
@@ -62,8 +72,16 @@ export function EquipmentRequestsTab() {
   const [inIT, setInIT] = useState(false);
   const [vedeniMembers, setVedeniMembers] = useState<Member[]>([]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
-  const [itForm, setItForm] = useState<{ id: number; response: string; approvalTo: number } | null>(null);
+  const [itForm, setItForm] = useState<{
+    id: number;
+    response: string;
+    approvalTo: number;
+    hasExistingResponse?: boolean;
+  } | null>(null);
   const [approveForm, setApproveForm] = useState<{ id: number; action: "approve" | "reject"; response: string } | null>(null);
+  const [rerouteForm, setRerouteForm] = useState<{ id: number; approvalTo: number; comment: string } | null>(null);
+  const [returnForm, setReturnForm] = useState<{ id: number; comment: string } | null>(null);
+  const [workflowLogs, setWorkflowLogs] = useState<Record<number, WorkflowLogEntry[]>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -119,6 +137,21 @@ export function EquipmentRequestsTab() {
     return () => clearTimeout(t);
   }, [highlightId, loading, requests]);
 
+  useEffect(() => {
+    if (expandedId == null) return;
+    fetch(`/api/equipment/requests/${expandedId}`)
+      .then((r) => safeJson(r))
+      .then((data) => {
+        if (data.request?.workflow_log) {
+          setWorkflowLogs((prev) => ({
+            ...prev,
+            [expandedId]: data.request.workflow_log,
+          }));
+        }
+      })
+      .catch(() => {});
+  }, [expandedId]);
+
   const handleItSubmit = async () => {
     if (!itForm) return;
     setSubmitting(true);
@@ -139,6 +172,11 @@ export function EquipmentRequestsTab() {
       }
       setItForm(null);
       setExpandedId(null);
+      setWorkflowLogs((prev) => {
+        const next = { ...prev };
+        delete next[itForm.id];
+        return next;
+      });
       fetchRequests();
     } catch {
       setError("Chyba při odesílání");
@@ -163,6 +201,73 @@ export function EquipmentRequestsTab() {
       fetchRequests();
     } catch {
       setError("Chyba při označování");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleRerouteSubmit = async () => {
+    if (!rerouteForm) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/equipment/requests/${rerouteForm.id}/reroute`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "reassign",
+          approval_requested_to: rerouteForm.approvalTo,
+          comment: rerouteForm.comment.trim() || undefined,
+        }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) {
+        setError(data.error ?? "Chyba při přeřazení");
+        return;
+      }
+      setRerouteForm(null);
+      setExpandedId(null);
+      setWorkflowLogs((prev) => {
+        const next = { ...prev };
+        delete next[rerouteForm.id];
+        return next;
+      });
+      fetchRequests();
+    } catch {
+      setError("Chyba při přeřazení");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleReturnSubmit = async () => {
+    if (!returnForm) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/equipment/requests/${returnForm.id}/reroute`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "return_to_it",
+          comment: returnForm.comment,
+        }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) {
+        setError(data.error ?? "Chyba při vrácení IT");
+        return;
+      }
+      setReturnForm(null);
+      setExpandedId(null);
+      setWorkflowLogs((prev) => {
+        const next = { ...prev };
+        delete next[returnForm.id];
+        return next;
+      });
+      fetchRequests();
+    } catch {
+      setError("Chyba při vrácení IT");
     } finally {
       setSubmitting(false);
     }
@@ -198,6 +303,25 @@ export function EquipmentRequestsTab() {
 
   const formatDate = (s: string | null) =>
     s ? new Date(s).toLocaleDateString("cs-CZ", { dateStyle: "short" }) : "-";
+
+  const formatWorkflowEntry = (entry: WorkflowLogEntry) => {
+    const actor = entry.users_actor
+      ? `${entry.users_actor.first_name} ${entry.users_actor.last_name}`
+      : "?";
+    if (entry.action === "reassign") {
+      const from = entry.users_from
+        ? `${entry.users_from.first_name} ${entry.users_from.last_name}`
+        : "?";
+      const to = entry.users_to
+        ? `${entry.users_to.first_name} ${entry.users_to.last_name}`
+        : "?";
+      return `${actor} přeřadil z ${from} na ${to}${entry.comment ? ` – ${entry.comment}` : ""}`;
+    }
+    if (entry.action === "return_to_it") {
+      return `${actor} vrátil IT${entry.comment ? ` – ${entry.comment}` : ""}`;
+    }
+    return actor;
+  };
 
   return (
     <div className="space-y-4">
@@ -240,24 +364,56 @@ export function EquipmentRequestsTab() {
               canDirectApprove ||
               (r.status === "cek_na_schv_len_" &&
                 (isAdmin || r.approval_requested_to === currentUserId));
+            const canReroute =
+              r.status === "cek_na_schv_len_" &&
+              (inIT || isAdmin || r.approval_requested_to === currentUserId);
+            const canReturnToIT =
+              r.status === "cek_na_schv_len_" &&
+              (isAdmin || r.approval_requested_to === currentUserId);
             const canResolve = r.status === "schv_leno" && inIT;
-            const hasQuickActions = canForwardToApproval || canApprove || canResolve;
+            const hasQuickActions =
+              canForwardToApproval || canApprove || canResolve || canReroute || canReturnToIT;
             const isHighlighted = highlightId === r.id;
+            const rerouteCandidates = vedeniMembers.filter(
+              (m) => m.id !== r.approval_requested_to
+            );
 
             const openItForm = () => {
               setExpandedId(r.id);
               setApproveForm(null);
+              setRerouteForm(null);
+              setReturnForm(null);
               setItForm({
                 id: r.id,
-                response: "",
-                // Pokud je ve Vedení jen jeden člen, předvyplň ho; jinak nechej uživatele explicitně vybrat.
+                response: r.it_response ?? "",
                 approvalTo: vedeniMembers.length === 1 ? vedeniMembers[0].id : 0,
+                hasExistingResponse: !!r.it_response,
               });
             };
             const openApproveForm = (action: "approve" | "reject") => {
               setExpandedId(r.id);
               setItForm(null);
+              setRerouteForm(null);
+              setReturnForm(null);
               setApproveForm({ id: r.id, action, response: "" });
+            };
+            const openRerouteForm = () => {
+              setExpandedId(r.id);
+              setItForm(null);
+              setApproveForm(null);
+              setReturnForm(null);
+              setRerouteForm({
+                id: r.id,
+                approvalTo: rerouteCandidates.length === 1 ? rerouteCandidates[0]!.id : 0,
+                comment: "",
+              });
+            };
+            const openReturnForm = () => {
+              setExpandedId(r.id);
+              setItForm(null);
+              setApproveForm(null);
+              setRerouteForm(null);
+              setReturnForm({ id: r.id, comment: "" });
             };
 
             return (
@@ -336,6 +492,26 @@ export function EquipmentRequestsTab() {
                       </button>
                     </>
                   )}
+                  {canReroute && rerouteCandidates.length > 0 && (
+                    <button
+                      onClick={openRerouteForm}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700"
+                      title="Přeřadit požadavek jinému schvalovateli z vedení"
+                    >
+                      <ArrowRightLeft className="h-3.5 w-3.5" />
+                      Přeřadit
+                    </button>
+                  )}
+                  {canReturnToIT && (
+                    <button
+                      onClick={openReturnForm}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700"
+                      title="Vrátit požadavek IT k přeřazení schvalovatele"
+                    >
+                      <Undo2 className="h-3.5 w-3.5" />
+                      Vrátit IT
+                    </button>
+                  )}
                   {canResolve && (
                     <button
                       onClick={() => handleResolve(r.id)}
@@ -379,9 +555,19 @@ export function EquipmentRequestsTab() {
                         <p>{r.admin_response}</p>
                       </div>
                     )}
+                    {(workflowLogs[r.id]?.length ?? 0) > 0 && (
+                      <div className="mt-2 rounded bg-amber-50/50 p-2 space-y-1">
+                        <p className="text-gray-500 text-xs">Historie přesměrování:</p>
+                        {workflowLogs[r.id]!.map((entry) => (
+                          <p key={entry.id} className="text-xs text-gray-700">
+                            {formatDate(entry.created_at)} – {formatWorkflowEntry(entry)}
+                          </p>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  {r.status === "nov_" && inIT && !itForm && !approveForm && (
+                  {r.status === "nov_" && inIT && !itForm && !approveForm && !rerouteForm && !returnForm && (
                     <div>
                       {vedeniMembers.length === 0 ? (
                         <p className="text-sm text-amber-600">
@@ -392,11 +578,12 @@ export function EquipmentRequestsTab() {
                         onClick={() =>
                           setItForm({
                             id: r.id,
-                            response: "",
+                            response: r.it_response ?? "",
                             approvalTo:
                               vedeniMembers.length === 1
                                 ? vedeniMembers[0]!.id
                                 : 0,
+                            hasExistingResponse: !!r.it_response,
                           })
                         }
                         className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -417,17 +604,23 @@ export function EquipmentRequestsTab() {
                       className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/50 p-4"
                     >
                       <p className="text-sm font-medium text-gray-700">
-                        Stanovisko IT a odeslání vedení
+                        {itForm.hasExistingResponse
+                          ? "Opětovné odeslání vedení"
+                          : "Stanovisko IT a odeslání vedení"}
                       </p>
                       <textarea
                         value={itForm.response}
                         onChange={(e) =>
                           setItForm((f) => f && { ...f, response: e.target.value })
                         }
-                        placeholder="Stanovisko IT…"
+                        placeholder={
+                          itForm.hasExistingResponse
+                            ? "Upravit stanovisko IT (volitelné)…"
+                            : "Stanovisko IT…"
+                        }
                         rows={3}
                         className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                        required
+                        required={!itForm.hasExistingResponse}
                       />
                       <div>
                         <label className="mb-1 block text-xs font-medium text-gray-700">
@@ -468,7 +661,7 @@ export function EquipmentRequestsTab() {
                           type="submit"
                           disabled={
                             submitting ||
-                            !itForm.response.trim() ||
+                            (!itForm.hasExistingResponse && !itForm.response.trim()) ||
                             !itForm.approvalTo
                           }
                           className="rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
@@ -490,7 +683,9 @@ export function EquipmentRequestsTab() {
                     (r.status === "cek_na_schv_len_" &&
                       (isAdmin || r.approval_requested_to === currentUserId))) &&
                     !approveForm &&
-                    !itForm && (
+                    !itForm &&
+                    !rerouteForm &&
+                    !returnForm && (
                       <div className="flex gap-2">
                         <button
                           onClick={() =>
@@ -520,6 +715,134 @@ export function EquipmentRequestsTab() {
                         </button>
                       </div>
                     )}
+
+                  {canReroute && rerouteCandidates.length > 0 && !rerouteForm && !itForm && !approveForm && !returnForm && (
+                    <button
+                      onClick={openRerouteForm}
+                      className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white hover:bg-amber-700"
+                    >
+                      <ArrowRightLeft className="h-4 w-4" />
+                      Přeřadit jinému schvalovateli
+                    </button>
+                  )}
+
+                  {canReturnToIT && !returnForm && !itForm && !approveForm && !rerouteForm && (
+                    <button
+                      onClick={openReturnForm}
+                      className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-medium text-white hover:bg-orange-700"
+                    >
+                      <Undo2 className="h-4 w-4" />
+                      Vrátit IT
+                    </button>
+                  )}
+
+                  {rerouteForm?.id === r.id && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleRerouteSubmit();
+                      }}
+                      className="space-y-3 rounded-lg border border-amber-200 bg-amber-50/50 p-4"
+                    >
+                      <p className="text-sm font-medium text-gray-700">
+                        Přeřazení schvalovatele
+                      </p>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-700">
+                          Nový schvalovatel z vedení <span className="text-red-600">*</span>
+                        </label>
+                        <select
+                          value={rerouteForm.approvalTo}
+                          onChange={(e) =>
+                            setRerouteForm((f) =>
+                              f ? { ...f, approvalTo: parseInt(e.target.value, 10) } : null
+                            )
+                          }
+                          required
+                          className={`w-full rounded-lg border px-3 py-2 text-sm ${
+                            rerouteForm.approvalTo === 0
+                              ? "border-red-300 bg-red-50"
+                              : "border-gray-300"
+                          }`}
+                        >
+                          <option value={0} disabled>
+                            — Vyberte schvalovatele —
+                          </option>
+                          {rerouteCandidates.map((m) => (
+                            <option key={m.id} value={m.id}>
+                              {m.first_name} {m.last_name}
+                              {m.email ? ` (${m.email})` : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <textarea
+                        value={rerouteForm.comment}
+                        onChange={(e) =>
+                          setRerouteForm((f) => f && { ...f, comment: e.target.value })
+                        }
+                        placeholder="Vyjádření (volitelné)…"
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={submitting || !rerouteForm.approvalTo}
+                          className="rounded-lg bg-amber-600 px-4 py-2 text-sm text-white hover:bg-amber-700 disabled:opacity-50"
+                        >
+                          Přeřadit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRerouteForm(null)}
+                          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Zrušit
+                        </button>
+                      </div>
+                    </form>
+                  )}
+
+                  {returnForm?.id === r.id && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleReturnSubmit();
+                      }}
+                      className="space-y-3 rounded-lg border border-orange-200 bg-orange-50/50 p-4"
+                    >
+                      <p className="text-sm font-medium text-gray-700">
+                        Vrácení požadavku IT
+                      </p>
+                      <textarea
+                        value={returnForm.comment}
+                        onChange={(e) =>
+                          setReturnForm((f) => f && { ...f, comment: e.target.value })
+                        }
+                        placeholder="Důvod / pokyn pro IT (např. přiřaďte jinému schvalovateli)…"
+                        rows={3}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        required
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="submit"
+                          disabled={submitting || !returnForm.comment.trim()}
+                          className="rounded-lg bg-orange-600 px-4 py-2 text-sm text-white hover:bg-orange-700 disabled:opacity-50"
+                        >
+                          Vrátit IT
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setReturnForm(null)}
+                          className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          Zrušit
+                        </button>
+                      </div>
+                    </form>
+                  )}
 
                   {approveForm?.id === r.id && (
                     <form

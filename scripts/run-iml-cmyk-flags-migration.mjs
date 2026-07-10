@@ -13,8 +13,7 @@ const envPath = join(root, ".env");
 const SQL_PATH = join(
   root,
   "prisma",
-  "migrations",
-  "manual",
+  "manual-migrations",
   "20260617_iml_product_cmyk_flags.sql"
 );
 

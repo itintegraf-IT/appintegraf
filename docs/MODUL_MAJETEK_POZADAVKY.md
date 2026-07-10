@@ -56,6 +56,17 @@ Klíčová pole pro schvalování:
 | `processed_at` | datum | Kdy |
 | `requester_user_id` | FK → users (volitelné) | Vazba na přihlášeného žadatele (interní formulář) |
 
+### Audit přesměrování (`equipment_request_workflow_log`)
+
+| Pole | Typ | Význam |
+|---|---|---|
+| `action` | enum | `reassign` (přeřazení) / `return_to_it` (vrácení IT) |
+| `actor_user_id` | FK → users | Kdo akci provedl |
+| `from_user_id` | FK → users | Původní schvalovatel |
+| `to_user_id` | FK → users | Nový schvalovatel (u reassign) |
+| `comment` | text | Vyjádření (povinné u return_to_it) |
+| `created_at` | datum | Čas události |
+
 ## Workflow krok za krokem
 
 ### 1. Žadatel odešle požadavek
@@ -118,6 +129,34 @@ Klíčová pole pro schvalování:
   - přepne status na **`schv_leno`** nebo **`zam_tnuto`** podle akce,
   - pokud má žadatel zadaný e-mail, **odešle mu informační e-mail** o výsledku (funkce `sendEquipmentRequestResultEmail`); chyba odeslání neblokuje uložení.
 
+### 3c. Přeřazení schvalovatele (stav `cek_na_schv_len_`)
+
+- Tlačítko **Přeřadit** vidí IT, admin nebo aktuální schvalovatel.
+- Formulář: výběr jiného člena Vedení + volitelné vyjádření.
+- API: `PATCH /api/equipment/requests/{id}/reroute` s body `{ action: "reassign", approval_requested_to, comment? }`.
+- Server:
+  - ověří stav `cek_na_schv_len_` a oprávnění (IT / admin / aktuální schvalovatel),
+  - změní `approval_requested_to` a `approval_requested_at`,
+  - zapíše záznam do `equipment_request_workflow_log`,
+  - notifikuje nového schvalovatele (`equipment_approval`).
+
+### 3d. Vrácení požadavku IT (stav `cek_na_schv_len_`)
+
+- Tlačítko **Vrátit IT** vidí admin nebo aktuální schvalovatel (ne IT, pokud není schvalovatelem).
+- Formulář: povinný důvod / pokyn pro IT.
+- API: `PATCH /api/equipment/requests/{id}/reroute` s body `{ action: "return_to_it", comment }`.
+- Server:
+  - přepne status na **`nov_`**, vynuluje `approval_requested_to` / `approval_requested_at`,
+  - **zachová** existující stanovisko IT (`it_response`),
+  - zapíše záznam do workflow logu,
+  - notifikuje IT uživatele s `equipment:write` a původního autora stanoviska (`it_response_by`).
+
+### 3e. Opětovné předání po vrácení
+
+- Po vrácení (stav `nov_` se zachovaným `it_response`) IT znovu klikne **Předat vedení**.
+- Stanovisko IT je volitelné (předvyplněné); stačí vybrat nového schvalovatele.
+- API: `PATCH /api/equipment/requests/{id}` – stejný endpoint, akceptuje `nov_` i s existujícím `it_response`.
+
 ### 4. IT označí jako vyřízené
 
 - Po schválení vedení proběhne fyzické pořízení / předání techniky.
@@ -141,13 +180,15 @@ Záložka Požadavky (`Majetek → Požadavky`) umožňuje filtrovat všechny po
 
 - číslo požadavku, stav (barevný badge), jméno žadatele, typ techniky, prioritu, stručný popis, datum vytvoření,
 - pod tím autora a datum stanoviska IT, na koho byl požadavek předán,
-- po rozbalení celý popis, stanovisko IT, stanovisko vedení a akční tlačítka podle role.
+- po rozbalení celý popis, stanovisko IT, stanovisko vedení, historie přesměrování a akční tlačítka podle role.
 
 ## Bezpečnost a oprávnění
 
 - **Čtení seznamu:** vyžaduje `equipment:read` – každý uživatel s jakýmkoli přístupem k modulu Majetek vidí požadavky.
 - **IT akce:** `equipment:write` + členství v „IT".
-- **Schválení:** `equipment:write` + členství v „Vedení" + být konkrétně určeným schvalovatelem.
+- **Schválení:** `equipment:write` + členství v „Vedení" + být konkrétně určeným schvalovatelem (admin obchází kontrolu přidělení).
+- **Přeřazení:** `equipment:write` + IT, admin nebo aktuální schvalovatel.
+- **Vrácení IT:** `equipment:write` + admin nebo aktuální schvalovatel.
 - **Veřejné odeslání (POST):** bez autentizace; validuje typy, e-mail a délku.
 
 Role „Admin" (globální role uživatele) má automaticky všechna `*:admin` oprávnění včetně `equipment:write`. Přesto **musí být členem odpovídajícího oddělení**, jinak server akci nepovolí.
@@ -159,8 +200,10 @@ Role „Admin" (globální role uživatele) má automaticky všechna `*:admin` o
 | `POST` | `/api/public/equipment-request` | Veřejné | Vytvoří požadavek (`nov_`), notifikuje admini Majetku |
 | `GET`  | `/api/equipment/requests?status=` | `equipment:read` | Seznam požadavků s volitelným filtrem |
 | `GET`  | `/api/equipment/requests/{id}` | `equipment:read` | Detail požadavku |
-| `PATCH`| `/api/equipment/requests/{id}` | IT (`write` + IT odd.) | Stanovisko IT + předání Vedení |
+| `PATCH`| `/api/equipment/requests/{id}` | IT (`write` + IT odd.) | Stanovisko IT + předání Vedení (i opětovné po vrácení) |
 | `PATCH`| `/api/equipment/requests/{id}/approve` | Vedení (`write` + Vedení odd.) | Schválit / zamítnout |
+| `PATCH`| `/api/equipment/requests/{id}/reroute` | IT / schvalovatel / admin | Přeřadit schvalovatele nebo vrátit IT |
+| `PATCH`| `/api/equipment/requests/{id}/resolve` | IT | Označit jako vyřízené |
 
 ## Zdroje v kódu
 
@@ -172,14 +215,17 @@ Role „Admin" (globální role uživatele) má automaticky všechna `*:admin` o
 | `app/api/equipment/requests/route.ts` | GET seznam |
 | `app/api/equipment/requests/[id]/route.ts` | GET detail + PATCH stanovisko IT |
 | `app/api/equipment/requests/[id]/approve/route.ts` | PATCH schválení / zamítnutí + e-mail žadateli |
+| `app/api/equipment/requests/[id]/reroute/route.ts` | PATCH přeřazení / vrácení IT + audit log |
 | `app/api/equipment/requests/[id]/resolve/route.ts` | PATCH označení jako vyřízené (IT) + e-mail žadateli |
+| `lib/equipment-request-approver.ts` | Validace schvalovatele z Vedení, notifikace IT |
 | `lib/email.ts` – `sendEquipmentRequestResultEmail` | Informační e-mail žadateli (approved/rejected/resolved) |
 | `prisma/schema.prisma` – model `equipment_requests` | Datový model a enumy |
+| `prisma/schema.prisma` – model `equipment_request_workflow_log` | Audit přesměrování schvalování |
 
 ## Známá omezení / návrhy na rozšíření
 
 1. **Přímá vazba na `equipment_items`** chybí – po schválení se nevytváří automaticky šablona položky k pořízení.
 2. **Stav „odloženo"** – UI jej zatím nenastavuje (existuje jen v DB).
 3. **Eskalace** – neexistuje žádný časový trigger. Dlouho čekající požadavky lze zatím sledovat pouze manuálně přes filtr.
-4. **Delegace / zástup** – schválit může pouze uživatel, kterému IT požadavek přiřadilo. Při jeho nepřítomnosti nelze schválení delegovat bez re-přidělení.
+4. **Zástup přes `user_deputies`** – přeřazení řeší manuální delegaci; automatický zástup se nepoužívá.
 5. **Hard-coded názvy oddělení** – proces závisí na přesných textových jménech „IT" a „Vedení". Při přejmenování oddělení přestane workflow fungovat.

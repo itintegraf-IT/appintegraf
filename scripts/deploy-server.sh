@@ -214,8 +214,8 @@ if [[ "${#SQL_FILES[@]}" -gt 0 ]]; then
       sql_path="$f"
     elif [[ -f "prisma/migrations/$f" ]]; then
       sql_path="prisma/migrations/$f"
-    elif [[ -f "prisma/migrations/manual/$f" ]]; then
-      sql_path="prisma/migrations/manual/$f"
+    elif [[ -f "prisma/manual-migrations/$f" ]]; then
+      sql_path="prisma/manual-migrations/$f"
     else
       echo "CHYBA: SQL soubor nenalezen: $f (ani v prisma/migrations/ ani manual/)" >&2
       exit 1

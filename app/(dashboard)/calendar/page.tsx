@@ -2,7 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { isAdmin, hasModuleAccess } from "@/lib/auth-utils";
-import { Calendar, Plus, Download } from "lucide-react";
+import { Calendar, Plus, Download, Building2 } from "lucide-react";
 import { CalendarNav } from "./CalendarNav";
 import { CalendarTabs } from "./CalendarTabs";
 import { CalendarViewToggle } from "./CalendarViewToggle";
@@ -393,7 +393,14 @@ export default async function CalendarPage({
           </h1>
           <p className="mt-1 text-gray-600">Události, úkoly a termíny</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/calendar/resources/rooms"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+          >
+            <Building2 className="h-4 w-4" />
+            Rezervace místností a aut
+          </Link>
           <a
             href={`/api/calendar/export?scope=${admin ? "all" : "mine"}`}
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
