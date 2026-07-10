@@ -67,6 +67,8 @@ body {
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
 }
 
 :root {
@@ -75,6 +77,8 @@ body {
   --foreground: oklch(0.22 0.02 248);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.22 0.02 248);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.02 248);
   --primary: oklch(0.52 0.2 25);
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.94 0.04 25);
@@ -130,6 +134,8 @@ body {
   --foreground: oklch(0.9 0.012 255);
   --card: oklch(0.2 0.014 255);
   --card-foreground: oklch(0.9 0.012 255);
+  --popover: oklch(0.2 0.014 255);
+  --popover-foreground: oklch(0.9 0.012 255);
   --primary: oklch(0.52 0.2 25);
   --primary-foreground: oklch(0.98 0 0);
   --secondary: oklch(0.24 0.016 255);

@@ -295,7 +295,7 @@ export function MonthCalendarGrid({
                           </PopoverTrigger>
                           <PopoverContent
                             align="start"
-                            className="w-80 p-3"
+                            className="w-80 border border-gray-200 bg-white p-3 shadow-lg"
                             onClick={(ev) => ev.stopPropagation()}
                             onOpenAutoFocus={(ev) => ev.preventDefault()}
                           >
