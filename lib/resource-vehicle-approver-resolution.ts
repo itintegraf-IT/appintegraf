@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
-import { isUserAbsentInRange } from "@/lib/calendar-approver-resolution";
+import { isUserAbsentAt } from "@/lib/calendar-approver-resolution";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -21,11 +21,14 @@ export function vehicleApproverTierLabel(tier: VehicleApproverTier): string {
   return TIER_LABELS[tier];
 }
 
+/**
+ * Přítomnost správců se posuzuje v okamžiku žádosti (`presenceAt`), ne v termínu rezervace.
+ */
 export async function resolveVehicleReservationApprover(
   db: Db,
-  start: Date,
-  end: Date
+  presenceAt?: Date
 ): Promise<ResolvedVehicleApprover | null> {
+  const at = presenceAt ?? new Date();
   const config = await db.resource_vehicle_approvers.findUnique({
     where: { id: 1 },
     select: {
@@ -49,7 +52,7 @@ export async function resolveVehicleReservationApprover(
   }
 
   for (const c of candidates) {
-    const absent = await isUserAbsentInRange(db, c.userId, start, end);
+    const absent = await isUserAbsentAt(db, c.userId, at);
     if (!absent) {
       return { userId: c.userId, tier: c.tier, skippedTiers };
     }

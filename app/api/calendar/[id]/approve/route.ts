@@ -131,13 +131,9 @@ export async function POST(
         });
       }
 
-      const resolved = await resolveDepartmentCalendarApprover(
-        prisma,
-        departmentId,
-        event.start_date,
-        event.end_date,
-        id
-      );
+      const resolved = await resolveDepartmentCalendarApprover(prisma, departmentId, {
+        excludeEventId: id,
+      });
 
       if (!resolved) {
         return NextResponse.json(

@@ -33,6 +33,7 @@ export function resolveApproverDepartmentId(user: {
 
 /**
  * Uživatel je v daném termínu „nepřítomen“ (má kolidující událost mimo firmu).
+ * Pro kontrolu zástupů a kolizí termínu události / rezervace.
  */
 export async function isUserAbsentInRange(
   db: Db,
@@ -56,15 +57,35 @@ export async function isUserAbsentInRange(
 }
 
 /**
+ * Uživatel je v daném okamžiku nepřítomen (absence v kalendáři pokrývá tento čas).
+ * Pro výběr schvalovatele v době žádosti – nezávisle na termínu schvalované události.
+ */
+export async function isUserAbsentAt(
+  db: Db,
+  userId: number,
+  at: Date,
+  excludeEventId?: number | null
+): Promise<boolean> {
+  return isUserAbsentInRange(db, userId, at, at, excludeEventId);
+}
+
+export type ResolveDepartmentCalendarApproverOptions = {
+  /** Okamžik kontroly přítomnosti; výchozí = teď (doba žádosti). */
+  presenceAt?: Date;
+  excludeEventId?: number | null;
+};
+
+/**
  * Vybere finálního schvalovatele po zástupovi: primární → sekundární → terciární → manager_id.
+ * Přítomnost se posuzuje v okamžiku žádosti (`presenceAt`), ne v termínu schvalované události.
  */
 export async function resolveDepartmentCalendarApprover(
   db: Db,
   departmentId: number,
-  start: Date,
-  end: Date,
-  excludeEventId?: number | null
+  options?: ResolveDepartmentCalendarApproverOptions
 ): Promise<ResolvedCalendarApprover | null> {
+  const presenceAt = options?.presenceAt ?? new Date();
+  const excludeEventId = options?.excludeEventId;
   const dept = await db.departments.findUnique({
     where: { id: departmentId },
     select: {
@@ -102,7 +123,7 @@ export async function resolveDepartmentCalendarApprover(
   }
 
   for (const c of candidates) {
-    const absent = await isUserAbsentInRange(db, c.userId, start, end, excludeEventId);
+    const absent = await isUserAbsentAt(db, c.userId, presenceAt, excludeEventId);
     if (!absent) {
       return { userId: c.userId, tier: c.tier, skippedTiers };
     }

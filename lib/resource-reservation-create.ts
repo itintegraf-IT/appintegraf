@@ -67,7 +67,7 @@ export async function createResourceReservation(
     return reservation;
   }
 
-  const approver = await resolveVehicleReservationApprover(db, input.start, input.end);
+  const approver = await resolveVehicleReservationApprover(db);
   if (!approver) {
     throw new Error("Není nastaven žádný dostupný správce vozidel pro schválení.");
   }
@@ -195,7 +195,7 @@ export async function updateResourceReservation(
   let approvalStatus = existing.approval_status;
 
   if (isVehicle && (input.start || input.end || input.resourceId)) {
-    const approver = await resolveVehicleReservationApprover(db, start, end);
+    const approver = await resolveVehicleReservationApprover(db);
     if (!approver) throw new Error("Není nastaven žádný dostupný správce vozidel.");
     assignedApproverId = approver.userId;
     approvalStatus = "pending";
