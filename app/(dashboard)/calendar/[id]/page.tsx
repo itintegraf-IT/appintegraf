@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
+import { isAdmin } from "@/lib/auth-utils";
 import { ArrowLeft } from "lucide-react";
 import { getEventTypeLabel, requiresBusinessTripDescription, formatCalendarEventTitleWithDuration } from "../lib/event-types";
 import { ApproveRejectButtons } from "../ApproveRejectButtons";
@@ -18,6 +19,7 @@ export default async function CalendarEventPage({
 
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
+  const admin = userId > 0 ? await isAdmin(userId) : false;
 
   const event = await prisma.calendar_events.findUnique({
     where: { id },
@@ -75,8 +77,12 @@ export default async function CalendarEventPage({
               Upravit
             </Link>
           )}
-          {event.created_by === userId && (
-            <DeleteEventButton eventId={id} eventTitle={displayTitle} />
+          {(event.created_by === userId || admin) && (
+            <DeleteEventButton
+              eventId={id}
+              eventTitle={displayTitle}
+              adminDelete={admin && event.created_by !== userId}
+            />
           )}
           <Link
             href="/calendar"

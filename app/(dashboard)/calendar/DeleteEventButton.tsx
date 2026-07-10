@@ -7,9 +7,10 @@ import { Trash2 } from "lucide-react";
 type Props = {
   eventId: number;
   eventTitle: string;
+  adminDelete?: boolean;
 };
 
-export function DeleteEventButton({ eventId, eventTitle }: Props) {
+export function DeleteEventButton({ eventId, eventTitle, adminDelete = false }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -51,6 +52,12 @@ export function DeleteEventButton({ eventId, eventTitle }: Props) {
             <p className="mt-2 text-sm text-gray-600">
               Opravdu chcete smazat událost „{eventTitle}“? Tato akce je nevratná.
             </p>
+            {adminDelete && (
+              <p className="mt-2 text-sm text-amber-700">
+                Mažete jako administrátor – událost nevytvořil tento účet. Všichni pozvaní dostanou
+                vyčištěné notifikace.
+              </p>
+            )}
             <p className="mt-2 text-sm text-amber-700">
               Pokud byla událost schválena, schvalovatelé obdrží notifikaci o smazání.
             </p>

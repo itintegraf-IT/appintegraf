@@ -3,14 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { sendCalendarInviteResponseEmail } from "@/lib/email";
 import { formatCalendarEventTitleWithDuration } from "@/app/(dashboard)/calendar/lib/event-types";
-
-function parseEventIdFromLink(link: string | null): number | null {
-  if (!link) return null;
-  const m = link.match(/^\/calendar\/(\d+)(?:\/|$)/);
-  if (!m) return null;
-  const id = parseInt(m[1], 10);
-  return Number.isFinite(id) ? id : null;
-}
+import { parseCalendarEventIdFromNotificationLink } from "@/lib/calendar-invite-notifications";
 
 /**
  * POST /api/notifications/[id]/invite-response
@@ -46,9 +39,17 @@ export async function POST(
     return NextResponse.json({ error: "Pozvánka nenalezena" }, { status: 404 });
   }
 
-  const eventId = parseEventIdFromLink(notification.link);
+  const eventId = parseCalendarEventIdFromNotificationLink(notification.link);
   if (!eventId) {
-    return NextResponse.json({ error: "Pozvánka nemá platný odkaz na událost" }, { status: 400 });
+    await prisma.notifications.updateMany({
+      where: { id: notificationId, user_id: userId },
+      data: { read_at: new Date() },
+    });
+    return NextResponse.json({
+      success: true,
+      action: "dismissed",
+      message: "Neplatná pozvánka byla skryta.",
+    });
   }
 
   const event = await prisma.calendar_events.findUnique({
@@ -64,7 +65,27 @@ export async function POST(
     },
   });
   if (!event) {
-    return NextResponse.json({ error: "Událost nenalezena" }, { status: 404 });
+    await prisma.notifications.updateMany({
+      where: { id: notificationId, user_id: userId },
+      data: { read_at: new Date() },
+    });
+    return NextResponse.json({
+      success: true,
+      action: "dismissed",
+      message: "Událost již neexistuje – pozvánka byla skryta.",
+    });
+  }
+
+  if (new Date(event.end_date) < new Date()) {
+    await prisma.notifications.updateMany({
+      where: { id: notificationId, user_id: userId },
+      data: { read_at: new Date() },
+    });
+    return NextResponse.json({
+      success: true,
+      action: "dismissed",
+      message: "Událost již skončila – pozvánka byla skryta.",
+    });
   }
 
   const participant = await prisma.calendar_event_participants.findFirst({
@@ -72,10 +93,26 @@ export async function POST(
     select: { id: true, status: true },
   });
   if (!participant) {
-    return NextResponse.json({ error: "Nejste mezi pozvanými účastníky" }, { status: 403 });
+    await prisma.notifications.updateMany({
+      where: { id: notificationId, user_id: userId },
+      data: { read_at: new Date() },
+    });
+    return NextResponse.json({
+      success: true,
+      action: "dismissed",
+      message: "Nejste mezi pozvanými – notifikace byla skryta.",
+    });
   }
   if (participant.status && participant.status !== "pending") {
-    return NextResponse.json({ error: "Na tuto pozvánku už jste reagoval/a" }, { status: 409 });
+    await prisma.notifications.updateMany({
+      where: { id: notificationId, user_id: userId },
+      data: { read_at: new Date() },
+    });
+    return NextResponse.json({
+      success: true,
+      action: "dismissed",
+      message: "Na tuto pozvánku už jste reagoval/a – notifikace byla skryta.",
+    });
   }
 
   const me = await prisma.users.findUnique({

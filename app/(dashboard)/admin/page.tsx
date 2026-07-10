@@ -83,6 +83,20 @@ export default async function AdminPage() {
           Schvalovatelé kalendáře
         </Link>
         <Link
+          href="/admin/calendar-resources"
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+        >
+          <Calendar className="h-4 w-4" />
+          Místnosti a auta
+        </Link>
+        <Link
+          href="/admin/vehicle-approvers"
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+        >
+          <Calendar className="h-4 w-4" />
+          Správci vozidel
+        </Link>
+        <Link
           href="/admin/shared-mails"
           className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
         >

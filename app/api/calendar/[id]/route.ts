@@ -11,6 +11,7 @@ import {
 } from "@/lib/calendar-participant-sync";
 import { formatCalendarEventTitleWithDuration, requiresBusinessTripDescription, requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
 import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
+import { isAdmin } from "@/lib/auth-utils";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 
 const OUT_OF_OFFICE_TYPES = [
@@ -314,12 +315,21 @@ export async function DELETE(
     return NextResponse.json({ error: "Událost nenalezena" }, { status: 404 });
   }
 
-  if (event.created_by !== userId) {
+  const userIsAdmin = await isAdmin(userId);
+
+  if (event.created_by !== userId && !userIsAdmin) {
     return NextResponse.json({ error: "Můžete mazat pouze své vlastní události" }, { status: 403 });
   }
 
-  const creatorName = event.users
-    ? `${event.users.first_name} ${event.users.last_name}`
+  const deletedByAdmin = event.created_by !== userId && userIsAdmin;
+  const actor = deletedByAdmin
+    ? await prisma.users.findUnique({
+        where: { id: userId },
+        select: { first_name: true, last_name: true },
+      })
+    : event.users;
+  const actorName = actor
+    ? `${actor.first_name} ${actor.last_name}`.trim() || "Uživatel"
     : "Uživatel";
 
   const displayTitle = formatCalendarEventTitleWithDuration(event);
@@ -335,10 +345,24 @@ export async function DELETE(
       data: approverIds.map((approverId) => ({
         user_id: approverId,
         title: "Událost byla smazána",
-        message: `${creatorName} smazal/a událost „${displayTitle}“, kterou jste schválil/a.`,
+        message: deletedByAdmin
+          ? `Administrátor ${actorName} smazal/a událost „${displayTitle}“, kterou jste schválil/a.`
+          : `${actorName} smazal/a událost „${displayTitle}“, kterou jste schválil/a.`,
         type: "calendar_deleted",
         link: "/calendar",
       })),
+    });
+  }
+
+  if (deletedByAdmin && event.created_by !== userId) {
+    await prisma.notifications.create({
+      data: {
+        user_id: event.created_by,
+        title: "Událost byla smazána administrátorem",
+        message: `Administrátor ${actorName} smazal/a vaši událost „${displayTitle}“.`,
+        type: "calendar_deleted",
+        link: "/calendar",
+      },
     });
   }
 
