@@ -1,5 +1,6 @@
 import {
   formatCalendarEventDurationPart,
+  formatCalendarSliceTimeRange,
   getEventTypeLabel,
 } from "@/app/(dashboard)/calendar/lib/event-types";
 import { formatTimeCz } from "@/lib/datetime-cz";
@@ -131,16 +132,24 @@ export function buildCalendarGlobalOwnerBlock(
     event_type: string | null;
     title: string;
   },
-  opts: { allDay?: boolean; statusAlignRight?: boolean } = {}
+  opts: { allDay?: boolean; statusAlignRight?: boolean; sliceStart?: Date; sliceEnd?: Date } = {}
 ): CalendarGlobalBlockLines {
   const headline = getCalendarGlobalHeadline(e);
   const status = getCalendarGlobalStatusLine(e);
   if (isModuleTask(e)) {
     return { headline, status: status || undefined, statusAlignRight: opts.statusAlignRight };
   }
+  let timeRange: string | undefined;
+  if (!opts.allDay) {
+    if (opts.sliceStart && opts.sliceEnd) {
+      timeRange = formatCalendarSliceTimeRange(opts.sliceStart, opts.sliceEnd);
+    } else {
+      timeRange = getCalendarGlobalTimeRange(e.start_date, e.end_date);
+    }
+  }
   return {
     headline,
-    timeRange: opts.allDay ? undefined : getCalendarGlobalTimeRange(e.start_date, e.end_date),
+    timeRange,
     status: status || undefined,
     statusAlignRight: opts.statusAlignRight,
   };
