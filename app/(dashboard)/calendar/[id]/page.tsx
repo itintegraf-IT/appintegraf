@@ -4,10 +4,9 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/auth";
 import { isAdmin } from "@/lib/auth-utils";
 import { ArrowLeft } from "lucide-react";
-import { getEventTypeLabel, requiresBusinessTripDescription, formatCalendarEventTitleWithDuration } from "../lib/event-types";
+import { getEventTypeLabel, requiresBusinessTripDescription, formatCalendarEventTitleWithDuration, formatCalendarDetailDateRange, formatCalendarDetailTimeRange } from "../lib/event-types";
 import { ApproveRejectButtons } from "../ApproveRejectButtons";
 import { DeleteEventButton } from "../DeleteEventButton";
-import { formatDateCz, formatTimeCz } from "@/lib/datetime-cz";
 
 export default async function CalendarEventPage({
   params,
@@ -52,10 +51,6 @@ export default async function CalendarEventPage({
     (a) => a.status === "pending" && a.approval_type !== "deputy"
   );
 
-  const formatDate = (d: Date) =>
-    formatDateCz(new Date(d), { day: "numeric", month: "long", year: "numeric" });
-  const formatTime = (d: Date) => formatTimeCz(new Date(d));
-
   const displayTitle = formatCalendarEventTitleWithDuration(event);
 
   return (
@@ -98,12 +93,14 @@ export default async function CalendarEventPage({
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <p className="text-sm text-gray-500">Datum</p>
-            <p className="font-medium">{formatDate(event.start_date)}</p>
+            <p className="font-medium">
+              {formatCalendarDetailDateRange(new Date(event.start_date), new Date(event.end_date))}
+            </p>
           </div>
           <div>
             <p className="text-sm text-gray-500">Čas</p>
             <p className="font-medium">
-              {formatTime(event.start_date)} – {formatTime(event.end_date)}
+              {formatCalendarDetailTimeRange(new Date(event.start_date), new Date(event.end_date))}
             </p>
           </div>
           <div>

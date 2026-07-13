@@ -115,22 +115,14 @@ const SPAN_ROW_PADDING = 4;
 /** Vypočítá top a height pro daný den – výška je vždy oříznutá na konec dne (24 hodin). */
 function getEventSliceForDay(
   event: CalendarEvent,
-  day: Date,
-  options?: { onlyFirstDayOfMultiDay?: boolean }
-): { top: number; height: number } | null {
+  day: Date
+): { top: number; height: number; sliceStart: Date; sliceEnd: Date } | null {
   const start = new Date(event.start_date);
   const end = new Date(event.end_date);
 
   const dayStr = formatDateYmdPrague(day);
   const dayStart = pragueDayStart(dayStr);
   const dayEnd = pragueDayEnd(dayStr);
-
-  const startDayStr = formatDateYmdPrague(start);
-  const endDayStr = formatDateYmdPrague(end);
-
-  if (options?.onlyFirstDayOfMultiDay && startDayStr !== endDayStr) {
-    if (dayStr !== startDayStr) return null;
-  }
 
   if (end <= dayStart || start >= dayEnd) return null;
 
@@ -146,7 +138,7 @@ function getEventSliceForDay(
   const maxHeight = DAY_GRID_HEIGHT - top;
   height = Math.min(height, maxHeight);
 
-  return { top, height };
+  return { top, height, sliceStart, sliceEnd };
 }
 
 /** Jemné zabarvení sloupce (hlavička / celý den / 0–23) podle první celodenní události v daném dni. */
@@ -881,16 +873,9 @@ export function WeekCalendarGrid({
                   />
                 ))}
                 {/* Události - absolutní pozicování */}
-                {(isGlobalMode
-                  ? timedEvents
+                {timedEvents
                       .map((e) => {
-                        const onlyFirst =
-                          requiresDeputy(e.event_type) &&
-                          formatDateYmdPrague(new Date(e.start_date)) !==
-                            formatDateYmdPrague(new Date(e.end_date));
-                        const slice = getEventSliceForDay(e, d, {
-                          onlyFirstDayOfMultiDay: onlyFirst,
-                        });
+                        const slice = getEventSliceForDay(e, d);
                         if (!slice) return null;
                         return {
                           e,
@@ -899,20 +884,7 @@ export function WeekCalendarGrid({
                         };
                       })
                       .filter(Boolean)
-                  : timedEvents
-                      .map((e) => {
-                        const onlyFirst =
-                          requiresDeputy(e.event_type) &&
-                          formatDateYmdPrague(new Date(e.start_date)) !==
-                            formatDateYmdPrague(new Date(e.end_date));
-                        const slice = getEventSliceForDay(e, d, {
-                          onlyFirstDayOfMultiDay: onlyFirst,
-                        });
-                        if (!slice) return null;
-                        return { e, slice, layoutId: `ev-${e.id}-owner` };
-                      })
-                      .filter(Boolean)
-                ).map((item) => {
+                      .map((item) => {
                   if (!item) return null;
                   const { e, slice, layoutId } = item;
                   const dayLayout = timedLayoutByDay.get(dayKey);
@@ -937,7 +909,11 @@ export function WeekCalendarGrid({
                   };
 
                   if (isGlobalMode) {
-                    const lines = buildCalendarGlobalOwnerBlock(e, { allDay: false });
+                    const lines = buildCalendarGlobalOwnerBlock(e, {
+                      allDay: false,
+                      sliceStart: slice.sliceStart,
+                      sliceEnd: slice.sliceEnd,
+                    });
                     return (
                       <div
                         key={`${layoutId}-${d.toISOString()}`}

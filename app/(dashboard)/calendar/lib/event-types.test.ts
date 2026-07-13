@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   allDayEventDisplayDates,
+  formatCalendarDetailDateRange,
+  formatCalendarDetailTimeRange,
   formatCalendarEventDurationPart,
   formatCalendarEventTitleWithDuration,
   formatCalendarListDateCell,
   formatCalendarListTimeCell,
+  formatCalendarSliceTimeRange,
   isAllDayEvent,
 } from "./event-types";
 
@@ -74,5 +77,46 @@ describe("formatCalendarEventTitleWithDuration", () => {
     expect(duration).toMatch(/25\. 5\. 2026/);
     expect(duration).toMatch(/26\. 5\. 2026/);
     expect(duration).toContain("–");
+  });
+});
+
+describe("vícedenní časované události – detail a seznam", () => {
+  const tripStart = new Date("2026-07-30T14:00:00.000Z");
+  const tripEnd = new Date("2026-08-01T15:00:00.000Z");
+
+  it("detail datum rozsah", () => {
+    const text = formatCalendarDetailDateRange(tripStart, tripEnd);
+    expect(text).toMatch(/30/);
+    expect(text).toMatch(/1/);
+    expect(text).toContain("–");
+  });
+
+  it("detail čas vícedenní", () => {
+    expect(formatCalendarDetailTimeRange(tripStart, tripEnd)).toBe("od 16:00 do 17:00");
+  });
+
+  it("seznam datum rozsah", () => {
+    const text = formatCalendarListDateCell(tripStart, tripEnd);
+    expect(text).toMatch(/30/);
+    expect(text).toMatch(/1/);
+    expect(text).toContain("–");
+  });
+
+  it("slice čas v jednom dni mřížky", () => {
+    const dayStart = new Date("2026-07-30T14:00:00.000Z");
+    const dayEnd = new Date("2026-07-30T21:59:59.999Z");
+    expect(formatCalendarSliceTimeRange(dayStart, dayEnd)).toMatch(/16:00/);
+  });
+
+  it("služební cesta v nadpisu", () => {
+    const title = formatCalendarEventTitleWithDuration({
+      title: "Praha",
+      event_type: "sluzebni_cesta",
+      start_date: tripStart,
+      end_date: tripEnd,
+    });
+    expect(title).toMatch(/^Služební cesta /);
+    expect(title).toMatch(/30/);
+    expect(title).toMatch(/1\. 8/);
   });
 });

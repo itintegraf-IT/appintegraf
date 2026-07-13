@@ -178,13 +178,22 @@ const LIST_DATE_OPTS: Intl.DateTimeFormatOptions = {
   year: "numeric",
 };
 
+const DETAIL_DATE_OPTS: Intl.DateTimeFormatOptions = {
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+};
+
 /** Sloupec Datum v seznamu / vyhledávání. */
 export function formatCalendarListDateCell(start: Date, end: Date): string {
-  if (!isAllDayEvent(start, end)) {
-    return formatDateCz(start, LIST_DATE_OPTS);
-  }
   const startYmd = formatDateYmdPrague(start);
   const endYmd = formatDateYmdPrague(end);
+  if (isAllDayEvent(start, end)) {
+    if (startYmd === endYmd) {
+      return formatDateCz(start, LIST_DATE_OPTS);
+    }
+    return `${formatDateCz(start, LIST_DATE_OPTS)} – ${formatDateCz(end, LIST_DATE_OPTS)}`;
+  }
   if (startYmd === endYmd) {
     return formatDateCz(start, LIST_DATE_OPTS);
   }
@@ -195,6 +204,40 @@ export function formatCalendarListDateCell(start: Date, end: Date): string {
 export function formatCalendarListTimeCell(start: Date, end: Date): string {
   if (isAllDayEvent(start, end)) return "Celý den";
   return `${formatTimeCz(start)} – ${formatTimeCz(end)}`;
+}
+
+/** Datum na detailu události (jeden den nebo rozsah). */
+export function formatCalendarDetailDateRange(start: Date, end: Date): string {
+  if (isAllDayEvent(start, end)) {
+    const startYmd = formatDateYmdPrague(start);
+    const endYmd = formatDateYmdPrague(end);
+    if (startYmd === endYmd) {
+      return formatDateCz(start, DETAIL_DATE_OPTS);
+    }
+    return `${formatDateCz(start, DETAIL_DATE_OPTS)} – ${formatDateCz(end, DETAIL_DATE_OPTS)}`;
+  }
+  const startYmd = formatDateYmdPrague(start);
+  const endYmd = formatDateYmdPrague(end);
+  if (startYmd === endYmd) {
+    return formatDateCz(start, DETAIL_DATE_OPTS);
+  }
+  return `${formatDateCz(start, DETAIL_DATE_OPTS)} – ${formatDateCz(end, DETAIL_DATE_OPTS)}`;
+}
+
+/** Čas na detailu události. */
+export function formatCalendarDetailTimeRange(start: Date, end: Date): string {
+  if (isAllDayEvent(start, end)) return "Celý den";
+  const startYmd = formatDateYmdPrague(start);
+  const endYmd = formatDateYmdPrague(end);
+  if (startYmd === endYmd) {
+    return `${formatTimeCz(start)} – ${formatTimeCz(end)}`;
+  }
+  return `od ${formatTimeCz(start)} do ${formatTimeCz(end)}`;
+}
+
+/** Časový rozsah bloku v jednom dni týdenní mřížky. */
+export function formatCalendarSliceTimeRange(sliceStart: Date, sliceEnd: Date): string {
+  return `${formatTimeCz(sliceStart)} – ${formatTimeCz(sliceEnd)}`;
 }
 
 function isModuleCalendarTask(e: {
