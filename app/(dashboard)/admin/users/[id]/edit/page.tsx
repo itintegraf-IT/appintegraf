@@ -7,6 +7,8 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AdminUserForm } from "../../AdminUserForm";
 import { parseStoredModuleAccess } from "@/lib/app-modules";
+import { userHasVehicleManagerRole } from "@/lib/sync-vehicle-manager-role";
+import { VEHICLE_MANAGER_ROLE } from "@/lib/resource-reservation-types";
 
 export default async function AdminUserEditPage({
   params,
@@ -42,8 +44,7 @@ export default async function AdminUserEditPage({
       display_in_list: true,
       role_id: true,
       user_roles: {
-        take: 1,
-        select: { role_id: true, module_access: true },
+        select: { role_id: true, module_access: true, roles: { select: { name: true } } },
       },
       user_secondary_departments: {
         select: { department_id: true },
@@ -55,10 +56,14 @@ export default async function AdminUserEditPage({
 
   if (!row) notFound();
 
-  const ur = row.user_roles?.[0];
+  const ur =
+    row.user_roles?.find((r) => r.roles.name?.toLowerCase() !== VEHICLE_MANAGER_ROLE) ??
+    row.user_roles?.[0];
   const module_access = ur?.module_access
     ? parseStoredModuleAccess(ur.module_access)
     : {};
+
+  const vehicle_manager = await userHasVehicleManagerRole(id);
 
   // Legacy: pokud má department_name ale ne department_id, zkusíme najít oddělení podle názvu
   let department_id = row.department_id;
@@ -84,6 +89,7 @@ export default async function AdminUserEditPage({
     shared_mail_ids,
     role_id: ur?.role_id ?? row.role_id,
     module_access,
+    vehicle_manager,
   };
 
   return (

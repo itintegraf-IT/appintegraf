@@ -33,7 +33,6 @@ export async function canViewReservation(
 ): Promise<boolean> {
   if (reservation.created_by === userId) return true;
   if (await isAdmin(userId)) return true;
-  if (await isVehicleManager(userId)) return true;
   if (reservation.assigned_approver_id === userId) return true;
   return canBookResources(userId);
 }
@@ -49,11 +48,22 @@ export async function canEditReservation(
 
 export async function canDeleteReservation(
   userId: number,
-  reservation: { created_by: number }
+  reservation: {
+    created_by: number;
+    approval_status: string;
+    assigned_approver_id: number | null;
+  }
 ): Promise<boolean> {
   if (await isAdmin(userId)) return true;
   if (reservation.created_by === userId) return true;
-  return isVehicleManager(userId);
+  if (
+    reservation.approval_status === "pending" &&
+    reservation.assigned_approver_id === userId &&
+    (await isVehicleManager(userId))
+  ) {
+    return true;
+  }
+  return false;
 }
 
 export async function assertUsersHaveVehicleManagerRole(userIds: number[]): Promise<boolean> {

@@ -362,6 +362,19 @@ Definice v `app/(dashboard)/calendar/lib/event-types.ts`, mapování barev v `li
 - Export vyžaduje `hasModuleAccess(userId, "calendar", "read")`
 - API vyžaduje přihlášeného uživatele (session)
 
+### Rezervace místností a aut
+
+| Oprávnění | Kdo |
+|-----------|-----|
+| Rezervovat místnosti/auta | `calendar: read` (Viewer) |
+| CRUD místností/aut v adminu | systémový admin nebo `calendar: admin` |
+| Konfigurace správců vozidel (primární/sekundární) | systémový admin |
+| Schvalovat rezervace aut | role **Správa vozidel** + přiřazení jako `assigned_approver` |
+
+Role **Správa vozidel** (`sprava_vozidel`) je **doplňková** – nezávislá na Viewer/Editor/Admin v `module_access`. Přiřadí se v Admin → Uživatelé (checkbox) nebo automaticky při výběru správce v Admin → Správci vozidel.
+
+Doporučené nastavení správce vozidel: hlavní role Viewer + `calendar: read` + checkbox Správa vozidel.
+
 ---
 
 ## Implementace (březen 2026)

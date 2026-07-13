@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { isAdmin } from "@/lib/auth-utils";
 import { assertUsersHaveVehicleManagerRole } from "@/lib/resource-reservation-access";
+import { ensureVehicleManagerRolesForUserIds } from "@/lib/sync-vehicle-manager-role";
 
 async function requireAdmin() {
   const session = await auth();
@@ -57,6 +58,8 @@ export async function PUT(req: NextRequest) {
   if (new Set(ids).size !== ids.length) {
     return NextResponse.json({ error: "Správci se nesmí opakovat." }, { status: 400 });
   }
+
+  await ensureVehicleManagerRolesForUserIds(ids);
 
   const valid = await assertUsersHaveVehicleManagerRole(ids);
   if (!valid) {

@@ -157,7 +157,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Rezervace nenalezena" }, { status: 404 });
   }
 
-  if (!(await canDeleteReservation(gate.userId, { created_by: existing.created_by }))) {
+  if (
+    !(await canDeleteReservation(gate.userId, {
+      created_by: existing.created_by,
+      approval_status: existing.approval_status,
+      assigned_approver_id: existing.assigned_approver_id,
+    }))
+  ) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 

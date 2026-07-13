@@ -9,6 +9,7 @@ import { sendAccountActivationEmail } from "@/lib/email";
 import { logAuthAudit, getRequestIp } from "@/lib/auth-audit";
 import { validatePassword } from "@/lib/password-policy";
 import { parseStoredModuleAccess } from "@/lib/app-modules";
+import { syncVehicleManagerRole, upsertPrimaryUserRole } from "@/lib/sync-vehicle-manager-role";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -98,6 +99,7 @@ export async function POST(req: NextRequest) {
       display_in_list = true,
       password_custom,
       send_activation_email = false,
+      vehicle_manager = false,
     } = body;
 
     if (!username || !email || !first_name || !last_name) {
@@ -208,11 +210,13 @@ export async function POST(req: NextRequest) {
       : JSON.stringify(module_access as Record<string, string>);
 
     try {
-      await prisma.user_roles.create({
-        data: { user_id: user.id, role_id: roleIdNum, module_access: moduleAccessJson },
-      });
+      await upsertPrimaryUserRole(user.id, roleIdNum, moduleAccessJson);
     } catch {
       // ignore
+    }
+
+    if (vehicle_manager === true) {
+      await syncVehicleManagerRole(user.id, true, roleIdNum);
     }
 
     if (!isAdminRole) {

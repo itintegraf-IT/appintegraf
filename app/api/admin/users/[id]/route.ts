@@ -7,6 +7,12 @@ import { validatePassword } from "@/lib/password-policy";
 import { logAuthAudit } from "@/lib/auth-audit";
 import { parseStoredModuleAccess } from "@/lib/app-modules";
 import { syncStitkyUserRolesFromModuleAccess } from "@/lib/stitky/sync-user-roles";
+import {
+  syncVehicleManagerRole,
+  upsertPrimaryUserRole,
+  userHasVehicleManagerRole,
+} from "@/lib/sync-vehicle-manager-role";
+import { VEHICLE_MANAGER_ROLE } from "@/lib/resource-reservation-types";
 
 export async function GET(
   _req: NextRequest,
@@ -48,8 +54,7 @@ export async function GET(
       created_at: true,
       roles: { select: { id: true, name: true } },
       user_roles: {
-        take: 1,
-        select: { role_id: true, module_access: true },
+        select: { role_id: true, module_access: true, roles: { select: { name: true } } },
       },
       user_secondary_departments: {
         select: { department_id: true },
@@ -63,11 +68,14 @@ export async function GET(
     return NextResponse.json({ error: "Uživatel nenalezen" }, { status: 404 });
   }
 
-  const ur = user.user_roles?.[0];
+  const ur =
+    user.user_roles?.find((row) => row.roles.name?.toLowerCase() !== VEHICLE_MANAGER_ROLE) ??
+    user.user_roles?.[0];
   const module_access = ur?.module_access
     ? parseStoredModuleAccess(ur.module_access)
     : {};
   const roleId = ur?.role_id ?? user.role_id;
+  const vehicle_manager = await userHasVehicleManagerRole(id);
 
   // Legacy: pokud má department_name ale ne department_id, zkusíme najít oddělení podle názvu
   let department_id = user.department_id;
@@ -93,6 +101,7 @@ export async function GET(
     shared_mail_ids,
     role_id: roleId,
     module_access,
+    vehicle_manager,
   });
 }
 
@@ -132,6 +141,7 @@ export async function PUT(
     const role_id = bodyData.role_id ?? null;
     const password_new = (bodyData.password_new as string) ?? "";
     const module_access = (bodyData.module_access as Record<string, string>) ?? {};
+    const vehicle_manager = bodyData.vehicle_manager === true;
 
     if (!first_name || !last_name || !email) {
       return NextResponse.json({ error: "Vyplňte jméno, příjmení a e-mail" }, { status: 400 });
@@ -244,17 +254,8 @@ export async function PUT(
       ? JSON.stringify({ all: true })
       : JSON.stringify(module_access);
 
-    const existing = await prisma.user_roles.findFirst({ where: { user_id: id } });
-    if (existing) {
-      await prisma.user_roles.update({
-        where: { id: existing.id },
-        data: { role_id: roleIdNum, module_access: moduleAccessJson },
-      });
-    } else {
-      await prisma.user_roles.create({
-        data: { user_id: id, role_id: roleIdNum, module_access: moduleAccessJson },
-      });
-    }
+    await upsertPrimaryUserRole(id, roleIdNum, moduleAccessJson);
+    await syncVehicleManagerRole(id, vehicle_manager, roleIdNum);
 
     if (!isAdminRole) {
       await syncStitkyUserRolesFromModuleAccess(id, module_access);

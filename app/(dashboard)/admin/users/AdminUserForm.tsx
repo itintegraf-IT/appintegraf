@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, Printer, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound, Layers, Tags } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, Printer, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound, Layers, Tags, Car } from "lucide-react";
 import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
 import { TotpAdminPanel } from "@/components/admin/TotpAdminPanel";
 import {
@@ -99,6 +99,7 @@ type User = {
   display_in_list?: boolean | null;
   role_id?: number | null;
   module_access?: ModuleAccessMap;
+  vehicle_manager?: boolean;
 };
 
 export function AdminUserForm({ user }: { user?: User }) {
@@ -135,6 +136,7 @@ export function AdminUserForm({ user }: { user?: User }) {
     shared_mail_ids: user?.shared_mail_ids ?? [] as number[],
     is_active: user?.is_active !== false,
     display_in_list: user?.display_in_list !== false,
+    vehicle_manager: user?.vehicle_manager === true,
     password_custom: "",
   });
 
@@ -189,6 +191,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         shared_mail_ids: user.shared_mail_ids ?? [],
         is_active: user.is_active !== false,
         display_in_list: user.display_in_list !== false,
+        vehicle_manager: user.vehicle_manager === true,
         password_custom: "",
       });
     }
@@ -455,6 +458,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         ...form,
         module_access: moduleAccess,
         shared_mail_ids: form.shared_mail_ids,
+        vehicle_manager: form.vehicle_manager,
         password_custom: form.password_custom || undefined,
       };
       if (!isEdit) {
@@ -679,6 +683,26 @@ export function AdminUserForm({ user }: { user?: User }) {
               Role <strong>Admin</strong> automaticky uděluje plný přístup ke všem modulům.
             </p>
           )}
+          <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+            <input
+              type="checkbox"
+              checked={form.vehicle_manager}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, vehicle_manager: e.target.checked }))
+              }
+              className="mt-0.5 h-4 w-4 rounded border-gray-300"
+            />
+            <span className="text-sm text-gray-700">
+              <span className="inline-flex items-center gap-1 font-medium">
+                <Car className="h-4 w-4 text-red-600" aria-hidden />
+                Správa vozidel
+              </span>
+              <span className="mt-0.5 block text-xs text-gray-500">
+                Doplňkové oprávnění ke schvalování rezervací aut (nezávislé na roli Viewer/Editor).
+                Uživatel potřebuje také přístup ke kalendáři (Viewer).
+              </span>
+            </span>
+          </label>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Pozice</label>
