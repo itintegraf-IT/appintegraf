@@ -12,6 +12,10 @@ import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
 import { parseImlProductBodyForSave } from "@/lib/iml/parse-product-body";
 import { applyPrintColorsSummaryOnSave } from "@/lib/iml-product-save-colors";
+import {
+  imlProductColorsReplaceErrorResponse,
+  imlProductSaveErrorResponse,
+} from "@/lib/iml-product-save-errors";
 import { toImlProductUpdateData } from "@/lib/iml/product-prisma-payload";
 
 export async function GET(
@@ -151,16 +155,22 @@ export async function PUT(
       }
     );
 
-    await prisma.$transaction(async (tx) => {
+    const colorsReplaceFailed = await prisma.$transaction(async (tx) => {
       await tx.iml_products.update({
         where: { id },
         data: updatePayload,
       });
       if (colorsValidation && colorsValidation.ok) {
         const res = await replaceProductColorsInTx(tx, id, colorsValidation.prepared, true);
-        if (!res.ok) throw new Error(res.error);
+        if (!res.ok) return res;
       }
+      return null;
     });
+
+    if (colorsReplaceFailed) {
+      const { status, body } = imlProductColorsReplaceErrorResponse(colorsReplaceFailed);
+      return NextResponse.json(body, { status });
+    }
 
     await logImlAudit({
       userId,
@@ -174,7 +184,8 @@ export async function PUT(
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("IML products PUT error:", e);
-    return NextResponse.json({ error: "Chyba při ukládání produktu" }, { status: 500 });
+    const { status, error } = imlProductSaveErrorResponse(e);
+    return NextResponse.json({ error }, { status });
   }
 }
 
