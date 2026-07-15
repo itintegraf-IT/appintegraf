@@ -68,19 +68,24 @@ export function validateProductColorsInput(
       invalid.push({ index: i, error: "Pokrytí musí být 0–100", field: "coverage_pct" });
       continue;
     }
-    const pantoneId = row.pantone_id != null ? Number(row.pantone_id) : null;
-    let code: string | null = null;
-    if (!pantoneId) {
-      const codeNorm = normalizePantoneCode(typeof row.code === "string" ? row.code : "");
-      if (!isValidPantoneCode(codeNorm)) {
-        invalid.push({ index: i, error: "Neplatný Pantone kód", field: "code" });
-        continue;
-      }
-      code = codeNorm;
+    const pantoneIdRaw = row.pantone_id != null ? Number(row.pantone_id) : null;
+    const pantoneId =
+      pantoneIdRaw != null && Number.isInteger(pantoneIdRaw) && pantoneIdRaw > 0
+        ? pantoneIdRaw
+        : null;
+    const codeRaw = typeof row.code === "string" ? row.code : "";
+    const codeNorm = codeRaw.trim() ? normalizePantoneCode(codeRaw) : null;
+    if (!pantoneId && !codeNorm) {
+      invalid.push({ index: i, error: "Zadejte Pantone kód", field: "code" });
+      continue;
+    }
+    if (codeNorm && !isValidPantoneCode(codeNorm)) {
+      invalid.push({ index: i, error: "Neplatný Pantone kód", field: "code" });
+      continue;
     }
     prepared.push({
       pantone_id: pantoneId,
-      code,
+      code: codeNorm,
       coverage_pct: Math.round(coverage * 100) / 100,
       sort_order: Number.isFinite(Number(row.sort_order)) ? Number(row.sort_order) : i,
     });
@@ -94,7 +99,7 @@ export function validateProductColorsInput(
  * Replace semantika v transakci: smaže existující vazby pro produkt a vloží nové.
  * Předpokládá, že vstup už byl validován přes validateProductColorsInput.
  *
- * Pokud v `prepared` narazí na neznámý kód (bez pantone_id) a !autoCreate,
+ * Pokud v `prepared` narazí na neznámý kód a !autoCreate,
  * vrátí { ok: false, status: 422, missing_codes }.
  *
  * Duplicitní pantone_id v rámci jednoho produktu se tiše zahazují (dedupe) –
@@ -112,17 +117,33 @@ export async function replaceProductColorsInTx(
   autoCreate: boolean
 ): Promise<ReplaceResult> {
   const neededCodes = Array.from(
-    new Set(prepared.filter((r) => r.pantone_id == null && r.code).map((r) => r.code!))
+    new Set(prepared.map((r) => r.code).filter((c): c is string => !!c))
+  );
+  const providedIds = Array.from(
+    new Set(
+      prepared
+        .map((r) => r.pantone_id)
+        .filter((id): id is number => id != null && Number.isInteger(id) && id > 0)
+    )
   );
 
-  const existing = neededCodes.length
-    ? await tx.iml_pantone_colors.findMany({
-        where: { code: { in: neededCodes } },
-        select: { id: true, code: true },
-      })
-    : [];
+  const [existingByCode, existingById] = await Promise.all([
+    neededCodes.length
+      ? tx.iml_pantone_colors.findMany({
+          where: { code: { in: neededCodes } },
+          select: { id: true, code: true },
+        })
+      : Promise.resolve([]),
+    providedIds.length
+      ? tx.iml_pantone_colors.findMany({
+          where: { id: { in: providedIds } },
+          select: { id: true, code: true },
+        })
+      : Promise.resolve([]),
+  ]);
 
-  const codeToId = new Map<string, number>(existing.map((c) => [c.code, c.id]));
+  const codeToId = new Map<string, number>(existingByCode.map((c) => [c.code, c.id]));
+  const validIds = new Set(existingById.map((c) => c.id));
   const missingCodes = neededCodes.filter((c) => !codeToId.has(c));
 
   if (missingCodes.length > 0 && !autoCreate) {
@@ -139,11 +160,13 @@ export async function replaceProductColorsInTx(
       data: { code, is_active: true },
     });
     codeToId.set(code, created.id);
+    validIds.add(created.id);
   }
 
   await tx.iml_product_colors.deleteMany({ where: { product_id: productId } });
 
   const seen = new Set<number>();
+  const unresolvedCodes: string[] = [];
   const rows: Array<{
     product_id: number;
     pantone_id: number;
@@ -151,7 +174,18 @@ export async function replaceProductColorsInTx(
     sort_order: number;
   }> = [];
   for (const r of prepared) {
-    const pid = r.pantone_id ?? (r.code ? codeToId.get(r.code) ?? null : null);
+    let pid: number | null = null;
+    if (r.code && codeToId.has(r.code)) {
+      pid = codeToId.get(r.code)!;
+    } else if (r.pantone_id != null && validIds.has(r.pantone_id)) {
+      pid = r.pantone_id;
+    } else if (r.code) {
+      unresolvedCodes.push(r.code);
+      continue;
+    } else if (r.pantone_id != null) {
+      unresolvedCodes.push(`#${r.pantone_id}`);
+      continue;
+    }
     if (!pid || seen.has(pid)) continue;
     seen.add(pid);
     rows.push({
@@ -161,6 +195,16 @@ export async function replaceProductColorsInTx(
       sort_order: r.sort_order,
     });
   }
+
+  if (unresolvedCodes.length > 0) {
+    return {
+      ok: false,
+      status: 422,
+      error: "Některé barvy nelze uložit — Pantone karta neexistuje v číselníku",
+      missing_codes: unresolvedCodes,
+    };
+  }
+
   if (rows.length > 0) {
     await tx.iml_product_colors.createMany({ data: rows });
   }

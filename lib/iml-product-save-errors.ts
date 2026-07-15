@@ -27,12 +27,30 @@ export function imlProductSaveErrorResponse(
     if (code === "P2002") {
       return { status: 400, error: "Duplicitní hodnota (např. SKU)." };
     }
+    if (
+      code === "P2003" &&
+      typeof metaMsg === "string" &&
+      metaMsg.toLowerCase().includes("pantone_id")
+    ) {
+      return {
+        status: 422,
+        error:
+          "Barva odkazuje na neexistující Pantone kartu. Znovu vyberte kód z číselníku nebo vytvořte novou kartu.",
+      };
+    }
   }
 
   if (e instanceof Error) {
     const msg = e.message;
     if (messageMentionsCmykColumns(msg) || msg.includes("Unknown column")) {
       return { status: 503, error: CMYK_MIGRATION_HINT };
+    }
+    if (msg.includes("Foreign key constraint") && msg.toLowerCase().includes("pantone_id")) {
+      return {
+        status: 422,
+        error:
+          "Barva odkazuje na neexistující Pantone kartu. Znovu vyberte kód z číselníku nebo vytvořte novou kartu.",
+      };
     }
     if (msg.length > 0 && msg.length <= 300) {
       return { status: 500, error: msg };
