@@ -78,6 +78,48 @@ export default function ProductPantoneEditor({ colors, onChange, labelsPerSheet 
     loadCatalog();
   }, [loadCatalog]);
 
+  /** Po načtení číselníku doplní pantone_id u řádků se známým kódem (jako výběr z dropdownu). */
+  useEffect(() => {
+    if (catalogLoading || catalog.length === 0) return;
+    let changed = false;
+    const next = colors.map((row) => {
+      if (row.pantone_id != null || !row.code.trim()) return row;
+      const normalized = normalizePantoneCode(row.code);
+      const match = catalog.find((p) => p.is_active && (p.code ?? "") === normalized);
+      if (!match) return row;
+      changed = true;
+      return {
+        ...row,
+        pantone_id: match.id,
+        code: match.code ?? normalized,
+        name: match.name,
+        hex: match.hex,
+      };
+    });
+    if (changed) onChange(next);
+  }, [catalog, catalogLoading, colors, onChange]);
+
+  /** Po načtení číselníku doplní pantone_id u řádků se známým kódem (jako výběr z dropdownu na testu). */
+  useEffect(() => {
+    if (catalogLoading || catalog.length === 0) return;
+    let changed = false;
+    const next = colors.map((row) => {
+      if (row.pantone_id != null || !row.code.trim()) return row;
+      const normalized = normalizePantoneCode(row.code);
+      const match = catalog.find((p) => p.is_active && (p.code ?? "") === normalized);
+      if (!match) return row;
+      changed = true;
+      return {
+        ...row,
+        pantone_id: match.id,
+        code: match.code ?? normalized,
+        name: match.name,
+        hex: match.hex,
+      };
+    });
+    if (changed) onChange(next);
+  }, [catalog, catalogLoading, colors, onChange]);
+
   /**
    * Vytvoří novou Pantone kartu v číselníku. Vrací nově vytvořený záznam,
    * nebo `null` (API vrátilo chybu – např. duplicita, neplatný kód).

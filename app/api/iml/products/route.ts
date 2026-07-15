@@ -12,6 +12,10 @@ import {
 } from "@/lib/iml-product-colors";
 import { parseImlProductBodyForSave } from "@/lib/iml/parse-product-body";
 import { applyPrintColorsSummaryOnSave } from "@/lib/iml-product-save-colors";
+import {
+  imlProductColorsReplaceErrorResponse,
+  imlProductSaveErrorResponse,
+} from "@/lib/iml-product-save-errors";
 import { toImlProductCreateData } from "@/lib/iml/product-prisma-payload";
 
 const productListSelect = {
@@ -256,16 +260,23 @@ export async function POST(req: NextRequest) {
       last_edited_by: editorName,
     });
 
-    const productId = await prisma.$transaction(async (tx) => {
+    const txResult = await prisma.$transaction(async (tx) => {
       const created = await tx.iml_products.create({
         data: createPayload,
       });
       if (colorsValidation && colorsValidation.ok) {
         const res = await replaceProductColorsInTx(tx, created.id, colorsValidation.prepared, true);
-        if (!res.ok) throw new Error(res.error);
+        if (!res.ok) return { colorsReplaceFailed: res } as const;
       }
-      return created.id;
+      return { productId: created.id } as const;
     });
+
+    if ("colorsReplaceFailed" in txResult && txResult.colorsReplaceFailed) {
+      const { status, body } = imlProductColorsReplaceErrorResponse(txResult.colorsReplaceFailed);
+      return NextResponse.json(body, { status });
+    }
+
+    const productId = txResult.productId;
 
     const product = await prisma.iml_products.findUniqueOrThrow({
       where: { id: productId },
@@ -283,7 +294,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, id: product.id });
   } catch (e) {
     console.error("IML products POST error:", e);
-    return NextResponse.json({ error: "Chyba při vytváření produktu" }, { status: 500 });
+    const { status, error } = imlProductSaveErrorResponse(e, "Chyba při vytváření produktu");
+    return NextResponse.json({ error }, { status });
   }
 }
 

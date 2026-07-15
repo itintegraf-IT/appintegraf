@@ -19,6 +19,7 @@ import {
   defaultProductCmykFlags,
   type ProductCmykFlags,
 } from "@/lib/iml-print-colors-summary";
+import { pantoneRowsFromPrintColorsText } from "@/lib/iml-print-colors-from-text";
 import { parseProductFormatToMm } from "@/lib/iml/product-format";
 
 type ProductColorResp = {
@@ -48,6 +49,7 @@ export default function ImlProductEditPage() {
   const [form, setForm] = useState<ProductFormState>(emptyProductForm);
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
   const [colors, setColors] = useState<ProductColorRow[]>([]);
+  const [colorsImportHint, setColorsImportHint] = useState<string | null>(null);
   const [cmykFlags, setCmykFlags] = useState<ProductCmykFlags>(defaultProductCmykFlags);
   const [hasImage, setHasImage] = useState(false);
   const [hasPdf, setHasPdf] = useState(false);
@@ -122,16 +124,39 @@ export default function ImlProductEditPage() {
           });
           setHasImage(!!p.has_image);
           setHasPdf(!!p.has_pdf);
-          if (Array.isArray(p.iml_product_colors)) {
-            const rows: ProductColorRow[] = (p.iml_product_colors as ProductColorResp[]).map((r, i) => ({
-              pantone_id: r.pantone_id,
-              code: r.iml_pantone_colors?.code ?? "",
-              name: r.iml_pantone_colors?.name ?? null,
-              hex: r.iml_pantone_colors?.hex ?? null,
-              coverage_pct: String(r.coverage_pct),
-              sort_order: r.sort_order ?? i,
-            }));
-            setColors(rows);
+          const dbColorRows: ProductColorRow[] = Array.isArray(p.iml_product_colors)
+            ? (p.iml_product_colors as ProductColorResp[]).map((r, i) => ({
+                pantone_id: r.pantone_id,
+                code: r.iml_pantone_colors?.code ?? "",
+                name: r.iml_pantone_colors?.name ?? null,
+                hex: r.iml_pantone_colors?.hex ?? null,
+                coverage_pct: String(r.coverage_pct),
+                sort_order: r.sort_order ?? i,
+              }))
+            : [];
+          if (dbColorRows.length > 0) {
+            setColors(dbColorRows);
+          } else {
+            const printText = s("print_colors_text");
+            const parsed = pantoneRowsFromPrintColorsText(printText);
+            if (parsed.length > 0) {
+              setColors(
+                parsed.map((r, i) => ({
+                  pantone_id: null,
+                  code: r.code,
+                  name: null,
+                  hex: null,
+                  coverage_pct: r.coverage_pct,
+                  sort_order: i,
+                }))
+              );
+              const missingCoverage = parsed.some((r) => !r.coverage_pct);
+              setColorsImportHint(
+                missingCoverage
+                  ? `Barvy byly předvyplněny z importovaného textu „${printText}". U řádků bez pokrytí doplňte % před uložením.`
+                  : `Barvy byly předvyplněny z importovaného textu „${printText}". Zkontrolujte pokrytí a uložte.`
+              );
+            }
           }
           setCmykFlags(
             cmykFlagsFromProduct({
@@ -258,6 +283,11 @@ export default function ImlProductEditPage() {
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
             <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          )}
+          {colorsImportHint && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {colorsImportHint}
+            </div>
           )}
 
           <ProductFormSections
