@@ -18,6 +18,7 @@ import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
 import { fetchUkolyForCalendarRange, UKOLY_CALENDAR_COLOR } from "@/lib/ukoly-calendar";
 import { isUserInVedeniDepartment } from "@/lib/calendar-vedeni";
 import type { CalendarEventMetaMode } from "@/lib/calendar-event-meta";
+import { getEffectiveCalendarApprovalStatus } from "@/lib/calendar-approval-reset";
 
 type CalendarScope = "all" | "mine";
 
@@ -204,12 +205,12 @@ export default async function CalendarPage({
     departments: { select: { name: true } },
     users_deputy: { select: { first_name: true, last_name: true } },
     calendar_approvals: {
-      where: {
-        status: "approved",
-        approval_type: { not: "deputy" },
+      select: {
+        approval_type: true,
+        status: true,
+        users: { select: { first_name: true, last_name: true } },
       },
-      take: 1,
-      include: { users: { select: { first_name: true, last_name: true } } },
+      orderBy: { approval_order: "asc" },
     },
     calendar_event_participants: {
       include: { users: { select: { first_name: true, last_name: true } } },
@@ -249,6 +250,32 @@ export default async function CalendarPage({
     orderBy: { start_date: "asc" },
     take: 200,
     include: baseInclude,
+  });
+
+  type RawCalendarEvent = (typeof events)[number];
+  const eventsWithEffectiveStatus = events.map((e: RawCalendarEvent) => {
+    const approvalRows = e.calendar_approvals.map((a) => ({
+      approval_type: a.approval_type,
+      status: a.status,
+    }));
+    const effectiveStatus = getEffectiveCalendarApprovalStatus(
+      {
+        deputy_id: e.deputy_id,
+        requires_approval: e.requires_approval,
+        approval_status: e.approval_status,
+        start_date: e.start_date,
+        end_date: e.end_date,
+        event_type: e.event_type,
+      },
+      approvalRows
+    );
+    return {
+      ...e,
+      approval_status: effectiveStatus,
+      calendar_approvals: e.calendar_approvals.filter(
+        (a) => a.status === "approved" && a.approval_type !== "deputy"
+      ),
+    };
   });
 
   let taskSearchRows:
@@ -315,7 +342,7 @@ export default async function CalendarPage({
     [key: string]: unknown;
   };
 
-  const eventsAsGrid: GridEvent[] = events as GridEvent[];
+  const eventsAsGrid: GridEvent[] = eventsWithEffectiveStatus as GridEvent[];
 
   let eventsForGrid: GridEvent[] = eventsAsGrid;
   let listMerged: GridEvent[] = eventsAsGrid;

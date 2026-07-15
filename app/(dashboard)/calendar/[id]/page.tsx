@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { isAdmin } from "@/lib/auth-utils";
 import { ArrowLeft } from "lucide-react";
 import { getEventTypeLabel, requiresBusinessTripDescription, formatCalendarEventTitleWithDuration, formatCalendarDetailDateRange, formatCalendarDetailTimeRange } from "../lib/event-types";
+import { syncStaleCalendarApprovalStatus } from "@/lib/calendar-approval-reset";
 import { ApproveRejectButtons } from "../ApproveRejectButtons";
 import { DeleteEventButton } from "../DeleteEventButton";
 
@@ -38,13 +39,16 @@ export default async function CalendarEventPage({
 
   if (!event) notFound();
 
-  const isDeputy = event.deputy_id === userId && event.approval_status === "pending";
+  const syncedApprovalStatus = await syncStaleCalendarApprovalStatus(prisma, id);
+  const approvalStatus = syncedApprovalStatus ?? event.approval_status;
+
+  const isDeputy = event.deputy_id === userId && approvalStatus === "pending";
   const pendingFinalApproval = event.calendar_approvals.find(
     (a) =>
       a.approver_id === userId &&
       a.status === "pending" &&
       a.approval_type !== "deputy" &&
-      event.approval_status === "deputy_approved"
+      approvalStatus === "deputy_approved"
   );
   const isFinalApprover = !!pendingFinalApproval;
   const assignedApprover = event.calendar_approvals.find(
@@ -150,31 +154,31 @@ export default async function CalendarEventPage({
               </ul>
             </div>
           )}
-          {event.approval_status && (
+          {approvalStatus && (
             <div>
               <p className="text-sm text-gray-500">Stav schválení</p>
               <p>
                 <span
                   className={`rounded px-2 py-0.5 text-sm ${
-                    event.approval_status === "approved"
+                    approvalStatus === "approved"
                       ? "bg-green-100 text-green-800"
-                      : event.approval_status === "rejected"
+                      : approvalStatus === "rejected"
                         ? "bg-red-100 text-red-800"
-                        : event.approval_status === "deputy_approved"
+                        : approvalStatus === "deputy_approved"
                           ? "bg-blue-100 text-blue-800"
                           : "bg-amber-100 text-amber-800"
                   }`}
                 >
-                  {event.approval_status === "approved"
+                  {approvalStatus === "approved"
                     ? "Schváleno"
-                    : event.approval_status === "rejected"
+                    : approvalStatus === "rejected"
                       ? "Zamítnuto"
-                      : event.approval_status === "deputy_approved"
+                      : approvalStatus === "deputy_approved"
                         ? "Čeká na schválení"
                         : "Čeká na zástupce"}
                 </span>
               </p>
-              {event.approval_status === "deputy_approved" && assignedApprover?.users && (
+              {approvalStatus === "deputy_approved" && assignedApprover?.users && (
                 <p className="mt-1 text-sm text-gray-600">
                   Schvalovatel: {assignedApprover.users.first_name} {assignedApprover.users.last_name}
                 </p>

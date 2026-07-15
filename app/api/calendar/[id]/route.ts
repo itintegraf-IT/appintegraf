@@ -10,6 +10,12 @@ import {
   notifyCalendarInvitees,
 } from "@/lib/calendar-participant-sync";
 import { formatCalendarEventTitleWithDuration, requiresBusinessTripDescription, requiresDeputy } from "@/app/(dashboard)/calendar/lib/event-types";
+import {
+  calendarEditRequiresApprovalReset,
+  clearCalendarApprovalRecords,
+  resetCalendarApprovalRecords,
+  stripCalendarApprovalNotes,
+} from "@/lib/calendar-approval-reset";
 import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
 import { isAdmin } from "@/lib/auth-utils";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
@@ -233,18 +239,65 @@ export async function PUT(
     });
     const newOnes = participantUserIds.filter((uid) => !oldParticipantIds.includes(uid));
 
+    const needsApprovalReset = calendarEditRequiresApprovalReset(existing, {
+      start,
+      end,
+      eventType,
+      deputyIdNum,
+    });
+    const deputyNewlyAssigned =
+      deputyIdNum !== null && existing.deputy_id === null && requiresDeputy(eventType);
+    const deputyRemoved = deputyIdNum === null && existing.deputy_id !== null;
+
+    let descriptionToSave = descTrim || null;
+    let approvalStatus: string | null = existing.approval_status;
+    let notifyDeputyId: number | null = null;
+
+    if (deputyRemoved || (deputyIdNum === null && !requiresDeputy(eventType))) {
+      approvalStatus = null;
+    } else if (deputyIdNum !== null) {
+      if (needsApprovalReset) {
+        descriptionToSave = stripCalendarApprovalNotes(descriptionToSave);
+        approvalStatus = "pending";
+        notifyDeputyId = deputyIdNum;
+      } else if (deputyNewlyAssigned) {
+        approvalStatus = "pending";
+        notifyDeputyId = deputyIdNum;
+      } else if (existing.deputy_id !== deputyIdNum) {
+        descriptionToSave = stripCalendarApprovalNotes(descriptionToSave);
+        approvalStatus = "pending";
+        notifyDeputyId = deputyIdNum;
+      } else if (approvalStatus === null) {
+        approvalStatus = "pending";
+      }
+    }
+
+    const displayTitle = formatCalendarEventTitleWithDuration({
+      title: String(title).trim(),
+      event_type: eventType,
+      start_date: start,
+      end_date: end,
+    });
+    const calendarLink = `/calendar/${id}`;
+
+    if (needsApprovalReset || existing.deputy_id !== deputyIdNum) {
+      await dismissNotificationsForLink(calendarLink, {
+        types: ["calendar_approval", "calendar_approved"],
+      });
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.calendar_events.update({
         where: { id },
         data: {
           title: String(title).trim(),
-          description: descTrim || null,
+          description: descriptionToSave,
           start_date: start,
           end_date: end,
           event_type: eventType,
           deputy_id: deputyIdNum,
           requires_approval: deputyIdNum !== null,
-          approval_status: deputyIdNum !== null ? "pending" : null,
+          approval_status: approvalStatus,
           is_private: !!is_private,
           is_public: !is_private,
           location: location ? String(location).trim() : null,
@@ -255,6 +308,13 @@ export async function PUT(
           ...(clearReminderSent ? { reminder_notified_at: null } : {}),
         },
       });
+
+      if (deputyRemoved || deputyIdNum === null) {
+        await clearCalendarApprovalRecords(tx, id);
+      } else if (needsApprovalReset || existing.deputy_id !== deputyIdNum || deputyNewlyAssigned) {
+        await resetCalendarApprovalRecords(tx, id, deputyIdNum);
+      }
+
       await replaceEventParticipants(tx, id, participantUserIds);
     });
 
@@ -263,6 +323,21 @@ export async function PUT(
       select: { first_name: true, last_name: true },
     });
     const creatorName = creator ? `${creator.first_name} ${creator.last_name}`.trim() : "Uživatel";
+
+    if (notifyDeputyId !== null) {
+      const notifMessage = needsApprovalReset
+        ? `${creatorName} upravil/a událost „${displayTitle}“. Událost čeká na vaše schválení.`
+        : `Událost „${displayTitle}“ vyžaduje vaše schválení. Žadatel: ${creatorName}. Jste uveden/a jako zástupce pro tuto událost.`;
+      await prisma.notifications.create({
+        data: {
+          user_id: notifyDeputyId,
+          title: needsApprovalReset ? "Událost byla upravena" : "Událost čeká na schválení",
+          message: notifMessage,
+          type: "calendar_approval",
+          link: calendarLink,
+        },
+      });
+    }
     if (newOnes.length > 0) {
       await notifyCalendarInvitees(prisma, {
         userIds: newOnes,
