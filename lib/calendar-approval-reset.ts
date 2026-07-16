@@ -216,7 +216,10 @@ export async function syncStaleCalendarApprovalStatus(
       end_date: new Date(),
       event_type: null,
     },
-    event.calendar_approvals
+    event.calendar_approvals.map((a) => ({
+      approval_type: a.approval_type ?? "",
+      status: a.status ?? "",
+    }))
   );
 
   if (effective && isStaleApprovalStatusMismatch(event.approval_status, effective)) {
