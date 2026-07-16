@@ -6,8 +6,9 @@ import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
 import { useListFilters } from "@/lib/navigation/use-list-filters";
 import { type ProductListRow } from "@/lib/iml/product-list-columns";
 import { useProductListColumns } from "@/lib/iml/use-product-list-columns";
+import { useProductListColumnWidths } from "@/lib/iml/use-product-list-column-widths";
 import { ProductListColumnPicker } from "./_components/ProductListColumnPicker";
-import { renderProductListCell } from "./_components/ProductListColumnCells";
+import { ResizableProductListTable } from "./_components/ResizableProductListTable";
 
 const PER_PAGE_STORAGE_KEY = "iml-products-per-page";
 
@@ -30,12 +31,6 @@ function parseStoredPerPage(value: string | null): PerPageOption {
   return "25";
 }
 
-function headerAlignClass(align?: "left" | "center" | "right"): string {
-  if (align === "center") return "text-center";
-  if (align === "right") return "text-right";
-  return "text-left";
-}
-
 export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const { filters, setFilter, setFilters, listHref } = useListFilters({
     defaults: PRODUCT_LIST_FILTER_DEFAULTS,
@@ -48,8 +43,15 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const page = parseInt(filters.page || "1", 10) || 1;
   const perPage = (filters.per_page || "25") as PerPageOption;
 
-  const { visibleColumns, visibleColumnIds, toggleColumn, resetToDefaults, ready } =
+  const { visibleColumns, visibleColumnIds, toggleColumn, resetToDefaults, ready: columnsReady } =
     useProductListColumns();
+  const {
+    columnWidths,
+    setWidth,
+    resetWidth,
+    resetWidths,
+    ready: widthsReady,
+  } = useProductListColumnWidths(visibleColumnIds);
 
   const [products, setProducts] = useState<ProductListRow[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -57,6 +59,8 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [perPageBootstrapped, setPerPageBootstrapped] = useState(false);
+
+  const tableReady = columnsReady && widthsReady;
 
   useEffect(() => {
     if (perPageBootstrapped || filters.per_page) return;
@@ -142,7 +146,6 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     [canWrite, listHref, handleDelete]
   );
 
-  const colCount = visibleColumns.length;
   const showPageNav = perPage !== "all" && totalPages > 1;
 
   return (
@@ -163,11 +166,12 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
           >
             Export Excel
           </a>
-          {ready && (
+          {tableReady && (
             <ProductListColumnPicker
               visibleColumnIds={visibleColumnIds}
               onToggle={toggleColumn}
               onReset={resetToDefaults}
+              onResetWidths={resetWidths}
             />
           )}
         </div>
@@ -223,50 +227,16 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
             </button>
           </form>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="border-b border-gray-200 bg-gray-50">
-              <tr>
-                {visibleColumns.map((col) => (
-                  <th
-                    key={col.id}
-                    className={`px-4 py-3 text-sm font-semibold text-gray-700 ${headerAlignClass(col.align)} ${col.headerClassName ?? ""}`}
-                  >
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading || !ready ? (
-                <tr>
-                  <td colSpan={colCount || 1} className="px-4 py-8 text-center text-gray-500">
-                    Načítání…
-                  </td>
-                </tr>
-              ) : products.length === 0 ? (
-                <tr>
-                  <td colSpan={colCount || 1} className="px-4 py-8 text-center text-gray-500">
-                    Žádné produkty
-                  </td>
-                </tr>
-              ) : (
-                products.map((p) => (
-                  <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    {visibleColumns.map((col) => (
-                      <td
-                        key={col.id}
-                        className={`px-4 py-3 ${headerAlignClass(col.align)} ${col.cellClassName ?? ""}`}
-                      >
-                        {renderProductListCell(col.id, p, cellContext)}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <ResizableProductListTable
+          visibleColumns={visibleColumns}
+          columnWidths={columnWidths}
+          loading={loading}
+          ready={tableReady}
+          products={products}
+          cellContext={cellContext}
+          onResizeColumn={setWidth}
+          onResetColumnWidth={resetWidth}
+        />
         {!loading && total > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-200 p-4">
             <label className="flex items-center gap-2 text-sm text-gray-600">

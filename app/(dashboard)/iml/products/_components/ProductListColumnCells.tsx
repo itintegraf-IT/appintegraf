@@ -135,11 +135,7 @@ export function renderProductListCell(
     case "ean_code":
       return dash(product.ean_code);
     case "die_cut_tool_code":
-      return (
-        <span className="block max-w-[10rem] truncate" title={product.die_cut_tool_code ?? undefined}>
-          {dash(product.die_cut_tool_code)}
-        </span>
-      );
+      return dash(product.die_cut_tool_code);
     case "label_shape_code":
       return dash(product.label_shape_code);
     case "assembly_code":
@@ -151,11 +147,7 @@ export function renderProductListCell(
     case "format":
       return formatProductListFormat(product);
     case "print_colors_text":
-      return (
-        <span className="block max-w-[12rem] truncate text-sm" title={product.print_colors_text ?? undefined}>
-          {dash(product.print_colors_text)}
-        </span>
-      );
+      return dash(product.print_colors_text);
     case "color_count":
       return dash(product.color_count);
     case "color_coverage":
