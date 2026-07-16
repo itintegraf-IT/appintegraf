@@ -12,9 +12,15 @@ type Props = {
   visibleColumnIds: ProductListColumnId[];
   onToggle: (id: ProductListColumnId) => void;
   onReset: () => void;
+  onResetWidths: () => void;
 };
 
-export function ProductListColumnPicker({ visibleColumnIds, onToggle, onReset }: Props) {
+export function ProductListColumnPicker({
+  visibleColumnIds,
+  onToggle,
+  onReset,
+  onResetWidths,
+}: Props) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -55,17 +61,27 @@ export function ProductListColumnPicker({ visibleColumnIds, onToggle, onReset }:
 
       {open && (
         <div className="absolute left-0 top-full z-50 mt-2 w-80 rounded-xl border border-gray-200 bg-white p-4 shadow-lg">
-          <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-sm font-semibold text-gray-900">Zobrazené sloupce</p>
-            <button
-              type="button"
-              onClick={onReset}
-              className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
-              title="Obnovit výchozí sloupce"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              Výchozí
-            </button>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={onResetWidths}
+                className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+                title="Obnovit výchozí šířky sloupců"
+              >
+                Obnovit šířky
+              </button>
+              <button
+                type="button"
+                onClick={onReset}
+                className="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-600 hover:bg-gray-100"
+                title="Obnovit výchozí sloupce"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Výchozí
+              </button>
+            </div>
           </div>
 
           <div className="max-h-96 space-y-4 overflow-y-auto pr-1">

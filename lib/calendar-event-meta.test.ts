@@ -45,7 +45,7 @@ describe("calendar-event-meta global formatting", () => {
     ).toBe("Schválen");
     expect(
       getCalendarGlobalStatusLine({ approval_status: "pending", deputy_id: 1 })
-    ).toBe("Čeká na schválení");
+    ).toBe("Čeká na zástupce");
     expect(getCalendarGlobalStatusLine({ approval_status: null, deputy_id: null })).toBe(
       ""
     );

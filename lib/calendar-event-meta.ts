@@ -101,8 +101,9 @@ export function getCalendarGlobalStatusLine(e: {
     case "rejected":
       return "Zamítnuto";
     case "deputy_approved":
+      return "Čeká na schválení";
     case "pending":
-      return e.deputy_id ? "Čeká na schválení" : "Čeká na zástupce";
+      return e.deputy_id ? "Čeká na zástupce" : "Čeká na schválení";
     default:
       return "";
   }
@@ -202,7 +203,7 @@ export function getCalendarEventApprovalStatusLabel(e: {
     case "deputy_approved":
       return "Čeká na schválení";
     case "pending":
-      return e.deputy_id ? "Čeká na schválení" : "Čeká na zástupce";
+      return e.deputy_id ? "Čeká na zástupce" : "Čeká na schválení";
     default:
       return "";
   }
