@@ -210,7 +210,7 @@ export default async function CalendarPage({
         status: true,
         users: { select: { first_name: true, last_name: true } },
       },
-      orderBy: { approval_order: "asc" },
+      orderBy: { approval_order: "asc" as const },
     },
     calendar_event_participants: {
       include: { users: { select: { first_name: true, last_name: true } } },
@@ -255,8 +255,8 @@ export default async function CalendarPage({
   type RawCalendarEvent = (typeof events)[number];
   const eventsWithEffectiveStatus = events.map((e: RawCalendarEvent) => {
     const approvalRows = e.calendar_approvals.map((a) => ({
-      approval_type: a.approval_type,
-      status: a.status,
+      approval_type: a.approval_type ?? "",
+      status: a.status ?? "",
     }));
     const effectiveStatus = getEffectiveCalendarApprovalStatus(
       {
