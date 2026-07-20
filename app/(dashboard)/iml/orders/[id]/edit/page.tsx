@@ -51,6 +51,8 @@ export default function ImlOrderEditPage() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [supervisorAck, setSupervisorAck] = useState(false);
   const [showSupervisorModal, setShowSupervisorModal] = useState(false);
+  const [itemAddedMessage, setItemAddedMessage] = useState("");
+  const [saveMessage, setSaveMessage] = useState("");
 
   const [form, setForm] = useState({
     customer_id: "",
@@ -176,6 +178,21 @@ export default function ImlOrderEditPage() {
   const canAddPickerItem =
     !!picker.product_id && Number.isFinite(pickerQuantity) && pickerQuantity > 0;
 
+  const hasValidItems = useMemo(
+    () =>
+      selectedItems.some((row) => {
+        const q = parseInt(row.quantity, 10);
+        return Number.isFinite(q) && q > 0;
+      }),
+    [selectedItems]
+  );
+
+  const handlePickerKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (canAddPickerItem) addSelectedItem();
+  };
+
   const addSelectedItem = () => {
     const pid = parseInt(picker.product_id, 10);
     if (!pid) {
@@ -192,6 +209,7 @@ export default function ImlOrderEditPage() {
       return;
     }
     setError("");
+    setItemAddedMessage("Položka přidána. Můžete přidat další produkt nebo uložit objednávku.");
     setSelectedItems((prev) => [
       ...prev,
       {
@@ -230,7 +248,7 @@ export default function ImlOrderEditPage() {
       })
       .filter(Boolean) as { product_id: number; quantity: number; unit_price: number | null }[];
 
-  const submitPut = async (withSupervisorOverride: boolean) => {
+  const submitPut = async (withSupervisorOverride: boolean): Promise<boolean> => {
     const invalidQty = selectedItems.some((row) => {
       if (!row.product_id) return false;
       const q = parseInt(row.quantity, 10);
@@ -238,12 +256,14 @@ export default function ImlOrderEditPage() {
     });
     if (invalidQty) {
       setError("Každá položka musí mít množství větší než 0.");
-      return;
+      setLoading(false);
+      return false;
     }
     const orderItems = buildItems();
     if (orderItems.length === 0) {
       setError("Přidejte alespoň jednu položku s množstvím větším než 0.");
-      return;
+      setLoading(false);
+      return false;
     }
 
     const res = await fetch(`/api/iml/orders/${id}`, {
@@ -265,28 +285,33 @@ export default function ImlOrderEditPage() {
       if (supervisor) {
         setShowSupervisorModal(true);
         setLoading(false);
-        return;
+        return false;
       }
       setError(data.error ?? "Nelze uložit kvůli stavu produktu.");
       setLoading(false);
-      return;
+      return false;
     }
     if (!res.ok) {
       setError(data.error ?? "Chyba při ukládání");
       setLoading(false);
-      return;
+      return false;
     }
 
+    setSaveMessage("Objednávka uložena, přesměrovávám…");
     router.push(`/iml/orders/${id}`);
     router.refresh();
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setItemAddedMessage("");
+    setSaveMessage("");
     setLoading(true);
     try {
-      await submitPut(supervisorAck);
+      const ok = await submitPut(supervisorAck);
+      if (!ok) setLoading(false);
     } catch {
       setError("Chyba při ukládání");
       setLoading(false);
@@ -297,11 +322,12 @@ export default function ImlOrderEditPage() {
     setSupervisorAck(true);
     setShowSupervisorModal(false);
     setLoading(true);
+    setSaveMessage("");
     try {
-      await submitPut(true);
+      const ok = await submitPut(true);
+      if (!ok) setLoading(false);
     } catch {
       setError("Chyba při ukládání");
-    } finally {
       setLoading(false);
     }
   };
@@ -327,6 +353,9 @@ export default function ImlOrderEditPage() {
       <form onSubmit={handleSubmit} className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        )}
+        {saveMessage && (
+          <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">{saveMessage}</div>
         )}
 
         <div className="mb-4 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm text-gray-600">
@@ -454,6 +483,7 @@ export default function ImlOrderEditPage() {
                 placeholder="0"
                 value={picker.quantity}
                 onChange={(e) => setPicker((prev) => ({ ...prev, quantity: e.target.value }))}
+                onKeyDown={handlePickerKeyDown}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-right"
               />
             </div>
@@ -464,6 +494,7 @@ export default function ImlOrderEditPage() {
                 step="0.01"
                 value={picker.unit_price}
                 onChange={(e) => setPicker((prev) => ({ ...prev, unit_price: e.target.value }))}
+                onKeyDown={handlePickerKeyDown}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-right"
               />
             </div>
@@ -478,6 +509,16 @@ export default function ImlOrderEditPage() {
               </button>
             </div>
           </div>
+          {selectedItems.length > 0 && (
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700">
+                Přidané položky: {selectedItems.length}
+              </span>
+            </div>
+          )}
+          {itemAddedMessage && (
+            <p className="mb-2 text-sm text-green-600">{itemAddedMessage}</p>
+          )}
           <div className="overflow-x-auto rounded-lg border border-gray-200">
             <table className="w-full text-sm">
               <thead className="border-b border-gray-200 bg-gray-50">
@@ -559,10 +600,10 @@ export default function ImlOrderEditPage() {
         <div className="mt-6 flex gap-2">
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !hasValidItems}
             className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
           >
-            {loading ? "Ukládám…" : "Uložit"}
+            {loading ? "Ukládám objednávku…" : "Uložit"}
           </button>
           <Link
             href={`/iml/orders/${id}`}
