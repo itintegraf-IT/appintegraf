@@ -23,6 +23,8 @@ export default function ImlProductAddPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [createdProductId, setCreatedProductId] = useState<number | null>(null);
+  const [hasImage, setHasImage] = useState(false);
+  const [hasPdf, setHasPdf] = useState(false);
   const [form, setForm] = useState<ProductFormState>(emptyProductForm);
   const [customData, setCustomData] = useState<Record<string, string | number | boolean>>({});
   const [colors, setColors] = useState<ProductColorRow[]>([]);
@@ -135,10 +137,17 @@ export default function ImlProductAddPage() {
             <p className="mb-4 font-medium text-green-800">
               Produkt byl vytvořen. Níže můžete nahrát obrázek a PDF.
             </p>
+            <p className="mb-4 text-sm text-green-700">
+              Dokumenty můžete doplnit i později v editaci.
+            </p>
             <ProductFilesUpload
               productId={createdProductId}
-              hasImage={false}
-              hasPdf={false}
+              hasImage={hasImage}
+              hasPdf={hasPdf}
+              onImageChange={() => setHasImage(true)}
+              onPdfChange={() => setHasPdf(true)}
+              onImageDelete={() => setHasImage(false)}
+              onPdfDelete={() => setHasPdf(false)}
             />
             <div className="mt-4 flex gap-2">
               <Link

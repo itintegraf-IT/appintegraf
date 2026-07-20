@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Image, FileText, Trash2, Upload } from "lucide-react";
 import { ProductPdfThumbnail } from "./ProductPdfThumbnail";
 import { pdfFileToJpegPreviewBlob } from "@/lib/iml-product-preview-from-pdf";
@@ -14,15 +14,38 @@ type Props = {
   hasPdf: boolean;
   onImageChange?: () => void;
   onPdfChange?: () => void;
+  onImageDelete?: () => void;
+  onPdfDelete?: () => void;
 };
 
-export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange, onPdfChange }: Props) {
+export function ProductFilesUpload({
+  productId,
+  hasImage,
+  hasPdf,
+  onImageChange,
+  onPdfChange,
+  onImageDelete,
+  onPdfDelete,
+}: Props) {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const [imageLoading, setImageLoading] = useState(false);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [imageError, setImageError] = useState("");
   const [pdfError, setPdfError] = useState("");
+  const [imageSuccess, setImageSuccess] = useState("");
+  const [pdfSuccess, setPdfSuccess] = useState("");
+  const [localHasImage, setLocalHasImage] = useState(hasImage);
+  const [localHasPdf, setLocalHasPdf] = useState(hasPdf);
+  const [imageCacheBust, setImageCacheBust] = useState(() => Date.now());
+
+  useEffect(() => {
+    setLocalHasImage(hasImage);
+  }, [hasImage]);
+
+  useEffect(() => {
+    setLocalHasPdf(hasPdf);
+  }, [hasPdf]);
 
   const pickImage = () => imageInputRef.current?.click();
   const pickPdf = () => pdfInputRef.current?.click();
@@ -32,6 +55,7 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
     const file = e.target.files?.[0];
     if (!file) return;
     setImageError("");
+    setImageSuccess("");
     setImageLoading(true);
     try {
       const isPdf =
@@ -58,8 +82,10 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
         setImageError(data.error ?? "Chyba při nahrávání");
         return;
       }
+      setLocalHasImage(true);
+      setImageCacheBust(Date.now());
+      setImageSuccess("Náhled byl nahrán.");
       onImageChange?.();
-      window.location.reload();
     } catch {
       setImageError("Chyba při nahrávání");
     } finally {
@@ -71,6 +97,7 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
   const handleImageDelete = async () => {
     if (!confirm("Opravdu smazat náhled (obrázek)?")) return;
     setImageError("");
+    setImageSuccess("");
     setImageLoading(true);
     try {
       const res = await fetch(`/api/iml/products/${productId}/image`, { method: "DELETE" });
@@ -79,8 +106,9 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
         setImageError(data.error ?? "Chyba při mazání");
         return;
       }
-      onImageChange?.();
-      window.location.reload();
+      setLocalHasImage(false);
+      setImageSuccess("Náhled byl smazán.");
+      onImageDelete?.();
     } catch {
       setImageError("Chyba při mazání");
     } finally {
@@ -92,6 +120,7 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
     const file = e.target.files?.[0];
     if (!file) return;
     setPdfError("");
+    setPdfSuccess("");
     setPdfLoading(true);
     try {
       const formData = new FormData();
@@ -115,8 +144,9 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
         );
         return;
       }
+      setLocalHasPdf(true);
+      setPdfSuccess("PDF bylo nahráno.");
       onPdfChange?.();
-      window.location.reload();
     } catch {
       setPdfError("Chyba při nahrávání");
     } finally {
@@ -128,6 +158,7 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
   const handlePdfDelete = async () => {
     if (!confirm("Opravdu smazat PDF?")) return;
     setPdfError("");
+    setPdfSuccess("");
     setPdfLoading(true);
     try {
       const res = await fetch(`/api/iml/products/${productId}/pdf`, { method: "DELETE" });
@@ -136,8 +167,9 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
         setPdfError(data.error ?? "Chyba při mazání");
         return;
       }
-      onPdfChange?.();
-      window.location.reload();
+      setLocalHasPdf(false);
+      setPdfSuccess("PDF bylo smazáno.");
+      onPdfDelete?.();
     } catch {
       setPdfError("Chyba při mazání");
     } finally {
@@ -152,16 +184,16 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
         <div>
           <p className="mb-2 text-sm text-gray-600">
             Náhled – obrázek (JPG, PNG, WebP, GIF) nebo PDF (1. stránka → uloží se jako JPEG, max. 5 MB)
-            {!hasImage && hasPdf && (
+            {!localHasImage && localHasPdf && (
               <span className="mt-0.5 block text-xs font-normal text-gray-500">
                 Dokud nenahrajete vlastní náhled výše, zobrazí se první stránka tiskových dat (PDF vpravo).
               </span>
             )}
           </p>
-          {hasImage ? (
+          {localHasImage ? (
             <div className="flex items-center gap-2">
               <img
-                src={`/api/iml/products/${productId}/image?t=${Date.now()}`}
+                src={`/api/iml/products/${productId}/image?t=${imageCacheBust}`}
                 alt="Náhled"
                 className="h-24 w-24 rounded-lg border object-cover"
               />
@@ -196,7 +228,7 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
                 />
               </div>
             </div>
-          ) : hasPdf ? (
+          ) : localHasPdf ? (
             <div className="flex items-center gap-2">
               <ProductPdfThumbnail productId={productId} maxHeight={96} className="shrink-0" />
               <div className="flex flex-col gap-1">
@@ -245,14 +277,15 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
             </>
           )}
           {imageError && <p className="mt-1 text-sm text-red-600">{imageError}</p>}
+          {imageSuccess && <p className="mt-1 text-sm text-green-600">{imageSuccess}</p>}
         </div>
 
         <div>
           <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max 50 MB)</p>
-          {hasPdf ? (
+          {localHasPdf ? (
             <div className="flex items-center gap-2">
               <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-gray-100">
-                {hasImage ? (
+                {localHasImage ? (
                   <ProductPdfThumbnail productId={productId} maxHeight={96} className="max-h-24 max-w-24" />
                 ) : (
                   <FileText className="h-10 w-10 text-gray-500" />
@@ -321,6 +354,7 @@ export function ProductFilesUpload({ productId, hasImage, hasPdf, onImageChange,
             </>
           )}
           {pdfError && <p className="mt-1 text-sm text-red-600">{pdfError}</p>}
+          {pdfSuccess && <p className="mt-1 text-sm text-green-600">{pdfSuccess}</p>}
         </div>
       </div>
     </div>
