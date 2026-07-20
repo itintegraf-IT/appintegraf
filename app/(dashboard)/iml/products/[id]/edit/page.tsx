@@ -278,6 +278,10 @@ export default function ImlProductEditPage() {
           productId={parseInt(id, 10)}
           hasImage={hasImage}
           hasPdf={hasPdf}
+          onImageChange={() => setHasImage(true)}
+          onPdfChange={() => setHasPdf(true)}
+          onImageDelete={() => setHasImage(false)}
+          onPdfDelete={() => setHasPdf(false)}
         />
 
         <form onSubmit={handleSubmit} className="space-y-6">
