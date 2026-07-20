@@ -63,6 +63,19 @@ export function buildPrintColorsSummary(
   return parts.join(" + ");
 }
 
+/**
+ * Souhrn barev pro zobrazení (např. záložka Tisková data) – bez pokrytí %.
+ * "P 3570 C 20.1% + K 2.4%" → "P 3570 C + K"
+ */
+export function formatPrintColorsSummaryForDisplay(text: string | null | undefined): string {
+  if (!text?.trim()) return "";
+  return text
+    .split(/\s*\+\s*/)
+    .map((part) => part.replace(/\s+\d+(?:[.,]\d+)?\s*%\s*$/u, "").trim())
+    .filter(Boolean)
+    .join(" + ");
+}
+
 export function cmykFlagsFromProduct(row: {
   cmyk_c_enabled?: boolean | null;
   cmyk_m_enabled?: boolean | null;

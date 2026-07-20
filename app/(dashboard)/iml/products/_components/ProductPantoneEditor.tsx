@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GripVertical, Plus, Trash2 } from "lucide-react";
 import { consumptionKg } from "@/lib/iml-color-consumption";
-import { normalizePantoneCode } from "@/lib/iml-pantone";
+import { normalizePantoneCode, resolvePantoneSwatchHex } from "@/lib/iml-pantone";
 
 /**
  * Jeden řádek barevnosti produktu.
@@ -79,27 +79,6 @@ export default function ProductPantoneEditor({ colors, onChange, labelsPerSheet 
   }, [loadCatalog]);
 
   /** Po načtení číselníku doplní pantone_id u řádků se známým kódem (jako výběr z dropdownu). */
-  useEffect(() => {
-    if (catalogLoading || catalog.length === 0) return;
-    let changed = false;
-    const next = colors.map((row) => {
-      if (row.pantone_id != null || !row.code.trim()) return row;
-      const normalized = normalizePantoneCode(row.code);
-      const match = catalog.find((p) => p.is_active && (p.code ?? "") === normalized);
-      if (!match) return row;
-      changed = true;
-      return {
-        ...row,
-        pantone_id: match.id,
-        code: match.code ?? normalized,
-        name: match.name,
-        hex: match.hex,
-      };
-    });
-    if (changed) onChange(next);
-  }, [catalog, catalogLoading, colors, onChange]);
-
-  /** Po načtení číselníku doplní pantone_id u řádků se známým kódem (jako výběr z dropdownu na testu). */
   useEffect(() => {
     if (catalogLoading || catalog.length === 0) return;
     let changed = false;
@@ -410,6 +389,7 @@ function PantoneCombobox({
 
   const normalized = normalizePantoneCode(row.code);
   const query = row.code.trim().toUpperCase();
+  const swatchHex = resolvePantoneSwatchHex(row.code, row.hex);
 
   const matches = useMemo(() => {
     const active = catalog.filter((p) => p.is_active);
@@ -497,13 +477,13 @@ function PantoneCombobox({
   return (
     <div ref={containerRef} className="relative">
       <div className="flex items-center gap-2">
-        {row.hex && /^#[0-9A-Fa-f]{6}$/.test(row.hex) && (
+        {swatchHex ? (
           <span
             className="inline-block h-5 w-5 shrink-0 rounded border border-gray-300"
-            style={{ backgroundColor: row.hex }}
-            title={row.hex}
+            style={{ backgroundColor: swatchHex }}
+            title={swatchHex}
           />
-        )}
+        ) : null}
         <input
           type="text"
           value={row.code}
@@ -553,14 +533,17 @@ function PantoneCombobox({
                 (highlight === idx ? "bg-red-50" : "hover:bg-gray-50")
               }
             >
-              {p.hex && /^#[0-9A-Fa-f]{6}$/.test(p.hex) ? (
+              {(() => {
+                const optionHex = resolvePantoneSwatchHex(p.code, p.hex);
+                return optionHex ? (
                 <span
                   className="inline-block h-4 w-4 shrink-0 rounded border border-gray-200"
-                  style={{ backgroundColor: p.hex }}
+                  style={{ backgroundColor: optionHex }}
                 />
               ) : (
                 <span className="inline-block h-4 w-4 shrink-0 rounded border border-dashed border-gray-200" />
-              )}
+              );
+              })()}
               <span className="font-mono">{p.code ?? "—"}</span>
               {p.name && (
                 <span className="truncate text-gray-500">— {p.name}</span>

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { isValidPantoneCode, normalizePantoneCode } from "./iml-pantone";
+import {
+  isValidPantoneCode,
+  normalizePantoneCode,
+  resolvePantoneSwatchHex,
+} from "./iml-pantone";
 
 describe("normalizePantoneCode", () => {
   it("trim, toUpperCase, collapse whitespace", () => {
@@ -55,5 +59,20 @@ describe("isValidPantoneCode", () => {
     expect(isValidPantoneCode("P_485")).toBe(false); // underscore
     expect(isValidPantoneCode("P.485")).toBe(false); // tečka
     expect(isValidPantoneCode("P@485")).toBe(false);
+  });
+});
+
+describe("resolvePantoneSwatchHex", () => {
+  it("preferuje hex z DB", () => {
+    expect(resolvePantoneSwatchHex("P 485 C", "#ec008c")).toBe("#EC008C");
+  });
+
+  it("mapuje procesní kanály C/M/Y/K", () => {
+    expect(resolvePantoneSwatchHex("K", null)).toBe("#1A1A1A");
+    expect(resolvePantoneSwatchHex("c", null)).toBe("#00A3E0");
+  });
+
+  it("u Pantone bez hex vrací null", () => {
+    expect(resolvePantoneSwatchHex("P 3570 C", null)).toBeNull();
   });
 });
