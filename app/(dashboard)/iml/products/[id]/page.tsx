@@ -23,7 +23,8 @@ import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
 import { imlLabelTypeLabel } from "@/lib/iml-constants";
 import { formatProductFormatFromMm } from "@/lib/iml/product-format";
-import { cmykFlagsFromProduct } from "@/lib/iml-print-colors-summary";
+import { cmykFlagsFromProduct, formatPrintColorsSummaryForDisplay } from "@/lib/iml-print-colors-summary";
+import { normalizePantoneCode, resolvePantoneSwatchHex } from "@/lib/iml-pantone";
 
 export default async function ImlProductDetailPage({
   params,
@@ -67,6 +68,34 @@ export default async function ImlProductDetailPage({
   ]);
 
   if (!product) notFound();
+
+  const codesNeedingHex = Array.from(
+    new Set(
+      product.iml_product_colors
+        .map((c) => ({
+          code: c.iml_pantone_colors?.code?.trim() ?? "",
+          hex: c.iml_pantone_colors?.hex ?? null,
+        }))
+        .filter((c) => c.code && !resolvePantoneSwatchHex(c.code, c.hex))
+        .map((c) => c.code)
+    )
+  );
+  const hexByCode = new Map<string, string>();
+  if (codesNeedingHex.length > 0) {
+    const mats = await prisma.materials.findMany({
+      where: {
+        category_code: "COLOR",
+        code: { in: codesNeedingHex },
+        hex_color: { not: null },
+      },
+      select: { code: true, hex_color: true },
+    });
+    for (const m of mats) {
+      if (!m.code || !m.hex_color) continue;
+      hexByCode.set(normalizePantoneCode(m.code), m.hex_color);
+      hexByCode.set(m.code.trim(), m.hex_color);
+    }
+  }
 
   const customData = (product.custom_data as Record<string, unknown> | null) ?? {};
   const hasCustomData = Object.keys(customData).length > 0;
@@ -213,12 +242,18 @@ export default async function ImlProductDetailPage({
           </div>
           {product.iml_product_colors.length > 0 ? (
             <ProductColorsTable
-              colors={product.iml_product_colors.map((c) => ({
-                code: c.iml_pantone_colors?.code ?? "",
-                name: c.iml_pantone_colors?.name ?? null,
-                hex: c.iml_pantone_colors?.hex ?? null,
-                coverage_pct: Number(c.coverage_pct),
-              }))}
+              colors={product.iml_product_colors.map((c) => {
+                const code = c.iml_pantone_colors?.code ?? "";
+                const dbHex = c.iml_pantone_colors?.hex ?? null;
+                const fromMaterials =
+                  hexByCode.get(normalizePantoneCode(code)) ?? hexByCode.get(code.trim()) ?? null;
+                return {
+                  code,
+                  name: c.iml_pantone_colors?.name ?? null,
+                  hex: dbHex ?? fromMaterials,
+                  coverage_pct: Number(c.coverage_pct),
+                };
+              })}
               labelsPerSheet={product.labels_per_sheet ?? null}
             />
           ) : (
@@ -257,7 +292,11 @@ export default async function ImlProductDetailPage({
             <InfoField label="Počet barev" value={fmtNum(product.color_count)} />
             <InfoField label="Etiketa" value={imlLabelTypeLabel(product.label_type) || "-"} />
             {product.print_colors_text && (
-              <InfoField label="Barvy (souhrn)" value={product.print_colors_text} span={2} />
+              <InfoField
+                label="Barvy (souhrn)"
+                value={formatPrintColorsSummaryForDisplay(product.print_colors_text)}
+                span={2}
+              />
             )}
             <InfoField label="EAN kód" value={fmt(product.ean_code)} mono />
             <InfoField label="Vzor min. tisku" value={product.has_print_sample ? "Ano" : "Ne"} />
@@ -368,16 +407,21 @@ function ProductColorsTable({
           <tbody>
             {colors.map((c, i) => {
               const kg = consumptionKg(REF, labelsPerSheet, c.coverage_pct);
+              const swatchHex = resolvePantoneSwatchHex(c.code, c.hex);
               return (
                 <tr key={i} className="border-t">
                   <td className="px-3 py-2">
-                    {c.hex && /^#[0-9A-Fa-f]{6}$/.test(c.hex) ? (
+                    {swatchHex ? (
                       <span
                         className="inline-block h-5 w-5 rounded border border-gray-300"
-                        style={{ backgroundColor: c.hex }}
+                        style={{ backgroundColor: swatchHex }}
+                        title={swatchHex}
                       />
                     ) : (
-                      <span className="inline-block h-5 w-5 rounded border border-dashed border-gray-300" />
+                      <span
+                        className="inline-block h-5 w-5 rounded border border-dashed border-gray-300"
+                        title="Barva není v číselníku (chybí hex)"
+                      />
                     )}
                   </td>
                   <td className="px-3 py-2 font-mono">{c.code}</td>
