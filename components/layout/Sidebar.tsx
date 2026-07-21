@@ -449,6 +449,7 @@ const navItems: NavItem[] = [
     subItems: [
       { href: "/projekty/boards", label: "Nástěnky" },
       { href: "/projekty/my-cards", label: "Moje karty" },
+      { href: "/projekty/todo", label: "Můj To Do list" },
     ],
     isActive: (p) => p.startsWith("/projekty"),
   },

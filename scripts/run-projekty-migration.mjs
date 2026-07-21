@@ -13,6 +13,7 @@ const envPath = join(root, ".env");
 
 const SQL_PATHS = [
   join(root, "prisma", "migrations", "20260720_projekty_module.sql"),
+  join(root, "prisma", "migrations", "20260721_projekty_personal_todo.sql"),
 ];
 
 function loadDatabaseUrl() {

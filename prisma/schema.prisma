@@ -1085,6 +1085,7 @@ model users {
   projekty_attachments                                           Attachment[]
   projekty_checklist_assignments                                 ChecklistItem[]               @relation("ProjektyChecklistItemAssignee")
   projekty_audit_logs                                            AuditLog[]
+  projekty_personal_todos                                        PersonalTodo[]                @relation("ProjektyPersonalTodoOwner")
   roles                                                          roles?                        @relation(fields: [role_id], references: [id], onUpdate: NoAction, map: "fk_users_role")
 
   @@index([is_active], map: "idx_active")
@@ -1915,6 +1916,12 @@ enum AuditAction {
   DELETE
 }
 
+enum PersonalTodoStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+}
+
 model Workspace {
   id        String   @id @default(cuid())
   name      String
@@ -1993,14 +2000,38 @@ model Card {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  list       BoardList    @relation(fields: [listId], references: [id], onDelete: Cascade)
-  members    CardMember[]
-  labels     CardLabel[]
-  checklists Checklist[]
+  list             BoardList     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  members          CardMember[]
+  labels           CardLabel[]
+  checklists       Checklist[]
+  promotedFromTodo PersonalTodo? @relation("PersonalTodoPromote")
 
   @@index([boardId, listId, position])
   @@index([dueDate])
   @@map("projekty_card")
+}
+
+model PersonalTodo {
+  id      String @id @default(cuid())
+  ownerId Int
+  owner   users  @relation("ProjektyPersonalTodoOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  title       String             @db.VarChar(500)
+  description String?            @db.Text
+  status      PersonalTodoStatus @default(NOT_STARTED)
+  completedAt DateTime?
+  dueDate     DateTime?
+
+  archivedAt       DateTime?
+  promotedToCardId String?   @unique
+  promotedToCard   Card?     @relation("PersonalTodoPromote", fields: [promotedToCardId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, archivedAt, status])
+  @@index([ownerId, dueDate])
+  @@map("projekty_personal_todo")
 }
 
 model CardMember {

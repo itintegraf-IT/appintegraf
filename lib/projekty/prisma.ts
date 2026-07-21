@@ -23,6 +23,7 @@ export const AUDITED_MODELS = new Set([
   "checklistItem",
   "note",
   "attachment",
+  "personalTodo",
 ]);
 
 export const MUTATION_ACTIONS = new Set(["create", "update", "delete", "upsert"]);
