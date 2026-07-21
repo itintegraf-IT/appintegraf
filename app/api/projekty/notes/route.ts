@@ -8,6 +8,7 @@ import { canEditCard, canViewCard } from "@/lib/projekty/rbac";
 import { loadCardForRBAC } from "@/lib/projekty/board-rbac";
 import { extractMentions } from "@/lib/projekty/mentions";
 import { projektyUserSelect, toDisplayUser } from "@/lib/projekty/user-display";
+import { notifyProjektyMentions, plainPreview, cardBoardContext } from "@/lib/projekty/notify";
 import type { ParentType } from "@prisma/client";
 
 export const GET = withApiError(async (req: NextRequest) => {
@@ -60,7 +61,23 @@ export const POST = withApiError(async (req: NextRequest) => {
     include: { author: { select: projektyUserSelect } },
   });
   const note = { ...raw, author: raw.author ? toDisplayUser(raw.author) : null };
-  // In-app notifikace @mentions jsou fáze 2 (model Notification). Zmínění se
-  // ukládají do note.mentions; doručování doplníme přes appintegraf notifications.
+  // Doručení @zmínek do appintegraf zvonečku (in-app). Best-effort — notify je resilientní.
+  if (parsed.data.parentType === "CARD" && mentionIds.length > 0) {
+    const ctx = await cardBoardContext(parsed.data.parentId);
+    if (ctx) {
+      // Notifikovat jen zmíněné s přístupem k boardu — obsah nesmí uniknout nečlenovi.
+      const recipients = mentionIds.filter((mid) => ctx.viewerIds.has(mid));
+      if (recipients.length > 0) {
+        await notifyProjektyMentions({
+          mentionUserIds: recipients,
+          actorId: user.id,
+          boardId: ctx.boardId,
+          cardId: parsed.data.parentId,
+          cardTitle: ctx.title,
+          preview: plainPreview(parsed.data.content),
+        });
+      }
+    }
+  }
   return NextResponse.json({ note }, { status: 201 });
 });

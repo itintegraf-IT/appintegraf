@@ -446,6 +446,10 @@ const navItems: NavItem[] = [
     icon: KanbanSquare,
     label: "Projekty",
     module: "projekty",
+    subItems: [
+      { href: "/projekty/boards", label: "Nástěnky" },
+      { href: "/projekty/my-cards", label: "Moje karty" },
+    ],
     isActive: (p) => p.startsWith("/projekty"),
   },
   { href: "/stitky", icon: Tags, label: "Štítky výroba", module: "stitky" },

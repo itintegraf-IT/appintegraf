@@ -71,8 +71,15 @@ export const DELETE = withApiError(async (_req: Request, { params }: Params) => 
   }
 
   const audited = getPrismaAudited(user.id);
-  await audited.boardMember.delete({
-    where: { boardId_userId: { boardId, userId } },
+  // Uklidit i přiřazení uživatele ke kartám tohoto boardu — jinak osiří: dostával by
+  // dál notifikace (termín) a karty by mu zůstaly v „Moje karty" i po odebrání z boardu.
+  await audited.$transaction(async (tx) => {
+    const cards = await tx.card.findMany({ where: { boardId }, select: { id: true } });
+    const cardIds = cards.map((c) => c.id);
+    if (cardIds.length > 0) {
+      await tx.cardMember.deleteMany({ where: { userId, cardId: { in: cardIds } } });
+    }
+    await tx.boardMember.delete({ where: { boardId_userId: { boardId, userId } } });
   });
 
   return NextResponse.json({ ok: true });

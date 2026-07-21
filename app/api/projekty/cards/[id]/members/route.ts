@@ -7,6 +7,7 @@ import { loadCardForRBAC } from "@/lib/projekty/board-rbac";
 import { canEditCard } from "@/lib/projekty/rbac";
 import { CardMemberAddSchema } from "@/lib/projekty/validators/card";
 import { projektyUserSelect, toDisplayUser } from "@/lib/projekty/user-display";
+import { notifyProjektyCardAssigned } from "@/lib/projekty/notify";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -51,6 +52,21 @@ export const POST = withApiError(async (req: Request, { params }: Params) => {
     include: { user: { select: projektyUserSelect } },
   });
   const member = { ...raw, user: toDisplayUser(raw.user) };
+
+  // Notifikace přiřazenému uživateli (kromě sebe-přiřazení — řeší notify).
+  const cardInfo = await prisma.card.findUnique({
+    where: { id: cardId },
+    select: { boardId: true, title: true },
+  });
+  if (cardInfo) {
+    await notifyProjektyCardAssigned({
+      assignedUserId: parsed.data.userId,
+      actorId: user.id,
+      boardId: cardInfo.boardId,
+      cardId,
+      cardTitle: cardInfo.title,
+    });
+  }
 
   return NextResponse.json({ member }, { status: 201 });
 });

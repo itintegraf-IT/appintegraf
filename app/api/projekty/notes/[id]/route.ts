@@ -8,6 +8,7 @@ import { canViewCard } from "@/lib/projekty/rbac";
 import { loadCardForRBAC } from "@/lib/projekty/board-rbac";
 import { extractMentions } from "@/lib/projekty/mentions";
 import { projektyUserSelect, toDisplayUser } from "@/lib/projekty/user-display";
+import { notifyProjektyMentions, plainPreview, cardBoardContext } from "@/lib/projekty/notify";
 
 async function load(id: string) {
   const note = await prisma.note.findUnique({ where: { id } });
@@ -36,6 +37,32 @@ export const PATCH = withApiError(async (req: NextRequest, ctx: { params: Promis
     where: { id: existing.id },
     data: { content: parsed.data.content, mentions: mentionIds },
   });
+  // Notifikovat jen NOVĚ přidané @zmínky (ne znovu ty, které v poznámce už byly).
+  if (existing.parentType === "CARD") {
+    const oldMentions = new Set(
+      Array.isArray(existing.mentions)
+        ? (existing.mentions as unknown[]).filter((x): x is number => typeof x === "number")
+        : [],
+    );
+    const newlyAdded = mentionIds.filter((mid) => !oldMentions.has(mid));
+    if (newlyAdded.length > 0) {
+      const ctx = await cardBoardContext(existing.parentId);
+      if (ctx) {
+        // Notifikovat jen nově zmíněné s přístupem k boardu — obsah nesmí uniknout nečlenovi.
+        const recipients = newlyAdded.filter((mid) => ctx.viewerIds.has(mid));
+        if (recipients.length > 0) {
+          await notifyProjektyMentions({
+            mentionUserIds: recipients,
+            actorId: user.id,
+            boardId: ctx.boardId,
+            cardId: existing.parentId,
+            cardTitle: ctx.title,
+            preview: plainPreview(parsed.data.content),
+          });
+        }
+      }
+    }
+  }
   return NextResponse.json({ note });
 });
 

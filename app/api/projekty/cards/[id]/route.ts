@@ -2,9 +2,11 @@ import { NextResponse } from "next/server";
 import { withApiError, getPrismaAudited } from "@/lib/projekty/api-utils";
 import { requireSession } from "@/lib/projekty/session";
 import { AppError } from "@/lib/projekty/errors";
+import { prisma } from "@/lib/projekty/prisma";
 import { loadCardForRBAC, loadCardForFullDetail } from "@/lib/projekty/board-rbac";
 import { canViewCard, canEditCard } from "@/lib/projekty/rbac";
 import { CardUpdateSchema } from "@/lib/projekty/validators/card";
+import { notifyProjektyCardDueDateChanged } from "@/lib/projekty/notify";
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -45,8 +47,50 @@ export const PATCH = withApiError(async (req: Request, { params }: Params) => {
     data.startDate = parsed.data.startDate ? new Date(parsed.data.startDate) : null;
   }
 
+  // Při změně termínu si předem načti stav pro porovnání + příjemce (členy karty).
+  const dueDateProvided = parsed.data.dueDate !== undefined;
+  let dueCtx: { boardId: string; title: string; memberIds: number[]; oldDue: Date | null } | null = null;
+  if (dueDateProvided) {
+    const before = await prisma.card.findUnique({
+      where: { id },
+      select: { boardId: true, title: true, dueDate: true, members: { select: { userId: true } } },
+    });
+    if (before) {
+      const board = await prisma.board.findUnique({
+        where: { id: before.boardId },
+        select: { ownerId: true, members: { select: { userId: true } } },
+      });
+      const viewerIds = new Set<number>(
+        board ? [board.ownerId, ...board.members.map((m) => m.userId)] : [],
+      );
+      dueCtx = {
+        boardId: before.boardId,
+        title: before.title,
+        // Jen členové karty, kteří stále mají přístup k boardu (ne bývalí členové).
+        memberIds: before.members.map((m) => m.userId).filter((uid) => viewerIds.has(uid)),
+        oldDue: before.dueDate,
+      };
+    }
+  }
+
   const audited = getPrismaAudited(user.id);
   const updated = await audited.card.update({ where: { id }, data });
+
+  // Notifikace o změně termínu členům karty — jen když se termín reálně změnil.
+  if (dueCtx) {
+    const newDue = (data.dueDate as Date | null) ?? null;
+    const changed = (dueCtx.oldDue?.getTime() ?? null) !== (newDue?.getTime() ?? null);
+    if (changed) {
+      await notifyProjektyCardDueDateChanged({
+        memberUserIds: dueCtx.memberIds,
+        actorId: user.id,
+        boardId: dueCtx.boardId,
+        cardId: id,
+        cardTitle: dueCtx.title,
+        dueDate: newDue,
+      });
+    }
+  }
 
   return NextResponse.json({ card: updated });
 });
