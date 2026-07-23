@@ -8,6 +8,7 @@ import type {
   EquipmentListSortKey,
   EquipmentListView,
 } from "@/lib/equipment-list-sort";
+import { formatEquipmentPrice } from "@/lib/equipment/format-price";
 import { EquipmentTableActions } from "./EquipmentTableActions";
 import { isEquipmentAssignedStatus } from "@/lib/equipment-status";
 
@@ -22,6 +23,7 @@ export type EquipmentListRow = {
   assignedToUserId: number | null;
   assignmentId: number | null;
   purchaseDate: string | null;
+  purchasePrice: number | null;
   ageText: string;
   ageFromRecord: boolean;
 };
@@ -178,6 +180,7 @@ export function EquipmentListClient({
                           <span className="rounded bg-gray-100 px-1.5 py-0.5">{row.status ?? "—"}</span>
                           <span>Stáří: {row.ageText}</span>
                           <span>Nákup: {formatDate(row.purchaseDate)}</span>
+                          <span>Cena: {formatEquipmentPrice(row.purchasePrice)}</span>
                         </div>
                       </div>
                       <EquipmentTableActions
@@ -205,6 +208,7 @@ export function EquipmentListClient({
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kategorie</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nákup</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cena</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stáří</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Akce</th>
               </tr>
@@ -228,6 +232,7 @@ export function EquipmentListClient({
                     </div>
                   </td>
                   <td className="px-4 py-3">{formatDate(row.purchaseDate)}</td>
+                  <td className="px-4 py-3 font-medium">{formatEquipmentPrice(row.purchasePrice)}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-0.5">
                       <span className="text-sm text-gray-900">{row.ageText}</span>

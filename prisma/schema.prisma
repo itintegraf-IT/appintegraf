@@ -485,42 +485,115 @@ model equipment_assignments {
 }
 
 model equipment_categories {
-  id              Int               @id @default(autoincrement())
-  name            String            @db.VarChar(100)
-  code            String            @unique(map: "code") @db.VarChar(20)
-  description     String?           @db.Text
-  icon            String?           @db.VarChar(50)
-  is_active       Boolean?          @default(true)
-  created_at      DateTime          @default(now()) @db.Timestamp(0)
-  equipment_items equipment_items[]
+  id                         Int                              @id @default(autoincrement())
+  name                       String                           @db.VarChar(100)
+  code                       String                           @unique(map: "code") @db.VarChar(20)
+  description                String?                          @db.Text
+  icon                       String?                          @db.VarChar(50)
+  is_active                  Boolean?                         @default(true)
+  responsible_user_id        Int?
+  created_at                 DateTime                         @default(now()) @db.Timestamp(0)
+  equipment_items            equipment_items[]
+  users_responsible          users?                           @relation("equipment_categories_responsible", fields: [responsible_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_categories_responsible_fk")
+  equipment_user_category_access equipment_user_category_access[]
 
   @@index([code], map: "idx_code")
   @@index([name], map: "idx_name")
+  @@index([responsible_user_id], map: "idx_equipment_cat_responsible")
+}
+
+model equipment_rooms {
+  id                           Int                           @id @default(autoincrement())
+  name                         String                        @db.VarChar(150)
+  code                         String                        @unique(map: "equipment_rooms_code_unique") @db.VarChar(40)
+  building                     String?                       @db.VarChar(100)
+  floor                        String?                       @db.VarChar(50)
+  description                  String?                       @db.Text
+  qr_code                      String                        @unique(map: "equipment_rooms_qr_code_unique") @db.VarChar(64)
+  is_active                    Boolean                       @default(true)
+  floor_plan_id                Int?
+  /// JSON: [{ "x": 0..1, "y": 0..1 }, ...] – souřadnice relativní k obrázku plánu
+  polygon_json                 String?                       @db.LongText
+  plan_color                   String?                       @db.VarChar(20)
+  created_at                   DateTime                      @default(now()) @db.Timestamp(0)
+  updated_at                   DateTime                      @default(now()) @db.Timestamp(0)
+  equipment_items              equipment_items[]
+  location_history_from        equipment_location_history[]  @relation("equipment_loc_hist_from")
+  location_history_to          equipment_location_history[]  @relation("equipment_loc_hist_to")
+  inventory_lines_expected     equipment_inventory_lines[]
+  floor_plan                   equipment_floor_plans?        @relation(fields: [floor_plan_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_rooms_floor_plan_fk")
+
+  @@index([is_active], map: "idx_equipment_rooms_active")
+  @@index([floor_plan_id], map: "idx_equipment_rooms_floor_plan")
+}
+
+/// Půdorys budovy (1NP, 2NP…) – pozadí pro interaktivní plán místností
+model equipment_floor_plans {
+  id            Int               @id @default(autoincrement())
+  name          String            @db.VarChar(150)
+  floor_label   String            @db.VarChar(40)
+  building      String?           @db.VarChar(100)
+  image_path    String            @db.VarChar(500)
+  image_width   Int?
+  image_height  Int?
+  sort_order    Int               @default(0)
+  is_active     Boolean           @default(true)
+  created_by    Int?
+  created_at    DateTime          @default(now()) @db.Timestamp(0)
+  updated_at    DateTime          @default(now()) @db.Timestamp(0)
+  rooms         equipment_rooms[]
+  users_created users?            @relation("equipment_floor_plans_created", fields: [created_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_floor_plans_user_fk")
+
+  @@index([is_active, sort_order], map: "idx_eq_floor_plans_active_sort")
+}
+
+model equipment_user_category_access {
+  user_id             Int
+  category_id         Int
+  access_level        String               @default("read") @db.VarChar(20)
+  granted_by          Int?
+  granted_at          DateTime             @default(now()) @db.Timestamp(0)
+  users               users                @relation("equipment_uca_user", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipment_uca_user_fk")
+  equipment_categories equipment_categories @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipment_uca_category_fk")
+  users_granted       users?               @relation("equipment_uca_granted", fields: [granted_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_uca_granted_fk")
+
+  @@id([user_id, category_id])
+  @@index([category_id], map: "idx_eq_uca_category")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model equipment_items {
-  id                    Int                     @id @default(autoincrement())
-  name                  String                  @db.VarChar(200)
-  brand                 String?                 @db.VarChar(100)
-  model                 String?                 @db.VarChar(100)
-  serial_number         String?                 @unique(map: "serial_number") @db.VarChar(100)
-  description           String?                 @db.Text
+  id                    Int                         @id @default(autoincrement())
+  name                  String                      @db.VarChar(200)
+  brand                 String?                     @db.VarChar(100)
+  model                 String?                     @db.VarChar(100)
+  serial_number         String?                     @unique(map: "serial_number") @db.VarChar(100)
+  asset_tag             String?                     @unique(map: "equipment_items_asset_tag_unique") @db.VarChar(40)
+  qr_code               String?                     @unique(map: "equipment_items_qr_code_unique") @db.VarChar(64)
+  description           String?                     @db.Text
   category_id           Int
-  purchase_date         DateTime?               @db.Date
-  purchase_price        Decimal?                @db.Decimal(10, 2)
-  supplier              String?                 @db.VarChar(200)
-  invoice_number        String?                 @db.VarChar(100)
-  status                String?                 @default("skladem")
-  location              String?                 @db.VarChar(200)
-  notes                 String?                 @db.Text
-  disposed_at           DateTime?               @db.DateTime(0)
-  disposal_reason       String?                 @db.Text
-  created_at            DateTime                @default(now()) @db.Timestamp(0)
-  updated_at            DateTime                @default(now()) @db.Timestamp(0)
+  purchase_date         DateTime?                   @db.Date
+  purchase_price        Decimal?                    @db.Decimal(10, 2)
+  supplier              String?                     @db.VarChar(200)
+  invoice_number        String?                     @db.VarChar(100)
+  status                String?                     @default("skladem")
+  location              String?                     @db.VarChar(200)
+  room_id               Int?
+  cover_file_id         Int?
+  warranty_until        DateTime?                   @db.Date
+  last_service_at       DateTime?                   @db.Date
+  notes                 String?                     @db.Text
+  disposed_at           DateTime?                   @db.DateTime(0)
+  disposal_reason       String?                     @db.Text
+  created_at            DateTime                    @default(now()) @db.Timestamp(0)
+  updated_at            DateTime                    @default(now()) @db.Timestamp(0)
   equipment_assignments equipment_assignments[]
-  equipment_categories  equipment_categories    @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "equipment_items_ibfk_1")
+  equipment_categories  equipment_categories        @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "equipment_items_ibfk_1")
+  equipment_rooms       equipment_rooms?            @relation(fields: [room_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_items_room_fk")
   equipment_transfers   equipment_transfers[]
+  location_history      equipment_location_history[]
+  qr_pool_entries       equipment_qr_pool[]
+  inventory_lines       equipment_inventory_lines[]
 
   @@index([brand], map: "idx_brand")
   @@index([category_id], map: "idx_category")
@@ -529,6 +602,86 @@ model equipment_items {
   @@index([name], map: "idx_name")
   @@index([serial_number], map: "idx_serial")
   @@index([status], map: "idx_status")
+  @@index([room_id], map: "idx_equipment_items_room")
+}
+
+model equipment_location_history {
+  id              Int              @id @default(autoincrement())
+  equipment_id    Int
+  from_room_id    Int?
+  to_room_id      Int
+  transferred_by  Int
+  transferred_at  DateTime         @default(now()) @db.Timestamp(0)
+  source          String           @default("manual") @db.VarChar(20)
+  notes           String?          @db.Text
+  protocol_number String?          @db.VarChar(40)
+  equipment_items equipment_items  @relation(fields: [equipment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipment_loc_hist_item_fk")
+  room_from       equipment_rooms? @relation("equipment_loc_hist_from", fields: [from_room_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_loc_hist_from_fk")
+  room_to         equipment_rooms  @relation("equipment_loc_hist_to", fields: [to_room_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "equipment_loc_hist_to_fk")
+  users           users            @relation("equipment_loc_hist_user", fields: [transferred_by], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "equipment_loc_hist_user_fk")
+
+  @@index([equipment_id], map: "idx_eq_loc_hist_equipment")
+  @@index([to_room_id], map: "idx_eq_loc_hist_to_room")
+  @@index([from_room_id], map: "idx_eq_loc_hist_from_room")
+  @@index([transferred_at], map: "idx_eq_loc_hist_transferred")
+}
+
+model equipment_qr_pool {
+  id              Int              @id @default(autoincrement())
+  qr_code         String           @unique(map: "equipment_qr_pool_qr_unique") @db.VarChar(64)
+  asset_tag       String           @unique(map: "equipment_qr_pool_tag_unique") @db.VarChar(40)
+  status          String           @default("available") @db.VarChar(20)
+  batch_id        String           @db.VarChar(40)
+  equipment_id    Int?
+  printed_at      DateTime?        @db.Timestamp(0)
+  assigned_at     DateTime?        @db.Timestamp(0)
+  assigned_by     Int?
+  created_at      DateTime         @default(now()) @db.Timestamp(0)
+  created_by      Int
+  notes           String?          @db.VarChar(255)
+  equipment_items equipment_items? @relation(fields: [equipment_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_qr_pool_item_fk")
+  users_created   users            @relation("equipment_qr_pool_created", fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "equipment_qr_pool_created_fk")
+  users_assigned  users?           @relation("equipment_qr_pool_assigned", fields: [assigned_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_qr_pool_assigned_fk")
+
+  @@index([batch_id], map: "idx_eq_qr_pool_batch")
+  @@index([status], map: "idx_eq_qr_pool_status")
+  @@index([equipment_id], map: "idx_eq_qr_pool_equipment")
+}
+
+model equipment_inventories {
+  id          Int                        @id @default(autoincrement())
+  name        String                     @db.VarChar(200)
+  status      String                     @default("draft") @db.VarChar(20)
+  scope_type  String                     @default("all") @db.VarChar(20)
+  scope_id    Int?
+  created_by  Int
+  completed_at DateTime?                 @db.Timestamp(0)
+  notes       String?                    @db.Text
+  created_at  DateTime                   @default(now()) @db.Timestamp(0)
+  updated_at  DateTime                   @default(now()) @db.Timestamp(0)
+  users       users                      @relation("equipment_inventories_created", fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "equipment_inventories_user_fk")
+  lines       equipment_inventory_lines[]
+
+  @@index([status], map: "idx_eq_inv_status")
+  @@index([created_by], map: "idx_eq_inv_created")
+}
+
+model equipment_inventory_lines {
+  id               Int                   @id @default(autoincrement())
+  inventory_id     Int
+  equipment_id     Int
+  expected_room_id Int?
+  scanned_at       DateTime?             @db.Timestamp(0)
+  scanned_by       Int?
+  line_status      String                @default("missing") @db.VarChar(20)
+  notes            String?               @db.VarChar(255)
+  inventory        equipment_inventories @relation(fields: [inventory_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipment_inv_lines_inv_fk")
+  equipment_items  equipment_items       @relation(fields: [equipment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipment_inv_lines_item_fk")
+  expected_room    equipment_rooms?      @relation(fields: [expected_room_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_inv_lines_room_fk")
+  users_scanned    users?                @relation("equipment_inv_lines_scanned", fields: [scanned_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_inv_lines_user_fk")
+
+  @@unique([inventory_id, equipment_id], map: "equipment_inv_lines_unique")
+  @@index([equipment_id], map: "idx_eq_inv_lines_equipment")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -1011,6 +1164,7 @@ model users {
   qr_code                                                        String?                       @db.VarChar(12)
   is_active                                                      Boolean?                      @default(true)
   display_in_list                                                Boolean?                      @default(true)
+  email_notifications                                            String?                       @db.LongText
   last_login                                                     DateTime?                     @db.DateTime(0)
   created_at                                                     DateTime                      @default(now()) @db.Timestamp(0)
   updated_at                                                     DateTime                      @default(now()) @db.Timestamp(0)
@@ -1049,6 +1203,15 @@ model users {
   equipment_transfers_equipment_transfers_from_user_idTousers    equipment_transfers[]         @relation("equipment_transfers_from_user_idTousers")
   equipment_transfers_equipment_transfers_to_user_idTousers      equipment_transfers[]         @relation("equipment_transfers_to_user_idTousers")
   equipment_transfers_equipment_transfers_transferred_byTousers  equipment_transfers[]         @relation("equipment_transfers_transferred_byTousers")
+  equipment_categories_responsible                               equipment_categories[]        @relation("equipment_categories_responsible")
+  equipment_uca_user                                             equipment_user_category_access[] @relation("equipment_uca_user")
+  equipment_uca_granted                                          equipment_user_category_access[] @relation("equipment_uca_granted")
+  equipment_loc_hist_user                                        equipment_location_history[]  @relation("equipment_loc_hist_user")
+  equipment_qr_pool_created                                      equipment_qr_pool[]           @relation("equipment_qr_pool_created")
+  equipment_qr_pool_assigned                                     equipment_qr_pool[]           @relation("equipment_qr_pool_assigned")
+  equipment_inventories_created                                  equipment_inventories[]       @relation("equipment_inventories_created")
+  equipment_inv_lines_scanned                                    equipment_inventory_lines[]   @relation("equipment_inv_lines_scanned")
+  equipment_floor_plans_created                                  equipment_floor_plans[]       @relation("equipment_floor_plans_created")
   file_uploads                                                   file_uploads[]
   person_tags                                                    person_tags[]
   presentations                                                  presentations[]

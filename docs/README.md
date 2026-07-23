@@ -17,6 +17,7 @@ Přehled dokumentace modulů a specifikací projektu.
 | [MODUL_KALENDAR.md](MODUL_KALENDAR.md) | Kalendář – zobrazení, CRUD, schvalování, opakování, připomínky, soukromé události, export .ics |
 | [MODUL_UKOLY.md](MODUL_UKOLY.md) | Úkoly – zadání, notifikace, archiv, export |
 | [MODUL_MAJETEK_POZADAVKY.md](MODUL_MAJETEK_POZADAVKY.md) | Majetek – schvalování požadavků na techniku (IT → Vedení) |
+| [MODUL_MAJETEK_QR.md](MODUL_MAJETEK_QR.md) | Majetek – plán evidence drobného majetku s QR, místnostmi a inventurou |
 | [MODUL_EVIDENCE_SMLOUV.md](MODUL_EVIDENCE_SMLOUV.md) | Evidence smluv – workflow, přílohy, export, upozornění na platnost |
 | [MODUL_MATERIALY.md](MODUL_MATERIALY.md) | Katalog materiálů – SDS/TDS/certifikáty, kategorie, vazba na IML |
 | [KALENDAR_SCHVALOVANI_FAZE2.md](KALENDAR_SCHVALOVANI_FAZE2.md) | Specifikace dvoufázového schvalování kalendáře |

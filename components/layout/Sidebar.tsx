@@ -435,7 +435,6 @@ const navItems: NavItem[] = [
     icon: Laptop,
     label: "Majetek",
     module: "equipment",
-    subItems: [{ href: "/equipment/prirazeni", label: "Přiřazení majetku" }],
     isActive: (p) => p.startsWith("/equipment"),
   },
   { href: "/calendar", icon: Calendar, label: "Kalendář", module: "calendar" },

@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendCalendarReminderEmail } from "@/lib/email";
 import { formatCalendarEventTitleWithDuration } from "@/app/(dashboard)/calendar/lib/event-types";
+import {
+  isEmailNotificationEnabled,
+  parseEmailNotifications,
+} from "@/lib/user-email-notifications";
 
 /**
  * GET s ?secret= (CRON_SECRET) nebo hlavičkou Authorization: Bearer.
@@ -42,7 +46,7 @@ export async function GET(req: NextRequest) {
     const displayTitle = formatCalendarEventTitleWithDuration(event);
     const u = await prisma.users.findUnique({
       where: { id: event.created_by },
-      select: { first_name: true, last_name: true, email: true },
+      select: { first_name: true, last_name: true, email: true, email_notifications: true },
     });
     if (!u) {
       continue;
@@ -58,7 +62,11 @@ export async function GET(req: NextRequest) {
         },
       });
     }
-    if (event.reminder_notify_email && u.email) {
+    const emailAllowed = isEmailNotificationEnabled(
+      parseEmailNotifications(u.email_notifications),
+      "calendar"
+    );
+    if (event.reminder_notify_email && emailAllowed && u.email) {
       await sendCalendarReminderEmail({
         toEmail: u.email,
         toName: `${u.first_name} ${u.last_name}`.trim() || "Uživateli",
