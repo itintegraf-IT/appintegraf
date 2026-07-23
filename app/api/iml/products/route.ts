@@ -39,6 +39,7 @@ const productListSelect = {
   foil_type: true,
   color_coverage: true,
   labels_per_sheet: true,
+  die_cut_id: true,
   print_note: true,
   has_print_sample: true,
   has_print_proof: true,

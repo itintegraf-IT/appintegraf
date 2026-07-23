@@ -3,9 +3,11 @@ import {
   parseProductFormatToMm,
   syncProductFormatFromMm,
 } from "@/lib/iml/product-format";
+import { dieCutToProductFields } from "@/lib/iml/die-cuts";
 import { IML_LABEL_TYPES } from "@/lib/iml-constants";
 import { findMaterialForImlLegacyId } from "@/lib/materialy/iml-compat";
 import { cmykFlagsToDb, type ProductCmykFlags } from "@/lib/iml-print-colors-summary";
+import { prisma } from "@/lib/db";
 
 const VALID_LABEL_TYPES = new Set(IML_LABEL_TYPES.map((t) => t.value));
 
@@ -149,6 +151,7 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
     pieces_per_pallet: int(body.pieces_per_pallet),
     ...materialFields,
     labels_per_sheet: parseLabelsPerSheet(body.labels_per_sheet),
+    die_cut_id: body.die_cut_id != null && body.die_cut_id !== "" ? int(body.die_cut_id) : null,
     print_note: str(body.print_note),
     has_print_sample: !!body.has_print_sample,
     has_print_proof: !!body.has_print_proof,
@@ -172,10 +175,27 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
   };
 }
 
-/** Výsledek parseImlProductBody s vynulovaným foil_id při aktivním foil_material_id. */
+/** Výsledek parseImlProductBody s vynulovaným foil_id při aktivním foil_material_id
+ *  a synchronizací výsekových polí z katalogu při die_cut_id. */
 export async function parseImlProductBodyForSave(body: Record<string, unknown>) {
   const data = await parseImlProductBody(body);
   const merged = { ...data };
   if (merged.foil_material_id != null) merged.foil_id = null;
+
+  if (merged.die_cut_id != null) {
+    const dieCut = await prisma.iml_die_cuts.findUnique({ where: { id: merged.die_cut_id } });
+    if (!dieCut || !dieCut.is_active) {
+      throw new DieCutNotFoundError(merged.die_cut_id);
+    }
+    Object.assign(merged, dieCutToProductFields(dieCut));
+  }
+
   return merged;
+}
+
+export class DieCutNotFoundError extends Error {
+  constructor(public dieCutId: number) {
+    super(`Výsek #${dieCutId} nenalezen nebo není aktivní.`);
+    this.name = "DieCutNotFoundError";
+  }
 }

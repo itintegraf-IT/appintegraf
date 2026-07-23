@@ -91,6 +91,7 @@ export default function ImlProductEditPage() {
             client_name: s("client_name"),
             requester: s("requester"),
             sku: s("sku"),
+            die_cut_id: si("die_cut_id"),
             label_shape_code: s("label_shape_code"),
             die_cut_tool_code: s("die_cut_tool_code"),
             assembly_code: s("assembly_code"),
@@ -212,6 +213,7 @@ export default function ImlProductEditPage() {
         body: JSON.stringify({
           ...form,
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
+          die_cut_id: form.die_cut_id ? parseInt(form.die_cut_id, 10) : null,
           foil_material_id: form.foil_material_id ? parseInt(form.foil_material_id, 10) : null,
           color_material_id: form.color_material_id ? parseInt(form.color_material_id, 10) : null,
           paper_material_id: form.paper_material_id ? parseInt(form.paper_material_id, 10) : null,

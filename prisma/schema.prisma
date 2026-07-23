@@ -1581,12 +1581,14 @@ model iml_products {
   is_active            Boolean   @default(true)
   custom_data          Json?     @db.Json
   labels_per_sheet     Int?
+  die_cut_id           Int?
 
   created_at DateTime @default(now()) @db.DateTime(0)
   updated_at DateTime @updatedAt @db.DateTime(0)
 
   iml_customers       iml_customers?       @relation(fields: [customer_id], references: [id], onDelete: SetNull)
   iml_foils           iml_foils?           @relation(fields: [foil_id], references: [id], onDelete: SetNull)
+  iml_die_cuts        iml_die_cuts?        @relation(fields: [die_cut_id], references: [id], onDelete: SetNull)
   iml_order_items     iml_order_items[]
   iml_product_colors  iml_product_colors[]
   iml_product_files   iml_product_files[]
@@ -1601,11 +1603,33 @@ model iml_products {
   @@index([sku])
   @@index([item_status])
   @@index([foil_id])
+  @@index([die_cut_id])
   @@index([foil_material_id], map: "idx_iml_products_foil_material")
   @@index([color_material_id], map: "idx_iml_products_color_material")
   @@index([paper_material_id], map: "idx_iml_products_paper_material")
   @@index([lacquer_material_id], map: "idx_iml_products_lacquer_material")
   @@map("iml_products")
+}
+
+/// Globální katalog výseků (unikátní kód tvaru etikety). Produkt na něj odkazuje přes die_cut_id.
+model iml_die_cuts {
+  id                 Int      @id @default(autoincrement())
+  label_shape_code   String   @unique @db.VarChar(100)
+  die_cut_tool_code  String?  @db.VarChar(100)
+  assembly_code      String?  @db.VarChar(100)
+  positions_on_sheet Int?
+  labels_per_sheet   Int?
+  pieces_per_box     Int?
+  pieces_per_pallet  Int?
+  note               String?  @db.Text
+  is_active          Boolean  @default(true)
+  created_at         DateTime @default(now()) @db.DateTime(0)
+  updated_at         DateTime @updatedAt @db.DateTime(0)
+
+  iml_products iml_products[]
+
+  @@index([is_active])
+  @@map("iml_die_cuts")
 }
 
 model iml_orders {
