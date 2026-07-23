@@ -4,7 +4,7 @@ import { collectMaketaNotifyUserIds } from "@/lib/makety-recipients";
 import {
   filterUserIdsAllowingEmail,
   userAllowsEmailNotification,
-} from "@/lib/user-email-notifications";
+} from "@/lib/user-email-notifications-db";
 
 export type MaketaNotifyKind =
   | "assigned"

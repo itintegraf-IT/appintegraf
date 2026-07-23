@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { sendCalendarInviteResponseEmail } from "@/lib/email";
 import { formatCalendarEventTitleWithDuration } from "@/app/(dashboard)/calendar/lib/event-types";
 import { parseCalendarEventIdFromNotificationLink } from "@/lib/calendar-invite-notifications";
-import { userAllowsEmailNotification } from "@/lib/user-email-notifications";
+import { userAllowsEmailNotification } from "@/lib/user-email-notifications-db";
 
 /**
  * POST /api/notifications/[id]/invite-response

@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { sendCalendarInviteEmail } from "@/lib/email";
-import { filterUserIdsAllowingEmail } from "@/lib/user-email-notifications";
+import { filterUserIdsAllowingEmail } from "@/lib/user-email-notifications-db";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 

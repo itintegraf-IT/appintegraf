@@ -4,7 +4,7 @@ import { collectUkolNotifyUserIds } from "@/lib/ukoly-recipients";
 import {
   filterUserIdsAllowingEmail,
   userAllowsEmailNotification,
-} from "@/lib/user-email-notifications";
+} from "@/lib/user-email-notifications-db";
 
 export type UkolNotifyKind = "assigned" | "deadline_changed";
 
