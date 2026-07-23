@@ -1,11 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
-import { canAdministerEquipment } from "@/lib/equipment/access";
+import { readFile } from "fs/promises";
+import { canAdministerEquipment, canReadEquipment } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
+import {
+  floorPlanImageContentType,
+  floorPlanImageDiskPath,
+  writeFloorPlanImageFile,
+} from "@/lib/equipment/floor-plan-storage";
 import { pdfBufferToJpeg } from "@/lib/iml-product-preview-pdf-server";
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
+  }
+  const userId = parseInt(session.user.id, 10);
+  if (!(await canReadEquipment(userId))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
+  }
+
+  const id = parseInt((await params).id, 10);
+  if (Number.isNaN(id)) {
+    return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
+  }
+
+  const plan = await prisma.equipment_floor_plans.findUnique({ where: { id } });
+  if (!plan || !plan.is_active) {
+    return NextResponse.json({ error: "Nenalezeno" }, { status: 404 });
+  }
+
+  const diskPath = floorPlanImageDiskPath(plan.image_path);
+  if (!diskPath) {
+    return NextResponse.json(
+      { error: "Neplatná cesta k obrázku půdorysu" },
+      { status: 404 }
+    );
+  }
+
+  try {
+    const buf = await readFile(diskPath);
+    return new NextResponse(new Uint8Array(buf), {
+      status: 200,
+      headers: {
+        "Content-Type": floorPlanImageContentType(plan.image_path),
+        "Cache-Control": "private, max-age=60",
+      },
+    });
+  } catch {
+    return NextResponse.json(
+      {
+        error:
+          "Soubor půdorysu na disku chybí. Nahrajte obrázek znovu (Vyměnit obrázek).",
+        image_path: plan.image_path,
+      },
+      { status: 404 }
+    );
+  }
+}
 
 export async function POST(
   req: NextRequest,
@@ -35,16 +91,6 @@ export async function POST(
       return NextResponse.json({ error: "Vyberte soubor" }, { status: 400 });
     }
 
-    const uploadDir = path.join(
-      process.cwd(),
-      "public",
-      "uploads",
-      "equipment",
-      "floor-plans",
-      String(id)
-    );
-    await mkdir(uploadDir, { recursive: true });
-
     const buf = Buffer.from(await file.arrayBuffer());
     const mime = (file.type || "").toLowerCase();
     const isPdf =
@@ -61,7 +107,10 @@ export async function POST(
       const jpeg = await pdfBufferToJpeg(buf, { maxSide: 2800, jpegQuality: 0.92 });
       if (!jpeg) {
         return NextResponse.json(
-          { error: "PDF se nepodařilo převést. Zkuste PNG/JPG." },
+          {
+            error:
+              "PDF se nepodařilo převést. Zkuste PNG/JPG, nebo na serveru spusťte npm run verify:canvas.",
+          },
           { status: 400 }
         );
       }
@@ -90,13 +139,12 @@ export async function POST(
     }
 
     const safeName = `plan_${Date.now()}${ext}`;
-    await writeFile(path.join(uploadDir, safeName), outBuf);
-    const image_path = `/uploads/equipment/floor-plans/${id}/${safeName}`;
+    const saved = await writeFloorPlanImageFile(id, safeName, outBuf);
 
     const row = await prisma.equipment_floor_plans.update({
       where: { id },
       data: {
-        image_path,
+        image_path: saved.image_path,
         image_width: width,
         image_height: height,
         updated_at: new Date(),
@@ -113,6 +161,9 @@ export async function POST(
     return NextResponse.json(row);
   } catch (e) {
     console.error("floor-plans image POST:", e);
-    return NextResponse.json({ error: "Chyba při nahrávání" }, { status: 500 });
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "Chyba při nahrávání" },
+      { status: 500 }
+    );
   }
 }

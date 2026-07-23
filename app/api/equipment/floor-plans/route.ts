@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
 import { canAdministerEquipment, canReadEquipment } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
+import { writeFloorPlanImageFile } from "@/lib/equipment/floor-plan-storage";
 import { pdfBufferToJpeg } from "@/lib/iml-product-preview-pdf-server";
 
 async function savePlanImage(
   planId: number,
   file: File
 ): Promise<{ image_path: string; image_width: number | null; image_height: number | null }> {
-  const uploadDir = path.join(process.cwd(), "public", "uploads", "equipment", "floor-plans", String(planId));
-  await mkdir(uploadDir, { recursive: true });
-
   const buf = Buffer.from(await file.arrayBuffer());
   const mime = (file.type || "").toLowerCase();
   const isPdf =
@@ -30,7 +26,7 @@ async function savePlanImage(
     const jpeg = await pdfBufferToJpeg(buf, { maxSide: 2800, jpegQuality: 0.92 });
     if (!jpeg) {
       throw new Error(
-        "PDF se nepodařilo převést na obrázek. Nahrajte PNG/JPG, nebo zkontrolujte @napi-rs/canvas."
+        "PDF se nepodařilo převést na obrázek. Nahrajte PNG/JPG, nebo na serveru spusťte npm run verify:canvas."
       );
     }
     outBuf = jpeg;
@@ -59,10 +55,9 @@ async function savePlanImage(
   }
 
   const safeName = `plan_${Date.now()}${ext}`;
-  const diskPath = path.join(uploadDir, safeName);
-  await writeFile(diskPath, outBuf);
+  const saved = await writeFloorPlanImageFile(planId, safeName, outBuf);
   return {
-    image_path: `/uploads/equipment/floor-plans/${planId}/${safeName}`,
+    image_path: saved.image_path,
     image_width: width,
     image_height: height,
   };

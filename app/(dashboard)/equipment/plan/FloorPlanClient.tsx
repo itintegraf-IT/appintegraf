@@ -29,6 +29,7 @@ type PlanSummary = {
   image_path: string;
   image_width: number | null;
   image_height: number | null;
+  updated_at?: string;
   _count?: { rooms: number };
 };
 
@@ -100,6 +101,8 @@ export default function FloorPlanClient({
       floor_plan_id: number | null;
     }[]
   >([]);
+  const [imageLoadError, setImageLoadError] = useState("");
+  const [imageBust, setImageBust] = useState(0);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -129,6 +132,7 @@ export default function FloorPlanClient({
       return;
     }
     setPlan(data);
+    setImageLoadError("");
     setError("");
   }, []);
 
@@ -185,7 +189,10 @@ export default function FloorPlanClient({
   }, [loadPlans]);
 
   useEffect(() => {
-    if (planId != null) void loadPlan(planId);
+    if (planId != null) {
+      setImageLoadError("");
+      void loadPlan(planId);
+    }
   }, [planId, loadPlan]);
 
   useEffect(() => {
@@ -372,6 +379,7 @@ export default function FloorPlanClient({
       setOkMsg("Půdorys nahrán.");
       await loadPlans();
       setPlanId(data.id);
+      setImageBust(Date.now());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chyba");
     } finally {
@@ -383,6 +391,7 @@ export default function FloorPlanClient({
     if (!file || !planId || !canAdmin) return;
     setSaving(true);
     setError("");
+    setImageLoadError("");
     try {
       const fd = new FormData();
       fd.append("file", file);
@@ -393,6 +402,7 @@ export default function FloorPlanClient({
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Chyba nahrání");
       setOkMsg("Obrázek plánu aktualizován.");
+      setImageBust(Date.now());
       await loadPlan(planId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chyba");
@@ -400,6 +410,10 @@ export default function FloorPlanClient({
       setSaving(false);
     }
   };
+
+  const planImageSrc = planId
+    ? `/api/equipment/floor-plans/${planId}/image?v=${imageBust || plan?.updated_at || planId}`
+    : "";
 
   const saveNewRoom = async () => {
     if (!planId || draft.length < 3) return;
@@ -829,14 +843,21 @@ export default function FloorPlanClient({
                   height: imgNatural.h,
                 }}
               >
+                {imageLoadError ? (
+                  <div className="flex h-full min-h-[240px] items-center justify-center bg-white p-6 text-center text-sm text-red-700">
+                    {imageLoadError}
+                  </div>
+                ) : null}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   ref={imgRef}
-                  src={plan.image_path}
+                  key={planImageSrc}
+                  src={planImageSrc}
                   alt={plan.name}
-                  className="pointer-events-none select-none"
+                  className={`pointer-events-none select-none ${imageLoadError ? "hidden" : ""}`}
                   style={{ width: imgNatural.w, height: imgNatural.h }}
                   onLoad={(e) => {
+                    setImageLoadError("");
                     const img = e.currentTarget;
                     if (
                       planId &&
@@ -852,6 +873,11 @@ export default function FloorPlanClient({
                         }),
                       }).then(() => loadPlan(planId));
                     }
+                  }}
+                  onError={() => {
+                    setImageLoadError(
+                      "Obrázek půdorysu se nepodařilo načíst (soubor na serveru chybí nebo není dostupný). Použijte „Vyměnit obrázek“ a nahrajte PDF/PNG/JPG znovu."
+                    );
                   }}
                   draggable={false}
                 />
