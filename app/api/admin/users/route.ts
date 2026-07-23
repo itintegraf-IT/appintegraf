@@ -10,6 +10,10 @@ import { logAuthAudit, getRequestIp } from "@/lib/auth-audit";
 import { validatePassword } from "@/lib/password-policy";
 import { parseStoredModuleAccess } from "@/lib/app-modules";
 import { syncVehicleManagerRole, upsertPrimaryUserRole } from "@/lib/sync-vehicle-manager-role";
+import {
+  normalizeEmailNotifications,
+  serializeEmailNotifications,
+} from "@/lib/user-email-notifications";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -100,6 +104,7 @@ export async function POST(req: NextRequest) {
       password_custom,
       send_activation_email = false,
       vehicle_manager = false,
+      email_notifications,
     } = body;
 
     if (!username || !email || !first_name || !last_name) {
@@ -161,6 +166,8 @@ export async function POST(req: NextRequest) {
       .filter((d): d is number => typeof d === "number" && !isNaN(d) && d > 0)
       .slice(0, 2);
 
+    const emailNotifications = normalizeEmailNotifications(email_notifications);
+
     const user = await prisma.users.create({
       data: {
         username: username.trim(),
@@ -178,6 +185,7 @@ export async function POST(req: NextRequest) {
         display_in_list: !!display_in_list,
         is_active: !!is_active,
         qr_code: qrCode,
+        email_notifications: serializeEmailNotifications(emailNotifications),
       },
     });
 

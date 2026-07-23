@@ -28,10 +28,16 @@ import {
   normalizeStitkyModuleAccessForSave,
   stitkyBaseLevelFromAccess,
 } from "@/lib/stitky-module-access-flags";
+import {
+  EMAIL_NOTIFICATION_MODULES,
+  EMAIL_NOTIFICATION_MODULE_LABELS,
+  normalizeEmailNotifications,
+  type EmailNotificationsMap,
+} from "@/lib/user-email-notifications";
 
 const AVAILABLE_MODULES = [
   { key: "contacts", label: "Kontakty", icon: Users },
-  { key: "equipment", label: "Majetek", icon: Laptop },
+  { key: "equipment", label: "Majetek (admin = správce)", icon: Laptop },
   { key: "calendar", label: "Kalendář", icon: Calendar },
   { key: "planovani", label: "Plánování výroby", icon: CalendarDays },
   { key: "vyroba", label: "Výroba", icon: Factory },
@@ -100,6 +106,7 @@ type User = {
   role_id?: number | null;
   module_access?: ModuleAccessMap;
   vehicle_manager?: boolean;
+  email_notifications?: EmailNotificationsMap | null;
 };
 
 export function AdminUserForm({ user }: { user?: User }) {
@@ -137,6 +144,7 @@ export function AdminUserForm({ user }: { user?: User }) {
     is_active: user?.is_active !== false,
     display_in_list: user?.display_in_list !== false,
     vehicle_manager: user?.vehicle_manager === true,
+    email_notifications: normalizeEmailNotifications(user?.email_notifications),
     password_custom: "",
   });
 
@@ -192,6 +200,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         is_active: user.is_active !== false,
         display_in_list: user.display_in_list !== false,
         vehicle_manager: user.vehicle_manager === true,
+        email_notifications: normalizeEmailNotifications(user.email_notifications),
         password_custom: "",
       });
     }
@@ -459,6 +468,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         module_access: moduleAccess,
         shared_mail_ids: form.shared_mail_ids,
         vehicle_manager: form.vehicle_manager,
+        email_notifications: normalizeEmailNotifications(form.email_notifications),
         password_custom: form.password_custom || undefined,
       };
       if (!isEdit) {
@@ -659,6 +669,46 @@ export function AdminUserForm({ user }: { user?: User }) {
                 })}
             </ul>
           )}
+        </div>
+        <div className="sm:col-span-2 rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-4">
+          <label className="mb-1 block text-sm font-medium text-gray-800">
+            E-mailové notifikace
+          </label>
+          <p className="mb-3 text-xs text-gray-500">
+            Vypne pouze e-mail; notifikace v aplikaci zůstanou. Auth e-maily (aktivace, reset hesla)
+            nejsou ovlivněny.
+          </p>
+          <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
+            {EMAIL_NOTIFICATION_MODULES.map((mod) => {
+              const checked = form.email_notifications[mod] !== false;
+              return (
+                <li key={mod} className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    id={`email-notif-${mod}`}
+                    checked={checked}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setForm((prev) => ({
+                        ...prev,
+                        email_notifications: {
+                          ...prev.email_notifications,
+                          [mod]: enabled,
+                        },
+                      }));
+                    }}
+                    className="mt-1 h-4 w-4 rounded border-gray-300"
+                  />
+                  <label
+                    htmlFor={`email-notif-${mod}`}
+                    className="cursor-pointer text-sm text-gray-700"
+                  >
+                    {EMAIL_NOTIFICATION_MODULE_LABELS[mod]}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Role *</label>

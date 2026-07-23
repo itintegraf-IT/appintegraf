@@ -5,6 +5,10 @@ import {
   hasStitkyTiskarFlag,
 } from "@/lib/stitky-module-access-flags";
 import type { StitkyUserRole } from "@/lib/stitky/constants";
+import {
+  isEmailNotificationEnabled,
+  parseEmailNotifications,
+} from "@/lib/user-email-notifications";
 
 export type StitkyNotifyChannel = "mailing" | "mistri";
 
@@ -111,10 +115,14 @@ export async function collectStitkyEmailAddresses(params: {
   if (userIds.length > 0) {
     const users = await prisma.users.findMany({
       where: { id: { in: userIds }, is_active: true },
-      select: { email: true },
+      select: { email: true, email_notifications: true },
     });
     for (const u of users) {
-      if (u.email?.trim()) emails.add(u.email.trim());
+      if (!u.email?.trim()) continue;
+      if (!isEmailNotificationEnabled(parseEmailNotifications(u.email_notifications), "stitky")) {
+        continue;
+      }
+      emails.add(u.email.trim());
     }
   }
 

@@ -13,6 +13,11 @@ import {
   userHasVehicleManagerRole,
 } from "@/lib/sync-vehicle-manager-role";
 import { VEHICLE_MANAGER_ROLE } from "@/lib/resource-reservation-types";
+import {
+  normalizeEmailNotifications,
+  parseEmailNotifications,
+  serializeEmailNotifications,
+} from "@/lib/user-email-notifications";
 
 export async function GET(
   _req: NextRequest,
@@ -52,6 +57,7 @@ export async function GET(
       role_id: true,
       totp_enabled: true,
       created_at: true,
+      email_notifications: true,
       roles: { select: { id: true, name: true } },
       user_roles: {
         select: { role_id: true, module_access: true, roles: { select: { name: true } } },
@@ -93,7 +99,7 @@ export async function GET(
 
   const shared_mail_ids = (user.user_shared_mails ?? []).map((m) => m.shared_mail_id);
 
-  const { user_roles: _, user_secondary_departments: __, user_shared_mails: _us, ...rest } = user;
+  const { user_roles: _, user_secondary_departments: __, user_shared_mails: _us, email_notifications: emailNotifRaw, ...rest } = user;
   return NextResponse.json({
     ...rest,
     department_id,
@@ -102,6 +108,7 @@ export async function GET(
     role_id: roleId,
     module_access,
     vehicle_manager,
+    email_notifications: parseEmailNotifications(emailNotifRaw),
   });
 }
 
@@ -142,6 +149,10 @@ export async function PUT(
     const password_new = (bodyData.password_new as string) ?? "";
     const module_access = (bodyData.module_access as Record<string, string>) ?? {};
     const vehicle_manager = bodyData.vehicle_manager === true;
+    const emailNotifications =
+      bodyData.email_notifications !== undefined
+        ? normalizeEmailNotifications(bodyData.email_notifications)
+        : null;
 
     if (!first_name || !last_name || !email) {
       return NextResponse.json({ error: "Vyplňte jméno, příjmení a e-mail" }, { status: 400 });
@@ -194,6 +205,10 @@ export async function PUT(
       display_in_list: !!display_in_list,
       role_id: roleIdNum,
     };
+
+    if (emailNotifications) {
+      updateData.email_notifications = serializeEmailNotifications(emailNotifications);
+    }
 
     let passwordChanged = false;
     if (password_new) {

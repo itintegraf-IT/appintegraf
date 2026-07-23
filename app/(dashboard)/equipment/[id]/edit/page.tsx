@@ -11,6 +11,7 @@ import {
 } from "@/lib/equipment-status";
 
 type Category = { id: number; name: string; code: string };
+type Room = { id: number; name: string; code: string };
 
 type EquipmentFormState = {
   name: string;
@@ -26,6 +27,11 @@ type EquipmentFormState = {
   status: EquipmentItemStatus;
   location: string;
   notes: string;
+  room_id: string;
+  warranty_until: string;
+  last_service_at: string;
+  disposed_at: string;
+  disposal_reason: string;
 };
 type Equipment = {
   id: number;
@@ -49,6 +55,7 @@ export default function EditEquipmentPage() {
   const params = useParams();
   const id = params.id as string;
   const [categories, setCategories] = useState<Category[]>([]);
+  const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState("");
@@ -66,14 +73,21 @@ export default function EditEquipmentPage() {
     status: EQUIPMENT_ITEM_STATUS.SKLADEM,
     location: "",
     notes: "",
+    room_id: "",
+    warranty_until: "",
+    last_service_at: "",
+    disposed_at: "",
+    disposal_reason: "",
   });
 
   useEffect(() => {
     Promise.all([
       fetch(`/api/equipment/categories`).then((r) => r.json()),
       fetch(`/api/equipment/${id}`).then((r) => r.json()),
-    ]).then(([cats, item]: [Category[], Equipment | undefined]) => {
+      fetch(`/api/equipment/rooms`).then((r) => r.json()),
+    ]).then(([cats, item, roomsData]) => {
       setCategories(Array.isArray(cats) ? cats : []);
+      setRooms(Array.isArray(roomsData) ? roomsData : []);
       if (item?.id) {
         const statusRaw = item.status ?? "";
         setForm({
@@ -94,6 +108,17 @@ export default function EditEquipmentPage() {
             : EQUIPMENT_ITEM_STATUS.SKLADEM,
           location: item.location ?? "",
           notes: item.notes ?? "",
+          room_id: item.room_id != null ? String(item.room_id) : "",
+          warranty_until: item.warranty_until
+            ? new Date(item.warranty_until).toISOString().slice(0, 10)
+            : "",
+          last_service_at: item.last_service_at
+            ? new Date(item.last_service_at).toISOString().slice(0, 10)
+            : "",
+          disposed_at: item.disposed_at
+            ? new Date(item.disposed_at).toISOString().slice(0, 10)
+            : "",
+          disposal_reason: item.disposal_reason ?? "",
         });
       }
     }).catch(() => setError("Chyba při načítání"))
@@ -113,6 +138,11 @@ export default function EditEquipmentPage() {
           ...form,
           purchase_date: form.purchase_date || null,
           purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : null,
+          room_id: form.room_id || null,
+          warranty_until: form.warranty_until || null,
+          last_service_at: form.last_service_at || null,
+          disposed_at: form.disposed_at || null,
+          disposal_reason: form.disposal_reason || null,
         }),
       });
 
@@ -244,6 +274,19 @@ export default function EditEquipmentPage() {
             />
           </div>
           <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Pořizovací cena (Kč)</label>
+            <input
+              type="number"
+              min={0}
+              step="0.01"
+              inputMode="decimal"
+              value={form.purchase_price}
+              onChange={(e) => setForm({ ...form, purchase_price: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              placeholder="např. 25000"
+            />
+          </div>
+          <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Dodavatel</label>
             <input
               type="text"
@@ -262,11 +305,53 @@ export default function EditEquipmentPage() {
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Umístění</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Umístění (text)</label>
             <input
               type="text"
               value={form.location}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Místnost</label>
+            <select
+              value={form.room_id}
+              onChange={(e) => setForm({ ...form, room_id: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            >
+              <option value="">— Bez místnosti —</option>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.code} – {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Záruka do</label>
+            <input
+              type="date"
+              value={form.warranty_until}
+              onChange={(e) => setForm({ ...form, warranty_until: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Vyřazeno dne</label>
+            <input
+              type="date"
+              value={form.disposed_at}
+              onChange={(e) => setForm({ ...form, disposed_at: e.target.value })}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Důvod vyřazení</label>
+            <input
+              type="text"
+              value={form.disposal_reason}
+              onChange={(e) => setForm({ ...form, disposal_reason: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>

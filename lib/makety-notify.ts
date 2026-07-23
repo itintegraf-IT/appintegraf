@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/db";
 import { sendMaketaEmail } from "@/lib/email";
 import { collectMaketaNotifyUserIds } from "@/lib/makety-recipients";
+import {
+  filterUserIdsAllowingEmail,
+  userAllowsEmailNotification,
+} from "@/lib/user-email-notifications";
 
 export type MaketaNotifyKind =
   | "assigned"
@@ -108,18 +112,21 @@ export async function notifyMaketaRecipients(params: {
     });
   }
 
-  const users = await prisma.users.findMany({
-    where: { id: { in: ids } },
-    select: { email: true, first_name: true, last_name: true },
-  });
+  const emailIds = await filterUserIdsAllowingEmail(ids, "makety");
+  if (emailIds.length > 0) {
+    const users = await prisma.users.findMany({
+      where: { id: { in: emailIds } },
+      select: { email: true, first_name: true, last_name: true },
+    });
 
-  await sendMaketaEmailsToUsers(users, {
-    subject: `${title} – INTEGRAF`,
-    intro,
-    bodyPreview: params.bodyPreview,
-    orderNumber: params.orderNumber,
-    maketaId: params.maketaId,
-  });
+    await sendMaketaEmailsToUsers(users, {
+      subject: `${title} – INTEGRAF`,
+      intro,
+      bodyPreview: params.bodyPreview,
+      orderNumber: params.orderNumber,
+      maketaId: params.maketaId,
+    });
+  }
 }
 
 export async function notifyMaketaCreator(params: {
@@ -138,11 +145,14 @@ export async function notifyMaketaCreator(params: {
     type: params.type,
   });
 
+  if (!(await userAllowsEmailNotification(params.creatorUserId, "makety"))) return;
+  if (params.bodyPreview === undefined) return;
+
   const creator = await prisma.users.findUnique({
     where: { id: params.creatorUserId },
     select: { email: true, first_name: true, last_name: true },
   });
-  if (!creator?.email || params.bodyPreview === undefined) return;
+  if (!creator?.email) return;
 
   await sendMaketaEmail({
     toEmail: creator.email,
@@ -198,6 +208,8 @@ export async function notifyMaketaDone(params: {
       link: `/makety/${params.maketaId}`,
     },
   });
+
+  if (!(await userAllowsEmailNotification(params.creatorUserId, "makety"))) return;
 
   const creator = await prisma.users.findUnique({
     where: { id: params.creatorUserId },

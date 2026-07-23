@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { Laptop, Plus, ClipboardList, UserCheck } from "lucide-react";
+import { Laptop, Plus, ClipboardList, UserCheck, DoorOpen, QrCode, ArrowRightLeft, ClipboardCheck, BarChart3, Map } from "lucide-react";
 import { equipmentAgeFromRecord } from "@/lib/equipment-age";
 import {
   parseEquipmentListDir,
@@ -13,6 +13,7 @@ import {
 import { EquipmentRequestsTab } from "./EquipmentRequestsTab";
 import { EquipmentTableActions } from "./EquipmentTableActions";
 import { EquipmentListClient } from "./EquipmentListClient";
+import { formatEquipmentPrice } from "@/lib/equipment/format-price";
 import { isEquipmentAssignedStatus } from "@/lib/equipment-status";
 
 /** Zachová `tab`, `scope` a řazení při přepínání záložek. */
@@ -58,6 +59,7 @@ export default async function EquipmentPage({
     serial_number: string | null;
     status: string | null;
     purchase_date: Date | null;
+    purchase_price: unknown;
     created_at: Date;
     equipment_categories?: { name: string };
     assignment_id?: number | null;
@@ -145,6 +147,10 @@ export default async function EquipmentPage({
           assignedToUserId: e.assigned_to_user_id ?? null,
           assignmentId: e.assignment_id ?? null,
           purchaseDate: e.purchase_date?.toISOString() ?? null,
+          purchasePrice:
+            e.purchase_price != null && !Number.isNaN(Number(e.purchase_price))
+              ? Number(e.purchase_price)
+              : null,
           ageText: age.text,
           ageFromRecord: age.source === "record",
         };
@@ -199,13 +205,6 @@ export default async function EquipmentPage({
                 <Laptop className="h-4 w-4" />
                 Vybavení
               </Link>
-              <Link
-                href="/equipment/prirazeni"
-                className="flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium text-gray-600 transition-colors hover:text-gray-900"
-              >
-                <UserCheck className="h-4 w-4" />
-                Přiřazení
-              </Link>
             </div>
           )}
           {admin && tab === "equipment" && (
@@ -231,6 +230,36 @@ export default async function EquipmentPage({
         </div>
       </div>
 
+      {tab === "equipment" && equipmentRead ? (
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {(
+            [
+              { href: "/equipment/rooms", icon: DoorOpen, label: "Místnosti", hint: "Umístění majetku" },
+              { href: "/equipment/plan", icon: Map, label: "Půdorys", hint: "Interaktivní plán" },
+              { href: "/equipment/scan", icon: QrCode, label: "Skenovat", hint: "QR a ruční kód" },
+              { href: "/equipment/presun", icon: ArrowRightLeft, label: "Přesun", hint: "Mezi místnostmi" },
+              { href: "/equipment/inventura", icon: ClipboardCheck, label: "Inventura", hint: "Kontrola stavu" },
+              { href: "/equipment/prirazeni", icon: UserCheck, label: "Přiřazení", hint: "Uživatelům" },
+              { href: "/equipment/reporty", icon: BarChart3, label: "Reporty", hint: "Přehledy" },
+            ] as const
+          ).map(({ href, icon: Icon, label, hint }) => (
+            <Link
+              key={href}
+              href={href}
+              className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-red-200 hover:bg-red-50/50"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                <Icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{label}</p>
+                <p className="text-xs text-gray-500">{hint}</p>
+              </div>
+            </Link>
+          ))}
+        </div>
+      ) : null}
+
       {tab === "requests" ? (
         <EquipmentRequestsTab />
       ) : showAdminList ? (
@@ -255,6 +284,7 @@ export default async function EquipmentPage({
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kategorie</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nákup</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cena</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stáří</th>
                   <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Akce</th>
                 </tr>
@@ -262,7 +292,7 @@ export default async function EquipmentPage({
               <tbody>
                 {equipment.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
                       Žádné vybavení
                     </td>
                   </tr>
@@ -292,6 +322,7 @@ export default async function EquipmentPage({
                           </div>
                         </td>
                         <td className="px-4 py-3">{formatDate(e.purchase_date)}</td>
+                        <td className="px-4 py-3 font-medium">{formatEquipmentPrice(e.purchase_price)}</td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col gap-0.5">
                             <span className="text-sm text-gray-900">{age.text}</span>

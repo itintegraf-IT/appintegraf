@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { sendEquipmentRequestResultEmail } from "@/lib/email";
 import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
+import { userAllowsEmailNotification } from "@/lib/user-email-notifications";
 
 async function isInDepartment(userId: number, departmentName: string): Promise<boolean> {
   const dept = await prisma.departments.findFirst({
@@ -102,18 +103,23 @@ export async function PATCH(
   });
 
   if (existing.requester_email) {
-    try {
-      await sendEquipmentRequestResultEmail({
-        toEmail: existing.requester_email,
-        toName: existing.requester_name ?? "uživateli",
-        requestId: id,
-        equipmentType: existing.equipment_type ?? "",
-        result: action === "approve" ? "approved" : "rejected",
-        itResponse: existing.it_response,
-        adminResponse: adminResponseText,
-      });
-    } catch (e) {
-      console.error("approve email send failed:", e);
+    const allowEmail =
+      existing.requester_user_id == null ||
+      (await userAllowsEmailNotification(existing.requester_user_id, "equipment"));
+    if (allowEmail) {
+      try {
+        await sendEquipmentRequestResultEmail({
+          toEmail: existing.requester_email,
+          toName: existing.requester_name ?? "uživateli",
+          requestId: id,
+          equipmentType: existing.equipment_type ?? "",
+          result: action === "approve" ? "approved" : "rejected",
+          itResponse: existing.it_response,
+          adminResponse: adminResponseText,
+        });
+      } catch (e) {
+        console.error("approve email send failed:", e);
+      }
     }
   }
 

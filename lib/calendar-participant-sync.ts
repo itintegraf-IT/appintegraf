@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { sendCalendarInviteEmail } from "@/lib/email";
+import { filterUserIdsAllowingEmail } from "@/lib/user-email-notifications";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -76,8 +77,11 @@ export async function notifyCalendarInvitees(
     })),
   });
 
+  const emailUserIds = await filterUserIdsAllowingEmail(options.userIds, "calendar");
+  if (emailUserIds.length === 0) return;
+
   const users = await db.users.findMany({
-    where: { id: { in: options.userIds } },
+    where: { id: { in: emailUserIds } },
     select: { id: true, email: true, first_name: true, last_name: true },
   });
   for (const u of users) {

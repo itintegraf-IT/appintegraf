@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/db";
 import { sendUkolEmail } from "@/lib/email";
 import { collectUkolNotifyUserIds } from "@/lib/ukoly-recipients";
+import {
+  filterUserIdsAllowingEmail,
+  userAllowsEmailNotification,
+} from "@/lib/user-email-notifications";
 
 export type UkolNotifyKind = "assigned" | "deadline_changed";
 
@@ -43,8 +47,9 @@ export async function notifyUkolRecipients(params: {
     });
   }
 
+  const emailUserIds = new Set(await filterUserIdsAllowingEmail(ids, "ukoly"));
   for (const u of users) {
-    if (!u.email) continue;
+    if (!u.email || !emailUserIds.has(u.id)) continue;
     await sendUkolEmail({
       toEmail: u.email,
       toName: `${u.first_name} ${u.last_name}`.trim() || "Uživateli",
@@ -85,6 +90,8 @@ export async function notifyUkolDone(params: {
       link: `/ukoly/${params.ukolId}`,
     },
   });
+
+  if (!(await userAllowsEmailNotification(params.creatorUserId, "ukoly"))) return;
 
   const creator = await prisma.users.findUnique({
     where: { id: params.creatorUserId },

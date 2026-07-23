@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { sendCalendarInviteResponseEmail } from "@/lib/email";
 import { formatCalendarEventTitleWithDuration } from "@/app/(dashboard)/calendar/lib/event-types";
 import { parseCalendarEventIdFromNotificationLink } from "@/lib/calendar-invite-notifications";
+import { userAllowsEmailNotification } from "@/lib/user-email-notifications";
 
 /**
  * POST /api/notifications/[id]/invite-response
@@ -160,7 +161,11 @@ export async function POST(
     select: { email: true, first_name: true, last_name: true },
   });
   const ownerEmail = owner?.email?.trim();
-  if (owner && ownerEmail) {
+  if (
+    owner &&
+    ownerEmail &&
+    (await userAllowsEmailNotification(event.created_by, "calendar"))
+  ) {
     const ownerName = `${owner.first_name} ${owner.last_name}`.trim() || "Pořadatel";
     const emailResult = await sendCalendarInviteResponseEmail({
       toEmail: ownerEmail,
