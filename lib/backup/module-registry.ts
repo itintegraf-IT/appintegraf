@@ -151,6 +151,7 @@ export const BACKUP_MODULES: Record<BackupModuleId, BackupModuleDef> = {
     tables: [
       prisma("iml_pantone_colors"),
       prisma("iml_foils"),
+      prisma("iml_die_cuts"),
       prisma("iml_custom_fields"),
       prisma("iml_customers"),
       prisma("iml_customer_emails"),

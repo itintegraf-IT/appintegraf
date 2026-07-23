@@ -6,6 +6,7 @@ type ParsedProduct = Awaited<ReturnType<typeof parseImlProductBodyForSave>>;
 export type ImlProductExistingFk = {
   customer_id?: number | null;
   foil_id?: number | null;
+  die_cut_id?: number | null;
   foil_material_id?: number | null;
   color_material_id?: number | null;
   paper_material_id?: number | null;
@@ -46,6 +47,7 @@ export function toImlProductUpdateData(
   const {
     customer_id,
     foil_id,
+    die_cut_id,
     foil_material_id,
     color_material_id,
     paper_material_id,
@@ -64,6 +66,7 @@ export function toImlProductUpdateData(
       fkRelationUpdate(customer_id, existing?.customer_id, { allowDisconnect: false })
     ),
     ...spreadRelation("iml_foils", fkRelationUpdate(foil_id, existing?.foil_id)),
+    ...spreadRelation("iml_die_cuts", fkRelationUpdate(die_cut_id, existing?.die_cut_id)),
     ...spreadRelation(
       "foil_material",
       fkRelationUpdate(foil_material_id, existing?.foil_material_id)
@@ -90,6 +93,7 @@ export function toImlProductCreateData(
   const {
     customer_id,
     foil_id,
+    die_cut_id,
     foil_material_id,
     color_material_id,
     paper_material_id,
@@ -107,6 +111,7 @@ export function toImlProductCreateData(
       ? { iml_customers: { connect: { id: customer_id } } }
       : {}),
     ...(foil_id != null ? { iml_foils: { connect: { id: foil_id } } } : {}),
+    ...(die_cut_id != null ? { iml_die_cuts: { connect: { id: die_cut_id } } } : {}),
     ...(foil_material_id != null
       ? { foil_material: { connect: { id: foil_material_id } } }
       : {}),

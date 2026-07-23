@@ -43,6 +43,7 @@ export async function GET(
       include: {
         iml_customers: { select: { id: true, name: true } },
         iml_foils: { select: { id: true, code: true, name: true } },
+        iml_die_cuts: true,
         ...productMaterialIncludes,
         iml_product_colors: {
           include: {

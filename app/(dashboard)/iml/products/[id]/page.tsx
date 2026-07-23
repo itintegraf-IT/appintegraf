@@ -191,6 +191,14 @@ export default async function ImlProductDetailPage({
           <InfoField label="Etiket na TA" value={fmtNum(product.labels_per_sheet)} />
           <InfoField label="Kusů v krabici" value={fmtNum(product.pieces_per_box)} />
           <InfoField label="Kusů na paletě" value={fmtNum(product.pieces_per_pallet)} />
+          {product.die_cut_id != null && (
+            <p className="sm:col-span-2 text-sm text-gray-500">
+              Navázáno na katalog výseků (ID {product.die_cut_id}).{" "}
+              <a href="/iml/die-cuts" className="text-red-600 hover:underline">
+                Správa výseků
+              </a>
+            </p>
+          )}
         </div>
       ),
     },

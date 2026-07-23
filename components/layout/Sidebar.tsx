@@ -453,6 +453,7 @@ const navItems: NavItem[] = [
     module: "iml",
     subItems: [
       { href: "/iml/inquiries", label: "Poptávky" },
+      { href: "/iml/die-cuts", label: "Výseky" },
       { href: "/iml/reports/pantone", label: "Report Pantone" },
     ],
     isActive: (p) => p.startsWith("/iml"),
