@@ -1,4 +1,12 @@
-import { normalizeHeaderKey } from "@/lib/iml-product-import-parse";
+/** Normalizace hlavičky pro auto-map (malá písmena, bez diakritiky). Bez serverových importů – používá i client page. */
+function normalizeHeaderKey(header: string): string {
+  return header
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/g, " ");
+}
 
 export const DIE_CUT_IMPORT_FIELDS = [
   { key: "label_shape_code", label: "Kód tvaru etikety", required: true },
