@@ -1241,6 +1241,14 @@ model users {
   stitky_user_roles                                              stitky_user_roles[]
   notifications                                                  notifications[]
   iml_product_files_uploaded                                     iml_product_files[]           @relation("iml_product_files_uploader")
+  projekty_owned_boards                                          Board[]                       @relation("ProjektyBoardOwner")
+  projekty_board_members                                         BoardMember[]
+  projekty_card_members                                          CardMember[]
+  projekty_notes                                                 Note[]
+  projekty_attachments                                           Attachment[]
+  projekty_checklist_assignments                                 ChecklistItem[]               @relation("ProjektyChecklistItemAssignee")
+  projekty_audit_logs                                            AuditLog[]
+  projekty_personal_todos                                        PersonalTodo[]                @relation("ProjektyPersonalTodoOwner")
   roles                                                          roles?                        @relation(fields: [role_id], references: [id], onUpdate: NoAction, map: "fk_users_role")
 
   @@index([is_active], map: "idx_active")
@@ -2051,4 +2059,259 @@ model stitky_user_roles {
 model stitky_settings {
   key   String @id @db.VarChar(50)
   value String @db.Text
+}
+
+// ===== Modul Projekty (port z integraf-pm; DB tabulky prefix projekty_) =====
+
+enum BoardRole {
+  ADMIN
+  MEMBER
+  OBSERVER
+}
+
+enum ParentType {
+  CARD
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum PersonalTodoStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  DONE
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  boards Board[]
+
+  @@map("projekty_workspace")
+}
+
+model Board {
+  id          String   @id @default(cuid())
+  workspaceId String
+  name        String
+  description String?  @db.Text
+  background  String?
+  ownerId     Int
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner     users         @relation("ProjektyBoardOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  lists     BoardList[]
+  members   BoardMember[]
+  labels    Label[]
+
+  @@index([workspaceId])
+  @@index([ownerId])
+  @@map("projekty_board")
+}
+
+model BoardMember {
+  boardId String
+  userId  Int
+  role    BoardRole @default(MEMBER)
+
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  user  users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([boardId, userId])
+  @@index([userId])
+  @@map("projekty_board_member")
+}
+
+model BoardList {
+  id        String   @id @default(cuid())
+  boardId   String
+  name      String
+  color     String?
+  position  Float
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  board Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards Card[]
+
+  @@index([boardId, position])
+  @@map("projekty_board_list")
+}
+
+model Card {
+  id          String    @id @default(cuid())
+  number      String    @unique
+  listId      String
+  boardId     String
+  title       String
+  description String?   @db.Text
+  position    Float
+  dueDate     DateTime?
+  startDate   DateTime?
+  completed   Boolean   @default(false)
+  cover       String?
+  archived    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  list             BoardList     @relation(fields: [listId], references: [id], onDelete: Cascade)
+  members          CardMember[]
+  labels           CardLabel[]
+  checklists       Checklist[]
+  promotedFromTodo PersonalTodo? @relation("PersonalTodoPromote")
+
+  @@index([boardId, listId, position])
+  @@index([dueDate])
+  @@map("projekty_card")
+}
+
+model PersonalTodo {
+  id      String @id @default(cuid())
+  ownerId Int
+  owner   users  @relation("ProjektyPersonalTodoOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  title       String             @db.VarChar(500)
+  description String?            @db.Text
+  status      PersonalTodoStatus @default(NOT_STARTED)
+  completedAt DateTime?
+  dueDate     DateTime?
+
+  archivedAt       DateTime?
+  promotedToCardId String?   @unique
+  promotedToCard   Card?     @relation("PersonalTodoPromote", fields: [promotedToCardId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId, archivedAt, status])
+  @@index([ownerId, dueDate])
+  @@map("projekty_personal_todo")
+}
+
+model CardMember {
+  cardId String
+  userId Int
+
+  card Card  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user users @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, userId])
+  @@index([userId])
+  @@map("projekty_card_member")
+}
+
+model Label {
+  id      String @id @default(cuid())
+  boardId String
+  name    String
+  color   String
+
+  board      Board       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cardLabels CardLabel[]
+
+  @@index([boardId])
+  @@map("projekty_label")
+}
+
+model CardLabel {
+  cardId  String
+  labelId String
+
+  card  Card  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  label Label @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([cardId, labelId])
+  @@index([labelId])
+  @@map("projekty_card_label")
+}
+
+model Checklist {
+  id        String   @id @default(cuid())
+  cardId    String
+  name      String
+  position  Float
+  createdAt DateTime @default(now())
+
+  card  Card            @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  items ChecklistItem[]
+
+  @@index([cardId, position])
+  @@map("projekty_checklist")
+}
+
+model ChecklistItem {
+  id          String    @id @default(cuid())
+  checklistId String
+  text        String
+  done        Boolean   @default(false)
+  position    Float
+  assigneeId  Int?
+  dueDate     DateTime?
+  createdAt   DateTime  @default(now())
+
+  checklist Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  assignee  users?    @relation("ProjektyChecklistItemAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  @@index([checklistId, position])
+  @@index([assigneeId])
+  @@map("projekty_checklist_item")
+}
+
+model Note {
+  id         String     @id @default(cuid())
+  parentType ParentType
+  parentId   String
+  content    String     @db.Text
+  authorId   Int?
+  mentions   Json?
+  createdAt  DateTime   @default(now())
+
+  author users? @relation(fields: [authorId], references: [id], onDelete: SetNull)
+
+  @@index([parentType, parentId])
+  @@index([authorId])
+  @@map("projekty_note")
+}
+
+model Attachment {
+  id         String     @id @default(cuid())
+  parentType ParentType
+  parentId   String
+  fileName   String
+  data       Bytes      @db.LongBlob
+  size       Int
+  mime       String
+  uploadedBy Int?
+  createdAt  DateTime   @default(now())
+
+  uploader users? @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  @@index([parentType, parentId])
+  @@map("projekty_attachment")
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     Int?
+  entityType String
+  entityId   String
+  action     AuditAction
+  diff       Json
+  createdAt  DateTime    @default(now())
+
+  user users? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("projekty_audit_log")
 }

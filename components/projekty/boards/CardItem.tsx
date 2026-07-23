@@ -1,0 +1,222 @@
+"use client";
+
+import Link from "next/link";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Calendar, CheckCircle2, CheckSquare } from "lucide-react";
+import { UserAvatar } from "@/components/projekty/UserAvatar";
+import { format, isPast, isToday } from "date-fns";
+import { cs } from "date-fns/locale";
+import { cn } from "@/lib/projekty/utils";
+import { useBulkSelection } from "./BulkSelectionContext";
+import { useIsTouchDevice } from "@/hooks/projekty/useIsTouchDevice";
+
+type UserLite = { id: number; email: string | null; name: string | null; image: string | null };
+
+export type CardData = {
+  id: string;
+  number: string;
+  listId: string;
+  boardId: string;
+  title: string;
+  description: string | null;
+  position: number;
+  dueDate: Date | string | null;
+  startDate: Date | string | null;
+  completed: boolean;
+  cover: string | null;
+  archived: boolean;
+  members: { userId: number; user: UserLite }[];
+  labels: { labelId: string; label: { id: string; name: string; color: string } }[];
+  notesCount?: number;
+  attachmentsCount?: number;
+  _count?: { checklists: number };
+};
+
+/**
+ * Pure visual content of a card. Used by both CardItem (sortable) and
+ * CardItemDragOverlay (rendered by BoardView's <DragOverlay>).
+ */
+function CardItemBody({
+  card,
+  boardId,
+  asLink,
+}: {
+  card: CardData;
+  boardId: string;
+  asLink: boolean;
+}) {
+  const due = card.dueDate ? new Date(card.dueDate) : null;
+  const dueColor = due
+    ? isPast(due) && !isToday(due) && !card.completed
+      ? "text-rose-600"
+      : isToday(due) && !card.completed
+        ? "text-amber-600"
+        : "text-[hsl(var(--notion-fg)/0.6)]"
+    : "";
+
+  const primaryMember = card.members[0]?.user;
+  const extraMembersCount = card.members.length - 1;
+  const primaryLabel = card.labels[0]?.label;
+  const extraLabelsCount = card.labels.length - 1;
+
+  const hasAnyMeta = Boolean(primaryLabel || due || card._count?.checklists || primaryMember);
+
+  const content = (
+    <div className="px-3 py-2">
+      {card.cover ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={card.cover}
+          alt=""
+          className="-mx-3 -mt-2 mb-2 h-[148px] w-[calc(100%+1.5rem)] rounded-t-lg object-cover"
+          draggable={false}
+        />
+      ) : null}
+
+      <div className="flex items-start gap-1.5">
+        {card.completed ? (
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden />
+        ) : null}
+        <div
+          className={`flex-1 text-sm font-medium leading-snug ${
+            card.completed
+              ? "text-[hsl(var(--notion-fg)/0.4)] line-through"
+              : "text-[hsl(var(--notion-fg))]"
+          }`}
+        >
+          {card.title}
+        </div>
+      </div>
+
+      {hasAnyMeta ? (
+        <div className="mt-1.5 flex items-center gap-2 text-xs text-[hsl(var(--notion-fg)/0.6)]">
+          {primaryLabel ? (
+            <span className="inline-flex items-center gap-1" title={primaryLabel.name}>
+              <span
+                className="size-2 shrink-0 rounded-full"
+                style={{ backgroundColor: primaryLabel.color }}
+                aria-hidden
+              />
+              <span className="truncate">{primaryLabel.name}</span>
+              {extraLabelsCount > 0 ? (
+                <span className="text-[hsl(var(--notion-fg)/0.4)]">+{extraLabelsCount}</span>
+              ) : null}
+            </span>
+          ) : null}
+          {due ? (
+            <span className={`inline-flex items-center gap-1 ${dueColor}`}>
+              <Calendar className="size-3" aria-hidden />
+              {format(due, "d. M.", { locale: cs })}
+            </span>
+          ) : null}
+          {card._count?.checklists ? (
+            <span className="inline-flex items-center gap-1">
+              <CheckSquare className="size-3" aria-hidden />
+              {card._count.checklists}
+            </span>
+          ) : null}
+          {primaryMember ? (
+            <span className="ml-auto inline-flex items-center gap-1">
+              <UserAvatar user={primaryMember} size="xs" />
+              {extraMembersCount > 0 ? (
+                <span className="text-[hsl(var(--notion-fg)/0.6)]">+{extraMembersCount}</span>
+              ) : null}
+            </span>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+
+  if (asLink) {
+    return (
+      <Link
+        href={`/projekty/boards/${boardId}?card=${card.id}`}
+        draggable={false}
+        className="block overflow-hidden rounded-lg"
+      >
+        {content}
+      </Link>
+    );
+  }
+  return <div className="block overflow-hidden rounded-lg">{content}</div>;
+}
+
+export function CardItem({
+  card,
+  boardId,
+  orderedCardIds,
+}: {
+  card: CardData;
+  boardId: string;
+  orderedCardIds: string[];
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({
+      id: card.id,
+      data: { type: "card", listId: card.listId },
+    });
+
+  const sel = useBulkSelection();
+  const isSelected = sel.isSelected(card.id);
+  const isTouch = useIsTouchDevice();
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    // Notion-style: originál zůstává jako "fantom" na své pozici (0.5 opacity);
+    // ghost u kursoru je primární vizuální focus (DragOverlay).
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  function handleCardClick(e: React.MouseEvent) {
+    // Bulk select je desktop-only (per ADR 0029). Na touch propusť default
+    // Link navigaci pro každý click bez ohledu na modifier keys.
+    if (isTouch) return;
+
+    if (e.metaKey || e.ctrlKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      sel.toggle(card.id);
+      return;
+    }
+    if (e.shiftKey && sel.lastSelectedId) {
+      e.preventDefault();
+      e.stopPropagation();
+      sel.selectRange(sel.lastSelectedId, card.id, orderedCardIds);
+      return;
+    }
+    // Default: nechej Link navigaci proběhnout
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      aria-label={`Přesunout kartu ${card.title}`}
+      data-bulk-card
+      {...attributes}
+      {...listeners}
+      onClick={handleCardClick}
+      className={cn(
+        "group relative cursor-grab touch-none rounded-lg bg-[hsl(var(--notion-surface))] shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-card-hover)] active:cursor-grabbing",
+        isSelected && !isTouch && "border-2 border-primary shadow-none",
+      )}
+    >
+      <CardItemBody card={card} boardId={boardId} asLink />
+    </div>
+  );
+}
+
+/**
+ * Static visual snapshot of a card for the <DragOverlay> portal.
+ * No drag listeners, no Link (= žádná navigace při drop).
+ */
+export function CardItemDragOverlay({ card, boardId }: { card: CardData; boardId: string }) {
+  return (
+    <div className="w-[244px] cursor-grabbing rounded-lg bg-[hsl(var(--notion-surface))] shadow-2xl rotate-2 scale-105">
+      <CardItemBody card={card} boardId={boardId} asLink={false} />
+    </div>
+  );
+}
