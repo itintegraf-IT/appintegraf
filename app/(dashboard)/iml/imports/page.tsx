@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Upload, Users, Package, ShoppingCart } from "lucide-react";
+import { ArrowLeft, Upload, Users, Package, ShoppingCart, Scissors } from "lucide-react";
 
 export default async function ImlImportsPage() {
   const session = await auth();
@@ -32,6 +32,12 @@ export default async function ImlImportsPage() {
       label: "Import objednávek",
       description: "CSV, Excel – drag & drop mapování",
     },
+    {
+      href: "/iml/die-cuts/import",
+      icon: Scissors,
+      label: "Import výseků",
+      description: "CSV, Excel – mapování polí katalogu výseků",
+    },
   ];
 
   return (
@@ -43,7 +49,7 @@ export default async function ImlImportsPage() {
             Importy IML
           </h1>
           <p className="mt-1 text-gray-600">
-            Import zákazníků, produktů a objednávek z CSV nebo Excel
+            Import zákazníků, produktů, objednávek a výseků z CSV nebo Excel
           </p>
         </div>
         <Link
