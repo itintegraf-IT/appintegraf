@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Plus, Search } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Search, Upload } from "lucide-react";
 
 type DieCutRow = {
   id: number;
@@ -139,14 +139,23 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
             IML
           </Link>
           {canWrite && (
-            <button
-              type="button"
-              onClick={openNew}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
-            >
-              <Plus className="h-4 w-4" />
-              Nový výsek
-            </button>
+            <>
+              <Link
+                href="/iml/die-cuts/import"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              >
+                <Upload className="h-4 w-4" />
+                Import
+              </Link>
+              <button
+                type="button"
+                onClick={openNew}
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
+              >
+                <Plus className="h-4 w-4" />
+                Nový výsek
+              </button>
+            </>
           )}
         </div>
       </div>
