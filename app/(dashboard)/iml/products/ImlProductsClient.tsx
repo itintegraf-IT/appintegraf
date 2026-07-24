@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Search } from "lucide-react";
-import { IML_ITEM_STATUSES, IML_PRODUCT_KINDS, imlItemStatusLabel } from "@/lib/iml-constants";
+import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
 import { useListFilters } from "@/lib/navigation/use-list-filters";
 import { type ProductListRow } from "@/lib/iml/product-list-columns";
 import { useProductListColumns } from "@/lib/iml/use-product-list-columns";
@@ -152,32 +152,59 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
 
   const showPageNav = perPage !== "all" && totalPages > 1;
 
+  const kindButtons: Array<{ value: string; label: string }> = [
+    { value: "", label: "Vše" },
+    { value: "iml", label: "IML" },
+    { value: "etikety", label: "Etikety" },
+  ];
+
   return (
     <div className="space-y-4">
       {canRead && (
-        <div className="flex flex-wrap items-center gap-2">
-          <a
-            href={buildExportUrl("csv")}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            download="iml-produkty.csv"
-          >
-            Export CSV
-          </a>
-          <a
-            href={buildExportUrl("xlsx")}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            download="iml-produkty.xlsx"
-          >
-            Export Excel
-          </a>
-          {tableReady && (
-            <ProductListColumnPicker
-              visibleColumnIds={visibleColumnIds}
-              onToggle={toggleColumn}
-              onReset={resetToDefaults}
-              onResetWidths={resetWidths}
-            />
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={buildExportUrl("csv")}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              download="iml-produkty.csv"
+            >
+              Export CSV
+            </a>
+            <a
+              href={buildExportUrl("xlsx")}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              download="iml-produkty.xlsx"
+            >
+              Export Excel
+            </a>
+            {tableReady && (
+              <ProductListColumnPicker
+                visibleColumnIds={visibleColumnIds}
+                onToggle={toggleColumn}
+                onReset={resetToDefaults}
+                onResetWidths={resetWidths}
+              />
+            )}
+          </div>
+          <div className="inline-flex rounded-lg border border-gray-300 bg-white p-0.5 shadow-sm">
+            {kindButtons.map((btn) => {
+              const active = filterProductKind === btn.value;
+              return (
+                <button
+                  key={btn.label}
+                  type="button"
+                  onClick={() => setFilter("product_kind", btn.value)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-red-600 text-white shadow-sm"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {btn.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -193,7 +220,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Hledat podle kódu, názvu, SKU…"
+                placeholder="Hledat podle kódu, názvu, SKU, formátu, výseku, barev…"
                 value={search}
                 onChange={(e) => setFilter("search", e.target.value)}
                 className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3"
@@ -208,18 +235,6 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={filterProductKind}
-              onChange={(e) => setFilter("product_kind", e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">Všechny druhy</option>
-              {IML_PRODUCT_KINDS.map((k) => (
-                <option key={k.value} value={k.value}>
-                  {k.label}
                 </option>
               ))}
             </select>

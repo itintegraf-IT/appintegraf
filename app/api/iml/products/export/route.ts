@@ -31,6 +31,15 @@ export async function GET(req: NextRequest) {
       { client_code: { contains: search } },
       { client_name: { contains: search } },
       { sku: { contains: search } },
+      { product_format: { contains: search } },
+      { label_shape_code: { contains: search } },
+      { die_cut_tool_code: { contains: search } },
+      { assembly_code: { contains: search } },
+      { color_coverage: { contains: search } },
+      { print_colors_text: { contains: search } },
+      { foil_type: { contains: search } },
+      { ean_code: { contains: search } },
+      { requester: { contains: search } },
     ];
   }
   if (customerId) where.customer_id = parseInt(customerId, 10);
