@@ -32,6 +32,10 @@ export async function GET(req: NextRequest) {
             { die_cut_tool_code: { contains: q } },
             { assembly_code: { contains: q } },
             { note: { contains: q } },
+            { internal_name: { contains: q } },
+            { die_cut_format: { contains: q } },
+            { primary_machine: { contains: q } },
+            { note_prepress: { contains: q } },
           ],
         }
       : {}),
@@ -41,13 +45,19 @@ export async function GET(req: NextRequest) {
     where,
     orderBy: [{ is_active: "desc" }, { label_shape_code: "asc" }],
     take: 1000,
-    include: { _count: { select: { iml_products: true } } },
+    include: {
+      _count: { select: { iml_products: true } },
+      iml_customers: { select: { id: true, name: true } },
+      iml_box_types: { select: { id: true, code: true, name: true } },
+    },
   });
 
   return NextResponse.json({
-    die_cuts: rows.map(({ _count, ...row }) => ({
+    die_cuts: rows.map(({ _count, iml_customers, iml_box_types, ...row }) => ({
       ...row,
       products_count: _count.iml_products,
+      customer: iml_customers,
+      box_type: iml_box_types,
     })),
   });
 }

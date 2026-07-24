@@ -1492,6 +1492,7 @@ model iml_customers {
   iml_inquiries                   iml_inquiries[]
   iml_customer_emails             iml_customer_emails[]
   iml_customer_contacts           iml_customer_contacts[]
+  iml_die_cuts                    iml_die_cuts[]
 
   @@index([parent_id])
   @@index([unit_type])
@@ -1611,6 +1612,22 @@ model iml_products {
   @@map("iml_products")
 }
 
+/// Typy krabic pro katalog výseků.
+model iml_box_types {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.DateTime(0)
+  updated_at  DateTime @updatedAt @db.DateTime(0)
+
+  iml_die_cuts iml_die_cuts[]
+
+  @@index([is_active])
+  @@map("iml_box_types")
+}
+
 /// Globální katalog výseků (unikátní kód tvaru etikety). Produkt na něj odkazuje přes die_cut_id.
 model iml_die_cuts {
   id                 Int      @id @default(autoincrement())
@@ -1623,12 +1640,33 @@ model iml_die_cuts {
   pieces_per_pallet  Int?
   note               String?  @db.Text
   is_active          Boolean  @default(true)
-  created_at         DateTime @default(now()) @db.DateTime(0)
-  updated_at         DateTime @updatedAt @db.DateTime(0)
 
-  iml_products iml_products[]
+  internal_name    String? @db.VarChar(255)
+  die_cut_format   String? @db.VarChar(100)
+  customer_id      Int?
+  primary_machine  String? @db.VarChar(100)
+  box_type_id      Int?
+  note_prepress    String? @db.Text
+
+  mat_eup_60        Boolean @default(false)
+  mat_eup_60_weight String? @db.VarChar(50)
+  mat_eup_50        Boolean @default(false)
+  mat_eup_50_weight String? @db.VarChar(50)
+  mat_eth_55        Boolean @default(false)
+  mat_eth_55_weight String? @db.VarChar(50)
+  mat_elr_70        Boolean @default(false)
+  mat_elr_70_weight String? @db.VarChar(50)
+
+  created_at DateTime @default(now()) @db.DateTime(0)
+  updated_at DateTime @updatedAt @db.DateTime(0)
+
+  iml_products  iml_products[]
+  iml_customers iml_customers? @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+  iml_box_types iml_box_types? @relation(fields: [box_type_id], references: [id], onDelete: SetNull)
 
   @@index([is_active])
+  @@index([customer_id])
+  @@index([box_type_id])
   @@map("iml_die_cuts")
 }
 

@@ -4,13 +4,15 @@ import { useState } from "react";
 import { ImlCustomFieldsClient } from "./ImlCustomFieldsClient";
 import { ImlFoilSettingsTab } from "./ImlFoilSettingsTab";
 import { ImlColorSettingsTab } from "./ImlColorSettingsTab";
+import { ImlBoxTypesSettingsTab } from "./ImlBoxTypesSettingsTab";
 
-type MainTab = "fields" | "foils" | "colors";
+type MainTab = "fields" | "foils" | "colors" | "boxes";
 
 const tabs: { id: MainTab; label: string }[] = [
   { id: "fields", label: "Vlastní pole" },
   { id: "foils", label: "Fólie" },
   { id: "colors", label: "Barvy" },
+  { id: "boxes", label: "Typy krabic" },
 ];
 
 export function ImlSettingsTabsClient({ canWrite }: { canWrite: boolean }) {
@@ -38,6 +40,7 @@ export function ImlSettingsTabsClient({ canWrite }: { canWrite: boolean }) {
       {tab === "fields" && <ImlCustomFieldsClient />}
       {tab === "foils" && <ImlFoilSettingsTab canWrite={canWrite} />}
       {tab === "colors" && <ImlColorSettingsTab canWrite={canWrite} />}
+      {tab === "boxes" && <ImlBoxTypesSettingsTab canWrite={canWrite} />}
     </div>
   );
 }
