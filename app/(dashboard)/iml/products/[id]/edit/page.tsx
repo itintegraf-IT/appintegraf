@@ -84,6 +84,7 @@ export default function ImlProductEditPage() {
             }
           }
           setForm({
+            product_kind: s("product_kind") || "etikety",
             customer_id: si("customer_id"),
             ig_code: s("ig_code"),
             ig_short_name: s("ig_short_name"),

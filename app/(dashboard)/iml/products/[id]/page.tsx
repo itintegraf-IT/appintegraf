@@ -21,7 +21,7 @@ import ProductPdfHistory from "../_components/ProductPdfHistory";
 import { consumptionKg } from "@/lib/iml-color-consumption";
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
-import { imlLabelTypeLabel } from "@/lib/iml-constants";
+import { imlLabelTypeLabel, imlProductKindLabel } from "@/lib/iml-constants";
 import { formatProductFormatFromMm } from "@/lib/iml/product-format";
 import { cmykFlagsFromProduct, formatPrintColorsSummaryForDisplay } from "@/lib/iml-print-colors-summary";
 import { normalizePantoneCode, resolvePantoneSwatchHex } from "@/lib/iml-pantone";
@@ -166,6 +166,10 @@ export default async function ImlProductDetailPage({
             </div>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
+            <InfoField
+              label="Druh produktu"
+              value={imlProductKindLabel(product.product_kind as string | null)}
+            />
             <InfoField label="Kód IG" value={fmt(product.ig_code)} />
             <InfoField label="Zkrácený název" value={fmt(product.ig_short_name)} />
             <InfoField label="Kód u klienta" value={fmt(product.client_code)} />
