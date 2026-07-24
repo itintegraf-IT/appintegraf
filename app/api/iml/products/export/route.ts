@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     client_code: p.client_code ?? "",
     client_name: p.client_name ?? "",
     sku: p.sku ?? "",
-    product_kind: p.product_kind ?? "etikety",
+    product_kind: p.product_kind ?? "iml",
     customer_name: p.iml_customers?.name ?? "",
     requester: p.requester ?? "",
     label_shape_code: p.label_shape_code ?? "",

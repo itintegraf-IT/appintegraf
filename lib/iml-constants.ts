@@ -49,7 +49,7 @@ export const IML_PRODUCT_KINDS = [
 
 export type ImlProductKind = (typeof IML_PRODUCT_KINDS)[number]["value"];
 
-export const DEFAULT_IML_PRODUCT_KIND: ImlProductKind = "etikety";
+export const DEFAULT_IML_PRODUCT_KIND: ImlProductKind = "iml";
 
 export function imlProductKindLabel(value: string | null | undefined): string {
   if (!value) return imlProductKindLabel(DEFAULT_IML_PRODUCT_KIND);

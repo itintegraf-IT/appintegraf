@@ -714,7 +714,7 @@ function Field({
 }
 
 export const emptyProductForm: ProductFormState = {
-  product_kind: "etikety",
+  product_kind: "iml",
   customer_id: "",
   ig_code: "",
   ig_short_name: "",
