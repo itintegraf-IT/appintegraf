@@ -323,6 +323,45 @@ export default async function ImlProductDetailPage({
           </div>
           <div>
             <h4 className="mb-2 text-sm font-semibold text-gray-700">
+              Aktuální tisková data
+            </h4>
+            {hasPdf ? (
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
+                <div className="w-full max-w-[240px] shrink-0">
+                  <ProductImagePreview
+                    productId={product.id}
+                    hasImage={hasImage}
+                    hasPdf={hasPdf}
+                    className="h-60 w-full"
+                  />
+                  <p className="mt-1 text-center text-xs text-gray-400">
+                    Kliknutím zvětšit · detail z PDF
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <a
+                    href={`/api/iml/products/${product.id}/pdf`}
+                    download
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                  >
+                    Stáhnout aktuální PDF
+                  </a>
+                  <a
+                    href={`/api/iml/products/${product.id}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    Otevřít v novém okně
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-6 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
+                Žádné aktuální PDF. Nahrát lze v editaci produktu.
+              </div>
+            )}
+            <h4 className="mb-2 text-sm font-semibold text-gray-700">
               Historie verzí PDF
             </h4>
             <ProductPdfHistory productId={product.id} canWrite={canWrite} />
