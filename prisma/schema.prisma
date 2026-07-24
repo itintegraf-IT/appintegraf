@@ -1401,6 +1401,7 @@ model iml_products {
   cmyk_y_enabled       Boolean   @default(true)
   cmyk_k_enabled       Boolean   @default(true)
   label_type           String?   @db.VarChar(20)
+  product_kind         String    @default("etikety") @db.VarChar(20)
   realization_log      String?   @db.Text
   internal_note        String?   @db.Text
   last_edited_by       String?   @db.VarChar(255)
@@ -1432,6 +1433,7 @@ model iml_products {
   @@index([ig_code])
   @@index([sku])
   @@index([item_status])
+  @@index([product_kind])
   @@index([foil_id])
   @@index([die_cut_id])
   @@index([foil_material_id], map: "idx_iml_products_foil_material")

@@ -15,6 +15,7 @@ import {
   IML_COLOR_COUNT_OPTIONS,
   IML_ITEM_STATUSES,
   IML_LABEL_TYPES,
+  IML_PRODUCT_KINDS,
   imlItemStatusLabel,
 } from "@/lib/iml-constants";
 import { formatProductFormatFromMm } from "@/lib/iml/product-format";
@@ -42,6 +43,7 @@ type DieCutOption = {
 };
 
 export type ProductFormState = {
+  product_kind: string;
   customer_id: string;
   ig_code: string;
   ig_short_name: string;
@@ -212,6 +214,23 @@ export default function ProductFormSections({
       icon: <CircleCheckBig className="h-4 w-4" />,
       content: (
         <TabShell title="Identifikace" subtitle="Zákazník, interní kódy IG, kódy u klienta a zadavatel">
+          <div className="mb-4">
+            <span className="mb-2 block text-sm font-medium text-gray-700">Druh produktu</span>
+            <div className="flex flex-wrap gap-4">
+              {IML_PRODUCT_KINDS.map((kind) => (
+                <label key={kind.value} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="product_kind"
+                    value={kind.value}
+                    checked={form.product_kind === kind.value}
+                    onChange={() => setField("product_kind", kind.value)}
+                  />
+                  {kind.label}
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Zákazník" error={err.customer_id}>
               <select
@@ -695,6 +714,7 @@ function Field({
 }
 
 export const emptyProductForm: ProductFormState = {
+  product_kind: "etikety",
   customer_id: "",
   ig_code: "",
   ig_short_name: "",

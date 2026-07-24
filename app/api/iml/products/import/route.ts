@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { enrichProductMaterialFields } from "@/lib/iml/product-materials";
+import { parseProductKind } from "@/lib/iml/parse-product-body";
 
 function parseCsvLine(line: string, delimiter: string): string[] {
   const result: string[] = [];
@@ -176,6 +177,7 @@ export async function POST(req: NextRequest) {
           color_count: get("color_count") ? parseInt(get("color_count"), 10) || null : null,
           print_colors_text: get("print_colors_text") || null,
           label_type: get("label_type") || null,
+          product_kind: parseProductKind(get("product_kind") || null),
           item_status: get("item_status") || null,
           sku,
           last_edited_by: editorName,

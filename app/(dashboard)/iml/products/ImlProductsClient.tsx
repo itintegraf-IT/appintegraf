@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { Search } from "lucide-react";
-import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
+import { IML_ITEM_STATUSES, IML_PRODUCT_KINDS, imlItemStatusLabel } from "@/lib/iml-constants";
 import { useListFilters } from "@/lib/navigation/use-list-filters";
 import { type ProductListRow } from "@/lib/iml/product-list-columns";
 import { useProductListColumns } from "@/lib/iml/use-product-list-columns";
@@ -16,6 +16,7 @@ const PRODUCT_LIST_FILTER_DEFAULTS = {
   search: "",
   customer_id: "",
   status: "",
+  product_kind: "",
   page: "1",
   per_page: "",
 };
@@ -34,12 +35,13 @@ function parseStoredPerPage(value: string | null): PerPageOption {
 export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const { filters, setFilter, setFilters, listHref } = useListFilters({
     defaults: PRODUCT_LIST_FILTER_DEFAULTS,
-    resetPageOnChange: ["search", "customer_id", "status", "per_page"],
+    resetPageOnChange: ["search", "customer_id", "status", "product_kind", "per_page"],
   });
 
   const search = filters.search;
   const filterCustomer = filters.customer_id;
   const filterStatus = filters.status;
+  const filterProductKind = filters.product_kind;
   const page = parseInt(filters.page || "1", 10) || 1;
   const perPage = (filters.per_page || "25") as PerPageOption;
 
@@ -90,6 +92,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     if (search) params.set("search", search);
     if (filterCustomer) params.set("customer_id", filterCustomer);
     if (filterStatus) params.set("status", filterStatus);
+    if (filterProductKind) params.set("product_kind", filterProductKind);
     params.set("page", String(page));
     params.set("per_page", perPage);
     const res = await fetch(`/api/iml/products?${params}`);
@@ -112,7 +115,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   useEffect(() => {
     const t = setTimeout(() => fetchProducts(), 300);
     return () => clearTimeout(t);
-  }, [search, filterCustomer, filterStatus, page, perPage]);
+  }, [search, filterCustomer, filterStatus, filterProductKind, page, perPage]);
 
   const buildExportUrl = (format: string) => {
     const params = new URLSearchParams();
@@ -120,6 +123,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     if (search) params.set("search", search);
     if (filterCustomer) params.set("customer_id", filterCustomer);
     if (filterStatus) params.set("status", filterStatus);
+    if (filterProductKind) params.set("product_kind", filterProductKind);
     return `/api/iml/products/export?${params}`;
   };
 
@@ -134,7 +138,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
         alert(data.error ?? "Chyba při mazání");
       }
     },
-    [search, filterCustomer, filterStatus, page, perPage]
+    [search, filterCustomer, filterStatus, filterProductKind, page, perPage]
   );
 
   const cellContext = useMemo(
@@ -204,6 +208,18 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
               {customers.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
+                </option>
+              ))}
+            </select>
+            <select
+              value={filterProductKind}
+              onChange={(e) => setFilter("product_kind", e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="">Všechny druhy</option>
+              {IML_PRODUCT_KINDS.map((k) => (
+                <option key={k.value} value={k.value}>
+                  {k.label}
                 </option>
               ))}
             </select>

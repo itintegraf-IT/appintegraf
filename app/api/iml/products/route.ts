@@ -50,6 +50,7 @@ const productListSelect = {
   color_count: true,
   print_colors_text: true,
   label_type: true,
+  product_kind: true,
   realization_log: true,
   internal_note: true,
   last_edited_by: true,
@@ -79,6 +80,7 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get("search")?.trim() ?? "";
   const customerId = searchParams.get("customer_id");
   const status = searchParams.get("item_status") ?? searchParams.get("status");
+  const productKind = searchParams.get("product_kind")?.trim() ?? "";
 
   const where: Record<string, unknown> = {};
   if (search) {
@@ -98,6 +100,9 @@ export async function GET(req: NextRequest) {
   }
   if (status) {
     where.item_status = status;
+  }
+  if (productKind === "iml" || productKind === "etikety") {
+    where.product_kind = productKind;
   }
 
   const pageParam = searchParams.get("page");
