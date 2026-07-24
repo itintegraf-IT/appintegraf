@@ -20,13 +20,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const row = await prisma.iml_die_cuts.findUnique({
     where: { id },
-    include: { _count: { select: { iml_products: true } } },
+    include: {
+      _count: { select: { iml_products: true } },
+      iml_customers: { select: { id: true, name: true } },
+      iml_box_types: { select: { id: true, code: true, name: true } },
+    },
   });
   if (!row) return NextResponse.json({ error: "Výsek nenalezen" }, { status: 404 });
 
-  const { _count, ...die_cut } = row;
+  const { _count, iml_customers, iml_box_types, ...die_cut } = row;
   return NextResponse.json({
-    die_cut,
+    die_cut: { ...die_cut, customer: iml_customers, box_type: iml_box_types },
     products_count: _count.iml_products,
   });
 }
@@ -77,12 +81,25 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     const row = await prisma.$transaction(async (tx) => {
       const updated = await tx.iml_die_cuts.update({
         where: { id },
-        data: parsed,
+        data: {
+          ...parsed,
+          // labels_per_sheet se ve formuláři needituje — zachovat stávající hodnotu
+          labels_per_sheet:
+            body.labels_per_sheet !== undefined
+              ? parsed.labels_per_sheet
+              : existing.labels_per_sheet,
+        },
       });
       // Synchronizace denormalizovaných polí na všech navázaných produktech
       await tx.iml_products.updateMany({
         where: { die_cut_id: id },
-        data: productFields,
+        data: {
+          ...productFields,
+          labels_per_sheet:
+            body.labels_per_sheet !== undefined
+              ? productFields.labels_per_sheet
+              : existing.labels_per_sheet,
+        },
       });
       return updated;
     });
