@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
-import { BackLink } from "@/components/navigation/BackLink";
 import { useReturnTo } from "@/lib/navigation/use-return-to";
 import { ProductFilesUpload } from "../../_components/ProductFilesUpload";
 import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
@@ -41,7 +41,7 @@ export default function ImlProductEditPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  const { withPreservedReturnTo } = useReturnTo(`/iml/products/${id}`);
+  const { backHref: listBackHref, withPreservedReturnTo } = useReturnTo("/iml/products");
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -273,7 +273,21 @@ export default function ImlProductEditPage() {
           <h1 className="text-2xl font-bold text-gray-900">Upravit produkt</h1>
           <p className="mt-1 text-gray-600">{form.ig_code || form.ig_short_name || "Produkt"}</p>
         </div>
-        <BackLink fallbackHref={`/iml/products/${id}`} />
+        <div className="flex items-center gap-2">
+          <Link
+            href={withPreservedReturnTo(`/iml/products/${id}`)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Zpět
+          </Link>
+          <Link
+            href={listBackHref}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+          >
+            Zpět na výběr
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-6">

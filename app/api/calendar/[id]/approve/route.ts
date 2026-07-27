@@ -9,6 +9,7 @@ import {
 } from "@/lib/calendar-approver-resolution";
 import { dismissNotificationsUpdate } from "@/lib/notifications-dismiss";
 import { formatCalendarEventTitleWithDuration } from "@/app/(dashboard)/calendar/lib/event-types";
+import { userAllowsEmailNotification } from "@/lib/user-email-notifications-db";
 
 /**
  * POST /api/calendar/[id]/approve
@@ -260,7 +261,10 @@ export async function POST(
         }),
       ]);
 
-      if (approver?.email) {
+      if (
+        approver?.email &&
+        (await userAllowsEmailNotification(resolved.userId, "calendar"))
+      ) {
         await sendCalendarApprovalEmail({
           toEmail: approver.email,
           toName: approverName,
