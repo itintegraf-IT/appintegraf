@@ -4,7 +4,10 @@ import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { extractTextFromPdfBuffer } from "@/lib/contracts/extract-text-from-pdf";
-import { getOrderPdfTemplate, ORDER_PDF_TEMPLATES } from "@/lib/iml/order-pdf/registry";
+import {
+  ORDER_PDF_TEMPLATES,
+  resolveOrderPdfTemplate,
+} from "@/lib/iml/order-pdf/registry";
 
 /**
  * Import objednávky IML z PDF.
@@ -31,17 +34,10 @@ type PreviewItem = {
 async function handlePreview(req: NextRequest): Promise<NextResponse> {
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
-  const templateKey = String(formData.get("template") ?? "");
+  const templateKey = String(formData.get("template") ?? "auto");
 
   if (!file?.size) {
     return NextResponse.json({ error: "Žádný soubor" }, { status: 400 });
-  }
-  const template = getOrderPdfTemplate(templateKey);
-  if (!template) {
-    return NextResponse.json(
-      { error: `Neznámá šablona. Dostupné: ${ORDER_PDF_TEMPLATES.map((t) => t.key).join(", ")}` },
-      { status: 400 }
-    );
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
@@ -49,6 +45,16 @@ async function handlePreview(req: NextRequest): Promise<NextResponse> {
   if (!text) {
     return NextResponse.json(
       { error: "Z PDF se nepodařilo vytěžit text (naskenovaný dokument bez textové vrstvy?)" },
+      { status: 400 }
+    );
+  }
+
+  const template = resolveOrderPdfTemplate(templateKey, text);
+  if (!template) {
+    return NextResponse.json(
+      {
+        error: `Nepodařilo se rozpoznat formát PDF. Dostupné šablony: ${ORDER_PDF_TEMPLATES.map((t) => t.label).join(", ")}`,
+      },
       { status: 400 }
     );
   }

@@ -1,4 +1,5 @@
 import type { OrderPdfTemplate, ParsedPdfOrder, ParsedPdfOrderItem } from "./types";
+import { normalizeLines, parseCzDate, parseCzNumber } from "./parse-utils";
 
 /**
  * Parser SAP objednávek Orkla Foods (Purchase Order).
@@ -17,21 +18,6 @@ import type { OrderPdfTemplate, ParsedPdfOrder, ParsedPdfOrderItem } from "./typ
  *   Total Amount  10.375,00
  */
 
-/** České číslo: tečka = tisíce, čárka = desetinná ("4.150,00" → 4150). */
-function parseCzechNumber(raw: string): number | null {
-  const cleaned = raw.trim().replace(/\./g, "").replace(",", ".");
-  if (!cleaned) return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? n : null;
-}
-
-/** "25.03.2026" → "2026-03-25". */
-function parseCzechDate(raw: string): string | null {
-  const m = raw.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
-  if (!m) return null;
-  return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
-}
-
 type ItemDraft = ParsedPdfOrderItem;
 
 function emptyItem(itemNo: string, description: string): ItemDraft {
@@ -49,9 +35,7 @@ function emptyItem(itemNo: string, description: string): ItemDraft {
 }
 
 export function parseOrklaOrderText(text: string): ParsedPdfOrder {
-  const lines = text
-    .split(/\r?\n/)
-    .map((l) => l.replace(/\t/g, " ").replace(/\s+/g, " ").trim());
+  const lines = normalizeLines(text);
 
   let orderNumber = "";
   let orderDate: string | null = null;
@@ -65,7 +49,7 @@ export function parseOrklaOrderText(text: string): ParsedPdfOrder {
     }
     if (!orderDate) {
       const m = line.match(/Order date:\s*(\d{1,2}\.\d{1,2}\.\d{4})/i);
-      if (m) orderDate = parseCzechDate(m[1]);
+      if (m) orderDate = parseCzDate(m[1]);
     }
     if (!currency) {
       const m = line.match(/Currency:\s*([A-Z]{3})\b/);
@@ -73,7 +57,7 @@ export function parseOrklaOrderText(text: string): ParsedPdfOrder {
     }
     if (totalAmount == null && /total amount/i.test(line)) {
       const m = line.replace(/total amount/i, "").match(/([\d.,]+)/);
-      if (m) totalAmount = parseCzechNumber(m[1]);
+      if (m) totalAmount = parseCzNumber(m[1]);
     }
   }
 
@@ -146,9 +130,9 @@ export function parseOrklaOrderText(text: string): ParsedPdfOrder {
       if (current.quantity == null) {
         const qty = line.match(/^([\d.,]+)\s+[A-Za-z]{2,5}\s+([\d.,]+)$/);
         if (qty) {
-          const q = parseCzechNumber(qty[1]);
+          const q = parseCzNumber(qty[1]);
           current.quantity = q != null ? Math.round(q) : null;
-          current.price = parseCzechNumber(qty[2]);
+          current.price = parseCzNumber(qty[2]);
           continue;
         }
         if (/^\d{6,12}$/.test(line) && current.customerMaterialNo == null) {
@@ -163,15 +147,15 @@ export function parseOrklaOrderText(text: string): ParsedPdfOrder {
       } else {
         const basis = line.match(/^Per\s+([\d.,]+)\s+[A-Za-z]{2,5}$/i);
         if (basis) {
-          const b = parseCzechNumber(basis[1]);
+          const b = parseCzNumber(basis[1]);
           if (b != null && b > 0) current.priceBasis = Math.round(b);
           continue;
         }
         if (current.netAmount == null) {
           const net = line.match(/^([\d.,]+)\s+(\d{1,2}\.\d{1,2}\.\d{4})$/);
           if (net) {
-            current.netAmount = parseCzechNumber(net[1]);
-            current.deliveryDate = parseCzechDate(net[2]);
+            current.netAmount = parseCzNumber(net[1]);
+            current.deliveryDate = parseCzDate(net[2]);
             continue;
           }
         }
@@ -207,5 +191,6 @@ export const orklaOrderPdfTemplate: OrderPdfTemplate = {
   key: "orkla",
   label: "Orkla Foods (SAP Purchase Order)",
   customerHint: "Orkla",
+  detect: (text) => /Purchase Order\s+\d+/i.test(text) && /Orkla/i.test(text),
   parse: parseOrklaOrderText,
 };
