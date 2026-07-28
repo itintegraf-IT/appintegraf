@@ -135,9 +135,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, id: created.id, created: 1 });
     }
 
-    const userIds = Array.isArray(body.user_ids)
-      ? [...new Set(body.user_ids.map((id: unknown) => parseInt(String(id), 10)).filter((id: number) => !isNaN(id)))]
-      : [];
+    const userIds: number[] = [];
+    if (Array.isArray(body.user_ids)) {
+      const seen = new Set<number>();
+      for (const raw of body.user_ids) {
+        const id = parseInt(String(raw), 10);
+        if (Number.isFinite(id) && id > 0 && !seen.has(id)) {
+          seen.add(id);
+          userIds.push(id);
+        }
+      }
+    }
 
     if (userIds.length === 0) {
       return NextResponse.json({ error: "Vyberte alespoň jednoho uživatele" }, { status: 400 });
