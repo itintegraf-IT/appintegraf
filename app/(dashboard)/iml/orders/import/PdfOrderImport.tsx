@@ -30,6 +30,7 @@ type PreviewItem = {
 };
 
 type PreviewResponse = {
+  template: string;
   order: {
     orderNumber: string;
     orderDate: string | null;
@@ -64,7 +65,7 @@ function formatCzk(n: number | null): string {
 
 export function PdfOrderImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [templateKey, setTemplateKey] = useState(ORDER_PDF_TEMPLATES[0]?.key ?? "");
+  const [templateKey, setTemplateKey] = useState("auto");
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [loadingPreview, setLoadingPreview] = useState(false);
@@ -268,6 +269,7 @@ export function PdfOrderImport() {
             onChange={(e) => setTemplateKey(e.target.value)}
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
           >
+            <option value="auto">Automaticky (rozpoznat z PDF)</option>
             {ORDER_PDF_TEMPLATES.map((t) => (
               <option key={t.key} value={t.key}>
                 {t.label}
@@ -345,7 +347,17 @@ export function PdfOrderImport() {
       {preview && (
         <>
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-            <h3 className="mb-4 text-sm font-semibold text-gray-700">Hlavička objednávky</h3>
+            <h3 className="mb-4 text-sm font-semibold text-gray-700">
+              Hlavička objednávky
+              {preview.template && (
+                <span className="ml-2 font-normal text-gray-500">
+                  (šablona:{" "}
+                  {ORDER_PDF_TEMPLATES.find((t) => t.key === preview.template)?.label ??
+                    preview.template}
+                  )
+                </span>
+              )}
+            </h3>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="mb-1 block text-sm font-medium text-gray-700">Zákazník *</label>

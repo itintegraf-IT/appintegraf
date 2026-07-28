@@ -37,5 +37,7 @@ export type OrderPdfTemplate = {
   label: string;
   /** Podřetězec pro návrh zákazníka podle iml_customers.name. */
   customerHint: string;
+  /** Rozpozná, zda text PDF odpovídá této šabloně (pro automatickou volbu). */
+  detect: (text: string) => boolean;
   parse: (text: string) => ParsedPdfOrder;
 };
