@@ -3,6 +3,29 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 
+/** Seznam testů pro administraci (včetně neaktivních, s počty otázek/pokusů/přiřazení). */
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
+  }
+
+  const userId = parseInt(session.user.id, 10);
+  if (!(await hasModuleAccess(userId, "training", "write"))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
+  }
+
+  const tests = await prisma.tests.findMany({
+    include: {
+      users: { select: { first_name: true, last_name: true } },
+      _count: { select: { test_questions: true, test_attempts: true, test_assignments: true } },
+    },
+    orderBy: [{ is_active: "desc" }, { name: "asc" }],
+  });
+
+  return NextResponse.json({ tests });
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {

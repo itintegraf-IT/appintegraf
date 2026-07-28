@@ -760,6 +760,8 @@ model questions {
   option_c            String?                  @db.Text
   option_d            String?                  @db.Text
   correct_answer      questions_correct_answer
+  /// Setříděný seznam správných odpovědí oddělený čárkou (např. "A,B"); má přednost před correct_answer
+  correct_answers     String?                  @db.VarChar(20)
   explanation         String?                  @db.Text
   source              String?                  @db.VarChar(200)
   is_active           Boolean?                 @default(true)
@@ -829,6 +831,8 @@ model test_answers {
   attempt_id    Int
   question_id   Int
   user_answer   test_answers_user_answer?
+  /// Seznam odpovědí uživatele oddělený čárkou (pro otázky s více správnými odpověďmi)
+  user_answers  String?                   @db.VarChar(20)
   is_correct    Boolean?
   answered_at   DateTime                  @default(now()) @db.Timestamp(0)
   test_attempts test_attempts             @relation(fields: [attempt_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_answers_ibfk_1")
@@ -842,22 +846,31 @@ model test_answers {
 model test_assignments {
   id            Int             @id @default(autoincrement())
   test_id       Int
-  group_id      Int
+  /// Skupina – vyplněno u přiřazení skupině (group_id XOR user_id)
+  group_id      Int?
+  /// Konkrétní uživatel – vyplněno u individuálního přiřazení
+  user_id       Int?
   assigned_by   Int
   start_date    DateTime?       @db.DateTime(0)
   end_date      DateTime?       @db.DateTime(0)
   max_attempts  Int?            @default(3)
   is_active     Boolean?        @default(true)
+  /// Odeslat in-app notifikaci při vytvoření přiřazení
+  notify_on_assign Boolean        @default(true)
+  /// Kolik dní před koncem termínu (end_date) poslat připomínku; null = bez připomínky
+  remind_days_before Int?
   created_at    DateTime        @default(now()) @db.Timestamp(0)
   tests         tests           @relation(fields: [test_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_assignments_ibfk_1")
-  user_groups   user_groups     @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_assignments_ibfk_2")
+  user_groups   user_groups?    @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_assignments_ibfk_2")
   users         users           @relation(fields: [assigned_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_assignments_ibfk_3")
+  target_user   users?          @relation("test_assignments_target_user", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_assignments_ibfk_user")
   test_attempts test_attempts[]
 
   @@index([assigned_by], map: "assigned_by")
   @@index([is_active], map: "idx_active")
   @@index([start_date, end_date], map: "idx_dates")
   @@index([group_id], map: "idx_group")
+  @@index([user_id], map: "idx_user")
   @@index([test_id], map: "idx_test")
 }
 
@@ -1056,6 +1069,7 @@ model users {
   question_imports                                               question_imports[]
   system_settings                                                system_settings[]
   test_assignments                                               test_assignments[]
+  test_assignments_target                                        test_assignments[]            @relation("test_assignments_target_user")
   test_attempts                                                  test_attempts[]
   tests                                                          tests[]
   user_deputies_user_deputies_user_idTousers                     user_deputies[]               @relation("user_deputies_user_idTousers")
