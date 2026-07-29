@@ -9,7 +9,7 @@ import {
   type MaterialNavItem,
 } from "@/lib/training/material-nav";
 import { materialTypeLabel, parseMaterialType } from "@/lib/training/material-types";
-import type { MaterialFileMeta } from "@/lib/training/material-api";
+import type { MaterialFileMeta } from "@/lib/training/material-shared";
 import { MaterialMediaContent } from "./MaterialMediaContent";
 
 type Category = { id: number; name: string; color: string | null };
