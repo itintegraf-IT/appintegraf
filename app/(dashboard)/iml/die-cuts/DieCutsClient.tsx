@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Plus, Search, Upload } from "lucide-react";
+import { ArrowLeft, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import { DIE_CUT_MATERIALS } from "@/lib/iml/die-cut-constants";
 
 type CustomerOpt = { id: number; name: string };
@@ -87,6 +87,12 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,6 +105,7 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
       setRows(data.die_cuts ?? []);
     }
     setLoading(false);
+    setCheckedIds(new Set());
   }, [q, includeInactive]);
 
   useEffect(() => {
@@ -215,6 +222,68 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
     if (res.ok) void load();
   };
 
+  const permanentDelete = async (row: DieCutRow) => {
+    if (!confirm(`Trvale smazat výsek „${row.label_shape_code}“? Tuto akci nelze vrátit.`)) return;
+    setNotice("");
+    const res = await fetch(`/api/iml/die-cuts/${row.id}?permanent=1`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) { alert(data.error ?? "Chyba při mazání"); return; }
+    setNotice(`Výsek „${row.label_shape_code}“ smazán.`);
+    void load();
+  };
+
+  const inactiveRows = useMemo(() => rows.filter((r) => !r.is_active), [rows]);
+
+  const checkedInactiveIds = useMemo(
+    () => [...checkedIds].filter((id) => inactiveRows.some((r) => r.id === id)),
+    [inactiveRows, checkedIds]
+  );
+
+  const toggleChecked = (id: number) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleCheckAllInactive = () => {
+    setCheckedIds((prev) => {
+      const ids = inactiveRows.map((r) => r.id);
+      const allChecked = ids.every((id) => prev.has(id));
+      if (allChecked) {
+        const next = new Set(prev);
+        for (const id of ids) next.delete(id);
+        return next;
+      }
+      return new Set([...prev, ...ids]);
+    });
+  };
+
+  const bulkDelete = async () => {
+    const ids = checkedInactiveIds;
+    if (ids.length === 0) return;
+    if (!confirm(`Trvale smazat ${ids.length} deaktivovaných výseků? Tuto akci nelze vrátit.`)) return;
+    setBulkDeleting(true);
+    setNotice("");
+    try {
+      const res = await fetch("/api/iml/die-cuts/bulk-delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? "Chyba při hromadném mazání");
+      setNotice(`Smazáno ${data.deleted} výseků.`);
+      void load();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Chyba při hromadném mazání");
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -255,6 +324,38 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
         </div>
       </div>
 
+      {notice && (
+        <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">{notice}</div>
+      )}
+
+      {canWrite && includeInactive && inactiveRows.length > 0 && (
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-4 py-2.5">
+          <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={inactiveRows.length > 0 && inactiveRows.every((r) => checkedIds.has(r.id))}
+              onChange={toggleCheckAllInactive}
+              className="h-4 w-4"
+            />
+            Vybrat všechny neaktivní
+            {checkedInactiveIds.length > 0 && (
+              <span className="text-gray-500">({checkedInactiveIds.length} vybráno)</span>
+            )}
+          </label>
+          {checkedInactiveIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => void bulkDelete()}
+              disabled={bulkDeleting}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              {bulkDeleting ? "Mažu…" : `Smazat vybrané (${checkedInactiveIds.length})`}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="relative min-w-[220px] flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -280,6 +381,7 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
+              {canWrite && includeInactive && <th className="w-8 px-3 py-2"></th>}
               <th className="px-3 py-2 text-left font-semibold text-gray-700">Kód tvaru</th>
               <th className="px-3 py-2 text-left font-semibold text-gray-700">Interní název</th>
               <th className="px-3 py-2 text-left font-semibold text-gray-700">Nástroj</th>
@@ -312,6 +414,18 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
                   key={row.id}
                   className={`border-b border-gray-100 ${row.is_active ? "" : "bg-gray-50 text-gray-500"}`}
                 >
+                  {canWrite && includeInactive && (
+                  <td className="px-3 py-2">
+                    {!row.is_active && (
+                      <input
+                        type="checkbox"
+                        checked={checkedIds.has(row.id)}
+                        onChange={() => toggleChecked(row.id)}
+                        className="h-4 w-4"
+                      />
+                    )}
+                  </td>
+                )}
                   <td className="px-3 py-2 font-mono font-medium">{row.label_shape_code}</td>
                   <td className="px-3 py-2">{row.internal_name ?? "—"}</td>
                   <td className="px-3 py-2">{row.die_cut_tool_code ?? "—"}</td>

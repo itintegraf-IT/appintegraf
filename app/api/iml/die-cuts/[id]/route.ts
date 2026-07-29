@@ -133,11 +133,41 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const id = parseInt((await params).id, 10);
   if (Number.isNaN(id)) return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
 
+  const url = new URL(_req.url);
+  const permanent = url.searchParams.get("permanent") === "1";
+
   const existing = await prisma.iml_die_cuts.findUnique({
     where: { id },
     include: { _count: { select: { iml_products: true } } },
   });
   if (!existing) return NextResponse.json({ error: "Výsek nenalezen" }, { status: 404 });
+
+  if (permanent) {
+    if (existing.is_active) {
+      return NextResponse.json(
+        { error: "Aktivní výsek nelze trvale smazat – nejdříve ho deaktivujte." },
+        { status: 400 }
+      );
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.iml_products.updateMany({
+        where: { die_cut_id: id },
+        data: { die_cut_id: null },
+      });
+      await tx.iml_die_cuts.delete({ where: { id } });
+    });
+
+    await logImlAudit({
+      userId,
+      action: "permanent_delete",
+      tableName: "iml_die_cuts",
+      recordId: id,
+      oldValues: existing as unknown as Record<string, unknown>,
+    });
+
+    return NextResponse.json({ success: true, deleted: true });
+  }
 
   // Soft-delete — produkty zůstávají navázané, ale výsek zmizí z výběru
   const row = await prisma.iml_die_cuts.update({
