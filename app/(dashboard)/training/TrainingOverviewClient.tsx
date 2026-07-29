@@ -8,7 +8,14 @@ import {
   ClipboardList,
   CheckCircle,
   CalendarClock,
+  Video,
+  Presentation,
 } from "lucide-react";
+import {
+  type MaterialType,
+  materialTypeLabel,
+  parseMaterialType,
+} from "@/lib/training/material-types";
 
 type Category = { id: number; name: string; color: string | null };
 
@@ -17,8 +24,11 @@ type Material = {
   title: string;
   source: string | null;
   category_id: number | null;
+  material_type: string;
   question_categories: Category | null;
 };
+
+type MaterialTypeFilter = "all" | MaterialType;
 
 type VisibleTest = {
   id: number;
@@ -49,6 +59,24 @@ function tabClass(active: boolean) {
   }`;
 }
 
+function TypeBadge({ type }: { type: MaterialType }) {
+  const label = materialTypeLabel(type);
+  const Icon = type === "video" ? Video : type === "presentation" ? Presentation : FileText;
+  const colors =
+    type === "video"
+      ? "bg-purple-100 text-purple-800"
+      : type === "presentation"
+        ? "bg-blue-100 text-blue-800"
+        : "bg-gray-100 text-gray-700";
+
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${colors}`}>
+      <Icon className="h-3 w-3" />
+      {label}
+    </span>
+  );
+}
+
 export function TrainingOverviewClient({
   materials,
   categories,
@@ -64,6 +92,7 @@ export function TrainingOverviewClient({
   const searchParams = useSearchParams();
   const tab: Tab = searchParams.get("tab") === "tests" ? "tests" : "materials";
   const [categoryId, setCategoryId] = useState<number | "all">("all");
+  const [typeFilter, setTypeFilter] = useState<MaterialTypeFilter>("all");
 
   const setTabWithUrl = useCallback(
     (next: Tab) => {
@@ -75,9 +104,12 @@ export function TrainingOverviewClient({
   );
 
   const filteredMaterials = useMemo(() => {
-    if (categoryId === "all") return materials;
-    return materials.filter((m) => m.category_id === categoryId);
-  }, [materials, categoryId]);
+    return materials.filter((m) => {
+      if (categoryId !== "all" && m.category_id !== categoryId) return false;
+      if (typeFilter !== "all" && parseMaterialType(m.material_type) !== typeFilter) return false;
+      return true;
+    });
+  }, [materials, categoryId, typeFilter]);
 
   const materialLink = (id: number) => {
     const params = new URLSearchParams();
@@ -122,36 +154,54 @@ export function TrainingOverviewClient({
       <div className="rounded-b-xl rounded-tr-xl border border-gray-200 bg-white shadow-sm">
         {tab === "materials" ? (
           <>
-            {categories.length > 0 && (
-              <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-4 py-3">
-                <label htmlFor="material-category" className="text-sm font-medium text-gray-700">
-                  Okruh:
-                </label>
-                <select
-                  id="material-category"
-                  value={categoryId}
-                  onChange={(e) =>
-                    setCategoryId(e.target.value === "all" ? "all" : parseInt(e.target.value, 10))
-                  }
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-                >
-                  <option value="all">Všechny okruhy</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-                <span className="text-sm text-gray-500">
-                  {filteredMaterials.length}{" "}
-                  {filteredMaterials.length === 1 ? "materiál" : "materiálů"}
-                </span>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-4 py-3">
+              {categories.length > 0 && (
+                <>
+                  <label htmlFor="material-category" className="text-sm font-medium text-gray-700">
+                    Okruh:
+                  </label>
+                  <select
+                    id="material-category"
+                    value={categoryId}
+                    onChange={(e) =>
+                      setCategoryId(e.target.value === "all" ? "all" : parseInt(e.target.value, 10))
+                    }
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                  >
+                    <option value="all">Všechny okruhy</option>
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              )}
+              <label htmlFor="material-type" className="text-sm font-medium text-gray-700">
+                Typ:
+              </label>
+              <select
+                id="material-type"
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value as MaterialTypeFilter)}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+              >
+                <option value="all">Vše</option>
+                <option value="text">Text</option>
+                <option value="video">Video</option>
+                <option value="presentation">Prezentace</option>
+              </select>
+              <span className="text-sm text-gray-500">
+                {filteredMaterials.length}{" "}
+                {filteredMaterials.length === 1 ? "materiál" : "materiálů"}
+              </span>
+            </div>
             <div className="divide-y divide-gray-100">
               {filteredMaterials.length === 0 ? (
                 <div className="px-4 py-12 text-center text-gray-500">
-                  {categoryId === "all" ? "Žádné materiály" : "V tomto okruhu nejsou žádné materiály"}
+                  {categoryId === "all" && typeFilter === "all"
+                    ? "Žádné materiály"
+                    : "Pro zvolené filtry nejsou žádné materiály"}
                 </div>
               ) : (
                 filteredMaterials.map((m) => (
@@ -160,6 +210,7 @@ export function TrainingOverviewClient({
                       <div className="min-w-0">
                         <p className="font-medium text-gray-900">{m.title}</p>
                         <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                          <TypeBadge type={parseMaterialType(m.material_type)} />
                           {m.question_categories && (
                             <span
                               className="inline-block rounded-full px-2 py-0.5 text-xs font-medium text-white"

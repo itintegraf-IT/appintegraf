@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { prisma } from "@/lib/db";
 import { type MaterialNavItem } from "@/lib/training/material-nav";
+import { getMaterialFile } from "@/lib/training/material-api";
 import { MaterialReader } from "./MaterialReader";
 
 export default async function MaterialPage({
@@ -19,7 +20,7 @@ export default async function MaterialPage({
   const initialCategoryId =
     categoryParam !== null && !isNaN(categoryParam) ? categoryParam : null;
 
-  const [material, allRows, categories] = await Promise.all([
+  const [material, allRows, categories, file] = await Promise.all([
     prisma.learning_materials.findUnique({
       where: { id },
       include: { question_categories: true },
@@ -33,6 +34,7 @@ export default async function MaterialPage({
       orderBy: { name: "asc" },
       select: { id: true, name: true, color: true },
     }),
+    getMaterialFile(id),
   ]);
 
   if (!material) notFound();
@@ -48,6 +50,7 @@ export default async function MaterialPage({
     <Suspense fallback={<div className="text-gray-500">Načítání materiálu…</div>}>
       <MaterialReader
         material={material}
+        file={file}
         allMaterials={allMaterials}
         categories={categories}
         initialCategoryId={initialCategoryId}
