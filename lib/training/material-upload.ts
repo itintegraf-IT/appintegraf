@@ -9,11 +9,19 @@ export const TRAINING_MATERIAL_UPLOAD_MODULE = "training_materials";
 export const TRAINING_VIDEO_MAX_BYTES = 200 * 1024 * 1024;
 export const TRAINING_PRESENTATION_MAX_BYTES = 50 * 1024 * 1024;
 
-export const TRAINING_VIDEO_MIME = new Set(["video/mp4", "video/webm"]);
+export const TRAINING_VIDEO_MIME = new Set(["video/mp4", "video/webm", "video/quicktime"]);
 export const TRAINING_PRESENTATION_MIME = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 ]);
+
+const EXTENSION_MIME: Record<string, string> = {
+  ".mp4": "video/mp4",
+  ".webm": "video/webm",
+  ".mov": "video/quicktime",
+  ".pdf": "application/pdf",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+};
 
 export const TRAINING_MATERIAL_UPLOAD_DIR = path.join(
   process.cwd(),
@@ -33,6 +41,27 @@ export function trainingMaterialUploadDiskPath(safeName: string): string {
 export function diskPathFromWebPath(webPath: string): string {
   const normalized = webPath.replace(/^\//, "");
   return path.join(process.cwd(), "public", normalized);
+}
+
+/** Odhad MIME z přípony, pokud prohlížeč nepošle typ (běžné u Windows). */
+export function inferUploadMime(fileName: string, reportedMime: string): string {
+  const reported = reportedMime.trim();
+  if (reported && reported !== "application/octet-stream") {
+    return reported;
+  }
+  const ext = path.extname(fileName).toLowerCase();
+  return EXTENSION_MIME[ext] ?? (reported || "application/octet-stream");
+}
+
+export function isAllowedUploadMime(materialType: MaterialType, mime: string, fileName: string): boolean {
+  const resolved = inferUploadMime(fileName, mime);
+  return allowedMimeForMaterialType(materialType).has(resolved);
+}
+
+export function contentDisposition(filename: string, inline: boolean): string {
+  const safe = filename.replace(/[^\w.\- ()ěščřžýáíéúůďťňĚŠČŘŽÝÁÍÉÚŮĎŤŇ]+/gi, "_");
+  const type = inline ? "inline" : "attachment";
+  return `${type}; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
 export function maxBytesForMaterialType(type: MaterialType): number {

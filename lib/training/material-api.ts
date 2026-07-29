@@ -8,7 +8,12 @@ export type MaterialFileMeta = {
   file_path: string;
   mime_type: string;
   file_size: number;
+  serve_url: string;
 };
+
+export function getMaterialFileServeUrl(materialId: number): string {
+  return `/api/training/materials/${materialId}/file`;
+}
 
 export async function getMaterialFiles(
   materialIds: number[]
@@ -40,6 +45,7 @@ export async function getMaterialFiles(
         file_path: row.file_path,
         mime_type: row.mime_type,
         file_size: row.file_size,
+        serve_url: getMaterialFileServeUrl(row.record_id),
       });
     }
   }

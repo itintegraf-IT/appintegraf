@@ -4,16 +4,18 @@ import Link from "next/link";
 import { Download, ExternalLink } from "lucide-react";
 import { parseMaterialType } from "@/lib/training/material-types";
 import type { MaterialFileMeta } from "@/lib/training/material-api";
+import { getMaterialFileServeUrl } from "@/lib/training/material-api";
 import { resolveVideoEmbed } from "@/lib/training/video-embed";
 
 type Props = {
+  materialId: number;
   materialType: string;
   content: string;
   mediaUrl: string | null;
   file: MaterialFileMeta | null;
 };
 
-export function MaterialMediaContent({ materialType, content, mediaUrl, file }: Props) {
+export function MaterialMediaContent({ materialId, materialType, content, mediaUrl, file }: Props) {
   const type = parseMaterialType(materialType);
 
   return (
@@ -29,26 +31,30 @@ export function MaterialMediaContent({ materialType, content, mediaUrl, file }: 
       )}
 
       {type === "video" && (
-        <VideoContent mediaUrl={mediaUrl} file={file} />
+        <VideoContent materialId={materialId} mediaUrl={mediaUrl} file={file} />
       )}
 
       {type === "presentation" && (
-        <PresentationContent file={file} />
+        <PresentationContent materialId={materialId} file={file} />
       )}
     </>
   );
 }
 
 function VideoContent({
+  materialId,
   mediaUrl,
   file,
 }: {
+  materialId: number;
   mediaUrl: string | null;
   file: MaterialFileMeta | null;
 }) {
   if (file) {
+    const src = file.serve_url || getMaterialFileServeUrl(materialId);
     return (
-      <video controls className="w-full rounded-lg bg-black" src={file.file_path}>
+      <video controls className="w-full rounded-lg bg-black" preload="metadata">
+        <source src={src} type={file.mime_type || "video/mp4"} />
         Váš prohlížeč nepodporuje přehrávání videa.
       </video>
     );
@@ -94,17 +100,24 @@ function VideoContent({
   return <p className="text-gray-500">Video není k dispozici.</p>;
 }
 
-function PresentationContent({ file }: { file: MaterialFileMeta | null }) {
+function PresentationContent({
+  materialId,
+  file,
+}: {
+  materialId: number;
+  file: MaterialFileMeta | null;
+}) {
   if (!file) {
     return <p className="text-gray-500">Prezentace není k dispozici.</p>;
   }
 
+  const src = file.serve_url || getMaterialFileServeUrl(materialId);
   const isPdf = file.mime_type === "application/pdf" || file.file_path.toLowerCase().endsWith(".pdf");
 
   if (isPdf) {
     return (
       <iframe
-        src={file.file_path}
+        src={src}
         title={file.original_filename}
         className="h-[70vh] w-full rounded-lg border border-gray-200"
       />
@@ -117,7 +130,7 @@ function PresentationContent({ file }: { file: MaterialFileMeta | null }) {
         Prezentace <strong>{file.original_filename}</strong> je k dispozici ke stažení.
       </p>
       <Link
-        href={file.file_path}
+        href={src}
         download={file.original_filename}
         className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
       >
