@@ -101,7 +101,7 @@ export async function GET(
   function nodeStreamToWeb(nodeStream: ReturnType<typeof createReadStream>): ReadableStream<Uint8Array> {
     return new ReadableStream({
       start(controller) {
-        nodeStream.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+        nodeStream.on("data", (chunk: string | Buffer) => controller.enqueue(new Uint8Array(typeof chunk === "string" ? Buffer.from(chunk) : chunk)));
         nodeStream.on("end", () => controller.close());
         nodeStream.on("error", (err) => controller.error(err));
       },
