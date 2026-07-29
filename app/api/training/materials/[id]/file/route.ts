@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createReadStream } from "fs";
 import { mkdir, open, readFile, stat, writeFile } from "fs/promises";
 import path from "path";
 import { auth } from "@/auth";
@@ -90,12 +91,32 @@ export async function GET(
   const materialType = parseMaterialType(material.material_type);
   const inline = materialType === "video" || mime === "application/pdf";
 
+  const headers: Record<string, string> = {
+    "Content-Type": mime,
+    "Accept-Ranges": "bytes",
+    "Content-Disposition": contentDisposition(fileRow.original_filename, inline),
+    "Cache-Control": "private, no-store",
+  };
+
+  function nodeStreamToWeb(nodeStream: ReturnType<typeof createReadStream>): ReadableStream<Uint8Array> {
+    return new ReadableStream({
+      start(controller) {
+        nodeStream.on("data", (chunk: Buffer) => controller.enqueue(new Uint8Array(chunk)));
+        nodeStream.on("end", () => controller.close());
+        nodeStream.on("error", (err) => controller.error(err));
+      },
+      cancel() {
+        nodeStream.destroy();
+      },
+    });
+  }
+
   const range = req.headers.get("range");
   if (range) {
     const match = /^bytes=(\d+)-(\d*)$/.exec(range);
     if (match) {
       const start = parseInt(match[1], 10);
-      const end = match[2] ? parseInt(match[2], 10) : size - 1;
+      const end = match[2] ? parseInt(match[2], 10) : Math.min(start + 2 * 1024 * 1024 - 1, size - 1);
       if (start >= size || end >= size || start > end) {
         return new NextResponse(null, {
           status: 416,
@@ -103,34 +124,21 @@ export async function GET(
         });
       }
       const length = end - start + 1;
-      const handle = await open(diskPath, "r");
-      const buffer = Buffer.alloc(length);
-      await handle.read(buffer, 0, length, start);
-      await handle.close();
-      return new NextResponse(buffer, {
+      const body = nodeStreamToWeb(createReadStream(diskPath, { start, end }));
+      return new NextResponse(body, {
         status: 206,
         headers: {
-          "Content-Type": mime,
+          ...headers,
           "Content-Length": String(length),
           "Content-Range": `bytes ${start}-${end}/${size}`,
-          "Accept-Ranges": "bytes",
-          "Content-Disposition": contentDisposition(fileRow.original_filename, inline),
-          "Cache-Control": "private, no-store",
         },
       });
     }
   }
 
-  const buf = await readFile(diskPath);
-
-  return new NextResponse(new Uint8Array(buf), {
-    headers: {
-      "Content-Type": mime,
-      "Content-Length": String(size),
-      "Accept-Ranges": "bytes",
-      "Content-Disposition": contentDisposition(fileRow.original_filename, inline),
-      "Cache-Control": "private, no-store",
-    },
+  const body = nodeStreamToWeb(createReadStream(diskPath));
+  return new NextResponse(body, {
+    headers: { ...headers, "Content-Length": String(size) },
   });
 }
 
