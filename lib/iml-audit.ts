@@ -3,7 +3,7 @@ import { headers } from "next/headers";
 
 const IML_MODULE = "iml";
 
-type AuditAction = "create" | "update" | "delete";
+type AuditAction = "create" | "update" | "delete" | "permanent_delete";
 
 /**
  * Zaloguje akci modulu IML do globálního audit_log.
