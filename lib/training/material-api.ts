@@ -60,6 +60,13 @@ export type MaterialPayload = {
   media_url?: string | null;
 };
 
+export function normalizeMediaUrl(raw: unknown): string | null | undefined {
+  if (raw === undefined) return undefined;
+  if (raw === null) return null;
+  const trimmed = String(raw).trim();
+  return trimmed || null;
+}
+
 export function validateMaterialPayload(
   payload: MaterialPayload,
   options: { isCreate: boolean; hasFile?: boolean }
@@ -67,10 +74,7 @@ export function validateMaterialPayload(
   const title = payload.title !== undefined ? String(payload.title).trim() : undefined;
   const content = payload.content !== undefined ? String(payload.content).trim() : undefined;
   const materialType = payload.material_type ?? "text";
-  const mediaUrl =
-    payload.media_url !== undefined
-      ? String(payload.media_url).trim() || null
-      : undefined;
+  const mediaUrl = normalizeMediaUrl(payload.media_url);
 
   if (options.isCreate) {
     if (!title) return { ok: false, error: "Vyplňte název materiálu" };
@@ -90,7 +94,7 @@ export function validateMaterialPayload(
 
   if (materialType === "video" && options.isCreate) {
     if (!mediaUrl && !options.hasFile) {
-      return { ok: false, error: "U videa zadejte URL nebo nahrajte soubor" };
+      return { ok: false, error: "U videa nahrajte soubor nebo volitelně zadejte externí URL" };
     }
   }
 
@@ -100,6 +104,9 @@ export function validateMaterialPayload(
     }
   }
 
+  if (materialType === "video" && !options.isCreate && !mediaUrl && !options.hasFile) {
+    return { ok: false, error: "U videa nahrajte soubor nebo volitelně zadejte externí URL" };
+  }
   if (mediaUrl && materialType === "video") {
     try {
       new URL(mediaUrl);

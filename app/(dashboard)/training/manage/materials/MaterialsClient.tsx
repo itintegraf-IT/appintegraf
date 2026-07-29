@@ -166,7 +166,7 @@ export function MaterialsClient() {
     const hasFile = Boolean(selectedFile || existingFile);
 
     if (type === "video" && !form.media_url.trim() && !hasFile) {
-      setError("U videa zadejte URL nebo nahrajte soubor");
+      setError("U videa nahrajte soubor (URL je volitelná)");
       setSaving(false);
       return;
     }
@@ -490,25 +490,7 @@ export function MaterialsClient() {
               {showVideoFields && (
                 <div>
                   <label className="mb-1 block text-sm font-medium text-gray-700">
-                    URL videa (YouTube, Vimeo…)
-                  </label>
-                  <input
-                    type="url"
-                    value={form.media_url}
-                    onChange={(e) => setForm((f) => ({ ...f, media_url: e.target.value }))}
-                    placeholder="https://www.youtube.com/watch?v=…"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">
-                    Volitelné, pokud nahrajete soubor. Stačí jedno z obou.
-                  </p>
-                </div>
-              )}
-
-              {(showVideoFields || showPresentationFields) && (
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {showVideoFields ? "Soubor videa (MP4, WebM)" : "Soubor prezentace (PDF, PPTX)"}
+                    Soubor videa (MP4, WebM)
                   </label>
                   {(existingFile || selectedFile) && (
                     <div className="mb-2 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
@@ -526,9 +508,53 @@ export function MaterialsClient() {
                   )}
                   <input
                     type="file"
-                    accept={
-                      showVideoFields ? "video/mp4,video/webm,.mp4,.webm" : ".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                    }
+                    accept="video/mp4,video/webm,.mp4,.webm"
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
+                    className="w-full text-sm"
+                  />
+                </div>
+              )}
+
+              {showVideoFields && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Externí URL videa (volitelné)
+                  </label>
+                  <input
+                    type="url"
+                    value={form.media_url}
+                    onChange={(e) => setForm((f) => ({ ...f, media_url: e.target.value }))}
+                    placeholder="https://www.youtube.com/watch?v=…"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Použijte jen pokud video není nahrané v aplikaci. Při nahraném souboru má přednost soubor.
+                  </p>
+                </div>
+              )}
+
+              {showPresentationFields && (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-gray-700">
+                    Soubor prezentace (PDF, PPTX) *
+                  </label>
+                  {(existingFile || selectedFile) && (
+                    <div className="mb-2 flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm">
+                      <span className="truncate">
+                        {selectedFile?.name ?? existingFile?.original_filename}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={removeExistingFile}
+                        className="ml-2 shrink-0 text-red-600 hover:underline"
+                      >
+                        Odebrat
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation"
                     onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
                     className="w-full text-sm"
                   />
