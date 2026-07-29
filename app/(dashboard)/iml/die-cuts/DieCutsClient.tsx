@@ -90,9 +90,6 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [notice, setNotice] = useState("");
-  const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
-  const [bulkDeleting, setBulkDeleting] = useState(false);
-  const [notice, setNotice] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
