@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, FileText, Video, Presentation } from "lucide-react";
 import {
   filterMaterialsByCategory,
   getMaterialNavPosition,
   type MaterialNavItem,
 } from "@/lib/training/material-nav";
+import { materialTypeLabel, parseMaterialType } from "@/lib/training/material-types";
+import type { MaterialFileMeta } from "@/lib/training/material-api";
+import { MaterialMediaContent } from "./MaterialMediaContent";
 
 type Category = { id: number; name: string; color: string | null };
 
@@ -18,8 +21,11 @@ type Props = {
     content: string;
     source: string | null;
     category_id: number | null;
+    material_type: string;
+    media_url: string | null;
     question_categories: Category | null;
   };
+  file: MaterialFileMeta | null;
   allMaterials: MaterialNavItem[];
   categories: Category[];
   initialCategoryId: number | null;
@@ -30,14 +36,26 @@ function materialUrl(id: number, categoryId: number | null) {
   return `/training/material/${id}?category=${categoryId}`;
 }
 
+function TypeLabel({ type }: { type: ReturnType<typeof parseMaterialType> }) {
+  const Icon = type === "video" ? Video : type === "presentation" ? Presentation : FileText;
+  return (
+    <span className="inline-flex items-center gap-1 text-sm text-gray-500">
+      <Icon className="h-4 w-4" />
+      {materialTypeLabel(type)}
+    </span>
+  );
+}
+
 export function MaterialReader({
   material,
+  file,
   allMaterials,
   categories,
   initialCategoryId,
 }: Props) {
   const router = useRouter();
   const categoryId = initialCategoryId;
+  const materialType = parseMaterialType(material.material_type);
 
   const filtered = filterMaterialsByCategory(allMaterials, categoryId);
   const nav = getMaterialNavPosition(filtered, material.id);
@@ -60,7 +78,7 @@ export function MaterialReader({
         <div className="min-w-0 flex-1">
           <h1 className="text-2xl font-bold text-gray-900">{material.title}</h1>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <p className="text-gray-600">Materiál ke školení</p>
+            <TypeLabel type={materialType} />
             {material.question_categories && (
               <span
                 className="inline-block rounded-full px-2.5 py-0.5 text-xs font-medium text-white"
@@ -136,9 +154,12 @@ export function MaterialReader({
         {material.source && (
           <p className="mb-4 text-sm text-gray-500">Zdroj: {material.source}</p>
         )}
-        <div className="prose max-w-none">
-          <div className="whitespace-pre-wrap text-gray-700">{material.content}</div>
-        </div>
+        <MaterialMediaContent
+          materialType={material.material_type}
+          content={material.content}
+          mediaUrl={material.media_url}
+          file={file}
+        />
       </div>
 
       {(nav.prevId !== null || nav.nextId !== null) && (

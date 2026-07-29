@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
+import { deleteMaterialUploads } from "@/lib/training/material-upload";
 
 /** Hromadné smazání výukových materiálů. */
 export async function POST(req: NextRequest) {
@@ -29,6 +30,10 @@ export async function POST(req: NextRequest) {
 
     if (ids.length === 0) {
       return NextResponse.json({ error: "Nebyly vybrány žádné materiály" }, { status: 400 });
+    }
+
+    for (const id of ids) {
+      await deleteMaterialUploads(id);
     }
 
     const result = await prisma.learning_materials.deleteMany({

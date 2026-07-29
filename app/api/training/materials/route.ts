@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
+import {
+  getMaterialFiles,
+  serializeMaterial,
+  validateMaterialPayload,
+} from "@/lib/training/material-api";
+import { parseMaterialType } from "@/lib/training/material-types";
 
 export async function GET() {
   const session = await auth();
@@ -19,7 +25,11 @@ export async function GET() {
     orderBy: { title: "asc" },
   });
 
-  return NextResponse.json({ materials });
+  const fileMap = await getMaterialFiles(materials.map((m) => m.id));
+
+  return NextResponse.json({
+    materials: materials.map((m) => serializeMaterial(m, fileMap.get(m.id) ?? null)),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -35,21 +45,37 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const title = String(body.title ?? "").trim();
-    const content = String(body.content ?? "").trim();
+    const materialType = parseMaterialType(body.material_type);
+    const hasFile = Boolean(body.has_file);
 
-    if (!title || !content) {
-      return NextResponse.json({ error: "Vyplňte název a obsah materiálu" }, { status: 400 });
+    const validated = validateMaterialPayload(
+      {
+        title: body.title,
+        content: body.content,
+        source: body.source,
+        category_id: body.category_id != null ? parseInt(String(body.category_id), 10) : null,
+        material_type: materialType,
+        media_url: body.media_url,
+      },
+      { isCreate: true, hasFile }
+    );
+
+    if (!validated.ok) {
+      return NextResponse.json({ error: validated.error }, { status: 400 });
     }
 
-    const categoryId = parseInt(String(body.category_id), 10);
-
+    const categoryId = validated.data.category_id;
     const created = await prisma.learning_materials.create({
       data: {
-        title,
-        content,
-        category_id: isNaN(categoryId) ? null : categoryId,
-        source: String(body.source ?? "").trim() || null,
+        title: validated.data.title!,
+        content: validated.data.content ?? "",
+        material_type: materialType,
+        media_url: materialType === "video" ? validated.data.media_url ?? null : null,
+        category_id: categoryId != null && !isNaN(categoryId) ? categoryId : null,
+        source:
+          validated.data.source !== undefined
+            ? String(validated.data.source).trim() || null
+            : null,
       },
     });
 
