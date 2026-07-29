@@ -86,7 +86,7 @@ export async function GET(
   }
 
   const size = fileStat.size;
-  const mime = fileRow.mime_type || "application/octet-stream";
+  const mime = inferUploadMime(fileRow.original_filename, fileRow.mime_type || "");
   const materialType = parseMaterialType(material.material_type);
   const inline = materialType === "video" || mime === "application/pdf";
 
