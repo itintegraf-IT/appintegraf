@@ -53,8 +53,7 @@ function VideoContent({
   if (file) {
     const src = file.serve_url || getMaterialFileServeUrl(materialId);
     return (
-      <video controls className="w-full rounded-lg bg-black" preload="metadata">
-        <source src={src} type={file.mime_type || "video/mp4"} />
+      <video controls className="w-full rounded-lg bg-black" preload="metadata" src={src}>
         Váš prohlížeč nepodporuje přehrávání videa.
       </video>
     );

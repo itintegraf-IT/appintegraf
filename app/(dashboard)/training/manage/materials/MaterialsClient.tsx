@@ -557,7 +557,7 @@ export function MaterialsClient() {
                   )}
                   <input
                     type="file"
-                    accept="video/mp4,video/webm,.mp4,.webm"
+                    accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/x-msvideo,video/mpeg,.mp4,.webm,.mov,.mkv,.avi,.mpeg,.mpg,.ogv,.3gp"
                     onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
                     className="w-full text-sm"
                   />

@@ -6,10 +6,19 @@ import type { MaterialType } from "@/lib/training/material-types";
 
 export const TRAINING_MATERIAL_UPLOAD_MODULE = "training_materials";
 
-export const TRAINING_VIDEO_MAX_BYTES = 200 * 1024 * 1024;
+export const TRAINING_VIDEO_MAX_BYTES = 500 * 1024 * 1024;
 export const TRAINING_PRESENTATION_MAX_BYTES = 50 * 1024 * 1024;
 
-export const TRAINING_VIDEO_MIME = new Set(["video/mp4", "video/webm", "video/quicktime"]);
+export const TRAINING_VIDEO_MIME = new Set([
+  "video/mp4",
+  "video/webm",
+  "video/quicktime",
+  "video/x-matroska",
+  "video/x-msvideo",
+  "video/mpeg",
+  "video/ogg",
+  "video/3gpp",
+]);
 export const TRAINING_PRESENTATION_MIME = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -19,6 +28,12 @@ const EXTENSION_MIME: Record<string, string> = {
   ".mp4": "video/mp4",
   ".webm": "video/webm",
   ".mov": "video/quicktime",
+  ".mkv": "video/x-matroska",
+  ".avi": "video/x-msvideo",
+  ".mpeg": "video/mpeg",
+  ".mpg": "video/mpeg",
+  ".ogv": "video/ogg",
+  ".3gp": "video/3gpp",
   ".pdf": "application/pdf",
   ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
