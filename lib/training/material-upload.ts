@@ -73,10 +73,16 @@ export function isAllowedUploadMime(materialType: MaterialType, mime: string, fi
   return allowedMimeForMaterialType(materialType).has(resolved);
 }
 
+/** Content-Disposition – ASCII fallback + UTF-8 filename* (ne-ASCII v filename="" rozbije Node hlavičky). */
 export function contentDisposition(filename: string, inline: boolean): string {
-  const safe = filename.replace(/[^\w.\- ()ěščřžýáíéúůďťňĚŠČŘŽÝÁÍÉÚŮĎŤŇ]+/gi, "_");
+  const asciiFallback =
+    filename
+      .replace(/[^\w.\-() ]+/g, "_")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 200) || "download";
   const type = inline ? "inline" : "attachment";
-  return `${type}; filename="${safe}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+  return `${type}; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
 export function maxBytesForMaterialType(type: MaterialType): number {

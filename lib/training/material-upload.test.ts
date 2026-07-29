@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { inferUploadMime, isAllowedUploadMime } from "@/lib/training/material-upload";
+import { contentDisposition, inferUploadMime, isAllowedUploadMime } from "@/lib/training/material-upload";
+
+describe("contentDisposition", () => {
+  it("použije ASCII fallback pro český název souboru", () => {
+    const header = contentDisposition("Školení_IT_bezpečnosti.mp4", true);
+    expect(header).toMatch(/^inline; filename="[^"]*"; filename\*=UTF-8''/);
+    expect(header).not.toMatch(/filename="[^"]*[ěščřžýáíéúůďťňŠ]/);
+    expect(header).toContain(encodeURIComponent("Školení_IT_bezpečnosti.mp4"));
+  });
+
+  it("attachment pro stažení", () => {
+    expect(contentDisposition("video.mp4", false)).toContain("attachment");
+  });
+});
 
 describe("inferUploadMime", () => {
   it("odhadne mp4 z přípony", () => {

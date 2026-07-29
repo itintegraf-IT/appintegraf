@@ -9,6 +9,7 @@ export type MaterialFileMeta = {
   serve_url: string;
 };
 
-export function getMaterialFileServeUrl(materialId: number): string {
-  return `/api/training/materials/${materialId}/file`;
+export function getMaterialFileServeUrl(materialId: number, download = false): string {
+  const base = `/api/training/materials/${materialId}/file`;
+  return download ? `${base}?download=1` : base;
 }

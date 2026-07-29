@@ -45,11 +45,35 @@ export function MaterialMediaContent({ materialId, materialType, content, mediaU
 function VideoFilePlayer({ src, filename }: { src: string; filename: string }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [playbackError, setPlaybackError] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadUrl = `${src}${src.includes("?") ? "&" : "?"}download=1`;
 
   const onError = useCallback(() => setPlaybackError(true), []);
 
+  const downloadFile = async () => {
+    setDownloading(true);
+    try {
+      const res = await fetch(downloadUrl, { credentials: "same-origin" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Stažení se nezdařilo. Zkuste to znovu nebo kontaktujte administrátora.");
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const openInNewTab = () => {
-    window.open(src, "_blank", "noopener");
+    window.open(src, "_blank", "noopener,noreferrer");
   };
 
   if (playbackError) {
@@ -57,7 +81,7 @@ function VideoFilePlayer({ src, filename }: { src: string; filename: string }) {
       <div className="flex flex-col items-center gap-4 rounded-lg border border-gray-200 bg-gray-50 p-8 text-center">
         <PlayCircle className="h-12 w-12 text-gray-400" />
         <p className="text-gray-700">
-          Prohlížeč nepodporuje formát tohoto videa (<strong>{filename}</strong>).
+          Video se nepodařilo přehrát v prohlížeči (<strong>{filename}</strong>).
         </p>
         <div className="flex flex-wrap justify-center gap-3">
           <button
@@ -68,14 +92,15 @@ function VideoFilePlayer({ src, filename }: { src: string; filename: string }) {
             <ExternalLink className="h-4 w-4" />
             Otevřít v novém okně
           </button>
-          <a
-            href={src}
-            download={filename}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100"
+          <button
+            type="button"
+            onClick={() => void downloadFile()}
+            disabled={downloading}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50"
           >
             <Download className="h-4 w-4" />
-            Stáhnout video
-          </a>
+            {downloading ? "Stahuji…" : "Stáhnout video"}
+          </button>
         </div>
         <p className="text-xs text-gray-500">
           Stáhněte soubor a otevřete ho v systémovém přehrávači (VLC, Windows Media Player apod.)
@@ -85,16 +110,29 @@ function VideoFilePlayer({ src, filename }: { src: string; filename: string }) {
   }
 
   return (
-    <video
-      ref={videoRef}
-      controls
-      className="w-full rounded-lg bg-black"
-      preload="metadata"
-      src={src}
-      onError={onError}
-    >
-      Váš prohlížeč nepodporuje přehrávání videa.
-    </video>
+    <div className="space-y-2">
+      <video
+        ref={videoRef}
+        controls
+        className="w-full rounded-lg bg-black"
+        preload="metadata"
+        src={src}
+        onError={onError}
+      >
+        Váš prohlížeč nepodporuje přehrávání videa.
+      </video>
+      <div className="flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={() => void downloadFile()}
+          disabled={downloading}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+        >
+          <Download className="h-3.5 w-3.5" />
+          {downloading ? "Stahuji…" : "Stáhnout"}
+        </button>
+      </div>
+    </div>
   );
 }
 
