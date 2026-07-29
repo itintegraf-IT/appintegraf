@@ -8,6 +8,11 @@ import {
   ORDER_PDF_TEMPLATES,
   resolveOrderPdfTemplate,
 } from "@/lib/iml/order-pdf/registry";
+import {
+  buildProductCodeIndexes,
+  matchProductByCodes,
+  productLabel,
+} from "@/lib/iml/order-pdf/product-match";
 
 /**
  * Import objednávky IML z PDF.
@@ -91,28 +96,14 @@ async function handlePreview(req: NextRequest): Promise<NextResponse> {
       customer_id: true,
     },
   });
-  type ProductRow = (typeof products)[number];
-  const byClientCode = new Map<string, ProductRow>();
-  const byIgCode = new Map<string, ProductRow>();
-  for (const p of products) {
-    if (p.client_code) byClientCode.set(p.client_code.trim().toLowerCase(), p);
-    if (p.ig_code) byIgCode.set(p.ig_code.trim().toLowerCase(), p);
-  }
-
-  const productLabel = (p: ProductRow) =>
-    `${p.ig_code ?? `#${p.id}`} — ${p.client_name ?? p.ig_short_name ?? "Bez názvu"}`;
+  const indexes = buildProductCodeIndexes(products);
 
   const items: PreviewItem[] = parsed.items.map((it) => {
-    let matched: ProductRow | undefined;
-    let matchedBy: PreviewItem["matchedBy"] = null;
-    if (it.customerMaterialNo) {
-      matched = byClientCode.get(it.customerMaterialNo.trim().toLowerCase());
-      if (matched) matchedBy = "client_code";
-    }
-    if (!matched && it.yourMaterialNo) {
-      matched = byIgCode.get(it.yourMaterialNo.trim().toLowerCase());
-      if (matched) matchedBy = "ig_code";
-    }
+    const { product: matched, matchedBy } = matchProductByCodes(indexes, [
+      it.customerMaterialNo,
+      it.yourMaterialNo,
+    ]);
+
     if (!matched) {
       warnings.push(
         `Položka ${it.itemNo} (${it.description}): produkt nenalezen podle kódu klienta` +

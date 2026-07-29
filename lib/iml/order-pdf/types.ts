@@ -4,9 +4,9 @@ export type ParsedPdfOrderItem = {
   /** Číslo položky z PDF (např. "00010"). */
   itemNo: string;
   description: string;
-  /** Material No zákazníka (např. Orkla 219010549) – páruje se na client_code. */
+  /** Kódy materiálu z PDF – párují se flexibilně na client_code i ig_code. */
   customerMaterialNo: string | null;
-  /** "Your Material No" = interní číslo Integraf – fallback párování na ig_code. */
+  /** Další kód materiálu z PDF (např. Your Material No) – páruje se na client_code i ig_code. */
   yourMaterialNo: string | null;
   /** Množství v kusech (PDF "4.000 PCS" = 4000 ks). */
   quantity: number | null;
