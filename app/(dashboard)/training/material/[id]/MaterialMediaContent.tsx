@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { Download, ExternalLink } from "lucide-react";
 import { parseMaterialType } from "@/lib/training/material-types";
-import type { MaterialFileMeta } from "@/lib/training/material-api";
-import { getMaterialFileServeUrl } from "@/lib/training/material-api";
+import type { MaterialFileMeta } from "@/lib/training/material-shared";
+import { getMaterialFileServeUrl } from "@/lib/training/material-shared";
 import { resolveVideoEmbed } from "@/lib/training/video-embed";
 
 type Props = {

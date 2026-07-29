@@ -17,7 +17,7 @@ import {
   materialTypeLabel,
   parseMaterialType,
 } from "@/lib/training/material-types";
-import type { MaterialFileMeta } from "@/lib/training/material-api";
+import type { MaterialFileMeta } from "@/lib/training/material-shared";
 
 type Category = { id: number; name: string; code: string; color: string | null };
 
