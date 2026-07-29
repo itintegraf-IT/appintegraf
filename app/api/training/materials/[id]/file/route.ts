@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createReadStream } from "fs";
-import { mkdir, open, readFile, stat, writeFile } from "fs/promises";
+import { Readable } from "node:stream";
+import { mkdir, stat, writeFile } from "fs/promises";
 import path from "path";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
@@ -47,99 +48,103 @@ async function requireRead(): Promise<{ userId: number } | NextResponse> {
   return { userId };
 }
 
+function streamResponse(
+  diskPath: string,
+  headers: Record<string, string>,
+  range?: { start: number; end: number }
+): NextResponse {
+  const nodeStream = createReadStream(
+    diskPath,
+    range ? { start: range.start, end: range.end } : undefined
+  );
+  const webStream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+  const status = range ? 206 : 200;
+  return new NextResponse(webStream, { status, headers });
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const access = await requireRead();
-  if (access instanceof NextResponse) return access;
-
-  const materialId = parseInt((await params).id, 10);
-  if (isNaN(materialId)) {
-    return new NextResponse("Neplatné ID", { status: 400 });
-  }
-
-  const material = await prisma.learning_materials.findUnique({
-    where: { id: materialId },
-    select: { id: true, material_type: true },
-  });
-  if (!material) {
-    return new NextResponse("Materiál nenalezen", { status: 404 });
-  }
-
-  const fileRow = await prisma.file_uploads.findFirst({
-    where: { module: TRAINING_MATERIAL_UPLOAD_MODULE, record_id: materialId },
-    orderBy: { created_at: "desc" },
-  });
-  if (!fileRow) {
-    return new NextResponse("Soubor nenalezen", { status: 404 });
-  }
-
-  const diskPath = diskPathFromWebPath(fileRow.file_path);
-  let fileStat;
   try {
-    fileStat = await stat(diskPath);
-  } catch {
-    return new NextResponse(
-      "Soubor na serveru chybí. Nahrajte materiál znovu v administraci.",
-      { status: 404 }
-    );
-  }
+    const access = await requireRead();
+    if (access instanceof NextResponse) return access;
 
-  const size = fileStat.size;
-  const mime = inferUploadMime(fileRow.original_filename, fileRow.mime_type || "");
-  const materialType = parseMaterialType(material.material_type);
-  const inline = materialType === "video" || mime === "application/pdf";
+    const materialId = parseInt((await params).id, 10);
+    if (isNaN(materialId)) {
+      return new NextResponse("Neplatné ID", { status: 400 });
+    }
 
-  const headers: Record<string, string> = {
-    "Content-Type": mime,
-    "Accept-Ranges": "bytes",
-    "Content-Disposition": contentDisposition(fileRow.original_filename, inline),
-    "Cache-Control": "private, no-store",
-  };
+    const forceDownload = req.nextUrl.searchParams.get("download") === "1";
 
-  function nodeStreamToWeb(nodeStream: ReturnType<typeof createReadStream>): ReadableStream<Uint8Array> {
-    return new ReadableStream({
-      start(controller) {
-        nodeStream.on("data", (chunk: string | Buffer) => controller.enqueue(new Uint8Array(typeof chunk === "string" ? Buffer.from(chunk) : chunk)));
-        nodeStream.on("end", () => controller.close());
-        nodeStream.on("error", (err) => controller.error(err));
-      },
-      cancel() {
-        nodeStream.destroy();
-      },
+    const material = await prisma.learning_materials.findUnique({
+      where: { id: materialId },
+      select: { id: true, material_type: true },
     });
-  }
+    if (!material) {
+      return new NextResponse("Materiál nenalezen", { status: 404 });
+    }
 
-  const range = req.headers.get("range");
-  if (range) {
-    const match = /^bytes=(\d+)-(\d*)$/.exec(range);
-    if (match) {
-      const start = parseInt(match[1], 10);
-      const end = match[2] ? parseInt(match[2], 10) : Math.min(start + 2 * 1024 * 1024 - 1, size - 1);
-      if (start >= size || end >= size || start > end) {
-        return new NextResponse(null, {
-          status: 416,
-          headers: { "Content-Range": `bytes */${size}` },
-        });
-      }
-      const length = end - start + 1;
-      const body = nodeStreamToWeb(createReadStream(diskPath, { start, end }));
-      return new NextResponse(body, {
-        status: 206,
-        headers: {
-          ...headers,
+    const fileRow = await prisma.file_uploads.findFirst({
+      where: { module: TRAINING_MATERIAL_UPLOAD_MODULE, record_id: materialId },
+      orderBy: { created_at: "desc" },
+    });
+    if (!fileRow) {
+      return new NextResponse("Soubor nenalezen", { status: 404 });
+    }
+
+    const diskPath = diskPathFromWebPath(fileRow.file_path);
+    let fileStat;
+    try {
+      fileStat = await stat(diskPath);
+    } catch {
+      return new NextResponse(
+        "Soubor na serveru chybí. Nahrajte materiál znovu v administraci.",
+        { status: 404 }
+      );
+    }
+
+    const size = fileStat.size;
+    const mime = inferUploadMime(fileRow.original_filename, fileRow.mime_type || "");
+    const materialType = parseMaterialType(material.material_type);
+    const inline = !forceDownload && (materialType === "video" || mime === "application/pdf");
+
+    const baseHeaders: Record<string, string> = {
+      "Content-Type": mime,
+      "Accept-Ranges": "bytes",
+      "Content-Disposition": contentDisposition(fileRow.original_filename, inline),
+      "Cache-Control": "private, no-store",
+    };
+
+    const rangeHeader = req.headers.get("range");
+    if (rangeHeader) {
+      const match = /^bytes=(\d+)-(\d*)$/.exec(rangeHeader);
+      if (match) {
+        const start = parseInt(match[1], 10);
+        const end = match[2] ? parseInt(match[2], 10) : size - 1;
+        if (start >= size || end >= size || start > end) {
+          return new NextResponse(null, {
+            status: 416,
+            headers: { "Content-Range": `bytes */${size}` },
+          });
+        }
+        const length = end - start + 1;
+        return streamResponse(diskPath, {
+          ...baseHeaders,
           "Content-Length": String(length),
           "Content-Range": `bytes ${start}-${end}/${size}`,
-        },
-      });
+        }, { start, end });
+      }
     }
-  }
 
-  const body = nodeStreamToWeb(createReadStream(diskPath));
-  return new NextResponse(body, {
-    headers: { ...headers, "Content-Length": String(size) },
-  });
+    return streamResponse(diskPath, {
+      ...baseHeaders,
+      "Content-Length": String(size),
+    });
+  } catch (e) {
+    console.error("GET /api/training/materials/[id]/file", e);
+    return new NextResponse("Chyba při načítání souboru", { status: 500 });
+  }
 }
 
 export async function POST(
