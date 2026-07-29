@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   FileText,
@@ -51,23 +51,11 @@ const EMPTY_FORM: MaterialForm = {
   media_url: "",
 };
 
-function TypeBadge({ type }: { type: MaterialType }) {
-  const label = materialTypeLabel(type);
-  const Icon = type === "video" ? Video : type === "presentation" ? Presentation : FileText;
-  const colors =
-    type === "video"
-      ? "bg-purple-100 text-purple-800"
-      : type === "presentation"
-        ? "bg-blue-100 text-blue-800"
-        : "bg-gray-100 text-gray-700";
-
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${colors}`}>
-      <Icon className="h-3 w-3" />
-      {label}
-    </span>
-  );
-}
+const MATERIAL_TABS: { type: MaterialType; label: string; icon: typeof FileText }[] = [
+  { type: "text", label: "Texty", icon: FileText },
+  { type: "video", label: "Videomateriály", icon: Video },
+  { type: "presentation", label: "Prezentace", icon: Presentation },
+];
 
 function materialMeta(m: Material): string {
   const type = parseMaterialType(m.material_type);
@@ -97,6 +85,20 @@ export function MaterialsClient() {
   const [checkedIds, setCheckedIds] = useState<Set<number>>(new Set());
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [notice, setNotice] = useState("");
+  const [activeType, setActiveType] = useState<MaterialType>("text");
+
+  const countsByType = useMemo(() => {
+    const counts: Record<MaterialType, number> = { text: 0, video: 0, presentation: 0 };
+    for (const m of materials) {
+      counts[parseMaterialType(m.material_type)]++;
+    }
+    return counts;
+  }, [materials]);
+
+  const filteredMaterials = useMemo(
+    () => materials.filter((m) => parseMaterialType(m.material_type) === activeType),
+    [materials, activeType]
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -125,7 +127,7 @@ export function MaterialsClient() {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, material_type: activeType });
     setExistingFile(null);
     setSelectedFile(null);
     setEditorOpen(true);
@@ -210,6 +212,7 @@ export function MaterialsClient() {
 
       setEditorOpen(false);
       setNotice(editingId ? "Materiál uložen." : "Materiál vytvořen.");
+      setActiveType(type);
       await load();
     } catch (e2) {
       setError(e2 instanceof Error ? e2.message : "Chyba při ukládání");
@@ -251,8 +254,15 @@ export function MaterialsClient() {
 
   const toggleCheckAll = () => {
     setCheckedIds((prev) =>
-      prev.size === materials.length ? new Set() : new Set(materials.map((m) => m.id))
+      prev.size === filteredMaterials.length
+        ? new Set()
+        : new Set(filteredMaterials.map((m) => m.id))
     );
+  };
+
+  const switchTypeTab = (type: MaterialType) => {
+    setActiveType(type);
+    setCheckedIds(new Set());
   };
 
   const bulkDelete = async () => {
@@ -322,18 +332,58 @@ export function MaterialsClient() {
         <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">{notice}</div>
       )}
 
+      <div className="mb-4 overflow-x-auto">
+        <nav className="flex min-w-max gap-1 rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+          {MATERIAL_TABS.map((tab) => {
+            const Icon = tab.icon;
+            const active = activeType === tab.type;
+            const count = countsByType[tab.type];
+            return (
+              <button
+                key={tab.type}
+                type="button"
+                onClick={() => switchTypeTab(tab.type)}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-red-600 text-white"
+                    : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                }`}
+              >
+                <Icon className="h-4 w-4" />
+                {tab.label}
+                {count > 0 && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs ${
+                      active ? "bg-red-500 text-white" : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+
       <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
         {loading ? (
           <div className="px-4 py-12 text-center text-gray-500">Načítání…</div>
-        ) : materials.length === 0 ? (
-          <div className="px-4 py-12 text-center text-gray-500">Žádné materiály</div>
+        ) : filteredMaterials.length === 0 ? (
+          <div className="px-4 py-12 text-center text-gray-500">
+            {materials.length === 0
+              ? "Žádné materiály"
+              : `V záložce „${materialTypeLabel(activeType)}“ nejsou žádné materiály`}
+          </div>
         ) : (
           <>
             <div className="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-4 py-2.5">
               <label className="inline-flex items-center gap-2 text-sm text-gray-700">
                 <input
                   type="checkbox"
-                  checked={checkedIds.size === materials.length && materials.length > 0}
+                  checked={
+                    checkedIds.size === filteredMaterials.length && filteredMaterials.length > 0
+                  }
                   onChange={toggleCheckAll}
                   className="h-4 w-4"
                 />
@@ -355,7 +405,7 @@ export function MaterialsClient() {
               )}
             </div>
             <div className="divide-y divide-gray-100">
-              {materials.map((m) => (
+              {filteredMaterials.map((m) => (
                 <div
                   key={m.id}
                   className="flex items-start justify-between gap-3 px-4 py-3 hover:bg-gray-50"
@@ -369,7 +419,6 @@ export function MaterialsClient() {
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-gray-900">{m.title}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                      <TypeBadge type={parseMaterialType(m.material_type)} />
                       {m.question_categories && (
                         <span
                           className="rounded-full px-2 py-0.5 font-medium text-white"
