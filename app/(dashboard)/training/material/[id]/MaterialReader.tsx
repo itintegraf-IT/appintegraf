@@ -155,6 +155,7 @@ export function MaterialReader({
           <p className="mb-4 text-sm text-gray-500">Zdroj: {material.source}</p>
         )}
         <MaterialMediaContent
+          materialId={material.id}
           materialType={material.material_type}
           content={material.content}
           mediaUrl={material.media_url}

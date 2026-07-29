@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, open, readFile, stat, writeFile } from "fs/promises";
 import path from "path";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
@@ -8,13 +8,19 @@ import { parseMaterialType } from "@/lib/training/material-types";
 import {
   TRAINING_MATERIAL_UPLOAD_DIR,
   TRAINING_MATERIAL_UPLOAD_MODULE,
-  allowedMimeForMaterialType,
+  contentDisposition,
   deleteMaterialUploads,
+  diskPathFromWebPath,
   documentTypeForMaterialType,
+  inferUploadMime,
+  isAllowedUploadMime,
   maxBytesForMaterialType,
   trainingMaterialUploadDiskPath,
   trainingMaterialUploadWebPath,
 } from "@/lib/training/material-upload";
+import { getMaterialFileServeUrl } from "@/lib/training/material-api";
+
+export const runtime = "nodejs";
 
 async function requireWrite(): Promise<{ userId: number } | NextResponse> {
   const session = await auth();
@@ -26,6 +32,106 @@ async function requireWrite(): Promise<{ userId: number } | NextResponse> {
     return NextResponse.json({ error: "Nemáte oprávnění nahrávat soubory" }, { status: 403 });
   }
   return { userId };
+}
+
+async function requireRead(): Promise<{ userId: number } | NextResponse> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return new NextResponse("Neautorizováno", { status: 401 });
+  }
+  const userId = parseInt(session.user.id, 10);
+  if (!(await hasModuleAccess(userId, "training", "read"))) {
+    return new NextResponse("Nemáte oprávnění", { status: 403 });
+  }
+  return { userId };
+}
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const access = await requireRead();
+  if (access instanceof NextResponse) return access;
+
+  const materialId = parseInt((await params).id, 10);
+  if (isNaN(materialId)) {
+    return new NextResponse("Neplatné ID", { status: 400 });
+  }
+
+  const material = await prisma.learning_materials.findUnique({
+    where: { id: materialId },
+    select: { id: true, material_type: true },
+  });
+  if (!material) {
+    return new NextResponse("Materiál nenalezen", { status: 404 });
+  }
+
+  const fileRow = await prisma.file_uploads.findFirst({
+    where: { module: TRAINING_MATERIAL_UPLOAD_MODULE, record_id: materialId },
+    orderBy: { created_at: "desc" },
+  });
+  if (!fileRow) {
+    return new NextResponse("Soubor nenalezen", { status: 404 });
+  }
+
+  const diskPath = diskPathFromWebPath(fileRow.file_path);
+  let fileStat;
+  try {
+    fileStat = await stat(diskPath);
+  } catch {
+    return new NextResponse(
+      "Soubor na serveru chybí. Nahrajte materiál znovu v administraci.",
+      { status: 404 }
+    );
+  }
+
+  const size = fileStat.size;
+  const mime = fileRow.mime_type || "application/octet-stream";
+  const materialType = parseMaterialType(material.material_type);
+  const inline = materialType === "video" || mime === "application/pdf";
+
+  const range = req.headers.get("range");
+  if (range) {
+    const match = /^bytes=(\d+)-(\d*)$/.exec(range);
+    if (match) {
+      const start = parseInt(match[1], 10);
+      const end = match[2] ? parseInt(match[2], 10) : size - 1;
+      if (start >= size || end >= size || start > end) {
+        return new NextResponse(null, {
+          status: 416,
+          headers: { "Content-Range": `bytes */${size}` },
+        });
+      }
+      const length = end - start + 1;
+      const handle = await open(diskPath, "r");
+      const buffer = Buffer.alloc(length);
+      await handle.read(buffer, 0, length, start);
+      await handle.close();
+      return new NextResponse(buffer, {
+        status: 206,
+        headers: {
+          "Content-Type": mime,
+          "Content-Length": String(length),
+          "Content-Range": `bytes ${start}-${end}/${size}`,
+          "Accept-Ranges": "bytes",
+          "Content-Disposition": contentDisposition(fileRow.original_filename, inline),
+          "Cache-Control": "private, no-store",
+        },
+      });
+    }
+  }
+
+  const buf = await readFile(diskPath);
+
+  return new NextResponse(new Uint8Array(buf), {
+    headers: {
+      "Content-Type": mime,
+      "Content-Length": String(size),
+      "Accept-Ranges": "bytes",
+      "Content-Disposition": contentDisposition(fileRow.original_filename, inline),
+      "Cache-Control": "private, no-store",
+    },
+  });
 }
 
 export async function POST(
@@ -59,9 +165,8 @@ export async function POST(
     return NextResponse.json({ error: "Vyberte soubor" }, { status: 400 });
   }
 
-  const mime = file.type || "application/octet-stream";
-  const allowed = allowedMimeForMaterialType(materialType);
-  if (!allowed.has(mime)) {
+  const mime = inferUploadMime(file.name, file.type || "");
+  if (!isAllowedUploadMime(materialType, mime, file.name)) {
     return NextResponse.json({ error: "Nepovolený typ souboru pro tento materiál" }, { status: 400 });
   }
 
@@ -82,9 +187,11 @@ export async function POST(
         ? ".mp4"
         : mime === "video/webm"
           ? ".webm"
-          : mime.includes("presentation")
-            ? ".pptx"
-            : ".bin");
+          : mime === "video/quicktime"
+            ? ".mov"
+            : mime.includes("presentation")
+              ? ".pptx"
+              : ".bin");
   const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}${ext}`;
   const diskPath = trainingMaterialUploadDiskPath(safeName);
   const webPath = trainingMaterialUploadWebPath(safeName);
@@ -115,6 +222,7 @@ export async function POST(
       file_path: row.file_path,
       mime_type: row.mime_type,
       file_size: row.file_size,
+      serve_url: getMaterialFileServeUrl(materialId),
     },
   });
 }
