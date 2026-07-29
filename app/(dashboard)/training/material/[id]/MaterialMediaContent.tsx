@@ -46,6 +46,14 @@ function VideoContent({
   mediaUrl: string | null;
   file: MaterialFileMeta | null;
 }) {
+  if (file) {
+    return (
+      <video controls className="w-full rounded-lg bg-black" src={file.file_path}>
+        Váš prohlížeč nepodporuje přehrávání videa.
+      </video>
+    );
+  }
+
   if (mediaUrl) {
     const embed = resolveVideoEmbed(mediaUrl);
     if (embed?.kind === "iframe") {
@@ -81,14 +89,6 @@ function VideoContent({
         </a>
       );
     }
-  }
-
-  if (file) {
-    return (
-      <video controls className="w-full rounded-lg bg-black" src={file.file_path}>
-        Váš prohlížeč nepodporuje přehrávání videa.
-      </video>
-    );
   }
 
   return <p className="text-gray-500">Video není k dispozici.</p>;
