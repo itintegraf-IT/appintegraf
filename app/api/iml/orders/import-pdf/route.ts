@@ -13,6 +13,7 @@ import {
   matchProductByCodes,
   productLabel,
 } from "@/lib/iml/order-pdf/product-match";
+import { requireJobNumberOrConfirm } from "@/lib/iml/order-job-number";
 
 /**
  * Import objednávky IML z PDF.
@@ -164,6 +165,14 @@ async function handleImport(req: NextRequest, userId: number): Promise<NextRespo
       { status: 400 }
     );
   }
+
+  const jobCheck = requireJobNumberOrConfirm({
+    job_number: body.job_number,
+    confirmed_without_job_number: body.confirmed_without_job_number,
+  });
+  if (!jobCheck.ok) {
+    return NextResponse.json({ error: jobCheck.error, field: "job_number" }, { status: 400 });
+  }
   const orderDate = new Date(orderDateRaw);
   if (Number.isNaN(orderDate.getTime())) {
     return NextResponse.json({ error: "Neplatné datum objednávky" }, { status: 400 });
@@ -225,6 +234,7 @@ async function handleImport(req: NextRequest, userId: number): Promise<NextRespo
       data: {
         customer_id: customerId,
         order_number: orderNumber,
+        job_number: jobCheck.jobNumber,
         order_date: orderDate,
         expected_ship_date: expectedShipDate,
         status,

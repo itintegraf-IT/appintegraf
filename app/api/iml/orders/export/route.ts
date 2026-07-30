@@ -50,6 +50,7 @@ export async function GET(req: NextRequest) {
   const rows = orders.map((o: OrderRow) => ({
     id: o.id,
     order_number: o.order_number ?? "",
+    job_number: o.job_number ?? "",
     customer_name: o.iml_customers?.name ?? "",
     order_date: o.order_date ? new Date(o.order_date).toISOString().slice(0, 10) : "",
     expected_ship_date: o.expected_ship_date
@@ -80,12 +81,13 @@ export async function GET(req: NextRequest) {
   }
 
   const header =
-    "id;order_number;customer_name;order_date;expected_ship_date;status;total;notes;items_count;items_summary;created_at;updated_at";
+    "id;order_number;job_number;customer_name;order_date;expected_ship_date;status;total;notes;items_count;items_summary;created_at;updated_at";
   type CsvRow = (typeof rows)[number];
   const csvRows = rows.map((r: CsvRow) =>
     [
       r.id,
       escapeCsv(r.order_number),
+      escapeCsv(r.job_number),
       escapeCsv(r.customer_name),
       escapeCsv(r.order_date),
       escapeCsv(r.expected_ship_date),

@@ -7,6 +7,7 @@ import { logImlAudit } from "@/lib/iml-audit";
 import { hasImlSupervisorOverride } from "@/lib/iml-permissions";
 import { parseOrderCustomData, validateOrderItemsProductStatus } from "@/lib/iml-order-utils";
 import { validateLineItemQuantities } from "@/lib/iml-line-item-quantity";
+import { normalizeJobNumber } from "@/lib/iml/order-job-number";
 
 export async function GET(
   _req: NextRequest,
@@ -77,6 +78,7 @@ export async function PUT(
       notes,
       items,
       custom_data,
+      job_number,
       supervisor_override: bodySupervisorOverride,
     } = body;
 
@@ -100,6 +102,9 @@ export async function PUT(
       status: newStatus,
       notes: newNotes,
     };
+    if (job_number !== undefined) {
+      updateData.job_number = normalizeJobNumber(job_number);
+    }
     if (parsedCustom !== undefined) {
       updateData.custom_data =
         parsedCustom === null ? Prisma.DbNull : (parsedCustom as Prisma.InputJsonValue);

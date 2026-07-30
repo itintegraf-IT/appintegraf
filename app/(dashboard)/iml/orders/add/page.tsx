@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Search } from "lucide-react";
 import { CustomFieldsFormSection } from "../../_components/CustomFieldsFormSection";
 import { filterProductsByQuery } from "@/lib/iml-product-search";
+import { CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE } from "@/lib/iml/order-job-number";
 
 const EMPTY_PICKER = { product_id: "", quantity: "0", unit_price: "" };
 
@@ -44,12 +45,16 @@ export default function ImlOrderAddPage() {
   const [form, setForm] = useState({
     customer_id: "",
     shipping_address_id: "",
+    job_number: "",
     order_number: "",
     order_date: new Date().toISOString().slice(0, 10),
     expected_ship_date: "",
     status: "nová",
     notes: "",
   });
+  const [confirmedWithoutJobNumber, setConfirmedWithoutJobNumber] = useState(false);
+  const jobStepReady =
+    form.job_number.trim().length > 0 || confirmedWithoutJobNumber;
   const [selectedItems, setSelectedItems] = useState<SelectedOrderItem[]>([]);
   const [picker, setPicker] = useState<{ product_id: string; quantity: string; unit_price: string }>(
     EMPTY_PICKER
@@ -235,6 +240,8 @@ export default function ImlOrderAddPage() {
       body: JSON.stringify({
         customer_id: customerId,
         order_number: form.order_number.trim(),
+        job_number: form.job_number.trim() || null,
+        confirmed_without_job_number: confirmedWithoutJobNumber,
         order_date: form.order_date,
         expected_ship_date: form.expected_ship_date.trim() || undefined,
         status: form.status,
@@ -324,6 +331,53 @@ export default function ImlOrderAddPage() {
           <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-800">{saveMessage}</div>
         )}
 
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <h2 className="text-sm font-semibold text-amber-900">Krok 1 – Číslo zakázky</h2>
+          <p className="mt-1 text-xs text-amber-800">
+            Pro párování s jiným systémem zadejte číslo zakázky. Pokud ho nemáte, výslovně potvrďte
+            pokračování bez něj.
+          </p>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="block flex-1 text-sm">
+              <span className="mb-1 block font-medium text-gray-700">Číslo zakázky</span>
+              <input
+                type="text"
+                value={form.job_number}
+                disabled={confirmedWithoutJobNumber}
+                onChange={(e) => {
+                  setForm({ ...form, job_number: e.target.value });
+                  if (e.target.value.trim()) setConfirmedWithoutJobNumber(false);
+                }}
+                maxLength={50}
+                placeholder="např. z ERP / výroby"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-100"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                if (form.job_number.trim()) return;
+                if (!confirm(CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE)) return;
+                setConfirmedWithoutJobNumber(true);
+                setForm((f) => ({ ...f, job_number: "" }));
+              }}
+              className={`shrink-0 rounded-lg border px-4 py-2 text-sm font-medium ${
+                confirmedWithoutJobNumber
+                  ? "border-amber-400 bg-amber-100 text-amber-900"
+                  : "border-gray-300 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              {confirmedWithoutJobNumber ? "Bez čísla zakázky (potvrzeno)" : "Pokračovat bez čísla zakázky"}
+            </button>
+          </div>
+          {!jobStepReady && (
+            <p className="mt-2 text-xs text-amber-700">
+              Dokončete tento krok, aby bylo možné vyplnit zbytek objednávky.
+            </p>
+          )}
+        </div>
+
+        <fieldset disabled={!jobStepReady} className={!jobStepReady ? "opacity-50" : undefined}>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">Zákazník *</label>
@@ -602,7 +656,7 @@ export default function ImlOrderAddPage() {
         <div className="mt-6 flex gap-2">
           <button
             type="submit"
-            disabled={loading || !hasValidItems}
+            disabled={loading || !hasValidItems || !jobStepReady}
             className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
           >
             {loading ? "Ukládám objednávku…" : "Vytvořit objednávku"}
@@ -614,6 +668,7 @@ export default function ImlOrderAddPage() {
             Zrušit
           </Link>
         </div>
+        </fieldset>
       </form>
 
       {showSupervisorModal && (

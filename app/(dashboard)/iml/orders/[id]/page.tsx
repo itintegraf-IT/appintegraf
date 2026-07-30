@@ -102,6 +102,10 @@ export default async function ImlOrderDetailPage({
             </Link>
           </div>
           <div>
+            <p className="text-sm text-gray-500">Číslo zakázky</p>
+            <p className="font-medium font-mono">{order.job_number?.trim() || "—"}</p>
+          </div>
+          <div>
             <p className="text-sm text-gray-500">Datum přijetí</p>
             <p className="font-medium">{new Date(order.order_date).toLocaleDateString("cs-CZ")}</p>
           </div>

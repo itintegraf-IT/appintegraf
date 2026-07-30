@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { FileText, Upload, AlertTriangle } from "lucide-react";
 import { ORDER_PDF_TEMPLATES } from "@/lib/iml/order-pdf/registry";
+import { CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE } from "@/lib/iml/order-job-number";
 
 type Customer = { id: number; name: string };
 type ProductOption = {
@@ -79,12 +80,14 @@ export function PdfOrderImport() {
   const [rows, setRows] = useState<EditableRow[]>([]);
   const [success, setSuccess] = useState<{ id: number; order_number: string } | null>(null);
   const [form, setForm] = useState({
+    job_number: "",
     order_number: "",
     order_date: "",
     expected_ship_date: "",
     customer_id: "",
     notes: "",
   });
+  const [confirmedWithoutJobNumber, setConfirmedWithoutJobNumber] = useState(false);
 
   useEffect(() => {
     fetch("/api/iml/customers?scope=units")
@@ -147,12 +150,14 @@ export function PdfOrderImport() {
       setWarnings(data.warnings ?? []);
       setDuplicate(data.duplicate);
       setForm({
+        job_number: "",
         order_number: data.order.orderNumber,
         order_date: data.order.orderDate ?? "",
         expected_ship_date: data.order.expectedShipDate ?? "",
         customer_id: data.suggestedCustomer ? String(data.suggestedCustomer.id) : "",
         notes: data.order.notes ?? "",
       });
+      setConfirmedWithoutJobNumber(false);
       setRows(
         (data.items ?? []).map((it) => ({
           itemNo: it.itemNo,
@@ -200,6 +205,7 @@ export function PdfOrderImport() {
     !!form.order_number.trim() &&
     !!form.order_date &&
     !!form.customer_id &&
+    (form.job_number.trim().length > 0 || confirmedWithoutJobNumber) &&
     rows.length > 0 &&
     unmatchedCount === 0 &&
     rows.every((r) => {
@@ -209,6 +215,10 @@ export function PdfOrderImport() {
 
   const handleImport = async () => {
     if (!canImport) return;
+    if (!form.job_number.trim() && !confirmedWithoutJobNumber) {
+      if (!confirm(CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE)) return;
+      setConfirmedWithoutJobNumber(true);
+    }
     setImporting(true);
     setError("");
     try {
@@ -228,6 +238,8 @@ export function PdfOrderImport() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           order_number: form.order_number.trim(),
+          job_number: form.job_number.trim() || null,
+          confirmed_without_job_number: confirmedWithoutJobNumber || !form.job_number.trim(),
           order_date: form.order_date,
           expected_ship_date: form.expected_ship_date || undefined,
           customer_id: parseInt(form.customer_id, 10),
@@ -373,6 +385,39 @@ export function PdfOrderImport() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Číslo zakázky
+                </label>
+                <input
+                  type="text"
+                  value={form.job_number}
+                  disabled={confirmedWithoutJobNumber}
+                  onChange={(e) => {
+                    setForm((f) => ({ ...f, job_number: e.target.value }));
+                    if (e.target.value.trim()) setConfirmedWithoutJobNumber(false);
+                  }}
+                  maxLength={50}
+                  placeholder="párování s jiným systémem"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-100"
+                />
+                <label className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={confirmedWithoutJobNumber}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        if (!confirm(CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE)) return;
+                        setConfirmedWithoutJobNumber(true);
+                        setForm((f) => ({ ...f, job_number: "" }));
+                      } else {
+                        setConfirmedWithoutJobNumber(false);
+                      }
+                    }}
+                  />
+                  Nemám číslo zakázky (potvrdit)
+                </label>
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">

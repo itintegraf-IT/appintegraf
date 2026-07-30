@@ -57,6 +57,7 @@ export default function ImlOrderEditPage() {
   const [form, setForm] = useState({
     customer_id: "",
     order_number: "",
+    job_number: "",
     order_date: "",
     expected_ship_date: "",
     status: "nová",
@@ -91,6 +92,7 @@ export default function ImlOrderEditPage() {
         setForm({
           customer_id: String(o.customer_id ?? ""),
           order_number: o.order_number ?? "",
+          job_number: o.job_number ?? "",
           order_date: o.order_date ? new Date(o.order_date).toISOString().slice(0, 10) : "",
           expected_ship_date: o.expected_ship_date
             ? new Date(o.expected_ship_date).toISOString().slice(0, 10)
@@ -274,6 +276,7 @@ export default function ImlOrderEditPage() {
         expected_ship_date: form.expected_ship_date.trim() || null,
         status: form.status,
         notes: form.notes || null,
+        job_number: form.job_number.trim() || null,
         items: orderItems,
         custom_data: Object.keys(customData).length > 0 ? customData : null,
         supervisor_override: withSupervisorOverride,
@@ -380,6 +383,17 @@ export default function ImlOrderEditPage() {
               readOnly
               value={form.order_number}
               className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-gray-700"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Číslo zakázky</label>
+            <input
+              type="text"
+              value={form.job_number}
+              onChange={(e) => setForm({ ...form, job_number: e.target.value })}
+              maxLength={50}
+              placeholder="párování s jiným systémem"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
           <div>

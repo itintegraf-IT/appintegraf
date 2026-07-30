@@ -24,6 +24,7 @@ type ListMeta = {
 type Order = {
   id: number;
   order_number: string;
+  job_number: string | null;
   order_date: string;
   expected_ship_date: string | null;
   status: string;
@@ -94,7 +95,7 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
     }
   };
 
-  const colCount = 11;
+  const colCount = 12;
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -173,6 +174,7 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
             <tr>
               <th className="w-14 px-2 py-3 text-left text-xs font-semibold text-gray-700">Náhled</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700">Číslo</th>
+              <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700">Zakázka</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700">Zákazník</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700">Přijato</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700">Expedice</th>
@@ -223,6 +225,9 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
                       )}
                     </td>
                     <td className="px-3 py-2 align-middle font-mono text-sm">{o.order_number}</td>
+                    <td className="px-3 py-2 align-middle font-mono text-sm text-gray-700">
+                      {o.job_number?.trim() || "—"}
+                    </td>
                     <td
                       className="max-w-[200px] truncate px-3 py-2 align-middle text-sm"
                       title={cust || undefined}

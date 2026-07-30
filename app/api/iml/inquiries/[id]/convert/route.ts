@@ -4,6 +4,7 @@ import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { parseOrderCustomData, resolveShippingSnapshot } from "@/lib/iml-order-utils";
+import { requireJobNumberOrConfirm } from "@/lib/iml/order-job-number";
 
 /**
  * Překlopí poptávku do objednávky. Idempotentní: opakované volání vrátí 409.
@@ -50,6 +51,8 @@ export async function POST(
     const body = await req.json();
     const {
       order_number,
+      job_number,
+      confirmed_without_job_number,
       order_date,
       status = "nová",
       notes,
@@ -59,6 +62,14 @@ export async function POST(
 
     if (!order_number || !String(order_number).trim()) {
       return NextResponse.json({ error: "Vyplňte číslo objednávky" }, { status: 400 });
+    }
+
+    const jobCheck = requireJobNumberOrConfirm({
+      job_number,
+      confirmed_without_job_number,
+    });
+    if (!jobCheck.ok) {
+      return NextResponse.json({ error: jobCheck.error, field: "job_number" }, { status: 400 });
     }
 
     const ordNum = String(order_number).trim();
@@ -93,6 +104,7 @@ export async function POST(
         data: {
           customer_id: inquiry.customer_id,
           order_number: ordNum,
+          job_number: jobCheck.jobNumber,
           order_date: orderDate,
           status: String(status).trim() || "nová",
           notes: orderNotes,
