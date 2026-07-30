@@ -1522,6 +1522,8 @@ model iml_orders {
   id           Int      @id @default(autoincrement())
   customer_id  Int
   order_number String   @unique @db.VarChar(50)
+  /// Číslo zakázky pro párování s jiným systémem (volitelné po výslovném potvrzení)
+  job_number          String?   @db.VarChar(50)
   order_date          DateTime  @db.DateTime(0)
   expected_ship_date DateTime? @db.DateTime(0)
   status              String    @default("nová") @db.VarChar(50)
@@ -1551,6 +1553,7 @@ model iml_orders {
   @@index([order_date])
   @@index([status])
   @@index([shipping_address_id])
+  @@index([job_number])
   @@map("iml_orders")
 }
 

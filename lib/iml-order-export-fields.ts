@@ -3,6 +3,7 @@
 export const ORDER_EXPORT_FIELDS = [
   "id",
   "order_number",
+  "job_number",
   "customer_name",
   "order_date",
   "expected_ship_date",
@@ -24,6 +25,7 @@ const FIELD_SET = new Set<string>(ORDER_EXPORT_FIELDS);
 export const ORDER_EXPORT_FIELD_LABELS: Record<OrderExportField, string> = {
   id: "ID",
   order_number: "Číslo objednávky",
+  job_number: "Číslo zakázky",
   customer_name: "Zákazník",
   order_date: "Datum přijetí",
   expected_ship_date: "Plánovaná expedice",

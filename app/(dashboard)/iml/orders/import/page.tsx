@@ -5,9 +5,11 @@ import Link from "next/link";
 import { ArrowLeft, Upload, FileSpreadsheet, GripVertical } from "lucide-react";
 import * as XLSX from "xlsx";
 import { PdfOrderImport } from "./PdfOrderImport";
+import { CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE } from "@/lib/iml/order-job-number";
 
 const TARGET_FIELDS = [
   { key: "order_number", label: "Číslo objednávky", required: true },
+  { key: "job_number", label: "Číslo zakázky", required: false },
   { key: "customer_name", label: "Název zákazníka", required: true },
   { key: "order_date", label: "Datum objednávky", required: true },
   { key: "status", label: "Stav", required: false },
@@ -161,11 +163,37 @@ function CsvOrdersImport() {
     setError("");
     setResult(null);
     try {
+      const jobMapped =
+        typeof mapping.job_number === "number" && mapping.job_number >= 0;
+      let confirmedWithout = false;
+      if (!jobMapped) {
+        if (!confirm(CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE)) {
+          setLoading(false);
+          return;
+        }
+        confirmedWithout = true;
+      } else {
+        // Některé řádky mohou mít prázdné číslo zakázky — API to ověří; při 400 s needs_job_number_confirm znovu potvrdíme.
+        confirmedWithout = false;
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("mapping", JSON.stringify(mapping));
-      const res = await fetch("/api/iml/orders/import", { method: "POST", body: formData });
-      const data = await res.json().catch(() => ({}));
+      if (confirmedWithout) {
+        formData.append("confirmed_without_job_number", "1");
+      }
+      let res = await fetch("/api/iml/orders/import", { method: "POST", body: formData });
+      let data = await res.json().catch(() => ({}));
+      if (
+        !res.ok &&
+        data.needs_job_number_confirm &&
+        confirm(CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE)
+      ) {
+        formData.set("confirmed_without_job_number", "1");
+        res = await fetch("/api/iml/orders/import", { method: "POST", body: formData });
+        data = await res.json().catch(() => ({}));
+      }
       if (!res.ok) throw new Error(data.error ?? "Chyba při importu");
       setResult({ imported: data.imported, errors: data.errors ?? [] });
       setFile(null);
