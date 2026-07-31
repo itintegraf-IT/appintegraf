@@ -170,9 +170,9 @@ export function PersonalTodoDetailSheet({
           className="flex w-full flex-col gap-0 p-0 sm:max-w-lg"
         >
           {/* Header */}
-          <SheetHeader className="flex-row items-center justify-between gap-2 border-b border-[hsl(var(--notion-fg)/0.08)] px-5 py-3">
+          <SheetHeader className="flex-row items-center justify-between gap-2 border-b border-border px-5 py-3">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--notion-fg)/0.5)]">
+              <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
                 Detail úkolu
               </span>
             </div>
@@ -180,7 +180,7 @@ export function PersonalTodoDetailSheet({
               type="button"
               onClick={() => onOpenChange(false)}
               aria-label="Zavřít"
-              className="grid size-7 place-items-center rounded-md text-[hsl(var(--notion-fg)/0.5)] hover:bg-[hsl(var(--notion-fg)/0.06)] hover:text-[hsl(var(--notion-fg))]"
+              className="grid size-7 place-items-center rounded-md text-muted-foreground/70 hover:bg-accent hover:text-foreground"
             >
               <X className="size-4" />
             </button>
@@ -219,7 +219,7 @@ export function PersonalTodoDetailSheet({
                 placeholder="Bez názvu"
                 className={cn(
                   "flex-1 resize-none border-0 bg-transparent text-2xl font-bold tracking-tight focus:outline-none",
-                  todo.status === "DONE" && "text-[hsl(var(--notion-fg)/0.45)] line-through",
+                  todo.status === "DONE" && "text-muted-foreground/70 line-through",
                 )}
                 style={{ minHeight: "2.5rem" }}
               />
@@ -271,7 +271,7 @@ export function PersonalTodoDetailSheet({
                         todo.status === "DONE" && "bg-emerald-100 text-emerald-700",
                         todo.status === "IN_PROGRESS" && "bg-amber-100 text-amber-700",
                         todo.status === "NOT_STARTED" &&
-                          "bg-[hsl(var(--notion-fg)/0.06)] text-[hsl(var(--notion-fg)/0.7)]",
+                          "bg-muted text-muted-foreground",
                       )}
                     >
                       <span
@@ -280,7 +280,7 @@ export function PersonalTodoDetailSheet({
                           todo.status === "DONE" && "bg-emerald-500",
                           todo.status === "IN_PROGRESS" && "bg-amber-500",
                           todo.status === "NOT_STARTED" &&
-                            "bg-[hsl(var(--notion-fg)/0.4)]",
+                            "bg-muted-foreground",
                         )}
                       />
                       {TODO_STATUS_LABEL[todo.status]}
@@ -288,7 +288,7 @@ export function PersonalTodoDetailSheet({
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
                     <DropdownMenuItem onClick={() => void patch({ status: "NOT_STARTED" })}>
-                      <span className="mr-2 size-1.5 rounded-full bg-[hsl(var(--notion-fg)/0.4)]" />
+                      <span className="mr-2 size-1.5 rounded-full bg-muted-foreground" />
                       K vyřízení
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => void patch({ status: "IN_PROGRESS" })}>
@@ -306,7 +306,7 @@ export function PersonalTodoDetailSheet({
 
             {/* Description — rich Tiptap (slash menu, headings, callouts, toggles…) */}
             <div className="mt-6 space-y-1.5">
-              <label className="block text-[11px] font-medium uppercase tracking-wider text-[hsl(var(--notion-fg)/0.5)]">
+              <label className="block text-[11px] font-medium uppercase tracking-wider text-muted-foreground/70">
                 Popis
               </label>
               <TiptapEditor
@@ -316,14 +316,14 @@ export function PersonalTodoDetailSheet({
                 placeholder="Stiskni / pro bloky, jinak piš…"
                 variant="rich"
               />
-              <p className="pt-1 text-[11px] text-[hsl(var(--notion-fg)/0.45)]">
+              <p className="pt-1 text-[11px] text-muted-foreground/70">
                 Změny se uloží automaticky.
               </p>
             </div>
           </div>
 
           {/* Footer actions */}
-          <div className="flex items-center justify-between gap-2 border-t border-[hsl(var(--notion-fg)/0.08)] px-5 py-3">
+          <div className="flex items-center justify-between gap-2 border-t border-border px-5 py-3">
             <Button
               variant="outline"
               size="sm"
@@ -385,7 +385,7 @@ function PropertyRow({
 }) {
   return (
     <div className="flex items-center gap-3">
-      <div className="flex w-24 shrink-0 items-center gap-1.5 text-xs font-medium text-[hsl(var(--notion-fg)/0.55)]">
+      <div className="flex w-24 shrink-0 items-center gap-1.5 text-xs font-medium text-muted-foreground">
         {icon}
         {label}
       </div>

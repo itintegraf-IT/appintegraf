@@ -31,8 +31,8 @@ export function PersonalTodoInlineAdd({ onCreated }: { onCreated: () => void }) 
   }
 
   return (
-    <div className="group flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-[hsl(var(--notion-fg)/0.02)]">
-      <Plus className="size-4 shrink-0 text-[hsl(var(--notion-fg)/0.4)] transition-colors group-focus-within:text-[hsl(var(--notion-fg))]" />
+    <div className="group flex items-center gap-2.5 px-4 py-2.5 text-sm transition-colors hover:bg-muted/50">
+      <Plus className="size-4 shrink-0 text-muted-foreground/70 transition-colors group-focus-within:text-foreground" />
       <input
         ref={inputRef}
         type="text"
@@ -48,7 +48,7 @@ export function PersonalTodoInlineAdd({ onCreated }: { onCreated: () => void }) 
         }}
         disabled={busy}
         placeholder="Nový úkol… (Enter pro uložení)"
-        className="flex-1 bg-transparent text-[hsl(var(--notion-fg))] placeholder:text-[hsl(var(--notion-fg)/0.4)] focus:outline-none"
+        className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground/70 focus:outline-none"
       />
     </div>
   );

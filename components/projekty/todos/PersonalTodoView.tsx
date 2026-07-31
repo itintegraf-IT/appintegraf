@@ -85,20 +85,20 @@ export function PersonalTodoView({
         }}
       />
 
-      <div className="min-h-[calc(100dvh-3rem)] bg-[hsl(var(--notion-canvas))]">
+      <div className="min-h-[calc(100dvh-3rem)] bg-background">
         <div className="mx-auto max-w-3xl px-6 py-10">
           <header className="mb-8">
             <div className="flex items-start gap-3">
-              <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-[hsl(var(--notion-fg)/0.05)] text-2xl">
+              <div className="grid size-12 shrink-0 place-items-center rounded-lg bg-muted text-2xl">
                 ✅
               </div>
               <div className="min-w-0 flex-1">
-                <h1 className="text-3xl font-bold tracking-tight text-[hsl(var(--notion-fg))]">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">
                   Můj To Do list
                 </h1>
-                <p className="pt-1 text-sm text-[hsl(var(--notion-fg)/0.6)]">
+                <p className="pt-1 text-sm text-muted-foreground">
                   Osobní úkoly. Stiskni{" "}
-                  <kbd className="rounded border border-[hsl(var(--notion-fg)/0.15)] bg-background px-1.5 py-0.5 text-[11px] font-medium">
+                  <kbd className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px] font-medium">
                     ⌘K
                   </kbd>{" "}
                   pro rychlé přidání odkudkoli.
@@ -108,7 +108,7 @@ export function PersonalTodoView({
           </header>
 
           {/* Tabs jako pill group (Notion-style) */}
-          <div className="mb-4 inline-flex items-center gap-1 rounded-lg border border-[hsl(var(--notion-fg)/0.08)] bg-background p-1">
+          <div className="mb-4 inline-flex items-center gap-1 rounded-lg border border-border bg-background p-1">
             <TabButton
               active={tab === "active"}
               onClick={() => setTab("active")}
@@ -126,11 +126,11 @@ export function PersonalTodoView({
           </div>
 
           {/* List */}
-          <div className="overflow-hidden rounded-xl border border-[hsl(var(--notion-fg)/0.08)] bg-background shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
             {visible.length === 0 ? (
               <EmptyState tab={tab} />
             ) : (
-              <ul className="divide-y divide-[hsl(var(--notion-fg)/0.06)]">
+              <ul className="divide-y divide-border/60">
                 {visible.map((todo) => (
                   <PersonalTodoRow
                     key={todo.id}
@@ -144,7 +144,7 @@ export function PersonalTodoView({
               </ul>
             )}
             {tab === "active" && (
-              <div className="border-t border-[hsl(var(--notion-fg)/0.06)]">
+              <div className="border-t border-border/60">
                 <PersonalTodoInlineAdd onCreated={refetch} />
               </div>
             )}
@@ -177,8 +177,8 @@ function TabButton({
       className={cn(
         "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
         active
-          ? "bg-[hsl(var(--notion-fg)/0.06)] text-[hsl(var(--notion-fg))]"
-          : "text-[hsl(var(--notion-fg)/0.55)] hover:text-[hsl(var(--notion-fg))]",
+          ? "bg-muted text-foreground"
+          : "text-muted-foreground hover:text-foreground",
       )}
     >
       {icon}
@@ -187,8 +187,8 @@ function TabButton({
         className={cn(
           "ml-0.5 rounded px-1.5 py-0.5 text-[11px] font-semibold",
           active
-            ? "bg-[hsl(var(--notion-fg)/0.08)] text-[hsl(var(--notion-fg)/0.7)]"
-            : "text-[hsl(var(--notion-fg)/0.5)]",
+            ? "bg-muted text-muted-foreground"
+            : "text-muted-foreground/70",
         )}
       >
         {count}
@@ -201,13 +201,13 @@ function EmptyState({ tab }: { tab: Tab }) {
   if (tab === "active") {
     return (
       <div className="grid place-items-center gap-2 py-12 text-center">
-        <Sparkles className="size-6 text-[hsl(var(--notion-fg)/0.3)]" />
-        <p className="text-sm font-medium text-[hsl(var(--notion-fg)/0.7)]">
+        <Sparkles className="size-6 text-muted-foreground/70" />
+        <p className="text-sm font-medium text-muted-foreground">
           Žádné úkoly k vyřízení
         </p>
-        <p className="text-xs text-[hsl(var(--notion-fg)/0.5)]">
+        <p className="text-xs text-muted-foreground/70">
           Napiš si první úkol dole, nebo stiskni{" "}
-          <kbd className="rounded border border-[hsl(var(--notion-fg)/0.15)] bg-background px-1 text-[10px]">
+          <kbd className="rounded border border-border bg-background px-1 text-[10px]">
             ⌘K
           </kbd>
           .
@@ -216,7 +216,7 @@ function EmptyState({ tab }: { tab: Tab }) {
     );
   }
   return (
-    <div className="py-10 text-center text-sm text-[hsl(var(--notion-fg)/0.5)]">
+    <div className="py-10 text-center text-sm text-muted-foreground/70">
       Žádné hotové úkoly.
     </div>
   );

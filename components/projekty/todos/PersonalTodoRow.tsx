@@ -90,8 +90,8 @@ export function PersonalTodoRow({
           }
         }}
         className={cn(
-          "group flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[hsl(var(--notion-fg)/0.03)]",
-          selected && "bg-[hsl(var(--notion-fg)/0.04)]",
+          "group flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/50",
+          selected && "bg-muted/50",
         )}
       >
         <TodoStatusCheckbox
@@ -104,15 +104,15 @@ export function PersonalTodoRow({
           className={cn(
             "flex-1 truncate text-sm",
             isDone
-              ? "text-[hsl(var(--notion-fg)/0.45)] line-through"
-              : "text-[hsl(var(--notion-fg))]",
+              ? "text-muted-foreground/70 line-through"
+              : "text-foreground",
           )}
         >
           {todo.title}
         </span>
 
         {dueDate && (
-          <span className="shrink-0 rounded-md bg-[hsl(var(--notion-fg)/0.04)] px-2 py-0.5 text-xs font-medium text-[hsl(var(--notion-fg)/0.65)]">
+          <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
             {format(dueDate, "d. M.", { locale: cs })}
           </span>
         )}
@@ -122,7 +122,7 @@ export function PersonalTodoRow({
             <button
               type="button"
               onClick={(e) => e.stopPropagation()}
-              className="shrink-0 rounded p-1 text-[hsl(var(--notion-fg)/0.4)] opacity-0 transition-all hover:bg-[hsl(var(--notion-fg)/0.06)] hover:text-[hsl(var(--notion-fg))] group-hover:opacity-100 data-[state=open]:opacity-100"
+              className="shrink-0 rounded p-1 text-muted-foreground/70 opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover:opacity-100 data-[state=open]:opacity-100"
               aria-label="Více akcí"
             >
               <MoreHorizontal className="size-4" />

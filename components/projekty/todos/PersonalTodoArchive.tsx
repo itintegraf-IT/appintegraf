@@ -35,30 +35,30 @@ export function PersonalTodoArchive({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-1.5 text-xs font-medium text-[hsl(var(--notion-fg)/0.55)] hover:text-[hsl(var(--notion-fg))]"
+        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
       >
         <ChevronRight className={cn("size-3.5 transition-transform", open && "rotate-90")} />
         <Archive className="size-3.5" />
         Historie přesunů ({archived.length})
       </button>
       {open && (
-        <div className="mt-2 overflow-hidden rounded-xl border border-[hsl(var(--notion-fg)/0.08)] bg-background">
+        <div className="mt-2 overflow-hidden rounded-xl border border-border bg-background">
           {archived.length === 0 ? (
-            <div className="p-4 text-xs text-[hsl(var(--notion-fg)/0.5)]">
+            <div className="p-4 text-xs text-muted-foreground/70">
               Žádné přesunuté úkoly. Při přesunu úkolu do projektu se sem uloží odkaz na vytvořenou kartu.
             </div>
           ) : (
-            <ul className="divide-y divide-[hsl(var(--notion-fg)/0.06)]">
+            <ul className="divide-y divide-border/60">
               {archived.map((todo) => (
                 <li
                   key={todo.id}
-                  className="group flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-[hsl(var(--notion-fg)/0.02)]"
+                  className="group flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-muted/50"
                 >
-                  <span className="flex-1 truncate text-[hsl(var(--notion-fg)/0.55)] line-through">
+                  <span className="flex-1 truncate text-muted-foreground line-through">
                     {todo.title}
                   </span>
                   {todo.archivedAt && (
-                    <span className="shrink-0 text-xs text-[hsl(var(--notion-fg)/0.45)]">
+                    <span className="shrink-0 text-xs text-muted-foreground/70">
                       {format(todo.archivedAt, "d. M. yyyy", { locale: cs })}
                     </span>
                   )}
@@ -74,7 +74,7 @@ export function PersonalTodoArchive({
                   <button
                     type="button"
                     onClick={() => void remove(todo.id)}
-                    className="shrink-0 rounded p-1 text-[hsl(var(--notion-fg)/0.4)] opacity-0 transition-all hover:bg-[hsl(var(--notion-fg)/0.06)] hover:text-destructive group-hover:opacity-100"
+                    className="shrink-0 rounded p-1 text-muted-foreground/70 opacity-0 transition-all hover:bg-accent hover:text-destructive group-hover:opacity-100"
                     aria-label="Smazat z historie"
                   >
                     <X className="size-3.5" />

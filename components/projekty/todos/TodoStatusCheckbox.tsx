@@ -63,7 +63,7 @@ export function TodoStatusCheckbox({
         status === "IN_PROGRESS" &&
           "border-amber-500 bg-amber-500 text-white",
         status === "NOT_STARTED" &&
-          "border-[hsl(var(--notion-fg)/0.25)] hover:border-[hsl(var(--notion-fg)/0.5)] hover:bg-[hsl(var(--notion-fg)/0.04)]",
+          "border-border hover:border-muted-foreground/50 hover:bg-accent",
       )}
     >
       {status === "DONE" && <Check className={iconDim} strokeWidth={2.5} />}
