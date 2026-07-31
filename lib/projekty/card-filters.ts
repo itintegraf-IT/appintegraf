@@ -1,3 +1,5 @@
+import { getDueStatus, startOfLocalDay } from "./due-date";
+
 export type CardFilters = {
   q?: string;
   memberIds?: string[];
@@ -60,14 +62,14 @@ export function matchesFilters(
     } else {
       if (!card.dueDate) return false;
       const due = new Date(card.dueDate);
-      const now = new Date();
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const today = startOfLocalDay();
       const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
       const weekFromNow = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
 
       if (filters.dueRange === "overdue") {
-        if (due >= today || card.completed) return false;
+        if (getDueStatus(due, card.completed) !== "overdue") return false;
       } else if (filters.dueRange === "today") {
+        // Záměrně bez completed guardu — filtr „dnes" má ukázat i hotové (filtr ≠ badge).
         if (due < today || due >= tomorrow) return false;
       } else if (filters.dueRange === "week") {
         if (due < today || due >= weekFromNow) return false;
