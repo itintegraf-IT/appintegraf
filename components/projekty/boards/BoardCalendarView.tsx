@@ -115,7 +115,7 @@ export function BoardCalendarView({
 
   if (isMobile) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-[hsl(var(--notion-fg)/0.6)]">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
         <p className="text-sm">Calendar je dostupný na desktopu.</p>
         <Button
           variant="outline"
@@ -169,7 +169,7 @@ export function BoardCalendarView({
     return (
       <div className="flex flex-1 flex-col">
         <CalendarHeader />
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-[hsl(var(--notion-fg)/0.5)]">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground/70">
           <p className="text-sm">Žádné karty odpovídající filtru.</p>
           <Button variant="outline" onClick={clearFilters}>
             Vymazat filtr
@@ -184,7 +184,7 @@ export function BoardCalendarView({
       <div className="flex flex-1 flex-col">
         <CalendarHeader />
         <CalendarGrid weeks={weeks} />
-        <div className="flex flex-col items-center justify-center gap-2 border-t border-[hsl(var(--notion-fg)/0.09)] p-3 text-[hsl(var(--notion-fg)/0.5)]">
+        <div className="flex flex-col items-center justify-center gap-2 border-t border-border p-3 text-muted-foreground/70">
           <p className="text-xs">Žádné karty s daty v tomto měsíci.</p>
           <Button variant="outline" size="sm" onClick={switchToKanban}>
             Přepnout na Kanban

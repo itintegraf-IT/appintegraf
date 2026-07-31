@@ -52,16 +52,16 @@ export function CalendarCardPill({ pill }: { pill: CalendarPill }) {
         }
       }}
       title={card.title}
-      className={`group flex w-full cursor-grab touch-none items-center gap-1 rounded px-1.5 py-0.5 text-left text-[11px] transition-colors hover:bg-[hsl(var(--notion-fg)/0.06)] active:cursor-grabbing ${
+      className={`group flex w-full cursor-grab touch-none items-center gap-1 rounded px-1.5 py-0.5 text-left text-[11px] transition-colors hover:bg-muted/50 active:cursor-grabbing ${
         card.completed ? "opacity-60" : ""
       }`}
     >
       {pill.continuesLeft ? (
-        <ChevronLeft className="size-3 shrink-0 text-[hsl(var(--notion-fg)/0.5)]" />
+        <ChevronLeft className="size-3 shrink-0 text-muted-foreground/70" />
       ) : null}
       <span
         className={`flex-1 truncate ${
-          card.completed ? "line-through text-[hsl(var(--notion-fg)/0.5)]" : "text-[hsl(var(--notion-fg))]"
+          card.completed ? "line-through text-muted-foreground/70" : "text-foreground"
         }`}
       >
         {card.title}
@@ -70,7 +70,7 @@ export function CalendarCardPill({ pill }: { pill: CalendarPill }) {
         <UserAvatar user={primaryMember} size="xs" className="shrink-0" />
       ) : null}
       {pill.continuesRight ? (
-        <ChevronRight className="size-3 shrink-0 text-[hsl(var(--notion-fg)/0.5)]" />
+        <ChevronRight className="size-3 shrink-0 text-muted-foreground/70" />
       ) : null}
     </div>
   );

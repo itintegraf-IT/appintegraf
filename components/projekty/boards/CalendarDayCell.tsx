@@ -2,6 +2,7 @@
 
 import { useDroppable } from "@dnd-kit/core";
 import { type DayCell } from "@/lib/projekty/calendar";
+import { cn } from "@/lib/projekty/utils";
 import { CalendarCardPill } from "./CalendarCardPill";
 
 export function CalendarDayCell({ cell }: { cell: DayCell }) {
@@ -13,16 +14,19 @@ export function CalendarDayCell({ cell }: { cell: DayCell }) {
   return (
     <div
       ref={setNodeRef}
-      className={`flex min-h-[6rem] flex-col gap-0.5 border-b border-r border-[hsl(var(--notion-fg)/0.06)] p-1 transition-colors ${
-        cell.outOfMonth ? "bg-[hsl(var(--notion-fg)/0.03)]" : "bg-[hsl(var(--notion-canvas))]"
-      } ${cell.isToday ? "ring-2 ring-[hsl(var(--info))] ring-inset" : ""} ${
-        isOver ? "bg-[hsl(var(--info)/0.15)]" : ""
-      }`}
+      className={cn(
+        "flex min-h-[6rem] flex-col gap-0.5 border-b border-r border-border/60 p-1 transition-colors",
+        isOver ? "bg-blue-500/15" : cell.outOfMonth ? "bg-muted/40" : "bg-background",
+        cell.isToday && "ring-2 ring-inset ring-blue-500 dark:ring-blue-400"
+      )}
     >
       <div
-        className={`text-right text-[11px] tabular-nums ${
-          cell.outOfMonth ? "text-[hsl(var(--notion-fg)/0.3)]" : "text-[hsl(var(--notion-fg)/0.5)]"
-        } ${cell.isToday ? "font-bold text-[hsl(var(--info))]" : ""}`}
+        className={cn(
+          "text-right text-[11px] tabular-nums",
+          cell.isToday
+            ? "font-bold text-blue-600 dark:text-blue-400"
+            : "text-muted-foreground/70"
+        )}
       >
         {cell.date.getDate()}
       </div>

@@ -32,7 +32,7 @@ export function CalendarHeader() {
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-[hsl(var(--notion-fg)/0.09)] bg-[hsl(var(--notion-canvas))] px-3 py-2">
+    <div className="flex items-center justify-between gap-3 border-b border-border bg-background px-3 py-2">
       <div className="flex items-center gap-1">
         <Button
           size="icon"
@@ -52,7 +52,7 @@ export function CalendarHeader() {
         >
           <ChevronRight className="size-4" />
         </Button>
-        <span className="ml-2 text-sm font-semibold text-[hsl(var(--notion-fg))]">
+        <span className="ml-2 text-sm font-semibold text-foreground">
           {monthLabelCapital}
         </span>
       </div>
