@@ -3,6 +3,7 @@ import { prisma } from "@/lib/projekty/prisma";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { DueDateBadge } from "@/components/projekty/DueDateBadge";
+import { LabelChip } from "@/components/projekty/LabelChip";
 
 // Cross-board přehled "Moje karty": karty (nearchivované), kde je přihlášený
 // uživatel členem. Read-only; každý řádek deep-linkuje na detail karty.
@@ -79,13 +80,7 @@ export default async function MyCardsPage() {
                   {c.labels.length > 0 ? (
                     <div className="flex shrink-0 gap-1">
                       {c.labels.slice(0, 3).map((l) => (
-                        <span
-                          key={l.labelId}
-                          className="rounded px-1.5 py-0.5 text-[10px] text-white"
-                          style={{ backgroundColor: l.label.color }}
-                        >
-                          {l.label.name}
-                        </span>
+                        <LabelChip key={l.labelId} name={l.label.name} color={l.label.color} />
                       ))}
                     </div>
                   ) : null}

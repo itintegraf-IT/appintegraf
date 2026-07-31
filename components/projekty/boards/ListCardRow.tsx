@@ -6,6 +6,7 @@ import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
 import { DueDateBadge } from "@/components/projekty/DueDateBadge";
+import { LabelChip } from "@/components/projekty/LabelChip";
 import { findListColor } from "@/lib/projekty/list-colors";
 import { cn } from "@/lib/projekty/utils";
 import { useBulkSelection } from "./BulkSelectionContext";
@@ -157,19 +158,12 @@ export function ListCardRow({
       {/* Labels */}
       <span className="hidden w-32 shrink-0 items-center gap-1 sm:flex">
         {visibleLabels.map((l) => (
-          <span
+          <LabelChip
             key={l.labelId}
-            className="inline-flex max-w-[5rem] items-center gap-1 truncate rounded-full px-1.5 py-0.5 text-[10px]"
-            style={{ backgroundColor: `${l.label.color}22`, color: l.label.color }}
-            title={l.label.name}
-          >
-            <span
-              className="size-1 shrink-0 rounded-full"
-              style={{ backgroundColor: l.label.color }}
-              aria-hidden
-            />
-            {l.label.name}
-          </span>
+            name={l.label.name}
+            color={l.label.color}
+            className="max-w-[5rem]"
+          />
         ))}
         {extraLabelsCount > 0 ? (
           <span className="text-xs text-muted-foreground/70">+{extraLabelsCount}</span>

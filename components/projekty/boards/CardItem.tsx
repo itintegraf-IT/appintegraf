@@ -6,6 +6,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { CheckCircle2, CheckSquare } from "lucide-react";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
 import { DueDateBadge } from "@/components/projekty/DueDateBadge";
+import { LabelChip } from "@/components/projekty/LabelChip";
 import { cn } from "@/lib/projekty/utils";
 import { useBulkSelection } from "./BulkSelectionContext";
 import { useIsTouchDevice } from "@/hooks/projekty/useIsTouchDevice";
@@ -83,13 +84,12 @@ function CardItemBody({
       {hasAnyMeta ? (
         <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
           {primaryLabel ? (
-            <span className="inline-flex items-center gap-1" title={primaryLabel.name}>
-              <span
-                className="size-2 shrink-0 rounded-full"
-                style={{ backgroundColor: primaryLabel.color }}
-                aria-hidden
+            <span className="inline-flex min-w-0 items-center gap-1">
+              <LabelChip
+                name={primaryLabel.name}
+                color={primaryLabel.color}
+                className="-my-0.5 max-w-[8rem]"
               />
-              <span className="truncate">{primaryLabel.name}</span>
               {extraLabelsCount > 0 ? (
                 <span className="text-muted-foreground/70">+{extraLabelsCount}</span>
               ) : null}
