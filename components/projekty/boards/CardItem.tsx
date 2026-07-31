@@ -31,6 +31,8 @@ export type CardData = {
   notesCount?: number;
   attachmentsCount?: number;
   _count?: { checklists: number };
+  checklistDone?: number;
+  checklistTotal?: number;
 };
 
 /**
@@ -52,7 +54,10 @@ function CardItemBody({
   const primaryLabel = card.labels[0]?.label;
   const extraLabelsCount = card.labels.length - 1;
 
-  const hasAnyMeta = Boolean(primaryLabel || due || card._count?.checklists || primaryMember);
+  const checklistTotal = card.checklistTotal ?? 0;
+  const checklistDone = card.checklistDone ?? 0;
+  const hasChecklist = checklistTotal > 0 || Boolean(card._count?.checklists);
+  const hasAnyMeta = Boolean(primaryLabel || due || hasChecklist || primaryMember);
 
   const content = (
     <div className="px-3 py-2">
@@ -98,10 +103,17 @@ function CardItemBody({
           {due ? (
             <DueDateBadge due={due} completed={card.completed} className="-my-0.5" />
           ) : null}
-          {card._count?.checklists ? (
-            <span className="inline-flex items-center gap-1">
+          {hasChecklist ? (
+            <span
+              className={cn(
+                "inline-flex items-center gap-1 tabular-nums",
+                checklistTotal > 0 && checklistDone === checklistTotal && "text-emerald-600",
+              )}
+            >
               <CheckSquare className="size-3" aria-hidden />
-              {card._count.checklists}
+              {checklistTotal > 0
+                ? `${checklistDone}/${checklistTotal}`
+                : card._count?.checklists}
             </span>
           ) : null}
           {primaryMember ? (

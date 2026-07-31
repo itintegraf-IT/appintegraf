@@ -64,9 +64,9 @@ export default async function BoardPage({ params }: { params: Params }) {
   });
   if (!board) notFound();
 
-  // Polymorfní counts — Note + Attachment
+  // Polymorfní counts — Note + Attachment + checklist done/total
   const cardIds = board.lists.flatMap((l) => l.cards.map((c) => c.id));
-  const [noteCounts, attachmentCounts] = await Promise.all([
+  const [noteCounts, attachmentCounts, checklistRows] = await Promise.all([
     cardIds.length > 0
       ? prisma.note.groupBy({
           by: ["parentId"],
@@ -81,8 +81,21 @@ export default async function BoardPage({ params }: { params: Params }) {
           _count: { id: true },
         })
       : Promise.resolve([] as Array<{ parentId: string; _count: { id: number } }>),
+    cardIds.length > 0
+      ? prisma.checklist.findMany({
+          where: { cardId: { in: cardIds } },
+          select: { cardId: true, items: { select: { done: true } } },
+        })
+      : Promise.resolve([] as Array<{ cardId: string; items: { done: boolean }[] }>),
   ]);
   const noteCountMap = Object.fromEntries(noteCounts.map((n) => [n.parentId, n._count.id]));
+  const checklistMap = new Map<string, { done: number; total: number }>();
+  for (const row of checklistRows) {
+    const agg = checklistMap.get(row.cardId) ?? { done: 0, total: 0 };
+    agg.total += row.items.length;
+    agg.done += row.items.filter((i) => i.done).length;
+    checklistMap.set(row.cardId, agg);
+  }
   const attachmentCountMap = Object.fromEntries(
     attachmentCounts.map((a) => [a.parentId, a._count.id]),
   );
@@ -98,6 +111,8 @@ export default async function BoardPage({ params }: { params: Params }) {
         members: c.members.map((m) => ({ ...m, user: toDisplayUser(m.user) })),
         notesCount: noteCountMap[c.id] ?? 0,
         attachmentsCount: attachmentCountMap[c.id] ?? 0,
+        checklistDone: checklistMap.get(c.id)?.done ?? 0,
+        checklistTotal: checklistMap.get(c.id)?.total ?? 0,
       })),
     })),
   };
