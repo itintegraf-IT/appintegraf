@@ -60,7 +60,6 @@ export function BoardCreateDialog({
       const { board } = (await res.json()) as { board: { id: string } };
       reset();
       onOpenChange(false);
-      // TODO(Task 10): drop `as never` cast once /boards/[boardId] route is registered
       router.push(`/projekty/boards/${board.id}`);
     } catch {
       toast.error("Vytvoření boardu selhalo (chyba sítě).");
