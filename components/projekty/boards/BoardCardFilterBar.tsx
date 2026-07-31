@@ -54,14 +54,14 @@ export function BoardCardFilterBar({
     filters.completed === "true";
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-[hsl(var(--notion-fg)/0.09)] bg-[hsl(var(--notion-canvas))] px-3 py-2">
+    <div className="flex flex-wrap items-center gap-2 border-b border-border bg-background px-3 py-2">
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-[hsl(var(--notion-fg)/0.4)]" />
+        <Search className="absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground/70" />
         <Input
           value={filters.q ?? ""}
           onChange={(e) => update({ q: e.target.value || undefined })}
           placeholder="Hledat…"
-          className="h-8 w-32 bg-[hsl(var(--notion-surface))] pl-7 text-[hsl(var(--notion-fg))] placeholder:text-[hsl(var(--notion-fg)/0.4)] sm:w-48"
+          className="h-8 w-32 bg-card pl-7 text-foreground placeholder:text-muted-foreground/70 sm:w-48"
         />
       </div>
 

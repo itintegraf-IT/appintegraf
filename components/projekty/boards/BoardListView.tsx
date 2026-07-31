@@ -125,7 +125,7 @@ export function BoardListView({
   // nejsou žádné karty.
   if (totalCards === 0 && hasActiveFilter) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-[hsl(var(--notion-fg)/0.5)]">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground/70">
         <p className="text-sm">Žádné karty odpovídající filtru.</p>
         <Button variant="outline" onClick={clearFilters}>
           Vymazat filtr
@@ -142,7 +142,7 @@ export function BoardListView({
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex-1 overflow-y-auto bg-[hsl(var(--notion-canvas))]">
+      <div className="flex-1 overflow-y-auto bg-background">
         {displayedLists.map((list) => (
           <section key={list.id} className="mb-2">
             <ListGroupHeader list={list} />
@@ -151,7 +151,7 @@ export function BoardListView({
               strategy={verticalListSortingStrategy}
             >
               {list.cards.length === 0 ? (
-                <p className="px-4 py-3 text-xs text-[hsl(var(--notion-fg)/0.5)]">
+                <p className="px-4 py-3 text-xs text-muted-foreground/70">
                   Žádné karty v tomto sloupci.
                 </p>
               ) : (
@@ -165,8 +165,8 @@ export function BoardListView({
       </div>
       <DragOverlay dropAnimation={null}>
         {activeCard ? (
-          <div className="flex items-center gap-3 rounded-lg border border-[hsl(var(--notion-fg)/0.12)] bg-[hsl(var(--notion-canvas))] px-4 py-2 shadow-2xl">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--notion-fg)/0.5)] tabular-nums">
+          <div className="flex items-center gap-3 rounded-lg border border-border bg-background px-4 py-2 shadow-2xl">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 tabular-nums">
               {activeCard.number}
             </span>
             <span className="text-sm font-medium">{activeCard.title}</span>

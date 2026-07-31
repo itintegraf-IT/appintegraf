@@ -49,7 +49,7 @@ export function ListCardRow({
       ? "bg-rose-100 text-rose-900"
       : isToday(due)
         ? "bg-amber-100 text-amber-900"
-        : "bg-[hsl(var(--notion-fg)/0.06)] text-[hsl(var(--notion-fg)/0.7)]"
+        : "bg-muted text-muted-foreground"
     : "";
 
   const primaryMember = card.members[0]?.user;
@@ -112,7 +112,7 @@ export function ListCardRow({
       }}
       aria-label={`Karta ${card.title} — přesun nebo otevření`}
       className={cn(
-        "group flex w-full cursor-grab touch-none items-center gap-3 border-b border-[hsl(var(--notion-fg)/0.06)] px-4 py-2 text-left transition-colors hover:bg-[hsl(var(--notion-fg)/0.04)] active:cursor-grabbing",
+        "group flex w-full cursor-grab touch-none items-center gap-3 border-b border-border/60 px-4 py-2 text-left transition-colors hover:bg-muted/50 active:cursor-grabbing",
         isSelected && !isTouch && "border-l-4 border-l-primary bg-primary/5",
       )}
     >
@@ -122,7 +122,7 @@ export function ListCardRow({
         aria-checked={card.completed}
         aria-label={card.completed ? "Označit jako nedokončené" : "Označit jako hotové"}
         onClick={toggleCompleted}
-        className="grid size-4 shrink-0 place-items-center rounded border border-[hsl(var(--notion-fg)/0.2)] transition-colors hover:bg-[hsl(var(--notion-fg)/0.06)]"
+        className="grid size-4 shrink-0 place-items-center rounded border border-border transition-colors hover:bg-accent"
       >
         {card.completed ? (
           <CheckCircle2 className="size-4 text-emerald-600" strokeWidth={2} />
@@ -130,7 +130,7 @@ export function ListCardRow({
       </span>
 
       {/* # number */}
-      <span className="w-16 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-[hsl(var(--notion-fg)/0.5)] tabular-nums">
+      <span className="w-16 shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 tabular-nums">
         {card.number}
       </span>
 
@@ -138,15 +138,15 @@ export function ListCardRow({
       <span
         className={`flex-1 truncate text-sm ${
           card.completed
-            ? "text-[hsl(var(--notion-fg)/0.5)] line-through"
-            : "font-medium text-[hsl(var(--notion-fg))]"
+            ? "text-muted-foreground/70 line-through"
+            : "font-medium text-foreground"
         }`}
       >
         {card.title}
       </span>
 
       {/* Sloupec */}
-      <span className="hidden w-32 shrink-0 items-center gap-1.5 text-xs text-[hsl(var(--notion-fg)/0.6)] sm:flex">
+      <span className="hidden w-32 shrink-0 items-center gap-1.5 text-xs text-muted-foreground sm:flex">
         <span
           className="size-1.5 shrink-0 rounded-full"
           style={{ backgroundColor: colorPreset.dot }}
@@ -159,7 +159,7 @@ export function ListCardRow({
       <span className="hidden w-24 shrink-0 items-center gap-1 sm:flex">
         {primaryMember ? <UserAvatar user={primaryMember} size="xs" /> : null}
         {extraMembersCount > 0 ? (
-          <span className="text-xs text-[hsl(var(--notion-fg)/0.5)]">+{extraMembersCount}</span>
+          <span className="text-xs text-muted-foreground/70">+{extraMembersCount}</span>
         ) : null}
       </span>
 
@@ -181,7 +181,7 @@ export function ListCardRow({
           </span>
         ))}
         {extraLabelsCount > 0 ? (
-          <span className="text-xs text-[hsl(var(--notion-fg)/0.5)]">+{extraLabelsCount}</span>
+          <span className="text-xs text-muted-foreground/70">+{extraLabelsCount}</span>
         ) : null}
       </span>
 
