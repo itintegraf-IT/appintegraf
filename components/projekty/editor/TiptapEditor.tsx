@@ -113,7 +113,7 @@ export function TiptapEditor({
               <Plus className="size-3.5" />
               Blok
             </Button>
-            <span className="mx-1 h-5 w-px bg-[hsl(var(--notion-fg)/0.12)]" aria-hidden />
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden />
             <Button
               type="button"
               size="icon"
@@ -144,7 +144,7 @@ export function TiptapEditor({
             >
               <Heading3 className="size-3.5" />
             </Button>
-            <span className="mx-1 h-5 w-px bg-[hsl(var(--notion-fg)/0.12)]" aria-hidden />
+            <span className="mx-1 h-5 w-px bg-border" aria-hidden />
           </>
         ) : null}
         <Button
@@ -210,7 +210,7 @@ export function TiptapEditor({
       ) : null}
       <EditorContent
         editor={editor}
-        className="min-h-24 p-3 text-sm focus:outline-none [&_*:focus]:outline-none [&_p]:my-1 [&_h1]:my-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:tracking-tight [&_h2]:my-2 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:tracking-tight [&_h3]:my-1.5 [&_h3]:text-base [&_h3]:font-semibold [&_ul]:ml-4 [&_ul]:list-disc [&_ol]:ml-4 [&_ol]:list-decimal [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-[hsl(var(--notion-fg)/0.2)] [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-[hsl(var(--notion-fg)/0.7)] [&_pre]:my-2 [&_pre]:rounded [&_pre]:bg-[hsl(var(--notion-fg)/0.06)] [&_pre]:p-2 [&_pre]:font-mono [&_pre]:text-xs [&_hr]:my-3 [&_hr]:border-[hsl(var(--notion-fg)/0.12)] [&_a]:text-primary [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_img]:max-w-full [&_img]:rounded"
+        className="min-h-24 p-3 text-sm focus:outline-none [&_*:focus]:outline-none [&_p]:my-1 [&_h1]:my-2 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:tracking-tight [&_h2]:my-2 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:tracking-tight [&_h3]:my-1.5 [&_h3]:text-base [&_h3]:font-semibold [&_ul]:ml-4 [&_ul]:list-disc [&_ol]:ml-4 [&_ol]:list-decimal [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:italic [&_blockquote]:text-muted-foreground [&_pre]:my-2 [&_pre]:rounded [&_pre]:bg-muted [&_pre]:p-2 [&_pre]:font-mono [&_pre]:text-xs [&_hr]:my-3 [&_hr]:border-border [&_a]:text-primary [&_a]:underline [&_code]:rounded [&_code]:bg-muted [&_code]:px-1 [&_img]:max-w-full [&_img]:rounded"
       />
     </div>
   );

@@ -22,7 +22,7 @@ export function EmojiPicker({
     <div
       role="dialog"
       aria-label="Vybrat emoji"
-      className="grid grid-cols-5 gap-1 rounded-lg border border-[hsl(var(--notion-fg)/0.12)] bg-[hsl(var(--notion-canvas))] p-2 shadow-lg"
+      className="grid grid-cols-5 gap-1 rounded-lg border border-border bg-popover p-2 shadow-lg"
     >
       {EMOJIS.map((emoji) => (
         <button
@@ -33,8 +33,8 @@ export function EmojiPicker({
             onClose();
           }}
           aria-label={`Emoji ${emoji}`}
-          className={`grid size-8 place-items-center rounded text-lg transition-colors hover:bg-[hsl(var(--notion-fg)/0.06)] ${
-            emoji === current ? "ring-2 ring-[hsl(var(--info))]" : ""
+          className={`grid size-8 place-items-center rounded text-lg transition-colors hover:bg-accent ${
+            emoji === current ? "ring-2 ring-blue-500" : ""
           }`}
         >
           {emoji}

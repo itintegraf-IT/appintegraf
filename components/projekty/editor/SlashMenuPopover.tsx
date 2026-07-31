@@ -53,7 +53,7 @@ export const SlashMenuPopover = forwardRef<SlashMenuPopoverRef, SlashMenuPopover
 
     if (items.length === 0) {
       return (
-        <div className="rounded-lg border border-[hsl(var(--notion-fg)/0.12)] bg-[hsl(var(--notion-canvas))] p-4 text-sm text-[hsl(var(--notion-fg)/0.6)] shadow-lg">
+        <div className="rounded-lg border border-border bg-popover p-4 text-sm text-muted-foreground shadow-lg">
           Žádné bloky nenalezeny.
         </div>
       );
@@ -71,13 +71,13 @@ export const SlashMenuPopover = forwardRef<SlashMenuPopoverRef, SlashMenuPopover
 
     return (
       <div className="flex items-start gap-1.5">
-        <div className="max-h-[320px] w-72 overflow-y-auto rounded-lg border border-[hsl(var(--notion-fg)/0.12)] bg-[hsl(var(--notion-canvas))] py-2 shadow-lg">
-          <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-[hsl(var(--notion-fg)/0.4)]">
+        <div className="max-h-[320px] w-72 overflow-y-auto rounded-lg border border-border bg-popover py-2 shadow-lg">
+          <div className="px-3 py-1 text-[10px] uppercase tracking-wider text-muted-foreground/70">
             Bloky · /
           </div>
           {grouped.map((group) => (
             <div key={group.cat}>
-              <div className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-[hsl(var(--notion-fg)/0.5)]">
+              <div className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70">
                 {CATEGORY_LABELS[group.cat]}
               </div>
               {group.items.map((item) => {
@@ -94,17 +94,17 @@ export const SlashMenuPopover = forwardRef<SlashMenuPopoverRef, SlashMenuPopover
                     }}
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm ${
-                      active ? "bg-[hsl(var(--notion-fg)/0.06)]" : ""
+                      active ? "bg-accent" : ""
                     }`}
                   >
-                    <span className="grid size-6 shrink-0 place-items-center rounded border border-[hsl(var(--notion-fg)/0.12)] bg-[hsl(var(--notion-canvas))] text-[11px] font-bold">
+                    <span className="grid size-6 shrink-0 place-items-center rounded border border-border bg-background text-[11px] font-bold">
                       {typeof item.icon === "string" ? (
                         item.icon
                       ) : Icon ? (
                         <Icon className="size-3.5" strokeWidth={1.75} />
                       ) : null}
                     </span>
-                    <span className="text-[hsl(var(--notion-fg))]">{item.name}</span>
+                    <span className="text-foreground">{item.name}</span>
                   </button>
                 );
               })}
@@ -114,9 +114,9 @@ export const SlashMenuPopover = forwardRef<SlashMenuPopoverRef, SlashMenuPopover
 
         {/* Preview panel — Notion-style. Skrývá se pokud blok nemá preview definovaný. */}
         {preview ? (
-          <div className="hidden w-56 shrink-0 rounded-lg bg-[hsl(var(--notion-fg))] p-2 shadow-lg sm:block">
+          <div className="hidden w-56 shrink-0 rounded-lg bg-foreground p-2 shadow-lg sm:block">
             <div className="grid min-h-[120px] place-items-center rounded bg-background p-3">{preview.mock}</div>
-            <div className="px-1 pt-2 text-xs text-white/80">{preview.caption}</div>
+            <div className="px-1 pt-2 text-xs text-background/80">{preview.caption}</div>
           </div>
         ) : null}
       </div>

@@ -7,7 +7,7 @@ export function ToggleNodeView({ node, updateAttributes }: ReactNodeViewProps) {
   const open = Boolean(node.attrs.open);
   return (
     <NodeViewWrapper
-      className="my-2 rounded-md border border-[hsl(var(--notion-fg)/0.12)] bg-[hsl(var(--notion-fg)/0.02)] px-2 py-1.5"
+      className="my-2 rounded-md border border-border bg-muted/30 px-2 py-1.5"
       data-type="toggle"
       data-open={open ? "true" : "false"}
     >
@@ -17,7 +17,7 @@ export function ToggleNodeView({ node, updateAttributes }: ReactNodeViewProps) {
           onClick={() => updateAttributes({ open: !open })}
           aria-label={open ? "Sbalit" : "Rozbalit"}
           title={open ? "Sbalit obsah" : "Rozbalit obsah"}
-          className="mt-0.5 grid size-6 shrink-0 cursor-pointer place-items-center rounded text-[hsl(var(--notion-fg)/0.6)] transition-colors hover:bg-[hsl(var(--notion-fg)/0.08)] hover:text-[hsl(var(--notion-fg))]"
+          className="mt-0.5 grid size-6 shrink-0 cursor-pointer place-items-center rounded text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
           contentEditable={false}
         >
           <ChevronRight
