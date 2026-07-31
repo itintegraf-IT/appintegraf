@@ -110,23 +110,23 @@ function BoardViewInner({ board, currentUserId, lists, setLists }: BoardViewInne
   return (
     <>
       <div
-        className="-m-4 flex h-[calc(100dvh-3rem)] flex-col bg-[hsl(var(--notion-canvas))] md:-m-6"
+        className="-m-4 flex h-[calc(100dvh-3rem)] flex-col bg-background md:-m-6"
         onClick={handleBoardClick}
       >
-        <header className="flex items-center justify-between gap-3 border-b border-[hsl(var(--notion-fg)/0.09)] bg-[hsl(var(--notion-canvas))] px-4 py-3">
+        <header className="flex items-center justify-between gap-3 border-b border-border bg-background px-4 py-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <span
               className="size-2.5 shrink-0 rounded-full"
               style={{ backgroundColor: board.background ?? "#64748b" }}
               aria-hidden
             />
-            <h1 className="truncate text-lg font-semibold tracking-tight text-[hsl(var(--notion-fg))]">
+            <h1 className="truncate text-lg font-semibold tracking-tight text-foreground">
               {board.name}
             </h1>
           </div>
           <Link
             href={`/projekty/boards/${board.id}/settings`}
-            className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-[hsl(var(--notion-fg)/0.6)] transition-colors hover:bg-[hsl(var(--notion-fg)/0.06)] hover:text-[hsl(var(--notion-fg))]"
+            className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <Settings className="size-4" />
             <span className="hidden sm:inline">Nastavení</span>

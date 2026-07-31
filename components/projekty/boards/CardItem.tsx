@@ -52,7 +52,7 @@ function CardItemBody({
       ? "text-rose-600"
       : isToday(due) && !card.completed
         ? "text-amber-600"
-        : "text-[hsl(var(--notion-fg)/0.6)]"
+        : "text-muted-foreground"
     : "";
 
   const primaryMember = card.members[0]?.user;
@@ -81,8 +81,8 @@ function CardItemBody({
         <div
           className={`flex-1 text-sm font-medium leading-snug ${
             card.completed
-              ? "text-[hsl(var(--notion-fg)/0.4)] line-through"
-              : "text-[hsl(var(--notion-fg))]"
+              ? "text-muted-foreground/70 line-through"
+              : "text-foreground"
           }`}
         >
           {card.title}
@@ -90,7 +90,7 @@ function CardItemBody({
       </div>
 
       {hasAnyMeta ? (
-        <div className="mt-1.5 flex items-center gap-2 text-xs text-[hsl(var(--notion-fg)/0.6)]">
+        <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
           {primaryLabel ? (
             <span className="inline-flex items-center gap-1" title={primaryLabel.name}>
               <span
@@ -100,7 +100,7 @@ function CardItemBody({
               />
               <span className="truncate">{primaryLabel.name}</span>
               {extraLabelsCount > 0 ? (
-                <span className="text-[hsl(var(--notion-fg)/0.4)]">+{extraLabelsCount}</span>
+                <span className="text-muted-foreground/70">+{extraLabelsCount}</span>
               ) : null}
             </span>
           ) : null}
@@ -120,7 +120,7 @@ function CardItemBody({
             <span className="ml-auto inline-flex items-center gap-1">
               <UserAvatar user={primaryMember} size="xs" />
               {extraMembersCount > 0 ? (
-                <span className="text-[hsl(var(--notion-fg)/0.6)]">+{extraMembersCount}</span>
+                <span className="text-muted-foreground">+{extraMembersCount}</span>
               ) : null}
             </span>
           ) : null}
@@ -200,8 +200,8 @@ export function CardItem({
       {...listeners}
       onClick={handleCardClick}
       className={cn(
-        "group relative cursor-grab touch-none rounded-lg bg-[hsl(var(--notion-surface))] shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-card-hover)] active:cursor-grabbing",
-        isSelected && !isTouch && "border-2 border-primary shadow-none",
+        "group relative cursor-grab touch-none rounded-lg border border-border bg-card transition-shadow hover:shadow-sm active:cursor-grabbing",
+        isSelected && !isTouch && "border-primary ring-1 ring-primary hover:shadow-none",
       )}
     >
       <CardItemBody card={card} boardId={boardId} asLink />
@@ -215,7 +215,7 @@ export function CardItem({
  */
 export function CardItemDragOverlay({ card, boardId }: { card: CardData; boardId: string }) {
   return (
-    <div className="w-[244px] cursor-grabbing rounded-lg bg-[hsl(var(--notion-surface))] shadow-2xl rotate-2 scale-105">
+    <div className="w-[244px] cursor-grabbing rounded-lg border border-border bg-card shadow-2xl rotate-2 scale-105">
       <CardItemBody card={card} boardId={boardId} asLink={false} />
     </div>
   );

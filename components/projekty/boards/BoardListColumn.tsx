@@ -118,7 +118,7 @@ export function BoardListColumn({
         />
         {editing ? (
           <input
-            className="min-w-0 flex-1 rounded bg-[hsl(var(--notion-surface))] px-2 py-0.5 text-sm font-semibold tracking-tight text-[hsl(var(--notion-fg))] outline-none ring-1 ring-[hsl(var(--notion-fg)/0.09)] focus:ring-ring"
+            className="min-w-0 flex-1 rounded bg-card px-2 py-0.5 text-sm font-semibold tracking-tight text-foreground outline-none ring-1 ring-border focus:ring-ring"
             value={name}
             onChange={(e) => setName(e.target.value)}
             onBlur={() => void handleRename()}
@@ -134,7 +134,7 @@ export function BoardListColumn({
           />
         ) : (
           <h3
-            className="cursor-pointer truncate text-sm font-semibold tracking-tight text-[hsl(var(--notion-fg))]"
+            className="cursor-pointer truncate text-sm font-semibold tracking-tight text-foreground"
             onClick={() => setEditing(true)}
             onPointerDown={(e) => e.stopPropagation()}
           >
@@ -230,7 +230,7 @@ export function BoardListColumnDragOverlay({ list }: { list: ListData }) {
           style={{ backgroundColor: colorPreset.dot }}
           aria-hidden
         />
-        <h3 className="truncate text-sm font-semibold tracking-tight text-[hsl(var(--notion-fg))]">
+        <h3 className="truncate text-sm font-semibold tracking-tight text-foreground">
           {list.name}
         </h3>
         <span

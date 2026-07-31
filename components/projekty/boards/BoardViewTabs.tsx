@@ -38,7 +38,7 @@ export function BoardViewTabs() {
     <div
       role="tablist"
       aria-label="Přepínač pohledu"
-      className="flex items-center gap-0.5 border-b border-[hsl(var(--notion-fg)/0.09)] bg-[hsl(var(--notion-canvas))] px-3 py-1.5"
+      className="flex items-center gap-0.5 border-b border-border bg-background px-3 py-1.5"
     >
       {TABS.map(({ value, label, Icon }) => {
         const active = current === value;
@@ -52,8 +52,8 @@ export function BoardViewTabs() {
             className={cn(
               "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-sm transition-colors",
               active
-                ? "bg-[hsl(var(--notion-fg)/0.08)] text-[hsl(var(--notion-fg))]"
-                : "text-[hsl(var(--notion-fg)/0.6)] hover:bg-[hsl(var(--notion-fg)/0.06)] hover:text-[hsl(var(--notion-fg))]",
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground hover:bg-accent hover:text-foreground",
             )}
           >
             <Icon className="size-4" strokeWidth={1.75} />

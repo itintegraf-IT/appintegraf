@@ -57,7 +57,7 @@ export function BoardListAddInline({ boardId, onCreated }: Props) {
     return (
       <button
         onClick={() => setActive(true)}
-        className="flex h-11 w-[260px] shrink-0 snap-start items-center gap-2 rounded-md px-2 text-sm text-[hsl(var(--notion-fg)/0.5)] transition-colors hover:bg-[hsl(var(--notion-fg)/0.06)] hover:text-[hsl(var(--notion-fg))]"
+        className="flex h-11 w-[260px] shrink-0 snap-start items-center gap-2 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
       >
         <Plus className="size-4" /> Nový sloupec
       </button>
@@ -65,10 +65,10 @@ export function BoardListAddInline({ boardId, onCreated }: Props) {
   }
 
   return (
-    <div className="flex w-[260px] shrink-0 snap-start flex-col gap-2 rounded-lg bg-[hsl(var(--notion-surface))] p-2 shadow-[var(--shadow-card)]">
+    <div className="flex w-[260px] shrink-0 snap-start flex-col gap-2 rounded-lg border border-border bg-card p-2 shadow-sm">
       <input
         ref={inputRef}
-        className="rounded border-0 bg-transparent px-2 py-1.5 text-sm text-[hsl(var(--notion-fg))] outline-none placeholder:text-[hsl(var(--notion-fg)/0.4)]"
+        className="rounded border-0 bg-transparent px-2 py-1.5 text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
         placeholder="Název sloupce…"
         value={name}
         onChange={(e) => setName(e.target.value)}
@@ -84,7 +84,7 @@ export function BoardListAddInline({ boardId, onCreated }: Props) {
           type="button"
           onClick={reset}
           disabled={busy}
-          className="rounded-md px-2 py-1 text-xs text-[hsl(var(--notion-fg)/0.6)] hover:bg-[hsl(var(--notion-fg)/0.06)] hover:text-[hsl(var(--notion-fg))]"
+          className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           Zrušit
         </button>
@@ -92,7 +92,7 @@ export function BoardListAddInline({ boardId, onCreated }: Props) {
           type="button"
           onClick={() => void handleCreate()}
           disabled={busy || !name.trim()}
-          className="rounded-md bg-[hsl(var(--notion-fg))] px-3 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? "Přidávám…" : "Přidat"}
         </button>

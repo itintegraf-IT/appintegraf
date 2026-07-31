@@ -72,7 +72,7 @@ export function CardQuickAdd({ listId, onCreated, open: controlledOpen, onOpenCh
 
   return (
     <div
-      className="mt-2 rounded-lg bg-[hsl(var(--notion-surface))] p-2 shadow-[var(--shadow-card)]"
+      className="mt-2 rounded-lg border border-border bg-card p-2 shadow-sm"
       onPointerDown={(e) => e.stopPropagation()}
     >
       <textarea
@@ -89,14 +89,14 @@ export function CardQuickAdd({ listId, onCreated, open: controlledOpen, onOpenCh
         placeholder="Název karty… (Enter pro přidání, Esc pro zrušení)"
         rows={2}
         disabled={busy}
-        className="w-full resize-none border-0 bg-transparent text-sm text-[hsl(var(--notion-fg))] outline-none placeholder:text-[hsl(var(--notion-fg)/0.4)]"
+        className="w-full resize-none border-0 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
       />
       <div className="mt-1.5 flex items-center justify-end gap-1.5">
         <button
           type="button"
           onClick={reset}
           disabled={busy}
-          className="rounded-md px-2 py-1 text-xs text-[hsl(var(--notion-fg)/0.6)] hover:bg-[hsl(var(--notion-fg)/0.06)] hover:text-[hsl(var(--notion-fg))]"
+          className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
         >
           Zrušit
         </button>
@@ -104,7 +104,7 @@ export function CardQuickAdd({ listId, onCreated, open: controlledOpen, onOpenCh
           type="button"
           onClick={() => void handleCreate()}
           disabled={busy || !title.trim()}
-          className="rounded-md bg-[hsl(var(--notion-fg))] px-3 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
           {busy ? "Přidávám…" : "Přidat"}
         </button>
