@@ -1,12 +1,11 @@
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { CheckCircle2, Calendar } from "lucide-react";
-import { format, isPast, isToday } from "date-fns";
-import { cs } from "date-fns/locale";
+import { CheckCircle2 } from "lucide-react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
+import { DueDateBadge } from "@/components/projekty/DueDateBadge";
 import { findListColor } from "@/lib/projekty/list-colors";
 import { cn } from "@/lib/projekty/utils";
 import { useBulkSelection } from "./BulkSelectionContext";
@@ -44,14 +43,6 @@ export function ListCardRow({
   };
 
   const due = card.dueDate ? new Date(card.dueDate) : null;
-  const dueClass = due
-    ? isPast(due) && !isToday(due) && !card.completed
-      ? "bg-rose-100 text-rose-900"
-      : isToday(due)
-        ? "bg-amber-100 text-amber-900"
-        : "bg-muted text-muted-foreground"
-    : "";
-
   const primaryMember = card.members[0]?.user;
   const extraMembersCount = card.members.length - 1;
   const visibleLabels = card.labels.slice(0, 2);
@@ -187,14 +178,7 @@ export function ListCardRow({
 
       {/* Due */}
       <span className="w-24 shrink-0 text-right">
-        {due ? (
-          <span
-            className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs ${dueClass}`}
-          >
-            <Calendar className="size-3" />
-            {format(due, "d. M.", { locale: cs })}
-          </span>
-        ) : null}
+        {due ? <DueDateBadge due={due} completed={card.completed} /> : null}
       </span>
     </div>
   );

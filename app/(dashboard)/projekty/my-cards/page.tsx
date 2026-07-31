@@ -1,9 +1,8 @@
 import { requireSession } from "@/lib/projekty/session";
 import { prisma } from "@/lib/projekty/prisma";
 import Link from "next/link";
-import { format } from "date-fns";
-import { cs } from "date-fns/locale";
-import { Calendar, CheckCircle2 } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
+import { DueDateBadge } from "@/components/projekty/DueDateBadge";
 
 // Cross-board přehled "Moje karty": karty (nearchivované), kde je přihlášený
 // uživatel členem. Read-only; každý řádek deep-linkuje na detail karty.
@@ -91,13 +90,15 @@ export default async function MyCardsPage() {
                     </div>
                   ) : null}
                   {c.completed ? (
-                    <CheckCircle2 className="size-4 shrink-0 text-green-600" />
+                    <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
                   ) : null}
                   {c.dueDate ? (
-                    <span className="flex shrink-0 items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs">
-                      <Calendar className="size-3" />
-                      {format(c.dueDate, "d. M. yyyy", { locale: cs })}
-                    </span>
+                    <DueDateBadge
+                      due={c.dueDate}
+                      completed={c.completed}
+                      variant="withYear"
+                      className="shrink-0"
+                    />
                   ) : null}
                 </Link>
               </li>

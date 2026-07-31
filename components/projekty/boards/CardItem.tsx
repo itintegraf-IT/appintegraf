@@ -3,10 +3,9 @@
 import Link from "next/link";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Calendar, CheckCircle2, CheckSquare } from "lucide-react";
+import { CheckCircle2, CheckSquare } from "lucide-react";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
-import { format, isPast, isToday } from "date-fns";
-import { cs } from "date-fns/locale";
+import { DueDateBadge } from "@/components/projekty/DueDateBadge";
 import { cn } from "@/lib/projekty/utils";
 import { useBulkSelection } from "./BulkSelectionContext";
 import { useIsTouchDevice } from "@/hooks/projekty/useIsTouchDevice";
@@ -47,14 +46,6 @@ function CardItemBody({
   asLink: boolean;
 }) {
   const due = card.dueDate ? new Date(card.dueDate) : null;
-  const dueColor = due
-    ? isPast(due) && !isToday(due) && !card.completed
-      ? "text-rose-600"
-      : isToday(due) && !card.completed
-        ? "text-amber-600"
-        : "text-muted-foreground"
-    : "";
-
   const primaryMember = card.members[0]?.user;
   const extraMembersCount = card.members.length - 1;
   const primaryLabel = card.labels[0]?.label;
@@ -105,10 +96,7 @@ function CardItemBody({
             </span>
           ) : null}
           {due ? (
-            <span className={`inline-flex items-center gap-1 ${dueColor}`}>
-              <Calendar className="size-3" aria-hidden />
-              {format(due, "d. M.", { locale: cs })}
-            </span>
+            <DueDateBadge due={due} completed={card.completed} className="-my-0.5" />
           ) : null}
           {card._count?.checklists ? (
             <span className="inline-flex items-center gap-1">

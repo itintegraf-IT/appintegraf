@@ -158,6 +158,7 @@ export function CardDetailModal({
 
             <CardDueDatePicker
               value={card.dueDate ? new Date(card.dueDate) : null}
+              completed={card.completed}
               onChange={(date) => void patchCard({ dueDate: date ? date.toISOString() : null })}
             />
 

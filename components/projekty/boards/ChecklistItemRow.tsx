@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/projekty/u
 import { Calendar as CalendarPicker } from "@/components/projekty/ui/calendar";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
 import { Trash2, User as UserIcon, Calendar, X, Check } from "lucide-react";
-import { format } from "date-fns";
+import { DueDateBadge } from "@/components/projekty/DueDateBadge";
 import { cs } from "date-fns/locale";
 import { toast } from "sonner";
 
@@ -139,12 +139,11 @@ export function ChecklistItemRow({
             {due ? (
               <button
                 onClick={() => void patch({ dueDate: null })}
-                className="flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 hover:bg-muted/60"
+                className="flex items-center gap-1 hover:opacity-80"
                 title="Odebrat termín"
               >
-                <Calendar className="size-3" />
-                <span>{format(due, "d. M. yyyy", { locale: cs })}</span>
-                <X className="size-3" />
+                <DueDateBadge due={due} completed={item.done} variant="withYear" />
+                <X className="size-3 text-muted-foreground" />
               </button>
             ) : null}
           </div>

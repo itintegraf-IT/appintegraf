@@ -5,8 +5,7 @@ import { MoreHorizontal, Trash2, ArrowRightCircle } from "lucide-react";
 import type { PersonalTodo } from "@prisma/client";
 import { TodoStatusCheckbox } from "@/components/projekty/todos/TodoStatusCheckbox";
 import { toast } from "sonner";
-import { format } from "date-fns";
-import { cs } from "date-fns/locale";
+import { DueDateBadge } from "@/components/projekty/DueDateBadge";
 import { cn } from "@/lib/projekty/utils";
 import {
   DropdownMenu,
@@ -112,9 +111,12 @@ export function PersonalTodoRow({
         </span>
 
         {dueDate && (
-          <span className="shrink-0 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-            {format(dueDate, "d. M.", { locale: cs })}
-          </span>
+          <DueDateBadge
+            due={dueDate}
+            completed={isDone}
+            showIcon={false}
+            className="shrink-0 font-medium"
+          />
         )}
 
         <DropdownMenu>
