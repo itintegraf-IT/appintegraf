@@ -2,8 +2,6 @@
 
 type Orientation = "horizontal" | "vertical";
 
-const NOTION_BLUE = "hsl(199 75% 52%)";
-
 /**
  * Drop indicator pro drag-and-drop. Renderovat conditionally v cílové pozici
  * mezi karty (horizontal) nebo mezi sloupce (vertical).
@@ -13,19 +11,9 @@ const NOTION_BLUE = "hsl(199 75% 52%)";
  */
 export function DropLine({ orientation }: { orientation: Orientation }) {
   if (orientation === "horizontal") {
-    return (
-      <div
-        aria-hidden
-        className="-my-0.5 h-1 rounded-full"
-        style={{ backgroundColor: NOTION_BLUE }}
-      />
-    );
+    return <div aria-hidden className="-my-0.5 h-1 rounded-full bg-blue-500" />;
   }
   return (
-    <div
-      aria-hidden
-      className="-mx-0.5 w-1 self-stretch rounded-full"
-      style={{ backgroundColor: NOTION_BLUE }}
-    />
+    <div aria-hidden className="-mx-0.5 w-1 self-stretch rounded-full bg-blue-500" />
   );
 }

@@ -165,9 +165,6 @@ export function CardItem({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    // Notion-style: originál zůstává jako "fantom" na své pozici (0.5 opacity);
-    // ghost u kursoru je primární vizuální focus (DragOverlay).
-    opacity: isDragging ? 0.5 : 1,
   };
 
   function handleCardClick(e: React.MouseEvent) {
@@ -201,6 +198,9 @@ export function CardItem({
       onClick={handleCardClick}
       className={cn(
         "group relative cursor-grab touch-none rounded-lg border border-border bg-card transition-shadow hover:shadow-sm active:cursor-grabbing",
+        // Ghost na původní pozici — vybledlý s čárkovaným okrajem (Linear vzor);
+        // primární fokus je DragOverlay u kurzoru.
+        isDragging && "border-dashed opacity-40",
         isSelected && !isTouch && "border-primary ring-1 ring-primary hover:shadow-none",
       )}
     >

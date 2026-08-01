@@ -381,10 +381,19 @@ function ColumnsList({
           strategy={horizontalListSortingStrategy}
         >
           {lists.map((list) => {
-            const showLineBefore =
+            // Linka na správné straně cíle: při přesunu doprava (dragging
+            // index < over index) se sloupec vloží ZA cíl, jinak před něj.
+            const isOverTarget =
               draggingListId !== null &&
               draggingListId !== list.id &&
               overListId === list.id;
+            const draggingIndex = draggingListId
+              ? lists.findIndex((l) => l.id === draggingListId)
+              : -1;
+            const overIndex = lists.findIndex((l) => l.id === list.id);
+            const movingRight = draggingIndex !== -1 && draggingIndex < overIndex;
+            const showLineBefore = isOverTarget && !movingRight;
+            const showLineAfter = isOverTarget && movingRight;
             return (
               <Fragment key={list.id}>
                 {showLineBefore ? <DropLine orientation="vertical" /> : null}
@@ -396,6 +405,7 @@ function ColumnsList({
                   onListArchive={onListArchive}
                   onCardCreated={onCardCreated}
                 />
+                {showLineAfter ? <DropLine orientation="vertical" /> : null}
               </Fragment>
             );
           })}

@@ -47,7 +47,8 @@ export function ListCardRow({
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0 : 1,
+    // Ghost 0.4 (sjednoceno s kanban kartou) — řádek při dragu nemizí úplně
+    opacity: isDragging ? 0.4 : 1,
   };
 
   const due = card.dueDate ? new Date(card.dueDate) : null;

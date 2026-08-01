@@ -6,6 +6,7 @@ import { useDndContext } from "@dnd-kit/core";
 import { useSortable, SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { findListColor } from "@/lib/projekty/list-colors";
+import { cn } from "@/lib/projekty/utils";
 import { BoardListMenu } from "./BoardListMenu";
 import { CardItem, type CardData } from "./CardItem";
 import { CardQuickAdd } from "./CardQuickAdd";
@@ -104,7 +105,11 @@ export function BoardListColumn({
           "--list-cta-text-dark": colorPreset.ctaTextDark,
         } as React.CSSProperties
       }
-      className="group/list flex h-full w-[260px] shrink-0 snap-start flex-col rounded-lg p-2"
+      className={cn(
+        "group/list flex h-full w-[260px] shrink-0 snap-start flex-col rounded-lg p-2",
+        // Zvýraznění drop zóny celého sloupce při dragu karty nad ním
+        isDraggingCardOverThisList && "ring-2 ring-blue-400/40",
+      )}
     >
       <div
         aria-label={`Přesunout sloupec ${list.name}`}

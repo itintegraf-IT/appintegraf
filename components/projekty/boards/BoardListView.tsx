@@ -7,6 +7,7 @@ import {
   DragOverlay,
   closestCorners,
   type DragEndEvent,
+  type DragOverEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
 import {
@@ -18,6 +19,7 @@ import { type ListData } from "./BoardListColumn";
 import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { ListGroupHeader } from "./ListGroupHeader";
 import { ListCardRow } from "./ListCardRow";
+import { DropLine } from "./DropLine";
 import { Button } from "@/components/projekty/ui/button";
 import { type CardData } from "./CardItem";
 import { useResponsiveSensors } from "@/lib/projekty/dnd-sensors";
@@ -40,6 +42,7 @@ export function BoardListView({
   const pathname = usePathname();
   const router = useRouter();
   const [activeCard, setActiveCard] = useState<CardData | null>(null);
+  const [overCardId, setOverCardId] = useState<string | null>(null);
   const sensors = useResponsiveSensors();
   const mutateLists = useOptimisticListsMutation({ lists, setLists });
 
@@ -92,10 +95,19 @@ export function BoardListView({
 
   function handleDragCancel() {
     setActiveCard(null);
+    setOverCardId(null);
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const over = event.over;
+    setOverCardId(
+      over && over.data.current?.type === "card" ? String(over.id) : null,
+    );
   }
 
   async function handleDragEnd(event: DragEndEvent) {
     setActiveCard(null);
+    setOverCardId(null);
     const { active, over } = event;
     if (!over) return;
 
@@ -106,41 +118,73 @@ export function BoardListView({
     // over.data.current is Record<string, any> — safe to access listId directly
     const targetListId = over.data.current?.listId as string | undefined;
     if (!targetListId) return;
-    if (targetListId === found.sourceListId) return; // no-op
+
+    // Poziční drop: drop na kartu = vlož před ni; drop na hlavičku = na konec
+    const overIsCard = over.data.current?.type === "card";
+    const insertBeforeId = overIsCard ? String(over.id) : null;
+    if (insertBeforeId === cardId) return;
+
+    const sourceListId = found.sourceListId;
+    const crossList = targetListId !== sourceListId;
+    if (!crossList && insertBeforeId === null) return; // drop na vlastní hlavičku
 
     const targetName = lists.find((l) => l.id === targetListId)?.name ?? "";
-    const sourceListId = found.sourceListId;
+
+    // Undo podklad: původní sousedé ve zdrojovém sloupci
+    const sourceCards = lists.find((l) => l.id === sourceListId)?.cards ?? [];
+    const origIndex = sourceCards.findIndex((c) => c.id === cardId);
+    const origBefore = sourceCards[origIndex - 1];
+    const origAfter = sourceCards[origIndex + 1];
+
+    // Optimistic výsledek spočítat předem — z něj plynou sousedé pro API
+    const movedCard: CardData = { ...found.card, listId: targetListId };
+    const optimisticLists = lists.map((l) => {
+      const without = l.cards.filter((c) => c.id !== cardId);
+      if (l.id !== targetListId) {
+        return l.id === sourceListId ? { ...l, cards: without } : l;
+      }
+      const base = l.id === sourceListId ? without : l.cards.filter((c) => c.id !== cardId);
+      const idx = insertBeforeId
+        ? Math.max(0, base.findIndex((c) => c.id === insertBeforeId))
+        : base.length;
+      const cards = [...base.slice(0, idx), movedCard, ...base.slice(idx)];
+      return { ...l, cards };
+    });
+    const newTargetCards =
+      optimisticLists.find((l) => l.id === targetListId)?.cards ?? [];
+    const newIndex = newTargetCards.findIndex((c) => c.id === cardId);
+    const before = newTargetCards[newIndex - 1];
+    const after = newTargetCards[newIndex + 1];
+
+    const body: Record<string, string> = { listId: targetListId };
+    if (before) body.afterCardId = before.id;
+    if (after) body.beforeCardId = after.id;
 
     await mutateLists({
-      optimistic: (prev) =>
-        prev.map((l) => {
-          if (l.id === sourceListId) {
-            return { ...l, cards: l.cards.filter((c) => c.id !== cardId) };
-          }
-          if (l.id === targetListId) {
-            const movedCard: CardData = { ...found.card, listId: targetListId };
-            return { ...l, cards: [...l.cards, movedCard] };
-          }
-          return l;
-        }),
+      optimistic: () => optimisticLists,
       request: () =>
         fetch(`/api/projekty/cards/${cardId}/move`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ listId: targetListId }),
+          body: JSON.stringify(body),
         }),
       errorMessage: "Přesun karty selhal",
-      successToast: {
-        message: `Karta přesunuta do „${targetName}“`,
-        undo: async () => {
-          const r = await fetch(`/api/projekty/cards/${cardId}/move`, {
-            method: "PATCH",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ listId: sourceListId }),
-          });
-          return r.ok;
-        },
-      },
+      successToast: crossList
+        ? {
+            message: `Karta přesunuta do „${targetName}“`,
+            undo: async () => {
+              const undoBody: Record<string, string> = { listId: sourceListId };
+              if (origBefore) undoBody.afterCardId = origBefore.id;
+              if (origAfter) undoBody.beforeCardId = origAfter.id;
+              const r = await fetch(`/api/projekty/cards/${cardId}/move`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(undoBody),
+              });
+              return r.ok;
+            },
+          }
+        : undefined,
     });
   }
 
@@ -199,6 +243,7 @@ export function BoardListView({
       sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragCancel={handleDragCancel}
       onDragEnd={handleDragEnd}
     >
@@ -223,14 +268,20 @@ export function BoardListView({
                 </p>
               ) : (
                 group.cards.map((card) => (
-                  <ListCardRow
-                    key={card.id}
-                    card={card}
-                    list={listById.get(card.listId) ?? displayedLists[0]!}
-                    orderedCardIds={orderedCardIds}
-                    onToggleCompleted={(c) => void toggleCompleted(c)}
-                    dragDisabled={groupBy !== "list"}
-                  />
+                  <div key={card.id}>
+                    {activeCard &&
+                    overCardId === card.id &&
+                    activeCard.id !== card.id ? (
+                      <DropLine orientation="horizontal" />
+                    ) : null}
+                    <ListCardRow
+                      card={card}
+                      list={listById.get(card.listId) ?? displayedLists[0]!}
+                      orderedCardIds={orderedCardIds}
+                      onToggleCompleted={(c) => void toggleCompleted(c)}
+                      dragDisabled={groupBy !== "list"}
+                    />
+                  </div>
                 ))
               )}
             </SortableContext>
