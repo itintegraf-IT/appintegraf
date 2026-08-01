@@ -8,11 +8,13 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { addDays, differenceInDays, parseISO } from "date-fns";
+import { CalendarDays, Monitor, SearchX } from "lucide-react";
 import { toast } from "sonner";
 import { type ListData } from "./BoardListColumn";
 import { CalendarHeader } from "./CalendarHeader";
 import { CalendarGrid } from "./CalendarGrid";
 import { Button } from "@/components/projekty/ui/button";
+import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { buildMonthGrid } from "@/lib/projekty/calendar";
 import { parseCalendarMonth } from "@/lib/projekty/board-view";
 import { type CardData } from "./CardItem";
@@ -115,20 +117,26 @@ export function BoardCalendarView({
 
   if (isMobile) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
-        <p className="text-sm">Calendar je dostupný na desktopu.</p>
-        <Button
-          variant="outline"
-          onClick={() => {
-            const sp = new URLSearchParams(searchParams.toString());
-            sp.set("view", "list");
-            sp.delete("month");
-            router.replace(`${pathname}?${sp.toString()}`);
-          }}
-        >
-          Přepnout na List
-        </Button>
-      </div>
+      <EmptyState
+        icon={Monitor}
+        title="Kalendář je dostupný na desktopu"
+        description="Na mobilu použij zobrazení List."
+        action={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const sp = new URLSearchParams(searchParams.toString());
+              sp.set("view", "list");
+              sp.delete("month");
+              router.replace(`${pathname}?${sp.toString()}`);
+            }}
+          >
+            Přepnout na List
+          </Button>
+        }
+        className="m-4 flex-1"
+      />
     );
   }
 
@@ -169,12 +177,16 @@ export function BoardCalendarView({
     return (
       <div className="flex flex-1 flex-col">
         <CalendarHeader />
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground/70">
-          <p className="text-sm">Žádné karty odpovídající filtru.</p>
-          <Button variant="outline" onClick={clearFilters}>
-            Vymazat filtr
-          </Button>
-        </div>
+        <EmptyState
+          icon={SearchX}
+          title="Žádné karty neodpovídají filtru"
+          action={
+            <Button variant="outline" size="sm" onClick={clearFilters}>
+              Vymazat filtry
+            </Button>
+          }
+          className="m-4 flex-1"
+        />
       </div>
     );
   }
@@ -184,12 +196,16 @@ export function BoardCalendarView({
       <div className="flex flex-1 flex-col">
         <CalendarHeader />
         <CalendarGrid weeks={weeks} />
-        <div className="flex flex-col items-center justify-center gap-2 border-t border-border p-3 text-muted-foreground/70">
-          <p className="text-xs">Žádné karty s daty v tomto měsíci.</p>
-          <Button variant="outline" size="sm" onClick={switchToKanban}>
-            Přepnout na Kanban
-          </Button>
-        </div>
+        <EmptyState
+          icon={CalendarDays}
+          title="Žádné karty s daty v tomto měsíci"
+          action={
+            <Button variant="outline" size="sm" onClick={switchToKanban}>
+              Přepnout na Kanban
+            </Button>
+          }
+          className="m-4"
+        />
       </div>
     );
   }

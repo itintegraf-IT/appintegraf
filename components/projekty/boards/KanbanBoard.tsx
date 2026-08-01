@@ -11,6 +11,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
+import { Columns3 } from "lucide-react";
 import { toast } from "sonner";
 import {
   BoardListColumn,
@@ -18,6 +19,7 @@ import {
   type ListData,
 } from "./BoardListColumn";
 import { BoardListAddInline } from "./BoardListAddInline";
+import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { CardItemDragOverlay, type CardData } from "./CardItem";
 import { DropLine } from "./DropLine";
 import { useBulkSelection } from "./BulkSelectionContext";
@@ -346,6 +348,14 @@ function ColumnsList({
             );
           })}
         </SortableContext>
+        {lists.length === 0 ? (
+          <EmptyState
+            icon={Columns3}
+            title="Board nemá žádné sloupce"
+            description="Přidej první sloupec a začni organizovat karty."
+            className="flex-1"
+          />
+        ) : null}
         <BoardListAddInline boardId={boardId} onCreated={onListCreated} />
       </div>
     </div>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/projekty/ui/button";
 import { ConfirmDialog } from "@/components/projekty/ui/confirm-dialog";
+import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { Paperclip, Upload, Trash2, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { cs } from "date-fns/locale";
@@ -129,6 +130,14 @@ export function CardAttachmentsSection({
         <p className="mt-1 text-xs text-muted-foreground">Max {formatSize(MAX_BYTES)}</p>
       </div>
 
+      {items.length === 0 ? (
+        <EmptyState
+          icon={Paperclip}
+          title="Zatím žádné přílohy"
+          description="Přetáhni soubor do pole výše, nebo klikni na „vyber“."
+          className="py-6"
+        />
+      ) : null}
       <ul className="space-y-1">
         {items.map((a) => {
           const canDelete = a.uploadedBy === currentUserId;

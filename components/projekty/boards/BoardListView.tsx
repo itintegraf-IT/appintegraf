@@ -13,8 +13,10 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { SearchX } from "lucide-react";
 import { toast } from "sonner";
 import { type ListData } from "./BoardListColumn";
+import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { ListGroupHeader } from "./ListGroupHeader";
 import { ListCardRow } from "./ListCardRow";
 import { Button } from "@/components/projekty/ui/button";
@@ -125,12 +127,16 @@ export function BoardListView({
   // nejsou žádné karty.
   if (totalCards === 0 && hasActiveFilter) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 text-muted-foreground/70">
-        <p className="text-sm">Žádné karty odpovídající filtru.</p>
-        <Button variant="outline" onClick={clearFilters}>
-          Vymazat filtr
-        </Button>
-      </div>
+      <EmptyState
+        icon={SearchX}
+        title="Žádné karty neodpovídají filtru"
+        action={
+          <Button variant="outline" size="sm" onClick={clearFilters}>
+            Vymazat filtry
+          </Button>
+        }
+        className="m-4 flex-1"
+      />
     );
   }
 

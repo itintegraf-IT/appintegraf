@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { cs } from "date-fns/locale";
 import { Activity } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { Skeleton } from "@/components/projekty/ui/skeleton";
 
 type AuditEntry = {
@@ -71,12 +72,7 @@ export function CardActivityFeed({ cardId }: { cardId: string }) {
   }
 
   if (entries.length === 0) {
-    return (
-      <div className="text-sm text-muted-foreground">
-        <Activity className="mr-2 inline size-4" />
-        Žádná aktivita
-      </div>
-    );
+    return <EmptyState icon={Activity} title="Žádná aktivita" className="py-6" />;
   }
 
   return (

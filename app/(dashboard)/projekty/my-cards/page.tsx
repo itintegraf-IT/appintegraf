@@ -1,9 +1,11 @@
 import { requireSession } from "@/lib/projekty/session";
 import { prisma } from "@/lib/projekty/prisma";
 import Link from "next/link";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, SquareKanban } from "lucide-react";
 import { DueDateBadge } from "@/components/projekty/DueDateBadge";
 import { LabelChip } from "@/components/projekty/LabelChip";
+import { Button } from "@/components/projekty/ui/button";
+import { EmptyState } from "@/components/projekty/ui/empty-state";
 
 // Cross-board přehled "Moje karty": karty (nearchivované), kde je přihlášený
 // uživatel členem. Read-only; každý řádek deep-linkuje na detail karty.
@@ -47,9 +49,16 @@ export default async function MyCardsPage() {
     <main className="space-y-6 p-4 md:p-6">
       <h1 className="text-2xl font-semibold">Moje karty</h1>
       {cards.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed py-12 text-center text-muted-foreground">
-          Žádné karty ti nejsou přiřazené.
-        </div>
+        <EmptyState
+          icon={SquareKanban}
+          title="Žádné karty ti nejsou přiřazené"
+          description="Karty, kde jsi členem, se objeví tady."
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/projekty/boards">Přejít na boardy</Link>
+            </Button>
+          }
+        />
       ) : (
         <ul className="space-y-2">
           {cards.map((c) => {

@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ListTodo, CheckCircle2, Sparkles } from "lucide-react";
+import { ListTodo, CheckCircle2 } from "lucide-react";
 import type { PersonalTodo } from "@prisma/client";
 import { cn } from "@/lib/projekty/utils";
+import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { PersonalTodoInlineAdd } from "@/components/projekty/todos/PersonalTodoInlineAdd";
 import { PersonalTodoRow } from "@/components/projekty/todos/PersonalTodoRow";
 import { PersonalTodoArchive } from "@/components/projekty/todos/PersonalTodoArchive";
@@ -128,7 +129,28 @@ export function PersonalTodoView({
           {/* List */}
           <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
             {visible.length === 0 ? (
-              <EmptyState tab={tab} />
+              tab === "active" ? (
+                <EmptyState
+                  icon={ListTodo}
+                  title="Žádné úkoly k vyřízení"
+                  description={
+                    <>
+                      Napiš si první úkol dole, nebo stiskni{" "}
+                      <kbd className="rounded border border-border bg-background px-1 text-[10px]">
+                        ⌘K
+                      </kbd>
+                      .
+                    </>
+                  }
+                  className="m-3"
+                />
+              ) : (
+                <EmptyState
+                  icon={CheckCircle2}
+                  title="Žádné hotové úkoly"
+                  className="m-3"
+                />
+              )
             ) : (
               <ul className="divide-y divide-border/60">
                 {visible.map((todo) => (
@@ -194,30 +216,5 @@ function TabButton({
         {count}
       </span>
     </button>
-  );
-}
-
-function EmptyState({ tab }: { tab: Tab }) {
-  if (tab === "active") {
-    return (
-      <div className="grid place-items-center gap-2 py-12 text-center">
-        <Sparkles className="size-6 text-muted-foreground/70" />
-        <p className="text-sm font-medium text-muted-foreground">
-          Žádné úkoly k vyřízení
-        </p>
-        <p className="text-xs text-muted-foreground/70">
-          Napiš si první úkol dole, nebo stiskni{" "}
-          <kbd className="rounded border border-border bg-background px-1 text-[10px]">
-            ⌘K
-          </kbd>
-          .
-        </p>
-      </div>
-    );
-  }
-  return (
-    <div className="py-10 text-center text-sm text-muted-foreground/70">
-      Žádné hotové úkoly.
-    </div>
   );
 }

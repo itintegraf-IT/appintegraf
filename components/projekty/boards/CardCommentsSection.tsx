@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/projekty/ui/button";
 import { ConfirmDialog } from "@/components/projekty/ui/confirm-dialog";
+import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { Textarea } from "@/components/projekty/ui/textarea";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
 import { MessageSquare, Trash2 } from "lucide-react";
@@ -32,6 +33,7 @@ export function CardCommentsSection({
   const [notes, setNotes] = useState<Note[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     fetch(`/api/projekty/notes?parentType=CARD&parentId=${cardId}`)
@@ -39,7 +41,8 @@ export function CardCommentsSection({
         res.ok ? res.json() : Promise.reject(new Error("fetch failed")),
       )
       .then((data: { notes: Note[] }) => setNotes(data.notes))
-      .catch(() => toast.error("Načtení komentářů selhalo."));
+      .catch(() => toast.error("Načtení komentářů selhalo."))
+      .finally(() => setLoaded(true));
   }, [cardId]);
 
   async function handlePost() {
@@ -105,6 +108,14 @@ export function CardCommentsSection({
         </div>
       </div>
 
+      {loaded && notes.length === 0 ? (
+        <EmptyState
+          icon={MessageSquare}
+          title="Zatím žádné komentáře"
+          description="Napiš první — @zmínkou pošleš upozornění."
+          className="py-6"
+        />
+      ) : null}
       <ul className="space-y-3">
         {notes.map((n) => (
           <li key={n.id} className="flex gap-2">
