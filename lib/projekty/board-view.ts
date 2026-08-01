@@ -12,6 +12,21 @@ export function parseBoardView(
   return "kanban";
 }
 
+export type BoardGroupBy = "list" | "assignee" | "due";
+
+const VALID_GROUPS: readonly BoardGroupBy[] = ["list", "assignee", "due"] as const;
+
+/** ?group= pro list view — whitelist, default seskupení podle sloupce. */
+export function parseBoardGroup(
+  searchParams: URLSearchParams | { get(k: string): string | null },
+): BoardGroupBy {
+  const raw = searchParams.get("group");
+  if (raw && VALID_GROUPS.includes(raw as BoardGroupBy)) {
+    return raw as BoardGroupBy;
+  }
+  return "list";
+}
+
 /**
  * Year/month parsed from ?month=YYYY-MM. Defaults to current month
  * (Europe/Prague) when missing or invalid.

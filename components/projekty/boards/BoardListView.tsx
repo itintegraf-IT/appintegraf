@@ -22,15 +22,19 @@ import { Button } from "@/components/projekty/ui/button";
 import { type CardData } from "./CardItem";
 import { useResponsiveSensors } from "@/lib/projekty/dnd-sensors";
 import { useOptimisticListsMutation } from "@/hooks/projekty/useOptimisticListsMutation";
+import { parseBoardGroup } from "@/lib/projekty/board-view";
+import { buildGroups } from "@/lib/projekty/list-grouping";
 
 export function BoardListView({
   displayedLists,
   lists,
   setLists,
+  allMembers,
 }: {
   displayedLists: ListData[];
   lists: ListData[];
   setLists: React.Dispatch<React.SetStateAction<ListData[]>>;
+  allMembers: { id: number; name: string | null; email: string | null }[];
 }) {
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -38,6 +42,16 @@ export function BoardListView({
   const [activeCard, setActiveCard] = useState<CardData | null>(null);
   const sensors = useResponsiveSensors();
   const mutateLists = useOptimisticListsMutation({ lists, setLists });
+
+  const groupBy = parseBoardGroup(searchParams);
+  const groups = useMemo(
+    () => buildGroups(groupBy, displayedLists, allMembers),
+    [groupBy, displayedLists, allMembers],
+  );
+  const listById = useMemo(
+    () => new Map(displayedLists.map((l) => [l.id, l])),
+    [displayedLists],
+  );
 
   const totalCards = displayedLists.reduce((acc, l) => acc + l.cards.length, 0);
   const hasActiveFilter =
@@ -189,25 +203,33 @@ export function BoardListView({
       onDragEnd={handleDragEnd}
     >
       <div className="flex-1 overflow-y-auto bg-background">
-        {displayedLists.map((list) => (
-          <section key={list.id} className="mb-2">
-            <ListGroupHeader list={list} />
+        {groups.map((group) => (
+          <section key={group.key} className="mb-2">
+            <ListGroupHeader
+              groupKey={group.key}
+              label={group.label}
+              dotColor={group.dotColor}
+              totalCount={group.cards.length}
+              completedCount={group.cards.filter((c) => c.completed).length}
+              droppableListId={group.droppableListId}
+            />
             <SortableContext
-              items={list.cards.map((c) => c.id)}
+              items={group.cards.map((c) => c.id)}
               strategy={verticalListSortingStrategy}
             >
-              {list.cards.length === 0 ? (
+              {group.cards.length === 0 ? (
                 <p className="px-4 py-3 text-xs text-muted-foreground/70">
                   Žádné karty v tomto sloupci.
                 </p>
               ) : (
-                list.cards.map((card) => (
+                group.cards.map((card) => (
                   <ListCardRow
                     key={card.id}
                     card={card}
-                    list={list}
+                    list={listById.get(card.listId) ?? displayedLists[0]!}
                     orderedCardIds={orderedCardIds}
                     onToggleCompleted={(c) => void toggleCompleted(c)}
+                    dragDisabled={groupBy !== "list"}
                   />
                 ))
               )}

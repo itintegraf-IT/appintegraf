@@ -146,6 +146,7 @@ function BoardViewInner({ board, currentUserId, lists, setLists }: BoardViewInne
                   displayedLists={displayedLists}
                   lists={lists}
                   setLists={setLists}
+                  allMembers={allMembers}
                 />
               );
             case "calendar":

@@ -19,12 +19,15 @@ export function ListCardRow({
   list,
   orderedCardIds,
   onToggleCompleted,
+  dragDisabled,
 }: {
   card: CardData;
   list: ListData;
   orderedCardIds: string[];
   /** Optimistic toggle zvednutý do BoardListView (má přístup k lists stavu). */
   onToggleCompleted?: (card: CardData) => void;
+  /** Drag vypnutý mimo group=list (přesun mezi projekčními skupinami nedává smysl). */
+  dragDisabled?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -38,6 +41,7 @@ export function ListCardRow({
     useSortable({
       id: card.id,
       data: { type: "card", listId: list.id },
+      disabled: dragDisabled,
     });
 
   const style: React.CSSProperties = {
@@ -112,7 +116,8 @@ export function ListCardRow({
       }}
       aria-label={`Karta ${card.title} — přesun nebo otevření`}
       className={cn(
-        "group flex w-full cursor-grab touch-none items-center gap-3 border-b border-border/60 px-4 py-2 text-left transition-colors hover:bg-muted/50 active:cursor-grabbing",
+        "group flex w-full touch-none items-center gap-3 border-b border-border/60 px-4 py-2 text-left transition-colors hover:bg-muted/50",
+        dragDisabled ? "cursor-pointer" : "cursor-grab active:cursor-grabbing",
         isSelected && !isTouch && "border-l-4 border-l-primary bg-primary/5",
       )}
     >

@@ -4,6 +4,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Columns, List as ListIcon, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/projekty/utils";
 import { parseBoardView, type BoardViewType } from "@/lib/projekty/board-view";
+import { BoardGroupPicker } from "./BoardGroupPicker";
 
 type Tab = { value: BoardViewType; label: string; Icon: typeof Columns };
 
@@ -28,6 +29,9 @@ export function BoardViewTabs() {
     }
     if (value !== "calendar") {
       sp.delete("month");
+    }
+    if (value !== "list") {
+      sp.delete("group");
     }
     router.replace(
       `${pathname}${sp.toString() ? `?${sp.toString()}` : ""}`,
@@ -61,6 +65,11 @@ export function BoardViewTabs() {
           </button>
         );
       })}
+      {current === "list" ? (
+        <div className="ml-auto">
+          <BoardGroupPicker />
+        </div>
+      ) : null}
     </div>
   );
 }
