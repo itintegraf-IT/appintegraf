@@ -18,9 +18,9 @@ import {
 } from "@/components/projekty/ui/dropdown-menu";
 import { TiptapEditor } from "@/components/projekty/editor/TiptapEditor";
 import { toast } from "sonner";
-import { format } from "date-fns";
 import { cs } from "date-fns/locale";
 import { cn } from "@/lib/projekty/utils";
+import { formatDue, getDueStatus } from "@/lib/projekty/due-date";
 import {
   Sheet,
   SheetContent,
@@ -118,6 +118,7 @@ export function PersonalTodoDetailSheet({
   if (!todo) return null;
 
   const dueDate = todo.dueDate ? new Date(todo.dueDate) : null;
+  const dueStatus = getDueStatus(dueDate, todo.status === "DONE");
 
   async function patch(data: Record<string, unknown>, opts?: { silent?: boolean }) {
     setBusy(true);
@@ -230,9 +231,17 @@ export function PersonalTodoDetailSheet({
               <PropertyRow icon={<CalendarIcon className="size-3.5" />} label="Termín">
                 <Popover open={dateOpen} onOpenChange={setDateOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className={cn(
+                        "h-8",
+                        dueStatus === "overdue" && "text-rose-700 dark:text-rose-400",
+                        dueStatus === "today" && "text-amber-700 dark:text-amber-400",
+                      )}
+                    >
                       <CalendarIcon className="mr-2 size-3.5" />
-                      {dueDate ? format(dueDate, "d. M. yyyy", { locale: cs }) : "Vybrat termín"}
+                      {dueDate ? formatDue(dueDate, "withYear") : "Vybrat termín"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">

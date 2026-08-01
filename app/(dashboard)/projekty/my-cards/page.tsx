@@ -94,7 +94,7 @@ export default async function MyCardsPage() {
                     </div>
                   ) : null}
                   {c.completed ? (
-                    <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                    <CheckCircle2 className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   ) : null}
                   {c.dueDate ? (
                     <DueDateBadge

@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { format } from "date-fns";
 import { cs } from "date-fns/locale";
 import { Activity } from "lucide-react";
-import { toast } from "sonner";
 import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { Skeleton } from "@/components/projekty/ui/skeleton";
+import { Button } from "@/components/projekty/ui/button";
 
 type AuditEntry = {
   id: string;
@@ -38,35 +38,48 @@ const ENTITY_LABEL: Record<string, string> = {
 
 export function CardActivityFeed({ cardId }: { cardId: string }) {
   const [entries, setEntries] = useState<AuditEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setStatus("loading");
     let cancelled = false;
-    setLoading(true);
     fetch(`/api/projekty/audit?cardId=${cardId}`)
       .then((res) =>
         res.ok ? res.json() : Promise.reject(new Error("fetch failed")),
       )
       .then((data: { entries: AuditEntry[] }) => {
-        if (!cancelled) setEntries(data.entries);
+        if (!cancelled) {
+          setEntries(data.entries);
+          setStatus("ok");
+        }
       })
       .catch(() => {
-        if (!cancelled) toast.error("Načtení aktivity selhalo.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setStatus("error");
       });
     return () => {
       cancelled = true;
     };
   }, [cardId]);
 
-  if (loading) {
+  useEffect(() => load(), [load]);
+
+  if (status === "loading") {
     return (
       <div className="space-y-2">
         <Skeleton className="h-4 w-2/3" />
         <Skeleton className="h-4 w-1/2" />
         <Skeleton className="h-4 w-3/5" />
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <div className="flex items-center gap-3 text-sm text-muted-foreground">
+        <span>Aktivitu se nepodařilo načíst.</span>
+        <Button variant="outline" size="sm" onClick={load}>
+          Zkusit znovu
+        </Button>
       </div>
     );
   }

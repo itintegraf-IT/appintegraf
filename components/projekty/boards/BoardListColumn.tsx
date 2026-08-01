@@ -101,6 +101,7 @@ export function BoardListColumn({
           backgroundColor: colorPreset.bgTint,
           "--list-pill-bg": colorPreset.pillBg,
           "--list-cta-text": colorPreset.ctaText,
+          "--list-cta-text-dark": colorPreset.ctaTextDark,
         } as React.CSSProperties
       }
       className="group/list flex h-full w-[260px] shrink-0 snap-start flex-col rounded-lg p-2"
@@ -141,7 +142,7 @@ export function BoardListColumn({
             {list.name}
           </h3>
         )}
-        <span className="ml-1 inline-flex items-center rounded-full bg-[var(--list-pill-bg)] px-1.5 py-0.5 text-xs tabular-nums text-[var(--list-cta-text)]">
+        <span className="ml-1 inline-flex items-center rounded-full bg-[var(--list-pill-bg)] px-1.5 py-0.5 text-xs tabular-nums text-[var(--list-cta-text)] dark:text-[var(--list-cta-text-dark)]">
           {totalCount}
         </span>
         <div
@@ -183,7 +184,7 @@ export function BoardListColumn({
         </SortableContext>
 
         {completedCount > 0 ? (
-          <div className="mt-2 px-1 text-[11px] text-[var(--list-cta-text)] opacity-60">
+          <div className="mt-2 px-1 text-[11px] text-[var(--list-cta-text)] opacity-60 dark:text-[var(--list-cta-text-dark)]">
             {completedCount} dokončeno
           </div>
         ) : null}
@@ -193,7 +194,7 @@ export function BoardListColumn({
             type="button"
             onClick={() => setQuickAddOpen(true)}
             onPointerDown={(e) => e.stopPropagation()}
-            className="mt-2 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-[var(--list-cta-text)] opacity-70 transition-all hover:bg-[var(--list-pill-bg)] hover:opacity-100"
+            className="mt-2 flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm text-[var(--list-cta-text)] opacity-70 transition-all hover:bg-[var(--list-pill-bg)] hover:opacity-100 dark:text-[var(--list-cta-text-dark)]"
           >
             <Plus className="size-3.5" strokeWidth={2} /> Nová karta
           </button>

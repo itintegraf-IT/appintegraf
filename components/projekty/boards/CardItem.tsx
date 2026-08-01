@@ -56,7 +56,9 @@ function CardItemBody({
 
   const checklistTotal = card.checklistTotal ?? 0;
   const checklistDone = card.checklistDone ?? 0;
-  const hasChecklist = checklistTotal > 0 || Boolean(card._count?.checklists);
+  // Jen počet položek (done/total) — počet checklistů by ve stejném slotu
+  // měnil význam čísla (karta jen s prázdnými checklisty counter nemá).
+  const hasChecklist = checklistTotal > 0;
   const hasAnyMeta = Boolean(primaryLabel || due || hasChecklist || primaryMember);
 
   const content = (
@@ -73,7 +75,7 @@ function CardItemBody({
 
       <div className="flex items-start gap-1.5">
         {card.completed ? (
-          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" aria-hidden />
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
         ) : null}
         <div
           className={`flex-1 text-sm font-medium leading-snug ${
@@ -107,13 +109,11 @@ function CardItemBody({
             <span
               className={cn(
                 "inline-flex items-center gap-1 tabular-nums",
-                checklistTotal > 0 && checklistDone === checklistTotal && "text-emerald-600",
+                checklistDone === checklistTotal && "text-emerald-600 dark:text-emerald-400",
               )}
             >
               <CheckSquare className="size-3" aria-hidden />
-              {checklistTotal > 0
-                ? `${checklistDone}/${checklistTotal}`
-                : card._count?.checklists}
+              {`${checklistDone}/${checklistTotal}`}
             </span>
           ) : null}
           {primaryMember ? (

@@ -9,6 +9,8 @@ export type ListColor = {
   pillBg: string;
   /** CSS color pro counter pill text + "+ Nová karta" CTA text (plná sytost, bez alpha). */
   ctaText: string;
+  /** Světlejší varianta ctaText pro dark mode (kontrast na tmavém pozadí). */
+  ctaTextDark: string;
   /** Lidský label (CZ) pro picker tooltip + a11y. */
   label: string;
 };
@@ -20,6 +22,7 @@ export const LIST_PRESET_COLORS: readonly ListColor[] = [
     bgTint: "hsl(215 16% 47% / 0.05)",
     pillBg: "hsl(215 16% 47% / 0.10)",
     ctaText: "hsl(215 16% 47%)",
+    ctaTextDark: "hsl(215 16% 70%)",
     label: "Neutrální",
   },
   {
@@ -28,6 +31,7 @@ export const LIST_PRESET_COLORS: readonly ListColor[] = [
     bgTint: "hsl(217 91% 60% / 0.06)",
     pillBg: "hsl(217 91% 60% / 0.12)",
     ctaText: "hsl(217 91% 60%)",
+    ctaTextDark: "hsl(217 91% 72%)",
     label: "Modrá",
   },
   {
@@ -36,6 +40,7 @@ export const LIST_PRESET_COLORS: readonly ListColor[] = [
     bgTint: "hsl(270 70% 55% / 0.06)",
     pillBg: "hsl(270 70% 55% / 0.12)",
     ctaText: "hsl(270 70% 55%)",
+    ctaTextDark: "hsl(270 70% 75%)",
     label: "Fialová",
   },
   {
@@ -44,6 +49,7 @@ export const LIST_PRESET_COLORS: readonly ListColor[] = [
     bgTint: "hsl(38 92% 50% / 0.07)",
     pillBg: "hsl(38 92% 50% / 0.14)",
     ctaText: "hsl(38 92% 50%)",
+    ctaTextDark: "hsl(38 92% 62%)",
     label: "Oranžová",
   },
   {
@@ -52,6 +58,7 @@ export const LIST_PRESET_COLORS: readonly ListColor[] = [
     bgTint: "hsl(152 69% 41% / 0.06)",
     pillBg: "hsl(152 69% 41% / 0.12)",
     ctaText: "hsl(152 69% 41%)",
+    ctaTextDark: "hsl(152 55% 62%)",
     label: "Zelená",
   },
   {
@@ -60,6 +67,7 @@ export const LIST_PRESET_COLORS: readonly ListColor[] = [
     bgTint: "hsl(0 72% 51% / 0.06)",
     pillBg: "hsl(0 72% 51% / 0.12)",
     ctaText: "hsl(0 72% 51%)",
+    ctaTextDark: "hsl(0 84% 70%)",
     label: "Červená",
   },
   {
@@ -68,6 +76,7 @@ export const LIST_PRESET_COLORS: readonly ListColor[] = [
     bgTint: "hsl(190 75% 45% / 0.06)",
     pillBg: "hsl(190 75% 45% / 0.12)",
     ctaText: "hsl(190 75% 45%)",
+    ctaTextDark: "hsl(190 70% 62%)",
     label: "Azurová",
   },
   {
@@ -76,6 +85,7 @@ export const LIST_PRESET_COLORS: readonly ListColor[] = [
     bgTint: "hsl(330 75% 55% / 0.06)",
     pillBg: "hsl(330 75% 55% / 0.12)",
     ctaText: "hsl(330 75% 55%)",
+    ctaTextDark: "hsl(330 75% 72%)",
     label: "Růžová",
   },
 ] as const;

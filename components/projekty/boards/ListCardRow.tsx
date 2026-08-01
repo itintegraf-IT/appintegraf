@@ -117,7 +117,7 @@ export function ListCardRow({
         className="grid size-4 shrink-0 place-items-center rounded border border-border transition-colors hover:bg-accent"
       >
         {card.completed ? (
-          <CheckCircle2 className="size-4 text-emerald-600" strokeWidth={2} />
+          <CheckCircle2 className="size-4 text-emerald-600 dark:text-emerald-400" strokeWidth={2} />
         ) : null}
       </span>
 

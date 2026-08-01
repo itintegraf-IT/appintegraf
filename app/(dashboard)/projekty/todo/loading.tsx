@@ -2,10 +2,13 @@ import { Skeleton } from "@/components/projekty/ui/skeleton";
 
 export default function TodoLoading() {
   return (
-    <main className="space-y-4">
-      <div className="flex items-center justify-between">
-        <Skeleton className="h-7 w-44" />
-        <Skeleton className="h-9 w-28" />
+    <div className="mx-auto max-w-3xl space-y-6 px-6 py-10">
+      <div className="flex items-center gap-4">
+        <Skeleton className="size-12 rounded-xl" />
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-52" />
+          <Skeleton className="h-4 w-72" />
+        </div>
       </div>
       <div className="flex gap-2">
         <Skeleton className="h-8 w-24" />
@@ -17,6 +20,6 @@ export default function TodoLoading() {
           <Skeleton key={i} className="h-11 rounded-lg" />
         ))}
       </div>
-    </main>
+    </div>
   );
 }

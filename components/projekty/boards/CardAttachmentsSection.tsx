@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/projekty/ui/button";
 import { ConfirmDialog } from "@/components/projekty/ui/confirm-dialog";
 import { EmptyState } from "@/components/projekty/ui/empty-state";
@@ -39,18 +39,23 @@ export function CardAttachmentsSection({
   const [items, setItems] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setStatus("loading");
     fetch(`/api/projekty/attachments?parentType=CARD&parentId=${cardId}`)
       .then((res) =>
         res.ok ? res.json() : Promise.reject(new Error("fetch failed")),
       )
-      .then((data: { attachments: Attachment[] }) => setItems(data.attachments))
-      .catch(() => toast.error("Načtení příloh selhalo."))
-      .finally(() => setLoaded(true));
+      .then((data: { attachments: Attachment[] }) => {
+        setItems(data.attachments);
+        setStatus("ok");
+      })
+      .catch(() => setStatus("error"));
   }, [cardId]);
+
+  useEffect(() => load(), [load]);
 
   async function handleUpload(file: File) {
     if (file.size > MAX_BYTES) {
@@ -133,13 +138,21 @@ export function CardAttachmentsSection({
         <p className="mt-1 text-xs text-muted-foreground">Max {formatSize(MAX_BYTES)}</p>
       </div>
 
-      {!loaded ? (
+      {status === "loading" ? (
         <div className="space-y-2">
           <Skeleton className="h-8 w-3/4" />
           <Skeleton className="h-8 w-2/3" />
         </div>
       ) : null}
-      {loaded && items.length === 0 ? (
+      {status === "error" ? (
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span>Přílohy se nepodařilo načíst.</span>
+          <Button variant="outline" size="sm" onClick={load}>
+            Zkusit znovu
+          </Button>
+        </div>
+      ) : null}
+      {status === "ok" && items.length === 0 ? (
         <EmptyState
           icon={Paperclip}
           title="Zatím žádné přílohy"

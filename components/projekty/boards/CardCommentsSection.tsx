@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/projekty/ui/button";
 import { ConfirmDialog } from "@/components/projekty/ui/confirm-dialog";
 import { EmptyState } from "@/components/projekty/ui/empty-state";
@@ -34,17 +34,22 @@ export function CardCommentsSection({
   const [notes, setNotes] = useState<Note[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setStatus("loading");
     fetch(`/api/projekty/notes?parentType=CARD&parentId=${cardId}`)
       .then((res) =>
         res.ok ? res.json() : Promise.reject(new Error("fetch failed")),
       )
-      .then((data: { notes: Note[] }) => setNotes(data.notes))
-      .catch(() => toast.error("Načtení komentářů selhalo."))
-      .finally(() => setLoaded(true));
+      .then((data: { notes: Note[] }) => {
+        setNotes(data.notes);
+        setStatus("ok");
+      })
+      .catch(() => setStatus("error"));
   }, [cardId]);
+
+  useEffect(() => load(), [load]);
 
   async function handlePost() {
     const trimmed = draft.trim();
@@ -109,13 +114,21 @@ export function CardCommentsSection({
         </div>
       </div>
 
-      {!loaded ? (
+      {status === "loading" ? (
         <div className="space-y-2">
           <Skeleton className="h-8 w-3/4" />
           <Skeleton className="h-8 w-2/3" />
         </div>
       ) : null}
-      {loaded && notes.length === 0 ? (
+      {status === "error" ? (
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span>Komentáře se nepodařilo načíst.</span>
+          <Button variant="outline" size="sm" onClick={load}>
+            Zkusit znovu
+          </Button>
+        </div>
+      ) : null}
+      {status === "ok" && notes.length === 0 ? (
         <EmptyState
           icon={MessageSquare}
           title="Zatím žádné komentáře"

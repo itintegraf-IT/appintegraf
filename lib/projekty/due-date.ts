@@ -14,11 +14,11 @@ export function startOfLocalDay(d: Date = new Date()): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
 /**
  * Stav termínu pro vizuální signalizaci (badge). Dokončená karta je vždy
- * "none" — hotové věci nehoří, bez ohledu na termín.
+ * "none" — hotové věci nehoří, bez ohledu na termín. Hranice dne přes
+ * kalendářní den (startOfLocalDay), ne +24 h — dny s přechodem letního
+ * času mají 23/25 hodin.
  */
 export function getDueStatus(
   due: Date | string | null | undefined,
@@ -27,8 +27,9 @@ export function getDueStatus(
   if (!due || completed) return "none";
   const d = new Date(due);
   const today = startOfLocalDay();
-  if (d.getTime() < today.getTime()) return "overdue";
-  if (d.getTime() < today.getTime() + DAY_MS) return "today";
+  const dueDay = startOfLocalDay(d);
+  if (dueDay.getTime() < today.getTime()) return "overdue";
+  if (dueDay.getTime() === today.getTime()) return "today";
   return "upcoming";
 }
 

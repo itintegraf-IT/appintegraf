@@ -2,8 +2,8 @@ import { Skeleton } from "@/components/projekty/ui/skeleton";
 
 export default function MyCardsLoading() {
   return (
-    <main className="space-y-4">
-      <Skeleton className="h-7 w-40" />
+    <div className="space-y-6 p-4 md:p-6">
+      <Skeleton className="h-8 w-40" />
       <ul className="space-y-2">
         {Array.from({ length: 8 }).map((_, i) => (
           <li key={i}>
@@ -11,6 +11,6 @@ export default function MyCardsLoading() {
           </li>
         ))}
       </ul>
-    </main>
+    </div>
   );
 }
