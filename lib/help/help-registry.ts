@@ -13,6 +13,7 @@ import {
   Tv,
   Phone,
   GraduationCap,
+  KanbanSquare,
   Wrench,
   User,
   Settings,
@@ -466,6 +467,38 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       "Vyberte školení a otevřete detail.",
       "Potvrďte absolvování (pokud máte školení přidělené).",
       "S oprávněním zápisu spravujte termíny a materiály.",
+    ],
+  },
+
+  projekty: {
+    key: "projekty",
+    module: "projekty",
+    icon: KanbanSquare,
+    title: "Projekty",
+    path: "/projekty",
+    intro:
+      "Projektové nástěnky s kartami úkolů — kanban, seznam a kalendář, komentáře, přílohy, checklisty a osobní To-Do list.",
+    features: [
+      "Nástěnky se sloupci a kartami (drag & drop, štítky, termíny, členové).",
+      "Tři pohledy: Kanban, Seznam, Kalendář — přepínání záložkami nad boardem.",
+      "Detail karty: popis, checklisty, komentáře se zmínkami, přílohy, historie aktivit.",
+      "Moje karty — přehled karet napříč boardy, kde jste členem.",
+      "Můj To Do list — osobní úkoly s možností povýšit úkol na kartu boardu.",
+    ],
+    quickSteps: [
+      "Otevřete Projekty → Nástěnky a vyberte board (nebo vytvořte nový).",
+      "Kartu přidáte tlačítkem + v patičce sloupce, přesouváte ji tažením.",
+      "Klikem na kartu otevřete detail; odkaz na kartu lze zkopírovat a poslat kolegovi.",
+      "Paletu příkazů otevřete zkratkou Ctrl+K (na Macu ⌘K) — skok na board, kartu i akce.",
+    ],
+    tips: [
+      "Hromadné akce: na počítači označte více karet Ctrl/⌘+klikem, rozsah Shift+klikem.",
+      "Filtry nad boardem (hledání, členové, štítky, termín) se ukládají do URL — vyfiltrovaný pohled lze poslat odkazem.",
+    ],
+    shortcuts: [
+      { keys: "Ctrl/⌘+K", action: "Paleta příkazů (hledání a akce)" },
+      { keys: "Ctrl/⌘+Shift+K", action: "Nový osobní úkol (quick capture)" },
+      { keys: "Esc", action: "Zavřít dialog / zrušit výběr karet" },
     ],
   },
 
