@@ -72,7 +72,12 @@ Cíl: jeden vizuální jazyk na standardních tokenech, „Linear look".
 
 ## 6. Navržené pořadí buildu
 
-1. **Vlna 3 — zdravý základ**: opravy z bodu 2 (audit endpoint, CSS tokeny, mrtvý kód) + vizuální jazyk (chipy, due badge, border/radius/typo škála, empty states, skeletony, hover disclosure).
+1. **Vlna 3 — zdravý základ**: ✅ HOTOVO (1. 8. 2026, 16 commitů na feat/modul-projekty). Opravy (audit route, migrace všech 262 výskytů CSS tokenů, mrtvý kód, 4 rozbité barvy sloupců, 2 neviditelná tlačítka) + vizuální jazyk (DueDateBadge, LabelChip, checklist counter done/total, empty states, skeletony vč. route-level loading.tsx, focus-within) + lib/projekty/due-date.ts (25 testů). Multi-agent review (17 agentů): 10 minor nálezů, 8 opraveno.
 2. **Vlna 4 — core UX**: side panel s URL, command palette, optimistic updates + toasty s undo, list view grouping, kanban drag feedback.
 3. **Vlna 5 — funkce A**: priority, Moje práce, @mentions autocomplete, watchers, šablony, opakující se úkoly, uložené pohledy (+ fulltext až bude MySQL config).
 4. **Vlna 6 — funkce B**: automatizační recepty, přehled projektu, inbox se snooze, přesun mezi boardy, UI archivu.
+
+### Odložené nálezy z review vlny 3 (vyřešit ve vlně 4/5)
+- **TZ serveru pro RSC due badge** — my-cards je čistě serverová stránka; pokud produkce běží v jiné TZ než Europe/Prague, urgence termínu se den kolem půlnoci klasifikuje špatně. Krátkodobě: ověřit s Michalem TZ produkčního procesu (nastavit `TZ=Europe/Prague`). Robustně: `Intl.DateTimeFormat` s explicitní timeZone v `lib/projekty/due-date.ts`.
+- **Audit feed nedohledá historii smazaných dětí karty** — DELETE záznamy komentářů/checklistů/příloh se ve feedu Aktivita neobjeví (vazba jen přes živé řádky). v2 = denormalizovaný `cardId` sloupec v `projekty_audit_log` + backfill (vyžaduje migraci → naplánovat do vlny s DB změnami).
+- **Předexistující mimo modul**: failing test `lib/backup/module-registry.test.ts` (v registru přibyl modul `makety`, test nezná) — nesouvisí s Projekty, jen upozornit vlastníka.
