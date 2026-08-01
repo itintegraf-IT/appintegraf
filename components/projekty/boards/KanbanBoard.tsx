@@ -1,7 +1,6 @@
 "use client";
 
 import { Fragment, useId, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   DndContext,
   DragOverlay,
@@ -12,7 +11,6 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, horizontalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { Columns3 } from "lucide-react";
-import { toast } from "sonner";
 import {
   BoardListColumn,
   BoardListColumnDragOverlay,
@@ -24,6 +22,7 @@ import { CardItemDragOverlay, type CardData } from "./CardItem";
 import { DropLine } from "./DropLine";
 import { useBulkSelection } from "./BulkSelectionContext";
 import { useResponsiveSensors } from "@/lib/projekty/dnd-sensors";
+import { useOptimisticListsMutation } from "@/hooks/projekty/useOptimisticListsMutation";
 
 export function KanbanBoard({
   boardId,
@@ -42,7 +41,7 @@ export function KanbanBoard({
   const sensors = useResponsiveSensors();
   const dndId = useId();
   const sel = useBulkSelection();
-  const router = useRouter();
+  const mutateLists = useOptimisticListsMutation({ lists, setLists });
 
   function handleDragStart(event: DragStartEvent) {
     const data: { type?: string } | undefined = event.active.data.current;
@@ -86,25 +85,68 @@ export function KanbanBoard({
       if (!targetListId) return;
       // Sanity check: cílový list musí být v boardu
       if (!lists.some((l) => l.id === targetListId)) return;
-      try {
-        const res = await fetch("/api/projekty/cards/bulk", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "move",
-            cardIds: ids,
-            payload: { listId: targetListId },
-          }),
-        });
-        if (!res.ok) {
-          toast.error("Hromadný přesun karet selhal.");
-          return;
+
+      // Undo podklad: původní list per karta (pozice se neobnoví — jde na
+      // konec; dokumentovaná limitace bulk move API)
+      const originListById = new Map<string, string>();
+      for (const l of lists) {
+        for (const c of l.cards) {
+          if (ids.includes(c.id)) originListById.set(c.id, l.id);
         }
-        sel.clear();
-        router.refresh();
-      } catch {
-        toast.error("Hromadný přesun karet selhal (chyba sítě).");
       }
+      const idSet = new Set(ids);
+      const targetName = lists.find((l) => l.id === targetListId)?.name ?? "";
+
+      const ok = await mutateLists({
+        // Optimistic: vyjmout označené karty odevšad a připojit na konec cíle
+        optimistic: (prev) => {
+          const moved = prev
+            .flatMap((l) => l.cards)
+            .filter((c) => idSet.has(c.id))
+            .map((c) => ({ ...c, listId: targetListId }));
+          return prev.map((l) => {
+            const kept = l.cards.filter((c) => !idSet.has(c.id));
+            return l.id === targetListId ? { ...l, cards: [...kept, ...moved] } : { ...l, cards: kept };
+          });
+        },
+        request: () =>
+          fetch("/api/projekty/cards/bulk", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "move",
+              cardIds: ids,
+              payload: { listId: targetListId },
+            }),
+          }),
+        errorMessage: "Hromadný přesun karet selhal",
+        refreshOnSuccess: true,
+        successToast: {
+          message: `${ids.length} karet přesunuto do „${targetName}“`,
+          undo: async () => {
+            const bySource = new Map<string, string[]>();
+            for (const [cid, lid] of originListById) {
+              if (lid === targetListId) continue;
+              bySource.set(lid, [...(bySource.get(lid) ?? []), cid]);
+            }
+            const results = await Promise.all(
+              [...bySource.entries()].map(([lid, cids]) =>
+                fetch("/api/projekty/cards/bulk", {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    action: "move",
+                    cardIds: cids,
+                    payload: { listId: lid },
+                  }),
+                }).then((r) => r.ok),
+              ),
+            );
+            return results.every(Boolean);
+          },
+        },
+      });
+      if (ok) sel.clear();
       return;
     }
 
@@ -127,10 +169,7 @@ export function KanbanBoard({
     const newIndex = lists.findIndex((l) => l.id === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
 
-    const original = lists;
     const reordered = arrayMove(lists, oldIndex, newIndex);
-    setLists(reordered);
-
     const before = reordered[newIndex - 1];
     const after = reordered[newIndex + 1];
     const body: Record<string, string> = {};
@@ -138,20 +177,16 @@ export function KanbanBoard({
     if (after) body.beforeListId = after.id;
     if (!body.afterListId && !body.beforeListId) return;
 
-    try {
-      const res = await fetch(`/api/projekty/lists/${active.id}/position`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        setLists(original);
-        toast.error("Přesun listu selhal.");
-      }
-    } catch {
-      setLists(original);
-      toast.error("Přesun listu selhal (chyba sítě).");
-    }
+    await mutateLists({
+      optimistic: () => reordered,
+      request: () =>
+        fetch(`/api/projekty/lists/${active.id}/position`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+      errorMessage: "Přesun listu selhal",
+    });
   }
 
   async function handleCardDragEnd(
@@ -205,7 +240,6 @@ export function KanbanBoard({
       if (l.id === targetList.id) return { ...l, cards: targetCards };
       return l;
     });
-    setLists(newLists);
 
     const newTargetCards = newLists.find((l) => l.id === targetListId)?.cards ?? [];
     const newCardIndex = newTargetCards.findIndex((c) => c.id === cardId);
@@ -216,20 +250,38 @@ export function KanbanBoard({
     if (before) body.afterCardId = before.id;
     if (after) body.beforeCardId = after.id;
 
-    try {
-      const res = await fetch(`/api/projekty/cards/${cardId}/move`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        setLists(original);
-        toast.error("Přesun karty selhal.");
-      }
-    } catch {
-      setLists(original);
-      toast.error("Přesun karty selhal (chyba sítě).");
-    }
+    const crossList = sourceListId !== targetListId;
+    // Undo podklad: původní sousedé ve zdrojovém sloupci
+    const origIndex = sourceList.cards.findIndex((c) => c.id === cardId);
+    const origBefore = sourceList.cards[origIndex - 1];
+    const origAfter = sourceList.cards[origIndex + 1];
+
+    await mutateLists({
+      optimistic: () => newLists,
+      request: () =>
+        fetch(`/api/projekty/cards/${cardId}/move`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+      errorMessage: "Přesun karty selhal",
+      successToast: crossList
+        ? {
+            message: `Karta přesunuta do „${targetList.name}“`,
+            undo: async () => {
+              const undoBody: Record<string, string> = { listId: sourceListId };
+              if (origBefore) undoBody.afterCardId = origBefore.id;
+              if (origAfter) undoBody.beforeCardId = origAfter.id;
+              const r = await fetch(`/api/projekty/cards/${cardId}/move`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(undoBody),
+              });
+              return r.ok;
+            },
+          }
+        : undefined,
+    });
   }
 
   function handleCardCreated(listId: string, card: CardData) {

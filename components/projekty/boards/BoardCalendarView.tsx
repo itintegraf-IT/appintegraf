@@ -9,7 +9,7 @@ import {
 } from "@dnd-kit/core";
 import { addDays, differenceInDays, parseISO } from "date-fns";
 import { CalendarDays, Monitor, SearchX } from "lucide-react";
-import { toast } from "sonner";
+import { useOptimisticListsMutation } from "@/hooks/projekty/useOptimisticListsMutation";
 import { type ListData } from "./BoardListColumn";
 import { CalendarHeader } from "./CalendarHeader";
 import { CalendarGrid } from "./CalendarGrid";
@@ -43,6 +43,7 @@ export function BoardCalendarView({
   }, []);
 
   const sensors = useResponsiveSensors();
+  const mutateLists = useOptimisticListsMutation({ lists, setLists });
 
   async function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
@@ -82,37 +83,57 @@ export function BoardCalendarView({
           ? addDays(parseISO(rawStart), deltaDays).toISOString()
           : null;
 
-    const original = lists;
-    const newLists = lists.map((l) => ({
-      ...l,
-      cards: l.cards.map((c) => {
-        if (c.id !== cardId) return c;
-        return {
-          ...c,
-          dueDate: newDueDateIso,
-          startDate: newStartDateIso ?? c.startDate,
-        };
-      }),
-    }));
-    setLists(newLists);
-
     const payload: { dueDate: string; startDate?: string } = { dueDate: newDueDateIso };
     if (newStartDateIso) payload.startDate = newStartDateIso;
 
-    try {
-      const res = await fetch(`/api/projekty/cards/${cardId}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        setLists(original);
-        toast.error("Posun data selhal.");
-      }
-    } catch {
-      setLists(original);
-      toast.error("Posun data selhal (chyba sítě).");
-    }
+    // Undo podklad: původní hodnoty z aktuálního stavu
+    const origCard = lists.flatMap((l) => l.cards).find((c) => c.id === cardId);
+    const origDueIso = origCard?.dueDate
+      ? new Date(origCard.dueDate).toISOString()
+      : null;
+    const origStartIso = origCard?.startDate
+      ? new Date(origCard.startDate).toISOString()
+      : null;
+
+    await mutateLists({
+      optimistic: (prev) =>
+        prev.map((l) => ({
+          ...l,
+          cards: l.cards.map((c) => {
+            if (c.id !== cardId) return c;
+            return {
+              ...c,
+              dueDate: newDueDateIso,
+              startDate: newStartDateIso ?? c.startDate,
+            };
+          }),
+        })),
+      request: () =>
+        fetch(`/api/projekty/cards/${cardId}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        }),
+      errorMessage: "Posun data selhal",
+      successToast: {
+        message:
+          deltaDays > 0
+            ? `Termín posunut o ${deltaDays} ${deltaDays === 1 ? "den" : deltaDays < 5 ? "dny" : "dní"} vpřed`
+            : `Termín posunut o ${-deltaDays} ${-deltaDays === 1 ? "den" : -deltaDays < 5 ? "dny" : "dní"} zpět`,
+        undo: async () => {
+          const undoPayload: { dueDate: string | null; startDate: string | null } = {
+            dueDate: origDueIso,
+            startDate: origStartIso,
+          };
+          const r = await fetch(`/api/projekty/cards/${cardId}`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(undoPayload),
+          });
+          return r.ok;
+        },
+      },
+    });
   }
 
   if (isMobile) {

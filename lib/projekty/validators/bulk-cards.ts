@@ -18,6 +18,11 @@ export const BulkUpdateSchema = z.discriminatedUnion("action", [
     cardIds,
     payload: z.object({ userIds: z.array(z.coerce.number().int()).min(1) }),
   }),
+  z.object({
+    action: z.literal("archive"),
+    cardIds,
+    payload: z.object({ archived: z.boolean() }),
+  }),
 ]);
 
 export type BulkUpdateInput = z.infer<typeof BulkUpdateSchema>;

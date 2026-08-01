@@ -89,6 +89,15 @@ export const PATCH = withApiError(async (req: Request) => {
         wantedUserIds.map((userId) => ({ cardId, userId })),
       );
       await tx.cardMember.createMany({ data, skipDuplicates: true });
+    } else if (action === "archive") {
+      // (Od)archivace — inverzní operace k bulk DELETE (soft archived flag);
+      // používá ji undo toast v BulkActionBar.
+      for (const cardId of cardIds) {
+        await tx.card.update({
+          where: { id: cardId },
+          data: { archived: payload.archived },
+        });
+      }
     }
   });
 

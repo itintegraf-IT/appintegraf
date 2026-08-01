@@ -18,10 +18,13 @@ export function ListCardRow({
   card,
   list,
   orderedCardIds,
+  onToggleCompleted,
 }: {
   card: CardData;
   list: ListData;
   orderedCardIds: string[];
+  /** Optimistic toggle zvednutý do BoardListView (má přístup k lists stavu). */
+  onToggleCompleted?: (card: CardData) => void;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -77,13 +80,18 @@ export function ListCardRow({
 
   async function toggleCompleted(e: React.MouseEvent) {
     e.stopPropagation();
+    if (onToggleCompleted) {
+      onToggleCompleted(card);
+      return;
+    }
+    // Fallback bez zvednutého handleru (neměl by nastat — BoardListView ho předává)
     const next = !card.completed;
-    await fetch(`/api/projekty/cards/${card.id}`, {
+    const res = await fetch(`/api/projekty/cards/${card.id}`, {
       method: "PATCH",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ completed: next }),
     });
-    router.refresh();
+    if (res.ok) router.refresh();
   }
 
   return (

@@ -14,7 +14,6 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { SearchX } from "lucide-react";
-import { toast } from "sonner";
 import { type ListData } from "./BoardListColumn";
 import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { ListGroupHeader } from "./ListGroupHeader";
@@ -22,6 +21,7 @@ import { ListCardRow } from "./ListCardRow";
 import { Button } from "@/components/projekty/ui/button";
 import { type CardData } from "./CardItem";
 import { useResponsiveSensors } from "@/lib/projekty/dnd-sensors";
+import { useOptimisticListsMutation } from "@/hooks/projekty/useOptimisticListsMutation";
 
 export function BoardListView({
   displayedLists,
@@ -37,6 +37,7 @@ export function BoardListView({
   const router = useRouter();
   const [activeCard, setActiveCard] = useState<CardData | null>(null);
   const sensors = useResponsiveSensors();
+  const mutateLists = useOptimisticListsMutation({ lists, setLists });
 
   const totalCards = displayedLists.reduce((acc, l) => acc + l.cards.length, 0);
   const hasActiveFilter =
@@ -93,33 +94,72 @@ export function BoardListView({
     if (!targetListId) return;
     if (targetListId === found.sourceListId) return; // no-op
 
-    const original = lists;
-    const newLists = lists.map((l) => {
-      if (l.id === found.sourceListId) {
-        return { ...l, cards: l.cards.filter((c) => c.id !== cardId) };
-      }
-      if (l.id === targetListId) {
-        const movedCard: CardData = { ...found.card, listId: targetListId };
-        return { ...l, cards: [...l.cards, movedCard] };
-      }
-      return l;
-    });
-    setLists(newLists);
+    const targetName = lists.find((l) => l.id === targetListId)?.name ?? "";
+    const sourceListId = found.sourceListId;
 
-    try {
-      const res = await fetch(`/api/projekty/cards/${cardId}/move`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ listId: targetListId }),
-      });
-      if (!res.ok) {
-        setLists(original);
-        toast.error("Přesun karty selhal.");
-      }
-    } catch {
-      setLists(original);
-      toast.error("Přesun karty selhal (chyba sítě).");
-    }
+    await mutateLists({
+      optimistic: (prev) =>
+        prev.map((l) => {
+          if (l.id === sourceListId) {
+            return { ...l, cards: l.cards.filter((c) => c.id !== cardId) };
+          }
+          if (l.id === targetListId) {
+            const movedCard: CardData = { ...found.card, listId: targetListId };
+            return { ...l, cards: [...l.cards, movedCard] };
+          }
+          return l;
+        }),
+      request: () =>
+        fetch(`/api/projekty/cards/${cardId}/move`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ listId: targetListId }),
+        }),
+      errorMessage: "Přesun karty selhal",
+      successToast: {
+        message: `Karta přesunuta do „${targetName}“`,
+        undo: async () => {
+          const r = await fetch(`/api/projekty/cards/${cardId}/move`, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ listId: sourceListId }),
+          });
+          return r.ok;
+        },
+      },
+    });
+  }
+
+  async function toggleCompleted(card: CardData) {
+    const next = !card.completed;
+    await mutateLists({
+      optimistic: (prev) =>
+        prev.map((l) => ({
+          ...l,
+          cards: l.cards.map((c) => (c.id === card.id ? { ...c, completed: next } : c)),
+        })),
+      request: () =>
+        fetch(`/api/projekty/cards/${card.id}`, {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ completed: next }),
+        }),
+      errorMessage: "Změna stavu selhala",
+      refreshOnSuccess: true,
+      successToast: next
+        ? {
+            message: "Karta označena jako hotová",
+            undo: async () => {
+              const r = await fetch(`/api/projekty/cards/${card.id}`, {
+                method: "PATCH",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ completed: false }),
+              });
+              return r.ok;
+            },
+          }
+        : undefined,
+    });
   }
 
   // Empty state ukazujeme jen když je aktivní filter — bez filtru má smysl
@@ -162,7 +202,13 @@ export function BoardListView({
                 </p>
               ) : (
                 list.cards.map((card) => (
-                  <ListCardRow key={card.id} card={card} list={list} orderedCardIds={orderedCardIds} />
+                  <ListCardRow
+                    key={card.id}
+                    card={card}
+                    list={list}
+                    orderedCardIds={orderedCardIds}
+                    onToggleCompleted={(c) => void toggleCompleted(c)}
+                  />
                 ))
               )}
             </SortableContext>
