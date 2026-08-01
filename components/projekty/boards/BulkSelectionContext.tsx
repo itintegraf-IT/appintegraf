@@ -86,10 +86,15 @@ export function BulkSelectionProvider({ children }: { children: ReactNode }) {
     setLastSelectedId(null);
   }, []);
 
-  // Esc → clear
+  // Esc → clear. Guard: neruš výběr, když Esc obsluhuje otevřený dialog
+  // (command palette, detail karty, potvrzovací dialogy — Radix nastavuje
+  // role="dialog" + data-state="open" na content).
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") clear();
+      if (e.key !== "Escape") return;
+      if (e.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"][data-state="open"]')) return;
+      clear();
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
