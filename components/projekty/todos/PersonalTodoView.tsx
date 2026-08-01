@@ -6,6 +6,7 @@ import { ListTodo, CheckCircle2 } from "lucide-react";
 import type { PersonalTodo } from "@prisma/client";
 import { cn } from "@/lib/projekty/utils";
 import { EmptyState } from "@/components/projekty/ui/empty-state";
+import { Kbd } from "@/components/projekty/ui/kbd";
 import { PersonalTodoInlineAdd } from "@/components/projekty/todos/PersonalTodoInlineAdd";
 import { PersonalTodoRow } from "@/components/projekty/todos/PersonalTodoRow";
 import { PersonalTodoArchive } from "@/components/projekty/todos/PersonalTodoArchive";
@@ -98,11 +99,8 @@ export function PersonalTodoView({
                   Můj To Do list
                 </h1>
                 <p className="pt-1 text-sm text-muted-foreground">
-                  Osobní úkoly. Stiskni{" "}
-                  <kbd className="rounded border border-border bg-background px-1.5 py-0.5 text-[11px] font-medium">
-                    ⌘K
-                  </kbd>{" "}
-                  pro rychlé přidání odkudkoli.
+                  Osobní úkoly. Stiskni <Kbd shortcut="mod+K" /> pro rychlé
+                  přidání odkudkoli.
                 </p>
               </div>
             </div>
@@ -136,10 +134,7 @@ export function PersonalTodoView({
                   description={
                     <>
                       Napiš si první úkol dole, nebo stiskni{" "}
-                      <kbd className="rounded border border-border bg-background px-1 text-[10px]">
-                        ⌘K
-                      </kbd>
-                      .
+                      <Kbd shortcut="mod+K" className="px-1 text-[10px]" />.
                     </>
                   }
                   className="m-3"
