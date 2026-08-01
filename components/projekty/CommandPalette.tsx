@@ -65,6 +65,11 @@ export function CommandPalette() {
   const isTouch = useIsTouchDevice();
   const isMac = useIsMac();
   const quickCapture = useQuickCapture();
+  // Zrcadlo `open` pro keydown listener (ten se registruje jen jednou)
+  const openRef = useRef(open);
+  useEffect(() => {
+    openRef.current = open;
+  }, [open]);
 
   const boardIdOnPage = useMemo(() => {
     const m = pathname.match(/^\/projekty\/boards\/([^/]+)$/);
@@ -76,23 +81,32 @@ export function CommandPalette() {
     if (isTouch) return;
     function handler(e: KeyboardEvent) {
       if (
-        (e.metaKey || e.ctrlKey) &&
-        !e.shiftKey &&
-        !e.altKey &&
-        e.key.toLowerCase() === "k"
+        !(e.metaKey || e.ctrlKey) ||
+        e.shiftKey ||
+        e.altKey ||
+        e.key.toLowerCase() !== "k"
       ) {
-        const target = e.target as HTMLElement | null;
-        if (
-          target &&
-          (target.tagName === "INPUT" ||
-            target.tagName === "TEXTAREA" ||
-            target.isContentEditable)
-        ) {
-          return;
-        }
-        e.preventDefault();
-        setOpen((o) => !o);
+        return;
       }
+      // Otevřená paleta: zavřít bez ohledu na focus (fokus drží její vlastní
+      // input, editable guard níže by jinak zkratku propustil prohlížeči).
+      if (openRef.current) {
+        e.preventDefault();
+        setOpen(false);
+        setQuery("");
+        return;
+      }
+      const target = e.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setOpen(true);
     }
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
@@ -158,6 +172,7 @@ export function CommandPalette() {
     if (view === "kanban") sp.delete("view");
     else sp.set("view", view);
     if (view !== "calendar") sp.delete("month");
+    if (view !== "list") sp.delete("group");
     close();
     router.replace(`${pathname}${sp.size ? `?${sp}` : ""}`);
   }
@@ -177,6 +192,7 @@ export function CommandPalette() {
       title="Paleta příkazů"
       description="Hledej boardy, karty a akce"
       showCloseButton={false}
+      shouldFilter={false}
     >
       <CommandInput
         placeholder="Hledej boardy, karty, akce…"
@@ -253,7 +269,7 @@ export function CommandPalette() {
           >
             <Plus className="text-muted-foreground" />
             Nový osobní úkol
-            <CommandShortcut>{formatShortcut("mod+shift+K", isMac)}</CommandShortcut>
+            <CommandShortcut>{formatShortcut("mod+shift+U", isMac)}</CommandShortcut>
           </CommandItem>
           {boardIdOnPage
             ? VIEW_ITEMS.filter(

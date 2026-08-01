@@ -497,7 +497,7 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     ],
     shortcuts: [
       { keys: "Ctrl/⌘+K", action: "Paleta příkazů (hledání a akce)" },
-      { keys: "Ctrl/⌘+Shift+K", action: "Nový osobní úkol (quick capture)" },
+      { keys: "Ctrl/⌘+Shift+U", action: "Nový osobní úkol (quick capture)" },
       { keys: "Esc", action: "Zavřít dialog / zrušit výběr karet" },
     ],
   },

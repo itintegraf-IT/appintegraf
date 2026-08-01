@@ -99,7 +99,7 @@ export function PersonalTodoView({
                   Můj To Do list
                 </h1>
                 <p className="pt-1 text-sm text-muted-foreground">
-                  Osobní úkoly. Stiskni <Kbd shortcut="mod+shift+K" /> pro rychlé
+                  Osobní úkoly. Stiskni <Kbd shortcut="mod+shift+U" /> pro rychlé
                   přidání odkudkoli.
                 </p>
               </div>
@@ -134,7 +134,7 @@ export function PersonalTodoView({
                   description={
                     <>
                       Napiš si první úkol dole, nebo stiskni{" "}
-                      <Kbd shortcut="mod+shift+K" className="px-1 text-[10px]" />.
+                      <Kbd shortcut="mod+shift+U" className="px-1 text-[10px]" />.
                     </>
                   }
                   className="m-3"

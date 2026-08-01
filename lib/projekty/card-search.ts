@@ -12,7 +12,8 @@ export function buildCardSearchWhere(
 ): Prisma.CardWhereInput {
   return {
     archived: false,
-    title: { contains: q },
+    // Číslo karty (T-123) je v paletě vidět → musí být i hledatelné
+    OR: [{ title: { contains: q } }, { number: { contains: q } }],
     list: {
       board: {
         archived: false,

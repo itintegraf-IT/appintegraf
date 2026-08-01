@@ -43,6 +43,8 @@ export function CardDetailPanel({
   useEffect(() => {
     if (!cardId || !open) return;
     let cancelled = false;
+    // Reset předchozího selhání téže karty → při retry zase skeleton, ne „nenalezena"
+    setFailed((f) => (f === cardId ? null : f));
     fetch(`/api/projekty/cards/${cardId}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error("HTTP " + res.status))))
       .then((data: { card: FullCard }) => {

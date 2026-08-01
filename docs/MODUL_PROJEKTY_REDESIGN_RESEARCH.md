@@ -73,9 +73,14 @@ Cíl: jeden vizuální jazyk na standardních tokenech, „Linear look".
 ## 6. Navržené pořadí buildu
 
 1. **Vlna 3 — zdravý základ**: ✅ HOTOVO (1. 8. 2026, 16 commitů na feat/modul-projekty). Opravy (audit route, migrace všech 262 výskytů CSS tokenů, mrtvý kód, 4 rozbité barvy sloupců, 2 neviditelná tlačítka) + vizuální jazyk (DueDateBadge, LabelChip, checklist counter done/total, empty states, skeletony vč. route-level loading.tsx, focus-within) + lib/projekty/due-date.ts (25 testů). Multi-agent review (17 agentů): 10 minor nálezů, 8 opraveno.
-2. **Vlna 4 — core UX**: side panel s URL, command palette, optimistic updates + toasty s undo, list view grouping, kanban drag feedback.
+2. **Vlna 4 — core UX**: ✅ HOTOVO (1. 8. 2026, 10 commitů). Toaster mount (~60 toastů modulu bylo neviditelných!), platform-aware zkratky (`Ctrl+K` paleta / `Ctrl+Shift+U` quick capture — appka běží hlavně na Windows, `⌘` jen na macu), command palette s hledáním karet (`GET /api/projekty/cards?q=`), detail karty jako Sheet panel + plná stránka `/boards/[boardId]/cards/[cardId]` + archivace s undo místo hard delete, `useOptimisticListsMutation` + undo toasty (drag, completed, kalendář, bulk), list grouping `?group=list|assignee|due`, drag feedback vč. pozičního dropu v list view. Multi-agent review: 25 nálezů, 12 potvrzeno a opraveno.
 3. **Vlna 5 — funkce A**: priority, Moje práce, @mentions autocomplete, watchers, šablony, opakující se úkoly, uložené pohledy (+ fulltext až bude MySQL config).
 4. **Vlna 6 — funkce B**: automatizační recepty, přehled projektu, inbox se snooze, přesun mezi boardy, UI archivu.
+
+### Odložené z vlny 4 (do vlny 5)
+- **Optimistic + undo u přiřazení členů** (`CardMembersPicker`, `BulkMembersPicker`) — dnes bez optimistic; slíbeno v bodě 4.9, doděláno jen pro přesun/completed/termín/bulk archivaci.
+- **Multi-drag undo neobnoví přesné pořadí** (vrátí jen původní sloupec, karty jdou na konec) — bulk move API neumí pozice.
+- **Zkratka Ctrl/⌘+Shift+U** zvolena kvůli Firefoxu na Windows (Ctrl+Shift+K je tam rezervovaná pro Web Console) — při doplňování dalších zkratek ověřovat kolize s prohlížeči.
 
 ### Odložené nálezy z review vlny 3 (vyřešit ve vlně 4/5)
 - **TZ serveru pro RSC due badge** — my-cards je čistě serverová stránka; pokud produkce běží v jiné TZ než Europe/Prague, urgence termínu se den kolem půlnoci klasifikuje špatně. Krátkodobě: ověřit s Michalem TZ produkčního procesu (nastavit `TZ=Europe/Prague`). Robustně: `Intl.DateTimeFormat` s explicitní timeZone v `lib/projekty/due-date.ts`.

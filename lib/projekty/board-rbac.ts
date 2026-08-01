@@ -55,7 +55,8 @@ export async function loadCardForRBAC(cardId: string): Promise<CardForRBAC> {
 }
 
 /**
- * Load card with all detail relations needed by CardDetailModal.
+ * Load card with all detail relations needed by CardDetailContent (sdílené
+ * tělo detailu — Sheet panel i plná stránka karty).
  * Includes members (with user info), labels (with label info), and
  * board context (members + available labels for pickers).
  *

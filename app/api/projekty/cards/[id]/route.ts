@@ -95,6 +95,9 @@ export const PATCH = withApiError(async (req: Request, { params }: Params) => {
   return NextResponse.json({ card: updated });
 });
 
+// Trvalé smazání karty. UI vlny 4 kartu jen archivuje (PATCH archived) —
+// hard delete zůstává pro archiv (vlna 6, „smazat z archivu"), a proto je
+// povolený jen nad už archivovanou kartou.
 export const DELETE = withApiError(async (_req: Request, { params }: Params) => {
   const user = await requireSession();
   const { id } = await params;
@@ -102,6 +105,10 @@ export const DELETE = withApiError(async (_req: Request, { params }: Params) => 
   const card = await loadCardForRBAC(id);
   if (!canEditCard(user, card)) {
     throw new AppError("FORBIDDEN", "Nemůžeš smazat tuto kartu.");
+  }
+  const state = await prisma.card.findUnique({ where: { id }, select: { archived: true } });
+  if (!state?.archived) {
+    throw new AppError("VALIDATION", "Nejdřív kartu archivuj — teprve archivovanou lze smazat.");
   }
 
   const audited = getPrismaAudited(user.id);

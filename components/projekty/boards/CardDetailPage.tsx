@@ -66,7 +66,22 @@ export function CardDetailPage({
         toast.error("Archivace selhala.");
         return;
       }
-      toast.success("Karta archivována");
+      const archivedId = card.id;
+      toast.success("Karta archivována", {
+        action: {
+          label: "Zpět",
+          onClick: () => {
+            void fetch(`/api/projekty/cards/${archivedId}`, {
+              method: "PATCH",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ archived: false }),
+            }).then((r) => {
+              if (r.ok) router.push(`/projekty/boards/${boardId}/cards/${archivedId}`);
+              else toast.error("Obnovení karty selhalo.");
+            });
+          },
+        },
+      });
       router.push(`/projekty/boards/${boardId}`);
     } catch {
       toast.error("Archivace selhala (chyba sítě).");
@@ -89,7 +104,7 @@ export function CardDetailPage({
       <div className="flex items-center justify-between gap-2">
         <Link
           href={`/projekty/boards/${boardId}`}
-          className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground transition-colors duration-150 hover:text-foreground motion-reduce:transition-none"
         >
           <ChevronLeft className="size-4 shrink-0" />
           <span className="truncate">{boardName}</span>
