@@ -6,7 +6,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { Settings } from "lucide-react";
 import { toast } from "sonner";
 import { type ListData } from "./BoardListColumn";
-import { CardDetailModal } from "./CardDetailModal";
+import { CardDetailPanel } from "./CardDetailPanel";
 import { BoardCardFilterBar } from "./BoardCardFilterBar";
 import { KanbanBoard } from "./KanbanBoard";
 import { matchesFilters, parseCardFilters } from "@/lib/projekty/card-filters";
@@ -169,7 +169,7 @@ function BoardViewInner({ board, currentUserId, lists, setLists }: BoardViewInne
           }
         })()}
 
-        <CardDetailModal
+        <CardDetailPanel
           cardId={cardIdParam}
           currentUserId={currentUserId}
           open={Boolean(cardIdParam)}
