@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/projekty/ui/button";
 import { ConfirmDialog } from "@/components/projekty/ui/confirm-dialog";
 import { EmptyState } from "@/components/projekty/ui/empty-state";
+import { Skeleton } from "@/components/projekty/ui/skeleton";
 import { Textarea } from "@/components/projekty/ui/textarea";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
 import { MessageSquare, Trash2 } from "lucide-react";
@@ -108,6 +109,12 @@ export function CardCommentsSection({
         </div>
       </div>
 
+      {!loaded ? (
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-8 w-2/3" />
+        </div>
+      ) : null}
       {loaded && notes.length === 0 ? (
         <EmptyState
           icon={MessageSquare}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/projekty/ui/button";
 import { ConfirmDialog } from "@/components/projekty/ui/confirm-dialog";
 import { EmptyState } from "@/components/projekty/ui/empty-state";
+import { Skeleton } from "@/components/projekty/ui/skeleton";
 import { Paperclip, Upload, Trash2, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { cs } from "date-fns/locale";
@@ -38,6 +39,7 @@ export function CardAttachmentsSection({
   const [items, setItems] = useState<Attachment[]>([]);
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -46,7 +48,8 @@ export function CardAttachmentsSection({
         res.ok ? res.json() : Promise.reject(new Error("fetch failed")),
       )
       .then((data: { attachments: Attachment[] }) => setItems(data.attachments))
-      .catch(() => toast.error("Načtení příloh selhalo."));
+      .catch(() => toast.error("Načtení příloh selhalo."))
+      .finally(() => setLoaded(true));
   }, [cardId]);
 
   async function handleUpload(file: File) {
@@ -130,7 +133,13 @@ export function CardAttachmentsSection({
         <p className="mt-1 text-xs text-muted-foreground">Max {formatSize(MAX_BYTES)}</p>
       </div>
 
-      {items.length === 0 ? (
+      {!loaded ? (
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-3/4" />
+          <Skeleton className="h-8 w-2/3" />
+        </div>
+      ) : null}
+      {loaded && items.length === 0 ? (
         <EmptyState
           icon={Paperclip}
           title="Zatím žádné přílohy"
