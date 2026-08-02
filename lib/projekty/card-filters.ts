@@ -1,4 +1,5 @@
 import { getDueStatus, startOfLocalDay } from "./due-date";
+import { isCardPriority, type CardPriorityValue } from "./priority";
 
 export type CardFilters = {
   q?: string;
@@ -6,6 +7,8 @@ export type CardFilters = {
   labelIds?: string[];
   dueRange?: "overdue" | "today" | "week" | "none";
   completed?: "true" | "false" | "any";
+  /** Prázdné/nepřítomné = bez filtru. "none" = karty bez priority. */
+  priorities?: (CardPriorityValue | "none")[];
 };
 
 export function parseCardFilters(
@@ -18,7 +21,17 @@ export function parseCardFilters(
     labelIds: get("labels")?.split(",").filter(Boolean),
     dueRange: (get("due") as CardFilters["dueRange"]) ?? undefined,
     completed: (get("completed") as CardFilters["completed"]) ?? "any",
+    priorities: parsePriorityParam(get("priority")),
   };
+}
+
+/** Neznámé hodnoty z URL zahazujeme — jinak by filtr tiše nevrátil nic. */
+function parsePriorityParam(raw: string | null): CardFilters["priorities"] {
+  if (!raw) return undefined;
+  const values = raw
+    .split(",")
+    .filter((v) => v === "none" || isCardPriority(v)) as (CardPriorityValue | "none")[];
+  return values.length > 0 ? values : undefined;
 }
 
 export function serializeCardFilters(filters: CardFilters): URLSearchParams {
@@ -30,6 +43,7 @@ export function serializeCardFilters(filters: CardFilters): URLSearchParams {
   if (filters.completed && filters.completed !== "any") {
     sp.set("completed", filters.completed);
   }
+  if (filters.priorities?.length) sp.set("priority", filters.priorities.join(","));
   return sp;
 }
 
@@ -40,6 +54,7 @@ export function matchesFilters(
     dueDate: Date | string | null;
     members: { userId: number }[];
     labels: { labelId: string }[];
+    priority?: CardPriorityValue | null;
   },
   filters: CardFilters,
 ): boolean {
@@ -56,6 +71,9 @@ export function matchesFilters(
   }
   if (filters.completed === "true" && !card.completed) return false;
   if (filters.completed === "false" && card.completed) return false;
+  if (filters.priorities?.length) {
+    if (!filters.priorities.includes(card.priority ?? "none")) return false;
+  }
   if (filters.dueRange) {
     if (filters.dueRange === "none") {
       if (card.dueDate) return false;

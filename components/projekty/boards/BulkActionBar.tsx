@@ -6,6 +6,8 @@ import { useBulkSelection } from "./BulkSelectionContext";
 import { BulkMoveListPicker } from "./BulkMoveListPicker";
 import { BulkLabelsPicker } from "./BulkLabelsPicker";
 import { BulkMembersPicker } from "./BulkMembersPicker";
+import { BulkPriorityPicker } from "./BulkPriorityPicker";
+import type { CardPriorityValue } from "@/lib/projekty/priority";
 import { cn } from "@/lib/projekty/utils";
 import { toast } from "sonner";
 import { useIsTouchDevice } from "@/hooks/projekty/useIsTouchDevice";
@@ -18,11 +20,13 @@ export function BulkActionBar({
   lists,
   labels,
   members,
+  cardPriorities,
   onAction,
 }: {
   lists: ListLite[];
   labels: LabelLite[];
   members: MemberLite[];
+  cardPriorities: Record<string, CardPriorityValue | null>;
   onAction: () => void;
 }) {
   const sel = useBulkSelection();
@@ -85,6 +89,7 @@ export function BulkActionBar({
       <BulkMoveListPicker lists={lists} onMoved={onAction} />
       <BulkLabelsPicker labels={labels} onApplied={onAction} />
       <BulkMembersPicker members={members} onApplied={onAction} />
+      <BulkPriorityPicker cardPriorities={cardPriorities} onApplied={onAction} />
       <Button
         variant="ghost"
         size="sm"

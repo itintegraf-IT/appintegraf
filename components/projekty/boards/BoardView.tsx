@@ -183,6 +183,9 @@ function BoardViewInner({ board, currentUserId, lists, setLists }: BoardViewInne
         lists={lists.map((l) => ({ id: l.id, name: l.name }))}
         labels={board.labels}
         members={allMembers}
+        cardPriorities={Object.fromEntries(
+          lists.flatMap((l) => l.cards.map((c) => [c.id, c.priority ?? null])),
+        )}
         onAction={() => router.refresh()}
       />
     </>

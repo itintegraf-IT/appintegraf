@@ -15,6 +15,7 @@ const GROUP_LABELS: Record<BoardGroupBy, string> = {
   list: "Sloupec",
   assignee: "Řešitel",
   due: "Termín",
+  priority: "Priorita",
 };
 
 /** Picker „Seskupit podle" pro list view (?group=). Default (list) se z URL maže. */

@@ -3,6 +3,7 @@ import type { ListData } from "@/components/projekty/boards/BoardListColumn";
 import type { BoardGroupBy } from "./board-view";
 import { findListColor } from "./list-colors";
 import { getDueStatus, type DueStatus } from "./due-date";
+import { CARD_PRIORITIES, PRIORITY_DOT_CSS, PRIORITY_LABELS } from "./priority";
 
 export type CardGroup = {
   key: string;
@@ -55,6 +56,27 @@ export function buildGroups(
       // termínu — pro grouping se completed ignoruje (kalendářní projekce).
       cards: allCards.filter((c) => getDueStatus(c.dueDate, false) === bucket.status),
     })).filter((g) => g.cards.length > 0);
+  }
+
+  if (groupBy === "priority") {
+    const groups: CardGroup[] = CARD_PRIORITIES.map((p) => ({
+      key: `priority-${p}`,
+      label: PRIORITY_LABELS[p],
+      dotColor: PRIORITY_DOT_CSS[p],
+      droppableListId: null,
+      cards: allCards.filter((c) => c.priority === p),
+    }));
+    const withoutPriority = allCards.filter((c) => !c.priority);
+    if (withoutPriority.length > 0) {
+      groups.push({
+        key: "priority-none",
+        label: "Bez priority",
+        dotColor: null,
+        droppableListId: null,
+        cards: withoutPriority,
+      });
+    }
+    return groups.filter((g) => g.cards.length > 0);
   }
 
   // assignee — podle prvního člena karty (pořadí dle allMembers), Nepřiřazeno na konec

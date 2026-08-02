@@ -4,9 +4,16 @@ import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Input } from "@/components/projekty/ui/input";
 import { Button } from "@/components/projekty/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/projekty/ui/popover";
-import { Search, Users, Tag, Calendar, X, CheckCircle2 } from "lucide-react";
+import { Search, Users, Tag, Calendar, X, CheckCircle2, Flag } from "lucide-react";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
 import { type CardFilters, parseCardFilters, serializeCardFilters } from "@/lib/projekty/card-filters";
+import {
+  CARD_PRIORITIES,
+  PRIORITY_DOT_CLASSES,
+  PRIORITY_LABELS,
+  type CardPriorityValue,
+} from "@/lib/projekty/priority";
+import { cn } from "@/lib/projekty/utils";
 
 type UserLite = { id: number; email: string | null; name: string | null; image: string | null };
 type Label = { id: string; name: string; color: string };
@@ -26,7 +33,7 @@ export function BoardCardFilterBar({
   function update(patch: Partial<CardFilters>) {
     const next = { ...filters, ...patch };
     const sp = new URLSearchParams(searchParams.toString());
-    for (const k of ["q", "members", "labels", "due", "completed"]) sp.delete(k);
+    for (const k of ["q", "members", "labels", "due", "completed", "priority"]) sp.delete(k);
     for (const [k, v] of serializeCardFilters(next).entries()) sp.set(k, v);
     router.replace(`${pathname}${sp.toString() ? `?${sp.toString()}` : ""}`);
   }
@@ -45,10 +52,18 @@ export function BoardCardFilterBar({
     update({ labelIds: ids.size > 0 ? Array.from(ids) : undefined });
   }
 
+  function togglePriority(value: CardPriorityValue | "none") {
+    const values = new Set(filters.priorities ?? []);
+    if (values.has(value)) values.delete(value);
+    else values.add(value);
+    update({ priorities: values.size > 0 ? Array.from(values) : undefined });
+  }
+
   const hasFilters =
     Boolean(filters.q) ||
     Boolean(filters.memberIds?.length) ||
     Boolean(filters.labelIds?.length) ||
+    Boolean(filters.priorities?.length) ||
     Boolean(filters.dueRange) ||
     filters.completed === "false" ||
     filters.completed === "true";
@@ -131,6 +146,42 @@ export function BoardCardFilterBar({
       <Popover>
         <PopoverTrigger asChild>
           <Button size="sm" variant="outline">
+            <Flag className="mr-1 size-3.5" />
+            <span className="hidden sm:inline">Priorita</span>
+            {filters.priorities?.length ? (
+              <span className="ml-0.5 sm:ml-0">({filters.priorities.length})</span>
+            ) : null}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-44 p-1" align="start">
+          {CARD_PRIORITIES.map((p) => (
+            <button
+              key={p}
+              onClick={() => togglePriority(p)}
+              className={cn(
+                "flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm hover:bg-muted/60",
+                filters.priorities?.includes(p) && "bg-muted",
+              )}
+            >
+              <span className={cn("size-2 rounded-full", PRIORITY_DOT_CLASSES[p])} aria-hidden />
+              <span className="flex-1">{PRIORITY_LABELS[p]}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => togglePriority("none")}
+            className={cn(
+              "mt-1 block w-full rounded border-t px-2 py-1 pt-2 text-left text-sm text-muted-foreground hover:bg-muted/60",
+              filters.priorities?.includes("none") && "bg-muted",
+            )}
+          >
+            Bez priority
+          </button>
+        </PopoverContent>
+      </Popover>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button size="sm" variant="outline">
             <Calendar className="mr-1 size-3.5" />
             <span className="hidden sm:inline">Termín</span>
             {filters.dueRange ? (
@@ -192,6 +243,7 @@ export function BoardCardFilterBar({
               q: undefined,
               memberIds: undefined,
               labelIds: undefined,
+              priorities: undefined,
               dueRange: undefined,
               completed: "any",
             })

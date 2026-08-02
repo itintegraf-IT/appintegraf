@@ -7,6 +7,8 @@ import { CheckCircle2, CheckSquare } from "lucide-react";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
 import { DueDateBadge } from "@/components/projekty/DueDateBadge";
 import { LabelChip } from "@/components/projekty/LabelChip";
+import { PriorityChip } from "@/components/projekty/PriorityChip";
+import type { CardPriorityValue } from "@/lib/projekty/priority";
 import { cn } from "@/lib/projekty/utils";
 import { useBulkSelection } from "./BulkSelectionContext";
 import { useIsTouchDevice } from "@/hooks/projekty/useIsTouchDevice";
@@ -26,6 +28,7 @@ export type CardData = {
   completed: boolean;
   cover: string | null;
   archived: boolean;
+  priority: CardPriorityValue | null;
   members: { userId: number; user: UserLite }[];
   labels: { labelId: string; label: { id: string; name: string; color: string } }[];
   notesCount?: number;
@@ -59,7 +62,9 @@ function CardItemBody({
   // Jen počet položek (done/total) — počet checklistů by ve stejném slotu
   // měnil význam čísla (karta jen s prázdnými checklisty counter nemá).
   const hasChecklist = checklistTotal > 0;
-  const hasAnyMeta = Boolean(primaryLabel || due || hasChecklist || primaryMember);
+  const hasAnyMeta = Boolean(
+    card.priority || primaryLabel || due || hasChecklist || primaryMember,
+  );
 
   const content = (
     <div className="px-3 py-2">
@@ -90,6 +95,8 @@ function CardItemBody({
 
       {hasAnyMeta ? (
         <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+          {/* Tečka místo chipu — meta řádek kanban karty je nejtěsnější slot v modulu. */}
+          <PriorityChip priority={card.priority} variant="dot" />
           {primaryLabel ? (
             <span className="inline-flex min-w-0 items-center gap-1">
               <LabelChip

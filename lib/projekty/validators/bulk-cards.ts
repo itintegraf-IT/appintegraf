@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CARD_PRIORITIES } from "@/lib/projekty/priority";
 
 const cardIds = z.array(z.string().cuid()).min(1).max(100);
 
@@ -22,6 +23,12 @@ export const BulkUpdateSchema = z.discriminatedUnion("action", [
     action: z.literal("archive"),
     cardIds,
     payload: z.object({ archived: z.boolean() }),
+  }),
+  z.object({
+    action: z.literal("setPriority"),
+    cardIds,
+    // null = odebrat prioritu; nullable (ne optional), ať je záměr v payloadu explicitní.
+    payload: z.object({ priority: z.enum(CARD_PRIORITIES).nullable() }),
   }),
 ]);
 

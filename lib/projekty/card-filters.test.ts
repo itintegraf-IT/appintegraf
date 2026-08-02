@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { matchesFilters } from "./card-filters";
+import { matchesFilters, parseCardFilters, serializeCardFilters } from "./card-filters";
 
 // Regresní síť před refaktorem dueRange na lib/projekty/due-date.ts —
 // zachycuje stávající sémantiku filtrů (pozor: filtr "today"/"week" completed
@@ -78,5 +78,39 @@ describe("matchesFilters — ostatní", () => {
     expect(matchesFilters(c, { memberIds: ["2"] })).toBe(false);
     expect(matchesFilters(c, { labelIds: ["l1"] })).toBe(true);
     expect(matchesFilters(c, { labelIds: ["l2"] })).toBe(false);
+  });
+});
+
+describe("matchesFilters — priorita", () => {
+  it("OR sémantika napříč vybranými stupni", () => {
+    const urgent = card({ priority: "URGENT" });
+    expect(matchesFilters(urgent, { priorities: ["URGENT", "HIGH"] })).toBe(true);
+    expect(matchesFilters(urgent, { priorities: ["LOW"] })).toBe(false);
+  });
+
+  it("„none\" matchuje karty bez priority, ne naopak", () => {
+    const withoutPriority = card();
+    expect(matchesFilters(withoutPriority, { priorities: ["none"] })).toBe(true);
+    expect(matchesFilters(withoutPriority, { priorities: ["URGENT"] })).toBe(false);
+    expect(matchesFilters(card({ priority: "LOW" }), { priorities: ["none"] })).toBe(false);
+  });
+
+  it("bez filtru priority projde vše", () => {
+    expect(matchesFilters(card({ priority: "LOW" }), {})).toBe(true);
+    expect(matchesFilters(card(), { priorities: [] })).toBe(true);
+  });
+});
+
+describe("parse/serialize priority", () => {
+  it("round-trip přes URL", () => {
+    const parsed = parseCardFilters(new URLSearchParams("priority=URGENT,none"));
+    expect(parsed.priorities).toEqual(["URGENT", "none"]);
+    expect(serializeCardFilters(parsed).get("priority")).toBe("URGENT,none");
+  });
+
+  it("neznámé hodnoty zahodí (jinak by filtr tiše nevrátil nic)", () => {
+    expect(parseCardFilters(new URLSearchParams("priority=urgent")).priorities).toBeUndefined();
+    expect(parseCardFilters(new URLSearchParams("priority=X,HIGH")).priorities).toEqual(["HIGH"]);
+    expect(parseCardFilters(new URLSearchParams()).priorities).toBeUndefined();
   });
 });

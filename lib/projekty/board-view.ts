@@ -12,9 +12,9 @@ export function parseBoardView(
   return "kanban";
 }
 
-export type BoardGroupBy = "list" | "assignee" | "due";
+export type BoardGroupBy = "list" | "assignee" | "due" | "priority";
 
-const VALID_GROUPS: readonly BoardGroupBy[] = ["list", "assignee", "due"] as const;
+const VALID_GROUPS: readonly BoardGroupBy[] = ["list", "assignee", "due", "priority"] as const;
 
 /** ?group= pro list view — whitelist, default seskupení podle sloupce. */
 export function parseBoardGroup(

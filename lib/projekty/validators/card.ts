@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { CARD_PRIORITIES } from "@/lib/projekty/priority";
 
 export const CardCreateSchema = z.object({
   title: z.string().trim().min(1, "Název karty je povinný.").max(500),
@@ -12,6 +13,8 @@ export const CardUpdateSchema = z.object({
   completed: z.boolean().optional(),
   cover: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().nullable(),
   archived: z.boolean().optional(),
+  // null = odebrat prioritu (výchozí stav karty), undefined = neměnit.
+  priority: z.enum(CARD_PRIORITIES).optional().nullable(),
 });
 
 export const CardMoveSchema = z.object({

@@ -7,6 +7,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
 import { DueDateBadge } from "@/components/projekty/DueDateBadge";
 import { LabelChip } from "@/components/projekty/LabelChip";
+import { PriorityChip } from "@/components/projekty/PriorityChip";
 import { findListColor } from "@/lib/projekty/list-colors";
 import { cn } from "@/lib/projekty/utils";
 import { useBulkSelection } from "./BulkSelectionContext";
@@ -149,6 +150,11 @@ export function ListCardRow({
         }`}
       >
         {card.title}
+      </span>
+
+      {/* Priorita */}
+      <span className="hidden w-24 shrink-0 items-center md:flex">
+        <PriorityChip priority={card.priority} />
       </span>
 
       {/* Sloupec */}

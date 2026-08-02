@@ -18,6 +18,7 @@ function card(id: string, overrides: Partial<CardData> = {}): CardData {
     completed: false,
     cover: null,
     archived: false,
+    priority: null,
     members: [],
     labels: [],
     ...overrides,
@@ -73,6 +74,7 @@ describe("parseBoardGroup", () => {
   it("whitelist + default list", () => {
     expect(parseBoardGroup(new URLSearchParams("group=due"))).toBe("due");
     expect(parseBoardGroup(new URLSearchParams("group=assignee"))).toBe("assignee");
+    expect(parseBoardGroup(new URLSearchParams("group=priority"))).toBe("priority");
     expect(parseBoardGroup(new URLSearchParams("group=nesmysl"))).toBe("list");
     expect(parseBoardGroup(new URLSearchParams())).toBe("list");
   });
@@ -103,6 +105,45 @@ describe("buildGroups — due", () => {
       ["c"],
     ]);
     expect(groups.every((g) => g.droppableListId === null)).toBe(true);
+  });
+});
+
+describe("buildGroups — priority", () => {
+  const withPriorities: ListData[] = [
+    {
+      ...lists[0]!,
+      cards: [
+        card("low", { priority: "LOW" }),
+        card("urgent", { priority: "URGENT" }),
+        card("none", {}),
+        card("high", { priority: "HIGH" }),
+      ],
+    },
+  ];
+
+  it("od nejnaléhavější, bez priority na konci, prázdné stupně vynechá", () => {
+    const groups = buildGroups("priority", withPriorities, allMembers);
+    expect(groups.map((g) => g.label)).toEqual([
+      "Urgentní",
+      "Vysoká",
+      "Nízká",
+      "Bez priority",
+    ]);
+    expect(groups.map((g) => g.cards.map((c) => c.id))).toEqual([
+      ["urgent"],
+      ["high"],
+      ["low"],
+      ["none"],
+    ]);
+    expect(groups.every((g) => g.droppableListId === null)).toBe(true);
+  });
+
+  it("skupinu „Bez priority\" nevytvoří, když všechny karty prioritu mají", () => {
+    const all: ListData[] = [
+      { ...lists[0]!, cards: [card("x", { priority: "MEDIUM" })] },
+    ];
+    const groups = buildGroups("priority", all, allMembers);
+    expect(groups.map((g) => g.key)).toEqual(["priority-MEDIUM"]);
   });
 });
 

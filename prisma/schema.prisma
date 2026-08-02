@@ -1922,6 +1922,13 @@ enum PersonalTodoStatus {
   DONE
 }
 
+enum CardPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+}
+
 model Workspace {
   id        String   @id @default(cuid())
   name      String
@@ -1997,6 +2004,8 @@ model Card {
   completed   Boolean   @default(false)
   cover       String?
   archived    Boolean   @default(false)
+  // NULL = bez priority. Záměrně bez defaultu — viz 20260802_projekty_card_priority.sql.
+  priority    CardPriority?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -2008,6 +2017,7 @@ model Card {
 
   @@index([boardId, listId, position])
   @@index([dueDate])
+  @@index([boardId, priority])
   @@map("projekty_card")
 }
 
@@ -2037,6 +2047,9 @@ model PersonalTodo {
 model CardMember {
   cardId String
   userId Int
+
+  // Kdy bylo přiřazení vytvořené — odznak „Nové" na stránce Moje práce.
+  assignedAt DateTime @default(now())
 
   card Card  @relation(fields: [cardId], references: [id], onDelete: Cascade)
   user users @relation(fields: [userId], references: [id], onDelete: Cascade)

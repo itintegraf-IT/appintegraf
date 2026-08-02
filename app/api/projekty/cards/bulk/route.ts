@@ -89,6 +89,15 @@ export const PATCH = withApiError(async (req: Request) => {
         wantedUserIds.map((userId) => ({ cardId, userId })),
       );
       await tx.cardMember.createMany({ data, skipDuplicates: true });
+    } else if (action === "setPriority") {
+      // Po jedné (ne updateMany) — audit extension zachytává jen `update`,
+      // hromadná varianta by se do audit logu vůbec nezapsala.
+      for (const cardId of cardIds) {
+        await tx.card.update({
+          where: { id: cardId },
+          data: { priority: payload.priority },
+        });
+      }
     } else if (action === "archive") {
       // (Od)archivace — inverzní operace k bulk DELETE (soft archived flag);
       // používá ji undo toast v BulkActionBar.

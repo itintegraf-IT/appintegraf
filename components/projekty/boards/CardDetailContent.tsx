@@ -6,6 +6,7 @@ import { Input } from "@/components/projekty/ui/input";
 import { Checkbox } from "@/components/projekty/ui/checkbox";
 import { Archive } from "lucide-react";
 import { CardDueDatePicker } from "./CardDueDatePicker";
+import { CardPriorityPicker } from "./CardPriorityPicker";
 import { CardDescriptionEditor } from "./CardDescriptionEditor";
 import { CardMembersPicker } from "./CardMembersPicker";
 import { CardLabelsPicker } from "./CardLabelsPicker";
@@ -13,6 +14,7 @@ import { CardChecklistSection, type Checklist } from "./CardChecklistSection";
 import { CardCommentsSection } from "./CardCommentsSection";
 import { CardAttachmentsSection } from "./CardAttachmentsSection";
 import { CardActivityFeed } from "./CardActivityFeed";
+import type { CardPriorityValue } from "@/lib/projekty/priority";
 
 type UserLite = { id: number; email: string | null; name: string | null; image: string | null };
 type Label = { id: string; name: string; color: string };
@@ -27,6 +29,7 @@ export type FullCard = {
   completed: boolean;
   cover: string | null;
   archived: boolean;
+  priority: CardPriorityValue | null;
   list: {
     id: string;
     name: string;
@@ -109,6 +112,11 @@ export function CardDetailContent({
           value={card.dueDate ? new Date(card.dueDate) : null}
           completed={card.completed}
           onChange={(date) => void onPatch({ dueDate: date ? date.toISOString() : null })}
+        />
+
+        <CardPriorityPicker
+          value={card.priority}
+          onChange={(priority) => void onPatch({ priority })}
         />
 
         <CardMembersPicker
