@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/projekty/ui/dialog";
 import { Button } from "@/components/projekty/ui/button";
 import { cn } from "@/lib/projekty/utils";
-import type { BoardLite } from "@/components/projekty/todos/PersonalTodoView";
+import type { BoardLite } from "@/components/projekty/todos/types";
 
 const LAST_BOARD_KEY = "personalTodo:lastBoardId";
 

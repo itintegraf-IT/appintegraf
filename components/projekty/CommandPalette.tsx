@@ -38,8 +38,7 @@ type CardHit = {
 
 const NAV_ITEMS = [
   { href: "/projekty/boards", label: "Nástěnky", icon: SquareKanban },
-  { href: "/projekty/my-cards", label: "Moje karty", icon: KanbanSquare },
-  { href: "/projekty/todo", label: "Můj To Do list", icon: ListChecks },
+  { href: "/projekty/moje-prace", label: "Moje práce", icon: ListChecks },
 ] as const;
 
 const VIEW_ITEMS = [

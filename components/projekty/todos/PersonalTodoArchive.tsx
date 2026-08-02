@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { format } from "date-fns";
 import { cs } from "date-fns/locale";
 import { cn } from "@/lib/projekty/utils";
-import type { ArchivedTodo } from "@/components/projekty/todos/PersonalTodoView";
+import type { ArchivedTodo } from "@/components/projekty/todos/types";
 
 export function PersonalTodoArchive({
   archived,
