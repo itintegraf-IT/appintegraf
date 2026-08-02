@@ -482,8 +482,8 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       "Nástěnky se sloupci a kartami (drag & drop, štítky, termíny, členové).",
       "Tři pohledy: Kanban, Seznam, Kalendář — přepínání záložkami nad boardem.",
       "Detail karty: popis, checklisty, komentáře se zmínkami, přílohy, historie aktivit.",
-      "Moje karty — přehled karet napříč boardy, kde jste členem.",
-      "Můj To Do list — osobní úkoly s možností povýšit úkol na kartu boardu.",
+      "Moje práce — karty napříč nástěnkami i osobní úkoly v jednom seznamu, seřazené podle naléhavosti.",
+      "Priorita karty (Urgentní / Vysoká / Střední / Nízká) s filtrem i seskupením v pohledu Seznam.",
     ],
     quickSteps: [
       "Otevřete Projekty → Nástěnky a vyberte board (nebo vytvořte nový).",
