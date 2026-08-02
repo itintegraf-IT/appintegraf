@@ -448,8 +448,7 @@ const navItems: NavItem[] = [
     module: "projekty",
     subItems: [
       { href: "/projekty/boards", label: "Nástěnky" },
-      { href: "/projekty/my-cards", label: "Moje karty" },
-      { href: "/projekty/todo", label: "Můj To Do list" },
+      { href: "/projekty/moje-prace", label: "Moje práce" },
     ],
     isActive: (p) => p.startsWith("/projekty"),
   },
