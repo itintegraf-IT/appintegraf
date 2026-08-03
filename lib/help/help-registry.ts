@@ -517,7 +517,7 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     features: [
       "Změna jména, e-mailu, telefonu.",
       "Změna hesla.",
-      "Nahrání podpisu pro e-mailovou komunikaci.",
+      "Stažení HTML vizitky (podpis.htm) pro Outlook Desktop.",
       "Nastavení 2FA (Google Authenticator) – pokud admin vyžaduje nebo dobrovolně.",
     ],
     quickSteps: [
