@@ -137,5 +137,8 @@ describe("detectOrderPdfTemplate", () => {
     expect(detectOrderPdfTemplate("SFA Packaging B.V.\nPURCHASE ORDER\nIK251631")?.key).toBe("sfa");
     expect(detectOrderPdfTemplate("OBJEDNÁVKA č.: 25096\nJEPA Plastics")?.key).toBe("jepa");
     expect(detectOrderPdfTemplate("Request Nr. AN121853\nJokey Praha")?.key).toBe("jokey");
+    expect(
+      detectOrderPdfTemplate("FRUTA Podivín, a.s.\nOBJEDNÁVKA\nČíslo dokladu 2600445")?.key
+    ).toBe("fruta");
   });
 });
