@@ -79,6 +79,7 @@ export async function POST(
     creatorUserId: existing.created_by,
     orderNumber: existing.order_number,
     bodyPreview: quoteProductionDescription,
+    workType: existing.work_type,
   });
 
   revalidateMaketyViews();

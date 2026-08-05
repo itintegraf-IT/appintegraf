@@ -135,6 +135,7 @@ export async function POST(req: NextRequest) {
       orderNumber: order_number,
       kind: "assigned",
       assigneeUserId: assignee_user_id,
+      workType: work_type,
     });
 
     return NextResponse.json({ success: true, id: created.id });

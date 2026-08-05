@@ -68,6 +68,7 @@ export async function POST(
       order_number: true,
       assignee_user_id: true,
       created_by: true,
+      work_type: true,
     },
   });
   if (!maketa) {
@@ -109,6 +110,7 @@ export async function POST(
       kind: "comment",
       assigneeUserId: uid,
       excludeUserId: userId,
+      workType: maketa.work_type,
     });
   }
 

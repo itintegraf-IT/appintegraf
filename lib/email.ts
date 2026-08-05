@@ -567,6 +567,7 @@ export type SendMaketaEmailParams = {
   bodyPreview: string;
   orderNumber: string | null;
   maketaId: number;
+  workType?: "maketa" | "grafika";
 };
 
 /**
@@ -588,6 +589,7 @@ export async function sendMaketaEmail(
   }
 
   const link = `${getBaseUrl()}/makety/${params.maketaId}`;
+  const openCta = params.workType === "grafika" ? "Otevřít grafiku" : "Otevřít maketu";
   const zak = params.orderNumber
     ? `<p><strong>Zakázka:</strong> ${params.orderNumber}</p>`
     : "";
@@ -600,7 +602,7 @@ export async function sendMaketaEmail(
   <p>${params.intro}</p>
   ${zak}
   <p><strong>Zadání:</strong> ${params.bodyPreview.slice(0, 500)}</p>
-  <p><a href="${link}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">Otevřít maketu</a></p>
+  <p><a href="${link}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">${openCta}</a></p>
   <p style="color: #666; font-size: 12px;">Pokud tlačítko nefunguje, zkopírujte odkaz: ${link}</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
   <p style="color: #999; font-size: 11px;">Tento e-mail byl odeslán automaticky z aplikace INTEGRAF.</p>
