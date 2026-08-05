@@ -36,6 +36,7 @@ export async function POST(
       created_by: true,
       body: true,
       order_number: true,
+      work_type: true,
     },
   });
   if (!maketa) {
@@ -61,6 +62,7 @@ export async function POST(
     creatorUserId: maketa.created_by,
     bodyPreview: maketa.body,
     orderNumber: maketa.order_number,
+    workType: maketa.work_type,
   });
 
   return NextResponse.json({ success: true });

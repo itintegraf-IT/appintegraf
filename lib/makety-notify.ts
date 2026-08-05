@@ -2,6 +2,11 @@ import { prisma } from "@/lib/db";
 import { sendMaketaEmail } from "@/lib/email";
 import { collectMaketaNotifyUserIds } from "@/lib/makety-recipients";
 import {
+  maketyWorkTypeWording,
+  normalizeMaketyWorkType,
+  type MaketyWorkType,
+} from "@/lib/makety-work-type";
+import {
   filterUserIdsAllowingEmail,
   userAllowsEmailNotification,
 } from "@/lib/user-email-notifications-db";
@@ -21,6 +26,57 @@ type UserEmailRow = {
   last_name: string;
 };
 
+function orderSuffix(orderNumber: string | null): string {
+  return orderNumber ? ` (zakázka ${orderNumber})` : "";
+}
+
+function notifyCopy(
+  workType: MaketyWorkType,
+  kind: MaketaNotifyKind,
+  orderNumber: string | null
+): { title: string; intro: string } {
+  const w = maketyWorkTypeWording(workType);
+  const zak = orderSuffix(orderNumber);
+
+  switch (kind) {
+    case "assigned":
+      return {
+        title: `Nová ${w.nominative}`,
+        intro: `Byla vám přidělena ${w.nominative}${zak}.`,
+      };
+    case "deadline_changed":
+      return {
+        title: `Změna termínu ${w.genitive}`,
+        intro: `U ${w.genitive}${zak} byl změněn termín.`,
+      };
+    case "done":
+      return {
+        title: `${w.label} dokončena`,
+        intro: `${w.label}${zak} byla označena jako hotová.`,
+      };
+    case "comment":
+      return {
+        title: `Nový komentář ${w.toPrep}`,
+        intro: `U ${w.genitive}${zak} byl přidán komentář.`,
+      };
+    case "quote_submitted":
+      return {
+        title: `Nabídka ${w.toPrep}`,
+        intro: `Výrobce odeslal nabídku ${w.toPrep}${zak}.`,
+      };
+    case "quote_approved":
+      return {
+        title: `${w.label} schválena`,
+        intro: `Zadavatel schválil ${w.accusative} do výroby${zak}.`,
+      };
+    case "quote_rejected":
+      return {
+        title: "Nabídka zamítnuta",
+        intro: `Zadavatel zamítl nabídku ${w.toPrep}${zak}.`,
+      };
+  }
+}
+
 async function sendMaketaEmailsToUsers(
   users: UserEmailRow[],
   params: {
@@ -29,6 +85,7 @@ async function sendMaketaEmailsToUsers(
     bodyPreview: string;
     orderNumber: string | null;
     maketaId: number;
+    workType: MaketyWorkType;
   }
 ): Promise<void> {
   for (const u of users) {
@@ -41,6 +98,7 @@ async function sendMaketaEmailsToUsers(
       bodyPreview: params.bodyPreview,
       orderNumber: params.orderNumber,
       maketaId: params.maketaId,
+      workType: params.workType,
     });
   }
 }
@@ -71,34 +129,16 @@ export async function notifyMaketaRecipients(params: {
   orderNumber: string | null;
   kind: MaketaNotifyKind;
   assigneeUserId: number | null;
+  workType?: MaketyWorkType | string | null;
   excludeUserId?: number;
 }): Promise<void> {
   const ids = await collectMaketaNotifyUserIds(params.assigneeUserId, params.excludeUserId);
   if (ids.length === 0) return;
 
+  const workType = normalizeMaketyWorkType(params.workType);
   const linkPath = `/makety/${params.maketaId}`;
-  const titleByKind: Record<MaketaNotifyKind, string> = {
-    assigned: "Nová maketa",
-    deadline_changed: "Změna termínu makety",
-    done: "Maketa dokončena",
-    comment: "Nový komentář k maketě",
-    quote_submitted: "Nabídka k maketě",
-    quote_approved: "Maketa schválena",
-    quote_rejected: "Nabídka zamítnuta",
-  };
-  const messageByKind: Record<MaketaNotifyKind, string> = {
-    assigned: `Byla vám přidělena maketa${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`,
-    deadline_changed: `U makety${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""} byl změněn termín.`,
-    done: `Maketa${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""} byla označena jako hotová.`,
-    comment: `U makety${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""} byl přidán komentář.`,
-    quote_submitted: `Výrobce odeslal nabídku k maketě${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`,
-    quote_approved: `Zadavatel schválil maketu do výroby${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`,
-    quote_rejected: `Zadavatel zamítl nabídku k maketě${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`,
-  };
-
+  const { title, intro } = notifyCopy(workType, params.kind, params.orderNumber);
   const type = `makety_${params.kind}`;
-  const title = titleByKind[params.kind];
-  const intro = messageByKind[params.kind];
 
   for (const uid of ids) {
     await prisma.notifications.create({
@@ -125,6 +165,7 @@ export async function notifyMaketaRecipients(params: {
       bodyPreview: params.bodyPreview,
       orderNumber: params.orderNumber,
       maketaId: params.maketaId,
+      workType,
     });
   }
 }
@@ -137,7 +178,10 @@ export async function notifyMaketaCreator(params: {
   type: string;
   orderNumber?: string | null;
   bodyPreview?: string;
+  workType?: MaketyWorkType | string | null;
 }): Promise<void> {
+  const workType = normalizeMaketyWorkType(params.workType);
+
   await notifyMaketaUser(params.creatorUserId, {
     maketaId: params.maketaId,
     title: params.title,
@@ -162,6 +206,7 @@ export async function notifyMaketaCreator(params: {
     bodyPreview: params.bodyPreview,
     orderNumber: params.orderNumber ?? null,
     maketaId: params.maketaId,
+    workType,
   });
 }
 
@@ -170,16 +215,20 @@ export async function notifyMaketaQuoteSubmitted(params: {
   creatorUserId: number;
   orderNumber: string | null;
   bodyPreview: string;
+  workType?: MaketyWorkType | string | null;
 }): Promise<void> {
-  const intro = `Výrobce odeslal cenu a popis výroby${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`;
+  const workType = normalizeMaketyWorkType(params.workType ?? "maketa");
+  const w = maketyWorkTypeWording(workType);
+  const intro = `Výrobce odeslal cenu a popis výroby${orderSuffix(params.orderNumber)}.`;
   await notifyMaketaCreator({
     maketaId: params.maketaId,
     creatorUserId: params.creatorUserId,
-    title: "Nabídka k maketě",
+    title: `Nabídka ${w.toPrep}`,
     message: `${intro} ${params.bodyPreview.slice(0, 150)}`,
     type: "makety_quote_submitted",
     orderNumber: params.orderNumber,
     bodyPreview: params.bodyPreview,
+    workType,
   });
 }
 
@@ -189,20 +238,25 @@ export async function notifyMaketaDone(params: {
   creatorUserId: number;
   bodyPreview: string;
   orderNumber: string | null;
+  workType?: MaketyWorkType | string | null;
 }): Promise<void> {
   if (params.creatorUserId === params.doneByUserId) return;
+
+  const workType = normalizeMaketyWorkType(params.workType);
+  const w = maketyWorkTypeWording(workType);
 
   const doneBy = await prisma.users.findUnique({
     where: { id: params.doneByUserId },
     select: { first_name: true, last_name: true },
   });
   const doneByName = doneBy ? `${doneBy.first_name} ${doneBy.last_name}`.trim() : "Uživatel";
-  const intro = `${doneByName} označil/a maketu jako hotovou${params.orderNumber ? ` (zakázka ${params.orderNumber})` : ""}.`;
+  const intro = `${doneByName} označil/a ${w.accusative} jako hotovou${orderSuffix(params.orderNumber)}.`;
+  const title = `${w.label} dokončena`;
 
   await prisma.notifications.create({
     data: {
       user_id: params.creatorUserId,
-      title: "Maketa dokončena",
+      title,
       message: intro,
       type: "makety_done",
       link: `/makety/${params.maketaId}`,
@@ -220,10 +274,11 @@ export async function notifyMaketaDone(params: {
   await sendMaketaEmail({
     toEmail: creator.email,
     toName: `${creator.first_name} ${creator.last_name}`.trim() || "Uživateli",
-    subject: "Maketa dokončena – INTEGRAF",
+    subject: `${title} – INTEGRAF`,
     intro,
     bodyPreview: params.bodyPreview,
     orderNumber: params.orderNumber,
     maketaId: params.maketaId,
+    workType,
   });
 }

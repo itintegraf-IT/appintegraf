@@ -65,6 +65,7 @@ export async function POST(
     kind: "quote_approved",
     assigneeUserId: existing.assignee_user_id,
     excludeUserId: userId,
+    workType: existing.work_type,
   });
 
   revalidateMaketyViews();

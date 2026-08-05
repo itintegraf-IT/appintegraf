@@ -151,9 +151,9 @@ export async function PUT(
     }
 
     if (nextAssignee == null) {
-      const wt = (existing.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+      const wtMissing = (existing.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
       return NextResponse.json(
-        { error: `Musí být vybrán uživatel s rolí ${maketyAssigneeRoleLabel(wt)}` },
+        { error: `Musí být vybrán uživatel s rolí ${maketyAssigneeRoleLabel(wtMissing)}` },
         { status: 400 }
       );
     }
@@ -177,12 +177,14 @@ export async function PUT(
     });
 
     if (dueChanged) {
+      const workType = (existing.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
       await notifyMaketaRecipients({
         maketaId: id,
         bodyPreview: nextBody,
         orderNumber: nextOrder,
         kind: "deadline_changed",
         assigneeUserId: nextAssignee,
+        workType,
       });
     }
 
