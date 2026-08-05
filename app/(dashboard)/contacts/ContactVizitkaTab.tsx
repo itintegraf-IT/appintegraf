@@ -127,7 +127,7 @@ export function ContactVizitkaTab({ signatureHtml }: Props) {
         <h3 className="mb-3 text-sm font-medium text-gray-700">Náhled</h3>
         <div className="flex justify-center overflow-x-auto bg-gray-100/90 py-8">
           <div
-            className="h-[50mm] w-[90mm] shrink-0 overflow-hidden rounded-sm bg-white shadow-[0_2px_12px_rgba(0,0,0,0.12)] ring-1 ring-gray-300 [&_table]:h-full [&_table]:w-full"
+            className="box-border h-[50mm] w-[90mm] shrink-0 overflow-hidden bg-white shadow-[0_2px_12px_rgba(0,0,0,0.12)] ring-1 ring-gray-300 [&>table]:h-full [&>table]:w-full"
             dangerouslySetInnerHTML={{ __html: signatureHtml }}
           />
         </div>
