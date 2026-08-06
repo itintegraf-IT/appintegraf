@@ -23,6 +23,7 @@ import {
   maketaPriorityLabel,
   maketaStatusBadgeClass,
   maketaStatusLabel,
+  isMaketaTerminalStatus,
 } from "@/lib/makety-status";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +33,11 @@ const STATUS_ORDER = [
   "quote_submitted",
   "open",
   "in_progress",
+  "data_problem",
   "done",
+  "prepress_approved",
+  "sent_for_approval",
+  "approved",
   "cancelled",
 ] as const;
 type MaketaStatus = (typeof STATUS_ORDER)[number];
@@ -135,7 +140,13 @@ export default async function MaketyListPage({
 
   const rows = selectedStatus
     ? allForTerm.filter((r) => r.status === selectedStatus)
-    : allForTerm.filter((r) => r.status !== "done" && r.status !== "cancelled");
+    : allForTerm.filter(
+        (r) =>
+          !isMaketaTerminalStatus(
+            r.status,
+            (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType
+          )
+      );
 
   const tableHeading = selectedStatus
     ? maketaStatusLabel(selectedStatus)

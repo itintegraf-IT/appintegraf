@@ -8,6 +8,8 @@ import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
 import { TotpAdminPanel } from "@/components/admin/TotpAdminPanel";
 import {
   hasMaketyGrafikaFlag,
+  hasMaketySchvalovatelFinalFlag,
+  hasMaketySchvalovatelPrepressFlag,
   hasMaketyVyrobaFlag,
   hasMaketyZadavatelGrafikaFlag,
   hasMaketyZadavatelMaketaFlag,
@@ -17,6 +19,8 @@ import {
 } from "@/lib/makety-module-access-flags";
 import {
   MAKETY_GRAFIKA_ROLE_LABEL,
+  MAKETY_SCHVALOVATEL_FINAL_LABEL,
+  MAKETY_SCHVALOVATEL_PREPRESS_LABEL,
   MAKETY_VYROBA_ROLE_LABEL,
   MAKETY_ZADAVATEL_GRAFIKA_LABEL,
   MAKETY_ZADAVATEL_MAKETA_LABEL,
@@ -225,6 +229,8 @@ export function AdminUserForm({ user }: { user?: User }) {
           delete next.makety_grafika;
           delete next.makety_zadavatel_maketa;
           delete next.makety_zadavatel_grafika;
+          delete next.makety_schvalovatel_prepress;
+          delete next.makety_schvalovatel_final;
         }
         if (moduleKey === "stitky") {
           delete next.stitky_tiskar;
@@ -242,20 +248,26 @@ export function AdminUserForm({ user }: { user?: User }) {
     }));
   };
 
+  const ensureMaketyBaseIfNeeded = (next: ModuleAccessMap) => {
+    if (
+      !maketyBaseLevelFromAccess(next) &&
+      (hasMaketyVyrobaFlag(next) ||
+        hasMaketyGrafikaFlag(next) ||
+        hasMaketyZadavatelMaketaFlag(next) ||
+        hasMaketyZadavatelGrafikaFlag(next) ||
+        hasMaketySchvalovatelPrepressFlag(next) ||
+        hasMaketySchvalovatelFinalFlag(next))
+    ) {
+      next.makety = "read";
+    }
+  };
+
   const setMaketyProductionFlag = (checked: boolean) => {
     setForm((prev) => {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (checked) next.makety_vyroba = "1";
       else delete next.makety_vyroba;
-      if (
-        !maketyBaseLevelFromAccess(next) &&
-        (checked ||
-          hasMaketyGrafikaFlag(next) ||
-          hasMaketyZadavatelMaketaFlag(next) ||
-          hasMaketyZadavatelGrafikaFlag(next))
-      ) {
-        next.makety = "read";
-      }
+      ensureMaketyBaseIfNeeded(next);
       return { ...prev, module_access: next };
     });
   };
@@ -265,15 +277,7 @@ export function AdminUserForm({ user }: { user?: User }) {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (checked) next.makety_grafika = "1";
       else delete next.makety_grafika;
-      if (
-        !maketyBaseLevelFromAccess(next) &&
-        (checked ||
-          hasMaketyVyrobaFlag(next) ||
-          hasMaketyZadavatelMaketaFlag(next) ||
-          hasMaketyZadavatelGrafikaFlag(next))
-      ) {
-        next.makety = "read";
-      }
+      ensureMaketyBaseIfNeeded(next);
       return { ...prev, module_access: next };
     });
   };
@@ -283,15 +287,7 @@ export function AdminUserForm({ user }: { user?: User }) {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (checked) next.makety_zadavatel_maketa = "1";
       else delete next.makety_zadavatel_maketa;
-      if (
-        !maketyBaseLevelFromAccess(next) &&
-        (checked ||
-          hasMaketyVyrobaFlag(next) ||
-          hasMaketyGrafikaFlag(next) ||
-          hasMaketyZadavatelGrafikaFlag(next))
-      ) {
-        next.makety = "read";
-      }
+      ensureMaketyBaseIfNeeded(next);
       return { ...prev, module_access: next };
     });
   };
@@ -301,15 +297,27 @@ export function AdminUserForm({ user }: { user?: User }) {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (checked) next.makety_zadavatel_grafika = "1";
       else delete next.makety_zadavatel_grafika;
-      if (
-        !maketyBaseLevelFromAccess(next) &&
-        (checked ||
-          hasMaketyVyrobaFlag(next) ||
-          hasMaketyGrafikaFlag(next) ||
-          hasMaketyZadavatelMaketaFlag(next))
-      ) {
-        next.makety = "read";
-      }
+      ensureMaketyBaseIfNeeded(next);
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setMaketySchvalovatelPrepressFlag = (checked: boolean) => {
+    setForm((prev) => {
+      const next: ModuleAccessMap = { ...prev.module_access };
+      if (checked) next.makety_schvalovatel_prepress = "1";
+      else delete next.makety_schvalovatel_prepress;
+      ensureMaketyBaseIfNeeded(next);
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setMaketySchvalovatelFinalFlag = (checked: boolean) => {
+    setForm((prev) => {
+      const next: ModuleAccessMap = { ...prev.module_access };
+      if (checked) next.makety_schvalovatel_final = "1";
+      else delete next.makety_schvalovatel_final;
+      ensureMaketyBaseIfNeeded(next);
       return { ...prev, module_access: next };
     });
   };
@@ -454,6 +462,8 @@ export function AdminUserForm({ user }: { user?: User }) {
         delete moduleAccess.makety_grafika;
         delete moduleAccess.makety_zadavatel_maketa;
         delete moduleAccess.makety_zadavatel_grafika;
+        delete moduleAccess.makety_schvalovatel_prepress;
+        delete moduleAccess.makety_schvalovatel_final;
       }
       if (isStitkyModuleEnabled(moduleAccess)) {
         moduleAccess = normalizeStitkyModuleAccessForSave(moduleAccess);
@@ -1023,6 +1033,26 @@ export function AdminUserForm({ user }: { user?: User }) {
                             className="rounded"
                           />
                           <span>{MAKETY_ZADAVATEL_GRAFIKA_LABEL}</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hasMaketySchvalovatelPrepressFlag(form.module_access)}
+                            onChange={(e) => setMaketySchvalovatelPrepressFlag(e.target.checked)}
+                            disabled={isAdminRoleSelected}
+                            className="rounded"
+                          />
+                          <span>{MAKETY_SCHVALOVATEL_PREPRESS_LABEL}</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hasMaketySchvalovatelFinalFlag(form.module_access)}
+                            onChange={(e) => setMaketySchvalovatelFinalFlag(e.target.checked)}
+                            disabled={isAdminRoleSelected}
+                            className="rounded"
+                          />
+                          <span>{MAKETY_SCHVALOVATEL_FINAL_LABEL}</span>
                         </label>
                       </div>
                     )}

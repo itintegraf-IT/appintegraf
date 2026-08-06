@@ -418,20 +418,34 @@ model makety {
   due_at             DateTime             @db.DateTime(0)
   assignee_user_id   Int?
   created_by                   Int
-  status                       String               @default("open") @db.VarChar(20)
+  status                       String               @default("open") @db.VarChar(30)
   quote_price                  Decimal?             @db.Decimal(12, 2)
   quote_production_description String?              @db.Text
   quote_submitted_at           DateTime?            @db.DateTime(0)
   quote_submitted_by           Int?
   rejection_reason             String?              @db.Text
   work_type                    String               @default("maketa") @db.VarChar(20)
+  customer_id                  Int?
+  product_id                   Int?
+  die_cut_id                   Int?
+  label_code                   String?              @db.VarChar(100)
+  job_number                   String?              @db.VarChar(50)
+  product_draft                Json?
+  prepress_user_id             Int?
+  final_approver_user_id       Int?
   created_at                   DateTime             @default(now()) @db.Timestamp(0)
   updated_at                   DateTime             @default(now()) @updatedAt @db.Timestamp(0)
   users_assignee               users?               @relation("makety_assignee", fields: [assignee_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_assignee_fk")
   users_creator                users                @relation("makety_creator", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_creator_fk")
   users_quote_submitter        users?               @relation("makety_quote_submitter", fields: [quote_submitted_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_quote_submitted_by_fk")
+  users_prepress               users?               @relation("makety_prepress", fields: [prepress_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_prepress_fk")
+  users_final_approver         users?               @relation("makety_final_approver", fields: [final_approver_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_final_approver_fk")
+  iml_customers                iml_customers?       @relation(fields: [customer_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_customer_fk")
+  iml_products                 iml_products?        @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_product_fk")
+  iml_die_cuts                 iml_die_cuts?        @relation(fields: [die_cut_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_die_cut_fk")
   makety_departments makety_departments[]
   makety_comments    makety_comments[]
+  makety_status_log  makety_status_log[]
 
   @@index([assignee_user_id], map: "idx_makety_assignee")
   @@index([created_by], map: "idx_makety_creator")
@@ -439,6 +453,26 @@ model makety {
   @@index([status], map: "idx_makety_status")
   @@index([work_type], map: "idx_makety_work_type")
   @@index([work_type, assignee_user_id, queue_position], map: "idx_makety_queue")
+  @@index([customer_id], map: "idx_makety_customer")
+  @@index([product_id], map: "idx_makety_product")
+  @@index([job_number], map: "idx_makety_job_number")
+  @@index([prepress_user_id], map: "idx_makety_prepress")
+  @@index([final_approver_user_id], map: "idx_makety_final_approver")
+}
+
+model makety_status_log {
+  id          Int      @id @default(autoincrement())
+  maketa_id   Int
+  from_status String?  @db.VarChar(30)
+  to_status   String   @db.VarChar(30)
+  user_id     Int
+  comment     String?  @db.Text
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+  makety      makety   @relation(fields: [maketa_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_status_log_maketa_fk")
+  users       users    @relation("makety_status_log_user", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_status_log_user_fk")
+
+  @@index([maketa_id], map: "idx_makety_status_log_maketa")
+  @@index([user_id], map: "idx_makety_status_log_user")
 }
 
 model makety_departments {
@@ -813,6 +847,9 @@ model file_uploads {
   record_id         Int?
   uploaded_by       Int
   is_public         Boolean? @default(false)
+  last_accessed_at  DateTime? @db.Timestamp(0)
+  archived_at       DateTime? @db.Timestamp(0)
+  archive_path      String?   @db.VarChar(500)
   created_at        DateTime @default(now()) @db.Timestamp(0)
   users             users    @relation(fields: [uploaded_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "file_uploads_ibfk_1")
 
@@ -1251,7 +1288,10 @@ model users {
   makety_assigned                                                makety[]                      @relation("makety_assignee")
   makety_created                                                 makety[]                      @relation("makety_creator")
   makety_quotes_submitted                                        makety[]                      @relation("makety_quote_submitter")
+  makety_prepress                                                makety[]                      @relation("makety_prepress")
+  makety_final_approver                                          makety[]                      @relation("makety_final_approver")
   makety_comments_authored                                       makety_comments[]             @relation("makety_comments_author")
+  makety_status_log_entries                                      makety_status_log[]           @relation("makety_status_log_user")
   stitky_orders_created                                          stitky_orders[]               @relation("stitky_orders_creator")
   stitky_orders_changed                                          stitky_orders[]               @relation("stitky_orders_changed")
   stitky_user_roles                                              stitky_user_roles[]
@@ -1509,6 +1549,7 @@ model iml_customers {
   iml_customer_emails             iml_customer_emails[]
   iml_customer_contacts           iml_customer_contacts[]
   iml_die_cuts                    iml_die_cuts[]
+  makety                          makety[]
 
   @@index([parent_id])
   @@index([unit_type])
@@ -1615,6 +1656,7 @@ model iml_products {
   color_material      materials?           @relation("ImlProductColor", fields: [color_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   paper_material        materials?           @relation("ImlProductPaper", fields: [paper_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   lacquer_material      materials?           @relation("ImlProductLacquer", fields: [lacquer_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  makety                makety[]
 
   @@index([customer_id])
   @@index([ig_code])
@@ -1681,6 +1723,7 @@ model iml_die_cuts {
   iml_products  iml_products[]
   iml_customers iml_customers? @relation(fields: [customer_id], references: [id], onDelete: SetNull)
   iml_box_types iml_box_types? @relation(fields: [box_type_id], references: [id], onDelete: SetNull)
+  makety        makety[]
 
   @@index([is_active])
   @@index([customer_id])

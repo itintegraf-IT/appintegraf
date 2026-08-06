@@ -1,9 +1,20 @@
+import {
+  grafikaStatusBadgeClass,
+  grafikaStatusLabel,
+  isGrafikaOnlyStatus,
+} from "@/lib/makety-grafika-status";
+import type { MaketyWorkType } from "@/lib/makety-work-type";
+
 export type MaketaStatus =
   | "awaiting_quote"
   | "quote_submitted"
   | "open"
   | "in_progress"
+  | "data_problem"
   | "done"
+  | "prepress_approved"
+  | "sent_for_approval"
+  | "approved"
   | "cancelled";
 
 export type MaketaPriority = "normal" | "high" | "urgent";
@@ -11,7 +22,10 @@ export type MaketaPriority = "normal" | "high" | "urgent";
 /** Stavy zakázky ve frontě výroby (po schválení ceny). */
 export const MAKETY_PRODUCTION_QUEUE_STATUSES = ["open", "in_progress"] as const;
 
-export function maketaStatusLabel(status: string): string {
+export function maketaStatusLabel(status: string, workType?: MaketyWorkType): string {
+  if (workType === "grafika" || isGrafikaOnlyStatus(status)) {
+    return grafikaStatusLabel(status);
+  }
   switch (status) {
     case "awaiting_quote":
       return "Čeká na kalkulaci";
@@ -30,7 +44,10 @@ export function maketaStatusLabel(status: string): string {
   }
 }
 
-export function maketaStatusBadgeClass(status: string): string {
+export function maketaStatusBadgeClass(status: string, workType?: MaketyWorkType): string {
+  if (workType === "grafika" || isGrafikaOnlyStatus(status)) {
+    return grafikaStatusBadgeClass(status);
+  }
   switch (status) {
     case "awaiting_quote":
       return "bg-sky-100 text-sky-800";
@@ -81,3 +98,5 @@ export function parseMaketaPriority(raw: string | null | undefined): MaketaPrior
 export function isMaketaPreApprovalStatus(status: string): boolean {
   return status === "awaiting_quote" || status === "quote_submitted";
 }
+
+export { isMaketaTerminalStatus, maketyActiveWhereClause, maketyArchiveWhereClause } from "@/lib/makety-grafika-status";

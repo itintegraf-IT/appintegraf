@@ -13,8 +13,15 @@ import {
 
 export type MaketaNotifyKind =
   | "assigned"
+  | "workflow_assigned"
   | "deadline_changed"
   | "done"
+  | "awaiting_prepress"
+  | "awaiting_final"
+  | "prepress_ok"
+  | "sent_for_client"
+  | "approved"
+  | "data_problem"
   | "comment"
   | "quote_submitted"
   | "quote_approved"
@@ -44,15 +51,59 @@ function notifyCopy(
         title: `Nová ${w.nominative}`,
         intro: `Byla vám přidělena ${w.nominative}${zak}.`,
       };
+    case "workflow_assigned":
+      return {
+        title: `Jste ve workflow ${w.genitive}`,
+        intro:
+          workType === "grafika"
+            ? `Byli jste zařazeni do schvalovacího workflow grafiky${zak}. Až na vás přijde řada, dostanete samostatnou výzvu ke schválení.`
+            : `Byli jste zařazeni do workflow ${w.genitive}${zak}.`,
+      };
     case "deadline_changed":
       return {
         title: `Změna termínu ${w.genitive}`,
         intro: `U ${w.genitive}${zak} byl změněn termín.`,
       };
     case "done":
+      if (workType === "grafika") {
+        return {
+          title: "Grafika hotová – čeká na prepress",
+          intro: `Grafik dokončil práci na grafice${zak}. Zakázka čeká na schválení prepressem.`,
+        };
+      }
       return {
         title: `${w.label} dokončena`,
         intro: `${w.label}${zak} byla označena jako hotová.`,
+      };
+    case "awaiting_prepress":
+      return {
+        title: "Grafika ke schválení (prepress)",
+        intro: `Máte grafiku ke schválení prepressem${zak}. Zkontrolujte data a schvalte, nebo vraťte k úpravě.`,
+      };
+    case "awaiting_final":
+      return {
+        title: "Grafika ke finálnímu schválení",
+        intro: `Máte grafiku ke finálnímu schválení${zak}. Prepress již schválil – můžete odeslat ke schválení klientovi a dokončit.`,
+      };
+    case "prepress_ok":
+      return {
+        title: "Grafika schválena prepressem",
+        intro: `Prepress schválil grafiku${zak}. Čeká na finálního schvalovatele.`,
+      };
+    case "sent_for_client":
+      return {
+        title: "Grafika odeslána ke schválení",
+        intro: `Grafika${zak} byla odeslána ke schválení (klient / další krok).`,
+      };
+    case "approved":
+      return {
+        title: "Grafika finálně schválena",
+        intro: `Grafika${zak} byla finálně schválena.`,
+      };
+    case "data_problem":
+      return {
+        title: "Problém s daty u grafiky",
+        intro: `U grafiky${zak} byl nahlášen problém s daty.`,
       };
     case "comment":
       return {
@@ -123,24 +174,29 @@ async function notifyMaketaUser(
   });
 }
 
-export async function notifyMaketaRecipients(params: {
+/** Odešle notifikaci (+ e-mail) konkrétním uživatelům se zvoleným textem. */
+export async function notifyMaketaUsers(params: {
   maketaId: number;
+  userIds: Array<number | null | undefined>;
   bodyPreview: string;
   orderNumber: string | null;
   kind: MaketaNotifyKind;
-  assigneeUserId: number | null;
   workType?: MaketyWorkType | string | null;
   excludeUserId?: number;
 }): Promise<void> {
-  const ids = await collectMaketaNotifyUserIds(params.assigneeUserId, params.excludeUserId);
-  if (ids.length === 0) return;
+  const set = new Set<number>();
+  for (const id of params.userIds) {
+    if (id != null && id !== params.excludeUserId) set.add(id);
+  }
+  const allIds = [...set];
+  if (allIds.length === 0) return;
 
   const workType = normalizeMaketyWorkType(params.workType);
   const linkPath = `/makety/${params.maketaId}`;
   const { title, intro } = notifyCopy(workType, params.kind, params.orderNumber);
   const type = `makety_${params.kind}`;
 
-  for (const uid of ids) {
+  for (const uid of allIds) {
     await prisma.notifications.create({
       data: {
         user_id: uid,
@@ -152,7 +208,7 @@ export async function notifyMaketaRecipients(params: {
     });
   }
 
-  const emailIds = await filterUserIdsAllowingEmail(ids, "makety");
+  const emailIds = await filterUserIdsAllowingEmail(allIds, "makety");
   if (emailIds.length > 0) {
     const users = await prisma.users.findMany({
       where: { id: { in: emailIds } },
@@ -166,6 +222,68 @@ export async function notifyMaketaRecipients(params: {
       orderNumber: params.orderNumber,
       maketaId: params.maketaId,
       workType,
+    });
+  }
+}
+
+export async function notifyMaketaRecipients(params: {
+  maketaId: number;
+  bodyPreview: string;
+  orderNumber: string | null;
+  kind: MaketaNotifyKind;
+  assigneeUserId: number | null;
+  workType?: MaketyWorkType | string | null;
+  excludeUserId?: number;
+  /** Další příjemci (prepress, finální schvalovatel). */
+  extraUserIds?: Array<number | null | undefined>;
+}): Promise<void> {
+  const ids = await collectMaketaNotifyUserIds(params.assigneeUserId, params.excludeUserId);
+  await notifyMaketaUsers({
+    maketaId: params.maketaId,
+    userIds: [...ids, ...(params.extraUserIds ?? [])],
+    bodyPreview: params.bodyPreview,
+    orderNumber: params.orderNumber,
+    kind: params.kind,
+    workType: params.workType,
+    excludeUserId: params.excludeUserId,
+  });
+}
+
+/**
+ * Při založení grafiky: grafik dostane „přidělena“,
+ * schvalovatelé jen info o zařazení do workflow (ne „přidělena“).
+ */
+export async function notifyGrafikaWorkflowCreated(params: {
+  maketaId: number;
+  bodyPreview: string;
+  orderNumber: string | null;
+  assigneeUserId: number;
+  prepressUserId: number | null;
+  finalApproverUserId: number | null;
+  excludeUserId?: number;
+}): Promise<void> {
+  await notifyMaketaUsers({
+    maketaId: params.maketaId,
+    userIds: [params.assigneeUserId],
+    bodyPreview: params.bodyPreview,
+    orderNumber: params.orderNumber,
+    kind: "assigned",
+    workType: "grafika",
+    excludeUserId: params.excludeUserId,
+  });
+
+  const approvers = [params.prepressUserId, params.finalApproverUserId].filter(
+    (id): id is number => id != null && id !== params.assigneeUserId
+  );
+  if (approvers.length > 0) {
+    await notifyMaketaUsers({
+      maketaId: params.maketaId,
+      userIds: approvers,
+      bodyPreview: params.bodyPreview,
+      orderNumber: params.orderNumber,
+      kind: "workflow_assigned",
+      workType: "grafika",
+      excludeUserId: params.excludeUserId,
     });
   }
 }
@@ -239,9 +357,9 @@ export async function notifyMaketaDone(params: {
   bodyPreview: string;
   orderNumber: string | null;
   workType?: MaketyWorkType | string | null;
+  /** U grafiky – notifikovat prepress ke schválení. */
+  prepressUserId?: number | null;
 }): Promise<void> {
-  if (params.creatorUserId === params.doneByUserId) return;
-
   const workType = normalizeMaketyWorkType(params.workType);
   const w = maketyWorkTypeWording(workType);
 
@@ -250,6 +368,37 @@ export async function notifyMaketaDone(params: {
     select: { first_name: true, last_name: true },
   });
   const doneByName = doneBy ? `${doneBy.first_name} ${doneBy.last_name}`.trim() : "Uživatel";
+
+  if (workType === "grafika") {
+    if (params.prepressUserId != null && params.prepressUserId !== params.doneByUserId) {
+      await notifyMaketaUsers({
+        maketaId: params.maketaId,
+        userIds: [params.prepressUserId],
+        bodyPreview: params.bodyPreview,
+        orderNumber: params.orderNumber,
+        kind: "awaiting_prepress",
+        workType: "grafika",
+        excludeUserId: params.doneByUserId,
+      });
+    }
+    if (params.creatorUserId !== params.doneByUserId) {
+      const intro = `${doneByName} dokončil/a grafiku${orderSuffix(params.orderNumber)} – čeká na schválení prepressem.`;
+      await notifyMaketaCreator({
+        maketaId: params.maketaId,
+        creatorUserId: params.creatorUserId,
+        title: "Grafika hotová – čeká na prepress",
+        message: intro,
+        type: "makety_done",
+        orderNumber: params.orderNumber,
+        bodyPreview: params.bodyPreview,
+        workType,
+      });
+    }
+    return;
+  }
+
+  if (params.creatorUserId === params.doneByUserId) return;
+
   const intro = `${doneByName} označil/a ${w.accusative} jako hotovou${orderSuffix(params.orderNumber)}.`;
   const title = `${w.label} dokončena`;
 

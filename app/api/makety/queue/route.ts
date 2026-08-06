@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { canManageMaketyQueue } from "@/lib/makety-access";
 import { sortMaketyProductionQueue } from "@/lib/makety-queue";
 import { isMaketyWorkType, type MaketyWorkType } from "@/lib/makety-work-type";
+import { GRAFIKA_QUEUE_STATUSES } from "@/lib/makety-grafika-status";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -21,10 +22,15 @@ export async function GET(req: NextRequest) {
   }
   const workType = workTypeRaw as MaketyWorkType;
 
+  const queueStatuses =
+    workType === "grafika"
+      ? [...GRAFIKA_QUEUE_STATUSES]
+      : (["open", "in_progress"] as const);
+
   const rows = await prisma.makety.findMany({
     where: {
       work_type: workType,
-      status: { in: ["open", "in_progress"] },
+      status: { in: [...queueStatuses] },
       assignee_user_id: { not: null },
     },
     include: {

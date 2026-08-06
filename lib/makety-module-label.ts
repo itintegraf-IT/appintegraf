@@ -12,3 +12,9 @@ export const MAKETY_ZADAVATEL_MAKETA_LABEL = "Zadavatel maket";
 
 /** Zadavatel zakázek grafiky. */
 export const MAKETY_ZADAVATEL_GRAFIKA_LABEL = "Zadavatel grafiky";
+
+/** Schvalovatel prepress u zakázek grafiky. */
+export const MAKETY_SCHVALOVATEL_PREPRESS_LABEL = "Schvalovatel prepress";
+
+/** Finální schvalovatel (obchod / technolog) u zakázek grafiky. */
+export const MAKETY_SCHVALOVATEL_FINAL_LABEL = "Finální schvalovatel grafiky";

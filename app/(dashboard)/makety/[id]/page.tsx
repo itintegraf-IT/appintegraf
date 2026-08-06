@@ -15,6 +15,7 @@ import {
   userCanCompleteMaketa,
   userCanSubmitMaketaQuote,
   userCanApproveMaketaQuote,
+  userCanOperateGrafikaAutomation,
   canManageMaketyQueue,
 } from "@/lib/makety-access";
 import { MaketaQuoteForm } from "./MaketaQuoteForm";
@@ -27,11 +28,15 @@ import {
   maketaPriorityLabel,
   maketaStatusBadgeClass,
   maketaStatusLabel,
+  isMaketaTerminalStatus,
 } from "@/lib/makety-status";
 import { CompleteMaketaButton } from "./CompleteMaketaButton";
 import { StartMaketaButton } from "./StartMaketaButton";
 import { MaketaFilesPanel } from "./MaketaFilesPanel";
 import { MaketaCommentsPanel } from "./MaketaCommentsPanel";
+import { GrafikaStatusPanel } from "./GrafikaStatusPanel";
+import { GrafikaAutomationPanel } from "./GrafikaAutomationPanel";
+import { GrafikaWorkflowPicker } from "../GrafikaWorkflowPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -63,20 +68,57 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
     include: {
       users_assignee: { select: { first_name: true, last_name: true, id: true } },
       users_creator: { select: { first_name: true, last_name: true } },
+      users_prepress: { select: { first_name: true, last_name: true, id: true } },
+      users_final_approver: { select: { first_name: true, last_name: true, id: true } },
+      iml_customers: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          iml_customer_emails: {
+            where: { is_primary: true },
+            take: 1,
+            select: { email: true },
+          },
+        },
+      },
+      iml_products: {
+        select: {
+          id: true,
+          ig_code: true,
+          client_code: true,
+          ig_short_name: true,
+          client_name: true,
+        },
+      },
+      iml_die_cuts: {
+        select: {
+          id: true,
+          label_shape_code: true,
+          die_cut_tool_code: true,
+          internal_name: true,
+        },
+      },
     },
   });
 
   if (!maketa) notFound();
 
+  const workType = (maketa.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
   const canEdit = await userCanEditMaketa(userId, id);
   const canDelete = await userCanDeleteMaketa(userId, id);
   const canComplete = await userCanCompleteMaketa(userId, id);
   const canSubmitQuote = await userCanSubmitMaketaQuote(userId, id);
   const canApproveQuote = await userCanApproveMaketaQuote(userId, id);
-  const isArchived = maketa.status === "done" || maketa.status === "cancelled";
+  const isArchived = isMaketaTerminalStatus(maketa.status, workType);
   const canManagePriority =
     (await canManageMaketyQueue(userId)) && !isArchived;
-  const workType = (maketa.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+  const canGrafikaAutomation =
+    workType === "grafika" && (await userCanOperateGrafikaAutomation(userId, id));
+  const softproofDefaultEmail =
+    maketa.iml_customers?.email?.trim() ||
+    maketa.iml_customers?.iml_customer_emails[0]?.email?.trim() ||
+    null;
   const quotePriceFormatted =
     maketa.quote_price != null
       ? new Intl.NumberFormat("cs-CZ", { style: "currency", currency: "CZK" }).format(
@@ -97,98 +139,208 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              {maketyWorkTypeLabel(workType)} #{maketa.id}
-            </h2>
-            <p className="mt-1 text-sm text-gray-500">
-              Zadal/a: {maketa.users_creator.first_name} {maketa.users_creator.last_name} ·{" "}
-              {formatDateTimeCz(new Date(maketa.assigned_at))}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {canEdit && (
-              <Link
-                href={`/makety/${maketa.id}/edit`}
-                className="rounded-lg border border-violet-300 px-4 py-2 text-sm font-medium text-violet-700 hover:bg-violet-50"
-              >
-                Upravit
-              </Link>
-            )}
-            {canComplete && maketa.status === "open" && <StartMaketaButton id={maketa.id} />}
-            {canComplete && !isArchived && <CompleteMaketaButton id={maketa.id} />}
-            {canDelete && <DeleteMaketaButton id={maketa.id} isAdmin={!canEdit && canDelete} />}
-          </div>
-        </div>
-
-        <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Stav</dt>
-            <dd className="mt-1">
-              <span
-                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(maketa.status)}`}
-              >
-                {maketaStatusLabel(maketa.status)}
-              </span>
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Typ</dt>
-            <dd className="mt-1 text-sm text-gray-900">{maketyWorkTypeLabel(workType)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Priorita</dt>
-            {canManagePriority ? (
-              <MaketyDetailPrioritySelect maketaId={maketa.id} initialPriority={maketa.priority} />
-            ) : (
-              <dd className="mt-1">
-                <span
-                  className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaPriorityBadgeClass(maketa.priority)}`}
-                >
-                  {maketaPriorityLabel(maketa.priority)}
-                </span>
-              </dd>
-            )}
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Termín</dt>
-            <dd className="mt-1 text-sm text-gray-900">{formatDateTimeCz(new Date(maketa.due_at))}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Zakázka</dt>
-            <dd className="mt-1 text-sm text-gray-900">{maketa.order_number ?? "—"}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium uppercase text-gray-500">Počet kusů</dt>
-            <dd className="mt-1 text-sm text-gray-900">{maketa.quantity ?? "—"}</dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-xs font-medium uppercase text-gray-500">{maketyAssigneeRoleLabel(workType)}</dt>
-            <dd className="mt-1 text-sm text-gray-900">
-              {maketa.users_assignee
-                ? `${maketa.users_assignee.first_name} ${maketa.users_assignee.last_name}`
-                : "—"}
-            </dd>
-          </div>
-          <div className="sm:col-span-2">
-            <dt className="text-xs font-medium uppercase text-gray-500">Popis zadání</dt>
-            <dd className="mt-1 whitespace-pre-wrap text-sm text-gray-900">{maketa.body}</dd>
-          </div>
-          {showApprovedQuote && quotePriceFormatted && (
-            <>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <dt className="text-xs font-medium uppercase text-gray-500">Schválená cena</dt>
-                <dd className="mt-1 text-sm font-medium text-gray-900">{quotePriceFormatted}</dd>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {maketyWorkTypeLabel(workType)} #{maketa.id}
+                </h2>
+                <p className="mt-1 text-sm text-gray-500">
+                  Zadal/a: {maketa.users_creator.first_name} {maketa.users_creator.last_name} ·{" "}
+                  {formatDateTimeCz(new Date(maketa.assigned_at))}
+                </p>
               </div>
-              <div className="sm:col-span-2">
-                <dt className="text-xs font-medium uppercase text-gray-500">Popis výroby (výrobce)</dt>
-                <dd className="mt-1 whitespace-pre-wrap text-sm text-gray-900">
-                  {maketa.quote_production_description ?? "—"}
+              <div className="flex flex-wrap gap-2">
+                {canEdit && (
+                  <Link
+                    href={`/makety/${maketa.id}/edit`}
+                    className="rounded-lg border border-violet-300 px-4 py-2 text-sm font-medium text-violet-700 hover:bg-violet-50"
+                  >
+                    Upravit
+                  </Link>
+                )}
+                {canComplete && workType === "maketa" && maketa.status === "open" && (
+                  <StartMaketaButton id={maketa.id} />
+                )}
+                {canComplete && workType === "maketa" && !isArchived && (
+                  <CompleteMaketaButton id={maketa.id} />
+                )}
+                {canDelete && <DeleteMaketaButton id={maketa.id} isAdmin={!canEdit && canDelete} />}
+              </div>
+            </div>
+
+            <dl className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">Stav</dt>
+                <dd className="mt-1">
+                  <span
+                    className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(maketa.status, workType)}`}
+                  >
+                    {maketaStatusLabel(maketa.status, workType)}
+                  </span>
                 </dd>
               </div>
-            </>
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">Typ</dt>
+                <dd className="mt-1 text-sm text-gray-900">{maketyWorkTypeLabel(workType)}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">Priorita</dt>
+                {canManagePriority ? (
+                  <MaketyDetailPrioritySelect maketaId={maketa.id} initialPriority={maketa.priority} />
+                ) : (
+                  <dd className="mt-1">
+                    <span
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaPriorityBadgeClass(maketa.priority)}`}
+                    >
+                      {maketaPriorityLabel(maketa.priority)}
+                    </span>
+                  </dd>
+                )}
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">Termín</dt>
+                <dd className="mt-1 text-sm text-gray-900">{formatDateTimeCz(new Date(maketa.due_at))}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">Zakázka</dt>
+                <dd className="mt-1 text-sm text-gray-900">{maketa.order_number ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">Počet kusů</dt>
+                <dd className="mt-1 text-sm text-gray-900">{maketa.quantity ?? "—"}</dd>
+              </div>
+              {workType === "grafika" && (
+                <>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-gray-500">Klient</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {maketa.iml_customers ? maketa.iml_customers.name : "—"}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-gray-500">Číslo zakázky (ERP)</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{maketa.job_number ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-gray-500">Kód etikety</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{maketa.label_code ?? "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-gray-500">Etiketa v katalogu</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {maketa.iml_products ? (
+                        <Link
+                          href={`/iml/products/${maketa.iml_products.id}`}
+                          className="font-medium text-violet-600 hover:underline"
+                        >
+                          {maketa.iml_products.ig_code ||
+                            maketa.iml_products.client_code ||
+                            `#${maketa.iml_products.id}`}
+                          {(maketa.iml_products.ig_short_name ||
+                            maketa.iml_products.client_name) &&
+                            ` — ${
+                              maketa.iml_products.ig_short_name ||
+                              maketa.iml_products.client_name
+                            }`}
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </dd>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <dt className="text-xs font-medium uppercase text-gray-500">Výsek</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {maketa.iml_die_cuts
+                        ? [
+                            maketa.iml_die_cuts.label_shape_code,
+                            maketa.iml_die_cuts.die_cut_tool_code,
+                            maketa.iml_die_cuts.internal_name,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")
+                        : "—"}
+                    </dd>
+                  </div>
+                </>
+              )}
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-medium uppercase text-gray-500">
+                  {maketyAssigneeRoleLabel(workType)}
+                </dt>
+                <dd className="mt-1 text-sm text-gray-900">
+                  {maketa.users_assignee
+                    ? `${maketa.users_assignee.first_name} ${maketa.users_assignee.last_name}`
+                    : "—"}
+                </dd>
+              </div>
+              <div className="sm:col-span-2">
+                <dt className="text-xs font-medium uppercase text-gray-500">Popis zadání</dt>
+                <dd className="mt-1 whitespace-pre-wrap text-sm text-gray-900">{maketa.body}</dd>
+              </div>
+              {showApprovedQuote && quotePriceFormatted && (
+                <>
+                  <div>
+                    <dt className="text-xs font-medium uppercase text-gray-500">Schválená cena</dt>
+                    <dd className="mt-1 text-sm font-medium text-gray-900">{quotePriceFormatted}</dd>
+                  </div>
+                  <div className="sm:col-span-2">
+                    <dt className="text-xs font-medium uppercase text-gray-500">
+                      Popis výroby (výrobce)
+                    </dt>
+                    <dd className="mt-1 whitespace-pre-wrap text-sm text-gray-900">
+                      {maketa.quote_production_description ?? "—"}
+                    </dd>
+                  </div>
+                </>
+              )}
+            </dl>
+          </div>
+
+          {workType === "grafika" && (
+            <div className="w-full shrink-0 sm:w-auto sm:max-w-xs">
+              <GrafikaStatusPanel
+                maketaId={id}
+                initialStatus={maketa.status}
+                defaultClientEmail={softproofDefaultEmail}
+              />
+            </div>
           )}
-        </dl>
+        </div>
+
+        {workType === "grafika" && (
+          <div className="mt-6">
+            <GrafikaWorkflowPicker
+              mode="readonly"
+              currentStatus={maketa.status}
+              creatorName={`${maketa.users_creator.first_name} ${maketa.users_creator.last_name}`}
+              grafikUsers={[]}
+              prepressUsers={[]}
+              finalUsers={[]}
+              initial={{
+                assignee_user_id: maketa.assignee_user_id,
+                prepress_user_id: maketa.prepress_user_id,
+                final_approver_user_id: maketa.final_approver_user_id,
+              }}
+              assigneeDisplayName={
+                maketa.users_assignee
+                  ? `${maketa.users_assignee.first_name} ${maketa.users_assignee.last_name}`
+                  : null
+              }
+              prepressDisplayName={
+                maketa.users_prepress
+                  ? `${maketa.users_prepress.first_name} ${maketa.users_prepress.last_name}`
+                  : null
+              }
+              finalDisplayName={
+                maketa.users_final_approver
+                  ? `${maketa.users_final_approver.first_name} ${maketa.users_final_approver.last_name}`
+                  : null
+              }
+            />
+          </div>
+        )}
       </div>
 
       {workType === "maketa" && canSubmitQuote && (
@@ -217,6 +369,16 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
               ? "Nahrajte podklady pro grafiku — můžete vybrat více souborů najednou."
               : "Nahrajte podklady pro výrobu makety — můžete vybrat více souborů najednou."
           }
+        />
+      )}
+
+      {workType === "grafika" && canGrafikaAutomation && (
+        <GrafikaAutomationPanel
+          maketaId={id}
+          canOperate={canGrafikaAutomation}
+          status={maketa.status}
+          hasCustomer={maketa.customer_id != null}
+          hasProduct={maketa.product_id != null}
         />
       )}
 

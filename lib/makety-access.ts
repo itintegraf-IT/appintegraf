@@ -5,10 +5,18 @@ import {
   hasExplicitMaketyZadavatelGrafikaRole,
   hasExplicitMaketyZadavatelMaketaRole,
   hasMaketyGrafikaAccess,
+  hasMaketySchvalovatelFinalAccess,
+  hasMaketySchvalovatelPrepressAccess,
   hasMaketyVyrobaAccess,
   isAdmin,
 } from "@/lib/auth-utils";
 import { type MaketyWorkType } from "@/lib/makety-work-type";
+import {
+  getAllowedGrafikaTransitions,
+  type GrafikaTransitionRole,
+  type GrafikaStatus,
+} from "@/lib/makety-grafika-status";
+import { isMaketaTerminalStatus } from "@/lib/makety-status";
 
 /** Správa fronty výroby (řazení, priorita) – admin modulu nebo globální admin. */
 export async function canManageMaketyQueue(userId: number): Promise<boolean> {
@@ -54,6 +62,8 @@ export async function canViewMaketyPlotrCalendar(userId: number): Promise<boolea
 export async function canViewMaketyGrafikaCalendar(userId: number): Promise<boolean> {
   if (await canViewAllMaketyTypes(userId)) return true;
   if (await hasMaketyGrafikaAccess(userId)) return true;
+  if (await hasMaketySchvalovatelPrepressAccess(userId)) return true;
+  if (await hasMaketySchvalovatelFinalAccess(userId)) return true;
   return canZadatMaketyWork(userId, "grafika");
 }
 
@@ -65,7 +75,13 @@ export async function getOrgWideWorkTypes(userId: number): Promise<MaketyWorkTyp
   if (await canViewAllMaketyTypes(userId)) return null;
   const types: MaketyWorkType[] = [];
   if (await hasMaketyVyrobaAccess(userId)) types.push("maketa");
-  if (await hasMaketyGrafikaAccess(userId)) types.push("grafika");
+  if (
+    (await hasMaketyGrafikaAccess(userId)) ||
+    (await hasMaketySchvalovatelPrepressAccess(userId)) ||
+    (await hasMaketySchvalovatelFinalAccess(userId))
+  ) {
+    types.push("grafika");
+  }
   return types.length > 0 ? types : null;
 }
 
@@ -108,21 +124,37 @@ async function userHasOrgAccessToWorkType(
 ): Promise<boolean> {
   if (await canViewAllMaketyTypes(userId)) return true;
   if (workType === "maketa" && (await hasMaketyVyrobaAccess(userId))) return true;
-  if (workType === "grafika" && (await hasMaketyGrafikaAccess(userId))) return true;
+  if (workType === "grafika") {
+    if (await hasMaketyGrafikaAccess(userId)) return true;
+    if (await hasMaketySchvalovatelPrepressAccess(userId)) return true;
+    if (await hasMaketySchvalovatelFinalAccess(userId)) return true;
+  }
   return false;
 }
 
 export async function userCanViewMaketa(userId: number, maketaId: number): Promise<boolean> {
   const row = await prisma.makety.findFirst({
     where: { id: maketaId },
-    select: { id: true, work_type: true, created_by: true, assignee_user_id: true },
+    select: {
+      id: true,
+      work_type: true,
+      created_by: true,
+      assignee_user_id: true,
+      prepress_user_id: true,
+      final_approver_user_id: true,
+    },
   });
   if (!row) return false;
 
   const workType = (row.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
   if (await userHasOrgAccessToWorkType(userId, workType)) return true;
 
-  return row.created_by === userId || row.assignee_user_id === userId;
+  return (
+    row.created_by === userId ||
+    row.assignee_user_id === userId ||
+    row.prepress_user_id === userId ||
+    row.final_approver_user_id === userId
+  );
 }
 
 export async function userCanEditMaketa(userId: number, maketaId: number): Promise<boolean> {
@@ -131,8 +163,8 @@ export async function userCanEditMaketa(userId: number, maketaId: number): Promi
     select: { id: true, status: true, work_type: true },
   });
   if (!row) return false;
-  if (row.status === "done" || row.status === "cancelled") return false;
   const workType = (row.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+  if (isMaketaTerminalStatus(row.status, workType)) return false;
   if (!(await canZadatMaketyWork(userId, workType))) return false;
   if (workType === "maketa") {
     return row.status === "awaiting_quote" || row.status === "quote_submitted";
@@ -194,4 +226,65 @@ export async function userCanCompleteMaketa(userId: number, maketaId: number): P
 
   if (!(await hasModuleAccess(userId, "makety", "read"))) return false;
   return row.created_by === userId || row.assignee_user_id === userId;
+}
+
+/** Role pro prepress přechody stavů u grafiky. */
+export async function getGrafikaTransitionRoles(
+  userId: number,
+  maketaId: number
+): Promise<GrafikaTransitionRole[]> {
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId, work_type: "grafika" },
+    select: {
+      id: true,
+      status: true,
+      assignee_user_id: true,
+      prepress_user_id: true,
+      final_approver_user_id: true,
+    },
+  });
+  if (!row || isMaketaTerminalStatus(row.status, "grafika")) return [];
+
+  const roles = new Set<GrafikaTransitionRole>();
+  const isModuleAdmin = await canViewAllMaketyTypes(userId);
+
+  if (isModuleAdmin || row.assignee_user_id === userId) {
+    roles.add("grafik");
+  }
+  if (isModuleAdmin || row.prepress_user_id === userId) {
+    roles.add("prepress");
+  }
+  if (isModuleAdmin || row.final_approver_user_id === userId) {
+    roles.add("final");
+  }
+
+  return [...roles];
+}
+
+export async function userCanTransitionGrafika(
+  userId: number,
+  maketaId: number,
+  toStatus: GrafikaStatus
+): Promise<boolean> {
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId, work_type: "grafika" },
+    select: { status: true },
+  });
+  if (!row) return false;
+  const roles = await getGrafikaTransitionRoles(userId, maketaId);
+  const allowed = getAllowedGrafikaTransitions(row.status, roles);
+  return allowed.includes(toStatus);
+}
+
+/** Softproof / Cicero / produkt – finální schvalovatel nebo admin modulu. */
+export async function userCanOperateGrafikaAutomation(
+  userId: number,
+  maketaId: number
+): Promise<boolean> {
+  if (await canViewAllMaketyTypes(userId)) return true;
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId, work_type: "grafika" },
+    select: { final_approver_user_id: true },
+  });
+  return row != null && row.final_approver_user_id === userId;
 }
