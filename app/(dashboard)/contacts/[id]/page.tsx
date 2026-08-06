@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { auth } from "@/auth";
 import { canViewContactVizitka, hasModuleAccess, isAdmin } from "@/lib/auth-utils";
-import { buildOutlookContactSignatureHtml, getContactSignatureAssetBaseUrl } from "@/lib/contact-signature-html";
+import { buildBothSignatureHtmls, getContactSignatureAssetBaseUrl } from "@/lib/contact-signature-html";
 import { prisma } from "@/lib/db";
 import { mergeUserEmails } from "@/lib/merge-user-emails";
 import { Mail, Phone, Building2, Pencil, QrCode } from "lucide-react";
@@ -61,8 +61,8 @@ export default async function ContactViewPage({
   const admin = await isAdmin(userId);
   const showPersonal = canWrite || userId === id || admin;
   const assetBaseUrl = await getContactSignatureAssetBaseUrl();
-  const signatureHtml = showVizitka
-    ? buildOutlookContactSignatureHtml(
+  const signatures = showVizitka
+    ? buildBothSignatureHtmls(
         {
           firstName: contact.first_name,
           lastName: contact.last_name,
@@ -72,7 +72,7 @@ export default async function ContactViewPage({
         },
         assetBaseUrl
       )
-    : "";
+    : null;
 
   const name = `${contact.first_name} ${contact.last_name}`;
 
@@ -120,7 +120,11 @@ export default async function ContactViewPage({
         personalPhone={contact.personal_phone}
         personalEmail={contact.personal_email}
         showVizitka={showVizitka}
-        vizitkaSlot={showVizitka ? <ContactVizitkaTab signatureHtml={signatureHtml} /> : undefined}
+        vizitkaSlot={
+          signatures ? (
+            <ContactVizitkaTab vizitkaHtml={signatures.vizitkaHtml} podpisHtml={signatures.podpisHtml} />
+          ) : undefined
+        }
         showPersonal={showPersonal}
       >
         <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
