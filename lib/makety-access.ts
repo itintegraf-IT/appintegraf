@@ -12,7 +12,7 @@ import {
 } from "@/lib/auth-utils";
 import { type MaketyWorkType } from "@/lib/makety-work-type";
 import {
-  getAllowedGrafikaTransitions,
+  listGrafikaTransitionOptions,
   type GrafikaTransitionRole,
   type GrafikaStatus,
 } from "@/lib/makety-grafika-status";
@@ -228,7 +228,7 @@ export async function userCanCompleteMaketa(userId: number, maketaId: number): P
   return row.created_by === userId || row.assignee_user_id === userId;
 }
 
-/** Role pro prepress přechody stavů u grafiky. */
+/** Role pro přechody stavů u grafiky – jen přiřazená osoba (ne celý admin). */
 export async function getGrafikaTransitionRoles(
   userId: number,
   maketaId: number
@@ -247,48 +247,98 @@ export async function getGrafikaTransitionRoles(
   if (!row || isMaketaTerminalStatus(row.status, "grafika")) return [];
 
   const roles = new Set<GrafikaTransitionRole>();
-  const isModuleAdmin = await canViewAllMaketyTypes(userId);
 
-  if (isModuleAdmin || row.assignee_user_id === userId) {
+  if (row.assignee_user_id === userId) {
     roles.add("grafik");
   }
-  if (isModuleAdmin || row.created_by === userId) {
+  if (row.created_by === userId) {
     roles.add("zadavatel");
   }
-  if (isModuleAdmin || row.prepress_user_id === userId) {
+  if (row.prepress_user_id === userId) {
     roles.add("prepress");
   }
-  if (isModuleAdmin || row.final_approver_user_id === userId) {
+  if (row.final_approver_user_id === userId) {
     roles.add("final");
   }
 
   return [...roles];
 }
 
-export async function userCanTransitionGrafika(
-  userId: number,
-  maketaId: number,
-  toStatus: GrafikaStatus
-): Promise<boolean> {
-  const row = await prisma.makety.findFirst({
-    where: { id: maketaId, work_type: "grafika" },
-    select: { status: true },
-  });
-  if (!row) return false;
-  const roles = await getGrafikaTransitionRoles(userId, maketaId);
-  const allowed = getAllowedGrafikaTransitions(row.status, roles);
-  return allowed.includes(toStatus);
-}
-
-/** Softproof / Cicero / produkt – finální schvalovatel nebo admin modulu. */
-export async function userCanOperateGrafikaAutomation(
+/** Zadavatel nebo admin modulu může převzít cizí krok s potvrzením. */
+export async function userCanOverrideGrafikaTransitions(
   userId: number,
   maketaId: number
 ): Promise<boolean> {
   if (await canViewAllMaketyTypes(userId)) return true;
   const row = await prisma.makety.findFirst({
     where: { id: maketaId, work_type: "grafika" },
+    select: { created_by: true },
+  });
+  return row != null && row.created_by === userId;
+}
+
+export async function resolveGrafikaTransitionAccess(
+  userId: number,
+  maketaId: number,
+  toStatus: GrafikaStatus,
+  acknowledgeOverride?: boolean
+): Promise<
+  | { ok: true; viaOverride: boolean; actingAs: GrafikaTransitionRole }
+  | { ok: false; error: string; needsOverrideAck?: boolean }
+> {
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId, work_type: "grafika" },
+    select: { status: true },
+  });
+  if (!row) return { ok: false, error: "Zakázka nenalezena" };
+
+  const roles = await getGrafikaTransitionRoles(userId, maketaId);
+  const canOverride = await userCanOverrideGrafikaTransitions(userId, maketaId);
+  const options = listGrafikaTransitionOptions(row.status, roles, canOverride);
+  const opt = options.find((o) => o.toStatus === toStatus);
+  if (!opt) {
+    return { ok: false, error: "Nemáte oprávnění k tomuto přechodu" };
+  }
+  if (opt.viaOverride && !acknowledgeOverride) {
+    return {
+      ok: false,
+      error: "Převzetí role vyžaduje potvrzení",
+      needsOverrideAck: true,
+    };
+  }
+  return { ok: true, viaOverride: opt.viaOverride, actingAs: opt.actingAs };
+}
+
+export async function userCanTransitionGrafika(
+  userId: number,
+  maketaId: number,
+  toStatus: GrafikaStatus,
+  acknowledgeOverride?: boolean
+): Promise<boolean> {
+  const resolved = await resolveGrafikaTransitionAccess(
+    userId,
+    maketaId,
+    toStatus,
+    acknowledgeOverride
+  );
+  return resolved.ok;
+}
+
+/** Softproof / produkt – finální schvalovatel, nebo override (zadavatel/admin). */
+export async function userCanOperateGrafikaAutomation(
+  userId: number,
+  maketaId: number
+): Promise<{ allowed: boolean; viaOverride: boolean }> {
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId, work_type: "grafika" },
     select: { final_approver_user_id: true },
   });
-  return row != null && row.final_approver_user_id === userId;
+  if (!row) return { allowed: false, viaOverride: false };
+  if (row.final_approver_user_id === userId) {
+    return { allowed: true, viaOverride: false };
+  }
+  if (await userCanOverrideGrafikaTransitions(userId, maketaId)) {
+    return { allowed: true, viaOverride: true };
+  }
+  return { allowed: false, viaOverride: false };
 }

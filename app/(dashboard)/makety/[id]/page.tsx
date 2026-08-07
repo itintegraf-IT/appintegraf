@@ -115,7 +115,8 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
   const canManagePriority =
     (await canManageMaketyQueue(userId)) && !isArchived;
   const canGrafikaAutomation =
-    workType === "grafika" && (await userCanOperateGrafikaAutomation(userId, id));
+    workType === "grafika" &&
+    (await userCanOperateGrafikaAutomation(userId, id)).allowed;
   const softproofDefaultEmail =
     maketa.iml_customers?.email?.trim() ||
     maketa.iml_customers?.iml_customer_emails[0]?.email?.trim() ||

@@ -51,18 +51,29 @@ export async function POST(
   if (!(await userCanViewMaketa(userId, maketaId))) {
     return NextResponse.json({ error: "Zakázka nenalezena" }, { status: 404 });
   }
-  if (!(await userCanOperateGrafikaAutomation(userId, maketaId))) {
+
+  let body: { fileId?: number; toEmail?: string; attachFile?: boolean; acknowledgeOverride?: boolean };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Neplatný JSON" }, { status: 400 });
+  }
+
+  const automation = await userCanOperateGrafikaAutomation(userId, maketaId);
+  if (!automation.allowed) {
     return NextResponse.json(
       { error: "Softproof může odeslat jen finální schvalovatel" },
       { status: 403 }
     );
   }
-
-  let body: { fileId?: number; toEmail?: string; attachFile?: boolean };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Neplatný JSON" }, { status: 400 });
+  if (automation.viaOverride && body.acknowledgeOverride !== true) {
+    return NextResponse.json(
+      {
+        error: "Převzetí role finálního schvalovatele vyžaduje potvrzení",
+        needsOverrideAck: true,
+      },
+      { status: 400 }
+    );
   }
 
   const fileId = Number(body.fileId);

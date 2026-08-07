@@ -30,7 +30,7 @@ export async function POST(
   if (!(await userCanViewMaketa(userId, maketaId))) {
     return NextResponse.json({ error: "Zakázka nenalezena" }, { status: 404 });
   }
-  if (!(await userCanOperateGrafikaAutomation(userId, maketaId))) {
+  if (!(await userCanOperateGrafikaAutomation(userId, maketaId)).allowed) {
     return NextResponse.json(
       { error: "Export může spustit jen finální schvalovatel" },
       { status: 403 }

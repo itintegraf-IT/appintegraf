@@ -5,6 +5,7 @@ import {
   grafikaStatusLabel,
   grafikaTransitionActionLabel,
   isMaketaTerminalStatus,
+  listGrafikaTransitionOptions,
   GRAFIKA_QUEUE_STATUSES,
 } from "@/lib/makety-grafika-status";
 
@@ -61,6 +62,25 @@ describe("makety-grafika-status", () => {
     expect(getAllowedGrafikaTransitions("prepress_approved", ["final"])).toContain(
       "sent_for_approval"
     );
+  });
+
+  it("zadavatel bez override nevidí schválení prepressem", () => {
+    const native = listGrafikaTransitionOptions("done", ["zadavatel"], false);
+    expect(native).toEqual([]);
+  });
+
+  it("zadavatel s override vidí schválení prepressem s potvrzením", () => {
+    const opts = listGrafikaTransitionOptions("done", ["zadavatel"], true);
+    expect(opts).toEqual([
+      { toStatus: "prepress_approved", viaOverride: true, actingAs: "prepress" },
+    ]);
+  });
+
+  it("přiřazený prepress má nativní přechod bez override", () => {
+    const opts = listGrafikaTransitionOptions("done", ["prepress", "zadavatel"], true);
+    expect(opts).toEqual([
+      { toStatus: "prepress_approved", viaOverride: false, actingAs: "prepress" },
+    ]);
   });
 
   it("vyřazuje pozastavené z fronty grafika", () => {

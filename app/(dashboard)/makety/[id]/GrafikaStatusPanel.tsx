@@ -11,6 +11,8 @@ type TransitionOption = {
   toStatus: GrafikaStatus;
   label: string;
   requiresComment: boolean;
+  requiresOverrideAck?: boolean;
+  actingAs?: string;
 };
 
 type FileRow = { id: number; original_filename: string };
@@ -34,6 +36,7 @@ export function GrafikaStatusPanel({
   const [selected, setSelected] = useState<GrafikaStatus | null>(null);
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [overrideAck, setOverrideAck] = useState(false);
 
   const [files, setFiles] = useState<FileRow[]>([]);
   const [fileId, setFileId] = useState<number | "">("");
@@ -86,9 +89,14 @@ export function GrafikaStatusPanel({
 
   const selectedTransition = transitions.find((t) => t.toStatus === selected);
   const needsSoftproof = selected === "sent_for_approval";
+  const needsOverrideAck = selectedTransition?.requiresOverrideAck === true;
 
   const onSubmit = async () => {
     if (!selected) return;
+    if (needsOverrideAck && !overrideAck) {
+      setError("Potvrďte, že víte, že přebíráte cizí roli ve workflow.");
+      return;
+    }
     setError(null);
     setSubmitting(selected);
 
@@ -106,6 +114,7 @@ export function GrafikaStatusPanel({
             fileId,
             toEmail: clientEmail.trim() || undefined,
             attachFile,
+            acknowledgeOverride: needsOverrideAck || undefined,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -124,6 +133,7 @@ export function GrafikaStatusPanel({
               selected === "sent_for_approval" && skipEmail
                 ? comment.trim() || "Odesláno ke schválení bez e-mailu softproofu"
                 : comment.trim() || undefined,
+            acknowledgeOverride: needsOverrideAck || undefined,
           }),
         });
         const data = await res.json().catch(() => ({}));
@@ -139,6 +149,7 @@ export function GrafikaStatusPanel({
       setFileId("");
       setAttachFile(false);
       setSkipEmail(false);
+      setOverrideAck(false);
       router.refresh();
       await load();
     } catch {
@@ -179,6 +190,7 @@ export function GrafikaStatusPanel({
             onClick={() => {
               setSelected(t.toStatus);
               setError(null);
+              setOverrideAck(false);
               if (!t.requiresComment) setComment("");
             }}
             className={`w-full text-left ${grafikaTransitionButtonClass(
@@ -204,6 +216,26 @@ export function GrafikaStatusPanel({
             placeholder="Popište problém s daty…"
           />
         </div>
+      )}
+
+      {needsOverrideAck && selected && (
+        <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={overrideAck}
+            onChange={(e) => {
+              setOverrideAck(e.target.checked);
+              setError(null);
+            }}
+            disabled={submitting != null}
+          />
+          <span>
+            Vím, co dělám — přebírám roli kompetentní osoby ve workflow
+            {selectedTransition?.actingAs ? ` (${selectedTransition.actingAs})` : ""}.
+            Normálně by tuto akci měl udělat přiřazený člověk.
+          </span>
+        </label>
       )}
 
       {needsSoftproof && (
@@ -281,6 +313,7 @@ export function GrafikaStatusPanel({
             disabled={
               submitting != null ||
               (selectedTransition?.requiresComment === true && !comment.trim()) ||
+              (needsOverrideAck && !overrideAck) ||
               (needsSoftproof &&
                 !skipEmail &&
                 (!fileId || !clientEmail.trim()))
@@ -301,6 +334,7 @@ export function GrafikaStatusPanel({
               setSelected(null);
               setComment("");
               setSkipEmail(false);
+              setOverrideAck(false);
               setError(null);
             }}
             className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-white"

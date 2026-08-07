@@ -4,13 +4,15 @@ import { prisma } from "@/lib/db";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import {
   getGrafikaTransitionRoles,
-  userCanTransitionGrafika,
+  resolveGrafikaTransitionAccess,
+  userCanOverrideGrafikaTransitions,
   userCanViewMaketa,
 } from "@/lib/makety-access";
 import {
   assertGrafikaTransition,
-  getAllowedGrafikaTransitions,
+  grafikaActingAsLabel,
   grafikaTransitionActionLabel,
+  listGrafikaTransitionOptions,
   parseGrafikaStatus,
   type GrafikaStatus,
 } from "@/lib/makety-grafika-status";
@@ -49,14 +51,19 @@ export async function GET(
   }
 
   const roles = await getGrafikaTransitionRoles(userId, id);
-  const allowed = getAllowedGrafikaTransitions(maketa.status, roles);
+  const canOverride = await userCanOverrideGrafikaTransitions(userId, id);
+  const options = listGrafikaTransitionOptions(maketa.status, roles, canOverride);
 
   return NextResponse.json({
     currentStatus: maketa.status,
-    transitions: allowed.map((to) => ({
-      toStatus: to,
-      label: grafikaTransitionActionLabel(to, maketa.status),
-      requiresComment: to === "data_problem",
+    transitions: options.map((o) => ({
+      toStatus: o.toStatus,
+      label: o.viaOverride
+        ? `${grafikaTransitionActionLabel(o.toStatus, maketa.status)} (převzetí: ${grafikaActingAsLabel(o.actingAs)})`
+        : grafikaTransitionActionLabel(o.toStatus, maketa.status),
+      requiresComment: o.toStatus === "data_problem",
+      requiresOverrideAck: o.viaOverride,
+      actingAs: o.actingAs,
     })),
   });
 }
@@ -79,7 +86,7 @@ export async function POST(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
-  let body: { toStatus?: string; comment?: string };
+  let body: { toStatus?: string; comment?: string; acknowledgeOverride?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -91,8 +98,20 @@ export async function POST(
     return NextResponse.json({ error: "Neplatný cílový stav" }, { status: 400 });
   }
 
-  if (!(await userCanTransitionGrafika(userId, id, toStatus))) {
-    return NextResponse.json({ error: "Nemáte oprávnění k tomuto přechodu" }, { status: 403 });
+  const access = await resolveGrafikaTransitionAccess(
+    userId,
+    id,
+    toStatus,
+    body.acknowledgeOverride === true
+  );
+  if (!access.ok) {
+    return NextResponse.json(
+      {
+        error: access.error,
+        needsOverrideAck: access.needsOverrideAck === true,
+      },
+      { status: access.needsOverrideAck ? 400 : 403 }
+    );
   }
 
   const maketa = await prisma.makety.findUnique({
@@ -113,7 +132,12 @@ export async function POST(
     return NextResponse.json({ error: "Zakázka nenalezena" }, { status: 404 });
   }
 
-  const comment = (body.comment ?? "").trim();
+  let comment = (body.comment ?? "").trim();
+  if (access.viaOverride) {
+    const note = `Převzetí role (${grafikaActingAsLabel(access.actingAs)}) – potvrzeno.`;
+    comment = comment ? `${comment}\n${note}` : note;
+  }
+
   try {
     assertGrafikaTransition({
       fromStatus: maketa.status,
@@ -166,7 +190,11 @@ export async function POST(
     finalApproverUserId: maketa.final_approver_user_id,
   });
 
-  return NextResponse.json({ success: true, status: toStatus });
+  return NextResponse.json({
+    success: true,
+    status: toStatus,
+    viaOverride: access.viaOverride,
+  });
 }
 
 async function notifyAfterGrafikaTransition(params: {

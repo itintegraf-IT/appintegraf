@@ -201,6 +201,9 @@ const ROLE_TRANSITIONS: Record<GrafikaTransitionRole, Array<{ from: GrafikaStatu
   ],
 };
 
+/** Role, které lze převzít (zadavatel/admin s potvrzením). */
+const OVERRIDABLE_ROLES: GrafikaTransitionRole[] = ["grafik", "prepress", "final"];
+
 export function getAllowedGrafikaTransitions(
   currentStatus: string,
   roles: GrafikaTransitionRole[]
@@ -214,6 +217,61 @@ export function getAllowedGrafikaTransitions(
     }
   }
   return [...allowed];
+}
+
+export type GrafikaTransitionOption = {
+  toStatus: GrafikaStatus;
+  viaOverride: boolean;
+  actingAs: GrafikaTransitionRole;
+};
+
+/**
+ * Dostupné přechody: nativní role bez potvrzení; při canOverride i cizí kroky (grafik/prepress/final).
+ */
+export function listGrafikaTransitionOptions(
+  currentStatus: string,
+  nativeRoles: GrafikaTransitionRole[],
+  canOverride: boolean
+): GrafikaTransitionOption[] {
+  const from = parseGrafikaStatus(currentStatus);
+  if (!from) return [];
+
+  const byTo = new Map<GrafikaStatus, GrafikaTransitionOption>();
+
+  for (const role of nativeRoles) {
+    for (const t of ROLE_TRANSITIONS[role]) {
+      if (t.from !== from) continue;
+      byTo.set(t.to, { toStatus: t.to, viaOverride: false, actingAs: role });
+    }
+  }
+
+  if (canOverride) {
+    for (const role of OVERRIDABLE_ROLES) {
+      for (const t of ROLE_TRANSITIONS[role]) {
+        if (t.from !== from) continue;
+        const existing = byTo.get(t.to);
+        if (existing && !existing.viaOverride) continue;
+        if (!existing) {
+          byTo.set(t.to, { toStatus: t.to, viaOverride: true, actingAs: role });
+        }
+      }
+    }
+  }
+
+  return [...byTo.values()];
+}
+
+export function grafikaActingAsLabel(role: GrafikaTransitionRole): string {
+  switch (role) {
+    case "grafik":
+      return "grafik";
+    case "prepress":
+      return "prepress";
+    case "final":
+      return "finální schvalovatel";
+    case "zadavatel":
+      return "zadavatel";
+  }
 }
 
 export type AssertGrafikaTransitionInput = {
