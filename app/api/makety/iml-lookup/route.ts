@@ -27,7 +27,12 @@ export async function GET(req: NextRequest) {
   if (type === "customers") {
     const idRaw = searchParams.get("id");
     const ensureId = idRaw ? parseInt(idRaw, 10) : null;
+    /** roots = jen centrály (výchozí, stejně jako IML katalog); all = včetně poboček */
+    const scope = (searchParams.get("scope") ?? "roots").trim().toLowerCase();
     const where: Prisma.iml_customersWhereInput = {};
+    if (scope !== "all") {
+      where.parent_id = null;
+    }
     if (q) {
       where.OR = [
         { name: { contains: q } },
@@ -38,7 +43,7 @@ export async function GET(req: NextRequest) {
     const customers = await prisma.iml_customers.findMany({
       where,
       orderBy: [{ name: "asc" }],
-      take: 200,
+      take: 500,
       select: { id: true, name: true, email: true, unit_type: true, parent_id: true },
     });
     if (ensureId != null && !Number.isNaN(ensureId) && !customers.some((c) => c.id === ensureId)) {

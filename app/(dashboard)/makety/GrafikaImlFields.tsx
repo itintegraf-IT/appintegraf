@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 export type GrafikaImlInitial = {
   customer_id: number | null;
@@ -45,7 +45,7 @@ function dieCutLabel(d: DieCutOpt): string {
 }
 
 export function GrafikaImlFields({ initial }: Props) {
-  const [customers, setCustomers] = useState<CustomerOpt[]>([]);
+  const [allCustomers, setAllCustomers] = useState<CustomerOpt[]>([]);
   const [products, setProducts] = useState<ProductOpt[]>([]);
   const [dieCuts, setDieCuts] = useState<DieCutOpt[]>([]);
   const [customerId, setCustomerId] = useState<string>(
@@ -60,12 +60,13 @@ export function GrafikaImlFields({ initial }: Props) {
   const [labelCode, setLabelCode] = useState(initial?.label_code ?? "");
   const [jobNumber, setJobNumber] = useState(initial?.job_number ?? "");
   const [customerQ, setCustomerQ] = useState("");
+  const [customersLoading, setCustomersLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  const loadCustomers = useCallback(async (q: string) => {
+  const loadCustomers = useCallback(async () => {
+    setCustomersLoading(true);
     try {
-      const params = new URLSearchParams({ type: "customers" });
-      if (q.trim()) params.set("q", q.trim());
+      const params = new URLSearchParams({ type: "customers", scope: "roots" });
       if (initial?.customer_id) params.set("id", String(initial.customer_id));
       const res = await fetch(`/api/makety/iml-lookup?${params}`);
       const data = await res.json().catch(() => ({}));
@@ -73,22 +74,24 @@ export function GrafikaImlFields({ initial }: Props) {
         setLoadError(typeof data.error === "string" ? data.error : "Nelze načíst klienty");
         return;
       }
-      setCustomers(Array.isArray(data.customers) ? data.customers : []);
+      setAllCustomers(Array.isArray(data.customers) ? data.customers : []);
       setLoadError(null);
     } catch {
       setLoadError("Síťová chyba při načítání klientů");
+    } finally {
+      setCustomersLoading(false);
     }
   }, [initial?.customer_id]);
 
   useEffect(() => {
-    void loadCustomers("");
+    void loadCustomers();
   }, [loadCustomers]);
 
-  useEffect(() => {
-    if (!customerQ.trim()) return;
-    const t = setTimeout(() => void loadCustomers(customerQ), 300);
-    return () => clearTimeout(t);
-  }, [customerQ, loadCustomers]);
+  const filteredCustomers = useMemo(() => {
+    const q = customerQ.trim().toLocaleLowerCase("cs");
+    if (!q) return allCustomers;
+    return allCustomers.filter((c) => c.name.toLocaleLowerCase("cs").includes(q));
+  }, [allCustomers, customerQ]);
 
   useEffect(() => {
     if (!customerId) {
@@ -137,6 +140,8 @@ export function GrafikaImlFields({ initial }: Props) {
     if (p.die_cut_id != null) setDieCutId(String(p.die_cut_id));
   };
 
+  const listSize = Math.min(10, Math.max(4, filteredCustomers.length + 1));
+
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 className="text-sm font-semibold text-gray-900">Propojení s IML katalogem</h3>
@@ -157,22 +162,31 @@ export function GrafikaImlFields({ initial }: Props) {
             type="search"
             value={customerQ}
             onChange={(e) => setCustomerQ(e.target.value)}
-            placeholder="Filtrovat klienty…"
+            placeholder="Hledat v seznamu klientů…"
             className="mb-2 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+            aria-label="Filtrovat seznam klientů"
           />
           <select
             name="customer_id"
             value={customerId}
             onChange={(e) => onCustomerChange(e.target.value)}
+            size={listSize}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">— bez klienta —</option>
-            {customers.map((c) => (
+            {filteredCustomers.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
           </select>
+          <p className="mt-1 text-xs text-gray-500">
+            {customersLoading
+              ? "Načítání klientů…"
+              : customerQ.trim()
+                ? `Zobrazeno ${filteredCustomers.length} z ${allCustomers.length} klientů`
+                : `${allCustomers.length} klientů z IML katalogu — vyberte ze seznamu`}
+          </p>
         </div>
 
         <div>
