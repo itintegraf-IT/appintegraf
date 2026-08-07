@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
-import { BackLink } from "@/components/navigation/BackLink";
 import { useReturnTo } from "@/lib/navigation/use-return-to";
 import { ProductFilesUpload } from "../../_components/ProductFilesUpload";
 import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
@@ -41,7 +41,7 @@ export default function ImlProductEditPage() {
   const router = useRouter();
   const params = useParams();
   const id = params.id as string;
-  const { withPreservedReturnTo } = useReturnTo(`/iml/products/${id}`);
+  const { backHref: listBackHref, withPreservedReturnTo } = useReturnTo("/iml/products");
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingData, setLoadingData] = useState(true);
@@ -84,6 +84,7 @@ export default function ImlProductEditPage() {
             }
           }
           setForm({
+            product_kind: s("product_kind") || "iml",
             customer_id: si("customer_id"),
             ig_code: s("ig_code"),
             ig_short_name: s("ig_short_name"),
@@ -91,6 +92,7 @@ export default function ImlProductEditPage() {
             client_name: s("client_name"),
             requester: s("requester"),
             sku: s("sku"),
+            die_cut_id: si("die_cut_id"),
             label_shape_code: s("label_shape_code"),
             die_cut_tool_code: s("die_cut_tool_code"),
             assembly_code: s("assembly_code"),
@@ -212,6 +214,7 @@ export default function ImlProductEditPage() {
         body: JSON.stringify({
           ...form,
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
+          die_cut_id: form.die_cut_id ? parseInt(form.die_cut_id, 10) : null,
           foil_material_id: form.foil_material_id ? parseInt(form.foil_material_id, 10) : null,
           color_material_id: form.color_material_id ? parseInt(form.color_material_id, 10) : null,
           paper_material_id: form.paper_material_id ? parseInt(form.paper_material_id, 10) : null,
@@ -270,7 +273,21 @@ export default function ImlProductEditPage() {
           <h1 className="text-2xl font-bold text-gray-900">Upravit produkt</h1>
           <p className="mt-1 text-gray-600">{form.ig_code || form.ig_short_name || "Produkt"}</p>
         </div>
-        <BackLink fallbackHref={`/iml/products/${id}`} />
+        <div className="flex items-center gap-2">
+          <Link
+            href={withPreservedReturnTo(`/iml/products/${id}`)}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Zpět
+          </Link>
+          <Link
+            href={listBackHref}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+          >
+            Zpět na výběr
+          </Link>
+        </div>
       </div>
 
       <div className="space-y-6">

@@ -18,10 +18,11 @@ import ProductDetailView, {
 } from "../_components/ProductDetailView";
 import ProductImagePreview from "../_components/ProductImagePreview";
 import ProductPdfHistory from "../_components/ProductPdfHistory";
+import { ProductArchiveBanner } from "../_components/ProductArchiveBanner";
 import { consumptionKg } from "@/lib/iml-color-consumption";
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
-import { imlLabelTypeLabel } from "@/lib/iml-constants";
+import { imlLabelTypeLabel, imlProductKindLabel } from "@/lib/iml-constants";
 import { formatProductFormatFromMm } from "@/lib/iml/product-format";
 import { cmykFlagsFromProduct, formatPrintColorsSummaryForDisplay } from "@/lib/iml-print-colors-summary";
 import { normalizePantoneCode, resolvePantoneSwatchHex } from "@/lib/iml-pantone";
@@ -37,6 +38,7 @@ export default async function ImlProductDetailPage({
   const userId = parseInt(session.user.id, 10);
   const canRead = await hasModuleAccess(userId, "iml", "read");
   const canWrite = await hasModuleAccess(userId, "iml", "write");
+  const canAdmin = await hasModuleAccess(userId, "iml", "admin");
 
   if (!canRead) redirect("/iml");
 
@@ -130,7 +132,8 @@ export default async function ImlProductDetailPage({
     (product.iml_foils ? `${product.iml_foils.code} — ${product.iml_foils.name}` : fmt(product.foil_type));
 
   const hasImage = !!(product.image_data && product.image_data.length > 0);
-  const hasLegacyPdf = !!(product.pdf_data && product.pdf_data.length > 0);
+  const hasLegacyPdf =
+    !!(product.pdf_data && product.pdf_data.length > 0) || !!product.pdf_archive_path;
   const hasPdf = hasLegacyPdf || hasFileTablePdf;
   const cmyk = cmykFlagsFromProduct(product);
   const hasPantoneColors = product.iml_product_colors.length > 0;
@@ -166,6 +169,10 @@ export default async function ImlProductDetailPage({
             </div>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
+            <InfoField
+              label="Druh produktu"
+              value={imlProductKindLabel(product.product_kind as string | null)}
+            />
             <InfoField label="Kód IG" value={fmt(product.ig_code)} />
             <InfoField label="Zkrácený název" value={fmt(product.ig_short_name)} />
             <InfoField label="Kód u klienta" value={fmt(product.client_code)} />
@@ -191,6 +198,14 @@ export default async function ImlProductDetailPage({
           <InfoField label="Etiket na TA" value={fmtNum(product.labels_per_sheet)} />
           <InfoField label="Kusů v krabici" value={fmtNum(product.pieces_per_box)} />
           <InfoField label="Kusů na paletě" value={fmtNum(product.pieces_per_pallet)} />
+          {product.die_cut_id != null && (
+            <p className="sm:col-span-2 text-sm text-gray-500">
+              Navázáno na katalog výseků (ID {product.die_cut_id}).{" "}
+              <a href="/iml/die-cuts" className="text-red-600 hover:underline">
+                Správa výseků
+              </a>
+            </p>
+          )}
         </div>
       ),
     },
@@ -311,6 +326,45 @@ export default async function ImlProductDetailPage({
           </div>
           <div>
             <h4 className="mb-2 text-sm font-semibold text-gray-700">
+              Aktuální tisková data
+            </h4>
+            {hasPdf ? (
+              <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start">
+                <div className="w-full max-w-[240px] shrink-0">
+                  <ProductImagePreview
+                    productId={product.id}
+                    hasImage={hasImage}
+                    hasPdf={hasPdf}
+                    className="h-60 w-full"
+                  />
+                  <p className="mt-1 text-center text-xs text-gray-400">
+                    Kliknutím zvětšit · detail z PDF
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <a
+                    href={`/api/iml/products/${product.id}/pdf`}
+                    download
+                    className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                  >
+                    Stáhnout aktuální PDF
+                  </a>
+                  <a
+                    href={`/api/iml/products/${product.id}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  >
+                    Otevřít v novém okně
+                  </a>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-6 rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
+                Žádné aktuální PDF. Nahrát lze v editaci produktu.
+              </div>
+            )}
+            <h4 className="mb-2 text-sm font-semibold text-gray-700">
               Historie verzí PDF
             </h4>
             <ProductPdfHistory productId={product.id} canWrite={canWrite} />
@@ -354,14 +408,23 @@ export default async function ImlProductDetailPage({
 
   return (
     <Suspense fallback={<div className="p-8 text-center text-gray-500">Načítání…</div>}>
-    <ProductDetailView
-      title={title}
-      subtitle={subtitle}
-      productId={product.id}
-      canWrite={canWrite}
-      hasPdf={hasPdf}
-      sections={sections}
-    />
+      <>
+        {product.archived_at && (
+          <ProductArchiveBanner
+            productId={product.id}
+            archivedAt={product.archived_at}
+            canAdmin={canAdmin}
+          />
+        )}
+        <ProductDetailView
+          title={title}
+          subtitle={subtitle}
+          productId={product.id}
+          canWrite={canWrite}
+          hasPdf={hasPdf}
+          sections={sections}
+        />
+      </>
     </Suspense>
   );
 }

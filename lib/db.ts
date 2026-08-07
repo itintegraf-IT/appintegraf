@@ -2,7 +2,14 @@ import { PrismaClient } from "@prisma/client";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import mariadb from "mariadb";
 
-const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient;
+  /** Invalidace cache po změně Prisma schématu (dev server jinak drží starý klient) */
+  prismaCacheKey?: string;
+};
+
+/** Zvyšte po změně prisma/schema.prisma, aby dev server načetl nový klient */
+const PRISMA_CACHE_KEY = "20260728-assignment-notifications";
 
 function parseDatabaseUrl(url: string): mariadb.PoolConfig | string {
   try {
@@ -35,9 +42,26 @@ function createPrismaClient() {
   });
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+function getPrismaClient(): PrismaClient {
+  if (
+    process.env.NODE_ENV !== "production" &&
+    globalForPrisma.prisma &&
+    globalForPrisma.prismaCacheKey === PRISMA_CACHE_KEY
+  ) {
+    return globalForPrisma.prisma;
+  }
 
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
+  const client = createPrismaClient();
+
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = client;
+    globalForPrisma.prismaCacheKey = PRISMA_CACHE_KEY;
+  }
+
+  return client;
+}
+
+export const prisma = getPrismaClient();
 
 /** Typ pro transakční klienta v prisma.$transaction(async (tx) => ...) */
 export type PrismaTransactionClient = Parameters<

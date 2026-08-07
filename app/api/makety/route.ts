@@ -4,9 +4,9 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { buildMaketyListWhere, canZadatMaketyWork } from "@/lib/makety-access";
-import { notifyMaketaRecipients } from "@/lib/makety-notify";
+import { notifyGrafikaWorkflowCreated, notifyMaketaRecipients } from "@/lib/makety-notify";
 import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
-import { parseMaketaPriority } from "@/lib/makety-status";
+import { parseMaketaPriority, maketyActiveWhereClause } from "@/lib/makety-status";
 import { maketyAssigneeRoleLabel, parseMaketyWorkType } from "@/lib/makety-work-type";
 import { userHasMaketyGrafikaRole } from "@/lib/makety-grafika-users";
 import {
@@ -14,6 +14,11 @@ import {
   sortMaketyProductionQueueByAssignee,
 } from "@/lib/makety-queue";
 import { userHasMaketyVyrobaRole } from "@/lib/makety-vyroba-users";
+import {
+  parseMaketyImlFieldsFromInput,
+  resolveMaketyImlFields,
+} from "@/lib/makety-iml-fields";
+import { resolveGrafikaWorkflowAssignees } from "@/lib/makety-workflow-assignees";
 
 export async function GET() {
   const session = await auth();
@@ -25,9 +30,7 @@ export async function GET() {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
-  const where = await buildMaketyListWhere(userId, {
-    status: { notIn: ["done", "cancelled"] },
-  });
+  const where = await buildMaketyListWhere(userId, maketyActiveWhereClause());
 
   const rows = await prisma.makety.findMany({
     where,
@@ -112,6 +115,36 @@ export async function POST(req: NextRequest) {
       ? null
       : await nextQueuePositionForAssignee(work_type, assignee_user_id);
 
+    const imlParsed = parseMaketyImlFieldsFromInput(formData);
+    if ("error" in imlParsed) {
+      return NextResponse.json({ error: imlParsed.error }, { status: 400 });
+    }
+    const imlFields = await resolveMaketyImlFields(work_type, imlParsed);
+    if ("error" in imlFields) {
+      return NextResponse.json({ error: imlFields.error }, { status: 400 });
+    }
+
+    const prepressRaw = String(formData.get("prepress_user_id") ?? "").trim();
+    const finalRaw = String(formData.get("final_approver_user_id") ?? "").trim();
+    const prepressParsed = prepressRaw ? parseInt(prepressRaw, 10) : null;
+    const finalParsed = finalRaw ? parseInt(finalRaw, 10) : null;
+    if (prepressRaw && (prepressParsed == null || Number.isNaN(prepressParsed))) {
+      return NextResponse.json({ error: "Neplatný schvalovatel prepress" }, { status: 400 });
+    }
+    if (finalRaw && (finalParsed == null || Number.isNaN(finalParsed))) {
+      return NextResponse.json({ error: "Neplatný finální schvalovatel" }, { status: 400 });
+    }
+
+    const workflow = await resolveGrafikaWorkflowAssignees(
+      work_type,
+      assignee_user_id,
+      prepressParsed,
+      finalParsed
+    );
+    if ("error" in workflow) {
+      return NextResponse.json({ error: workflow.error }, { status: 400 });
+    }
+
     const created = await prisma.makety.create({
       data: {
         body,
@@ -122,20 +155,40 @@ export async function POST(req: NextRequest) {
         priority,
         queue_position,
         due_at,
-        assignee_user_id,
+        assignee_user_id: workflow.assignee_user_id,
         created_by: userId,
         work_type,
         status: isMaketaPlotr ? "awaiting_quote" : "open",
+        customer_id: imlFields.customer_id,
+        product_id: imlFields.product_id,
+        die_cut_id: imlFields.die_cut_id,
+        label_code: imlFields.label_code,
+        job_number: imlFields.job_number,
+        prepress_user_id: workflow.prepress_user_id,
+        final_approver_user_id: workflow.final_approver_user_id,
       },
     });
 
-    await notifyMaketaRecipients({
-      maketaId: created.id,
-      bodyPreview: body,
-      orderNumber: order_number,
-      kind: "assigned",
-      assigneeUserId: assignee_user_id,
-    });
+    if (work_type === "grafika") {
+      await notifyGrafikaWorkflowCreated({
+        maketaId: created.id,
+        bodyPreview: body,
+        orderNumber: order_number,
+        assigneeUserId: workflow.assignee_user_id,
+        prepressUserId: workflow.prepress_user_id,
+        finalApproverUserId: workflow.final_approver_user_id,
+        excludeUserId: userId,
+      });
+    } else {
+      await notifyMaketaRecipients({
+        maketaId: created.id,
+        bodyPreview: body,
+        orderNumber: order_number,
+        kind: "assigned",
+        assigneeUserId: workflow.assignee_user_id,
+        workType: work_type,
+      });
+    }
 
     return NextResponse.json({ success: true, id: created.id });
   } catch (e) {

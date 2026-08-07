@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { canAdministerEquipment, canWriteEquipment } from "@/lib/equipment/access";
 
 /** GET – seznam uživatelů pro přiřazení vybavení (dropdown) */
 export async function GET() {
@@ -11,7 +11,8 @@ export async function GET() {
   }
 
   const userId = parseInt(session.user.id, 10);
-  const canAssign = (await isAdmin(userId)) || (await hasModuleAccess(userId, "equipment", "write"));
+  const canAssign =
+    (await canAdministerEquipment(userId)) || (await canWriteEquipment(userId));
   if (!canAssign) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }

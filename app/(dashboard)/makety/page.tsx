@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import type { Prisma } from "@prisma/client";
 import { hasMaketyGrafikaAccess, hasMaketyVyrobaAccess } from "@/lib/auth-utils";
 import {
+  applyWorkTypeToWhere,
   buildMaketyListWhere,
   canViewAllMaketyTypes,
   canZadatAnyMaketyWork,
@@ -11,13 +12,18 @@ import {
 } from "@/lib/makety-access";
 import { MaketyAdminRowActions } from "./MaketyAdminRowActions";
 import { sortMaketyProductionQueueByAssignee } from "@/lib/makety-queue";
-import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type";
+import {
+  isMaketyWorkType,
+  maketyWorkTypeLabel,
+  type MaketyWorkType,
+} from "@/lib/makety-work-type";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import {
   maketaPriorityBadgeClass,
   maketaPriorityLabel,
   maketaStatusBadgeClass,
   maketaStatusLabel,
+  isMaketaTerminalStatus,
 } from "@/lib/makety-status";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +33,11 @@ const STATUS_ORDER = [
   "quote_submitted",
   "open",
   "in_progress",
+  "data_problem",
   "done",
+  "prepress_approved",
+  "sent_for_approval",
+  "approved",
   "cancelled",
 ] as const;
 type MaketaStatus = (typeof STATUS_ORDER)[number];
@@ -46,12 +56,21 @@ function applyTermToWhere(
   }
 }
 
-function buildListQuery(term: string, status?: string): string {
+function buildListQuery(term: string, status?: string, workType?: string): string {
   const p = new URLSearchParams();
+  if (workType) p.set("work_type", workType);
   if (term) p.set("term", term);
   if (status) p.set("status", status);
   const q = p.toString();
   return q ? `/makety?${q}` : "/makety";
+}
+
+function workTypeToggleClass(active: boolean): string {
+  return `rounded-lg border px-4 py-2 text-sm font-medium ${
+    active
+      ? "border-violet-200 bg-violet-50 text-violet-700"
+      : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+  }`;
 }
 
 export default async function MaketyListPage({
@@ -60,6 +79,7 @@ export default async function MaketyListPage({
   searchParams: Promise<{
     status?: string;
     term?: string;
+    work_type?: string;
     created?: string;
     grafika_created?: string;
     comment_sent?: string;
@@ -79,6 +99,8 @@ export default async function MaketyListPage({
     params.term === "overdue" || params.term === "today" || params.term === "week"
       ? params.term
       : "";
+  const rawWorkType = params.work_type ?? "";
+  const selectedWorkType: MaketyWorkType | "" = isMaketyWorkType(rawWorkType) ? rawWorkType : "";
   const created = params.created === "1";
   const grafikaCreated = params.grafika_created === "1";
   const commentSent = params.comment_sent === "1";
@@ -94,6 +116,7 @@ export default async function MaketyListPage({
 
   const baseWhere = await buildMaketyListWhere(userId, {});
   applyTermToWhere(baseWhere, selectedTerm, termBounds);
+  if (selectedWorkType) applyWorkTypeToWhere(baseWhere, [selectedWorkType]);
 
   const allForTermRaw = await prisma.makety.findMany({
     where: baseWhere,
@@ -117,7 +140,13 @@ export default async function MaketyListPage({
 
   const rows = selectedStatus
     ? allForTerm.filter((r) => r.status === selectedStatus)
-    : allForTerm.filter((r) => r.status !== "done" && r.status !== "cancelled");
+    : allForTerm.filter(
+        (r) =>
+          !isMaketaTerminalStatus(
+            r.status,
+            (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType
+          )
+      );
 
   const tableHeading = selectedStatus
     ? maketaStatusLabel(selectedStatus)
@@ -189,12 +218,36 @@ export default async function MaketyListPage({
         </p>
       )}
 
+      <div className="flex flex-wrap gap-2">
+        <Link
+          href={buildListQuery(selectedTerm, selectedStatus || undefined)}
+          className={workTypeToggleClass(!selectedWorkType)}
+        >
+          Vše
+        </Link>
+        <Link
+          href={buildListQuery(selectedTerm, selectedStatus || undefined, "maketa")}
+          className={workTypeToggleClass(selectedWorkType === "maketa")}
+        >
+          Makety
+        </Link>
+        <Link
+          href={buildListQuery(selectedTerm, selectedStatus || undefined, "grafika")}
+          className={workTypeToggleClass(selectedWorkType === "grafika")}
+        >
+          Grafika
+        </Link>
+      </div>
+
       <form
         method="get"
         action="/makety"
         className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
       >
         {selectedStatus ? <input type="hidden" name="status" value={selectedStatus} /> : null}
+        {selectedWorkType ? (
+          <input type="hidden" name="work_type" value={selectedWorkType} />
+        ) : null}
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[200px] flex-1">
             <label className="mb-1 block text-xs font-medium uppercase text-gray-500">Termín</label>
@@ -223,8 +276,8 @@ export default async function MaketyListPage({
           </Link>
         </div>
         <p className="mt-2 text-xs text-gray-500">
-          Počty ve stavech odpovídají zvolenému termínu. Kliknutím na rámeček zobrazíte daný stav v tabulce
-          níže.
+          Počty ve stavech odpovídají zvolenému typu a termínu. Kliknutím na rámeček zobrazíte daný stav
+          v tabulce níže.
         </p>
       </form>
 
@@ -234,7 +287,7 @@ export default async function MaketyListPage({
           return (
             <Link
               key={g.status}
-              href={buildListQuery(selectedTerm, g.status)}
+              href={buildListQuery(selectedTerm, g.status, selectedWorkType || undefined)}
               className={`block rounded-xl border bg-white p-4 shadow-sm transition-colors hover:border-violet-300 hover:bg-violet-50/30 ${
                 active ? "border-violet-400 ring-2 ring-violet-200" : "border-gray-200"
               }`}
@@ -264,6 +317,11 @@ export default async function MaketyListPage({
       <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
         <div className="border-b border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">
           {tableHeading}
+          {selectedWorkType ? (
+            <span className="ml-2 font-normal text-gray-500">
+              · {selectedWorkType === "grafika" ? "Grafika" : "Makety"}
+            </span>
+          ) : null}
           {selectedTerm ? (
             <span className="ml-2 font-normal text-gray-500">
               ·{" "}

@@ -5,7 +5,14 @@ import { buildMaketyListWhere, canViewAllMaketyTypes } from "@/lib/makety-access
 import { MaketyAdminRowActions } from "../MaketyAdminRowActions";
 import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
-import { maketaStatusBadgeClass, maketaStatusLabel } from "@/lib/makety-status";
+import {
+  maketaPriorityBadgeClass,
+  maketaPriorityLabel,
+  maketaStatusBadgeClass,
+  maketaStatusLabel,
+  isMaketaTerminalStatus,
+  maketyArchiveWhereClause,
+} from "@/lib/makety-status";
 
 export const dynamic = "force-dynamic";
 
@@ -13,9 +20,7 @@ export default async function MaketyArchivePage() {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
   const canModuleAdmin = await canViewAllMaketyTypes(userId);
-  const where = await buildMaketyListWhere(userId, {
-    status: { in: ["done", "cancelled"] },
-  });
+  const where = await buildMaketyListWhere(userId, maketyArchiveWhereClause());
 
   const rows = await prisma.makety.findMany({
     where,
@@ -77,7 +82,7 @@ export default async function MaketyArchivePage() {
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(r.status)}`}
                     >
-                      {maketaStatusLabel(r.status)}
+                      {maketaStatusLabel(r.status, wt)}
                     </span>
                   </td>
                   {canModuleAdmin && (

@@ -10,6 +10,7 @@ import {
   type ProductListColumnId,
   type ProductListRow,
 } from "@/lib/iml/product-list-columns";
+import { imlProductKindLabel } from "@/lib/iml-constants";
 
 export type ProductListCellContext = {
   canWrite: boolean;
@@ -70,9 +71,25 @@ export function renderProductListCell(
       return product.client_name ?? product.ig_short_name ?? "-";
     case "customer":
       return <span className="text-gray-600">{product.iml_customers?.name ?? "-"}</span>;
+    case "product_kind":
+      return (
+        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs">
+          {imlProductKindLabel(product.product_kind)}
+        </span>
+      );
     case "status":
       return (
-        <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">{product.item_status ?? "-"}</span>
+        <span className="inline-flex flex-wrap items-center gap-1">
+          <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">{product.item_status ?? "-"}</span>
+          {product.archived_at ? (
+            <span
+              className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+              title="Tisková data jsou v archivu na disku"
+            >
+              Archiv
+            </span>
+          ) : null}
+        </span>
       );
     case "pdf":
       return product.has_pdf ? (

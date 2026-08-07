@@ -17,3 +17,44 @@ export function maketyWorkTypeLabel(type: MaketyWorkType): string {
 export function maketyAssigneeRoleLabel(type: MaketyWorkType): string {
   return type === "grafika" ? "Grafika" : "Výroba maket";
 }
+
+/** České tvary pro texty notifikací / e-mailů podle typu zakázky. */
+export type MaketyWorkTypeWording = {
+  /** Maketa / Grafika */
+  label: string;
+  /** maketa / grafika */
+  nominative: string;
+  /** makety / grafiky */
+  genitive: string;
+  /** maketu / grafiku */
+  accusative: string;
+  /** k maketě / ke grafice */
+  toPrep: string;
+  /** Otevřít maketu / Otevřít grafiku */
+  openCta: string;
+};
+
+export function maketyWorkTypeWording(type: MaketyWorkType): MaketyWorkTypeWording {
+  if (type === "grafika") {
+    return {
+      label: "Grafika",
+      nominative: "grafika",
+      genitive: "grafiky",
+      accusative: "grafiku",
+      toPrep: "ke grafice",
+      openCta: "Otevřít grafiku",
+    };
+  }
+  return {
+    label: "Maketa",
+    nominative: "maketa",
+    genitive: "makety",
+    accusative: "maketu",
+    toPrep: "k maketě",
+    openCta: "Otevřít maketu",
+  };
+}
+
+export function normalizeMaketyWorkType(raw: string | null | undefined): MaketyWorkType {
+  return raw === "grafika" ? "grafika" : "maketa";
+}

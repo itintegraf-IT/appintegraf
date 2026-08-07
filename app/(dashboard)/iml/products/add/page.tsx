@@ -72,6 +72,7 @@ export default function ImlProductAddPage() {
         body: JSON.stringify({
           ...form,
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
+          die_cut_id: form.die_cut_id ? parseInt(form.die_cut_id, 10) : null,
           foil_material_id: form.foil_material_id ? parseInt(form.foil_material_id, 10) : null,
           color_material_id: form.color_material_id ? parseInt(form.color_material_id, 10) : null,
           paper_material_id: form.paper_material_id ? parseInt(form.paper_material_id, 10) : null,

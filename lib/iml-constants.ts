@@ -41,6 +41,21 @@ export function imlLabelTypeLabel(value: string | null | undefined): string {
   return IML_LABEL_TYPES.find((t) => t.value === value)?.label ?? value;
 }
 
+/** Druh produktu v katalogu IML (`iml_products.product_kind`). */
+export const IML_PRODUCT_KINDS = [
+  { value: "iml", label: "IML (plast)" },
+  { value: "etikety", label: "Etikety (papír)" },
+] as const;
+
+export type ImlProductKind = (typeof IML_PRODUCT_KINDS)[number]["value"];
+
+export const DEFAULT_IML_PRODUCT_KIND: ImlProductKind = "iml";
+
+export function imlProductKindLabel(value: string | null | undefined): string {
+  if (!value) return imlProductKindLabel(DEFAULT_IML_PRODUCT_KIND);
+  return IML_PRODUCT_KINDS.find((k) => k.value === value)?.label ?? value;
+}
+
 /** Stav schválení tiskových dat (`iml_products.approval_status`). */
 export const IML_APPROVAL_STATUSES = [
   "máme",

@@ -4,6 +4,8 @@ import {
   roleHasMaketyVyrobaFromDecoded,
   roleHasMaketyZadavatelGrafikaFromDecoded,
   roleHasMaketyZadavatelMaketaFromDecoded,
+  roleHasMaketySchvalovatelPrepressFromDecoded,
+  roleHasMaketySchvalovatelFinalFromDecoded,
   roleMaketyGrantsModuleAccess,
 } from "@/lib/makety-module-access-flags";
 import { roleStitkyGrantsModuleAccess } from "@/lib/stitky-module-access-flags";
@@ -233,6 +235,52 @@ export async function hasExplicitMaketyZadavatelGrafikaRole(userId: number): Pro
     }
   }
   return false;
+}
+
+/** Explicitní schvalovatel prepress (bez globálního admina). */
+export async function hasExplicitMaketySchvalovatelPrepressRole(userId: number): Promise<boolean> {
+  const roles = await getUserRoles(userId);
+  for (const role of roles) {
+    const rawAccess = role.module_access;
+    if (rawAccess === null || rawAccess === undefined) continue;
+    let decoded: unknown = rawAccess;
+    if (typeof rawAccess === "string") {
+      decoded = parseModuleAccessJson(rawAccess);
+      if (decoded === null) continue;
+    }
+    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+      if (roleHasMaketySchvalovatelPrepressFromDecoded(decoded as Record<string, unknown>)) return true;
+    }
+  }
+  return false;
+}
+
+/** Explicitní finální schvalovatel grafiky (bez globálního admina). */
+export async function hasExplicitMaketySchvalovatelFinalRole(userId: number): Promise<boolean> {
+  const roles = await getUserRoles(userId);
+  for (const role of roles) {
+    const rawAccess = role.module_access;
+    if (rawAccess === null || rawAccess === undefined) continue;
+    let decoded: unknown = rawAccess;
+    if (typeof rawAccess === "string") {
+      decoded = parseModuleAccessJson(rawAccess);
+      if (decoded === null) continue;
+    }
+    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+      if (roleHasMaketySchvalovatelFinalFromDecoded(decoded as Record<string, unknown>)) return true;
+    }
+  }
+  return false;
+}
+
+export async function hasMaketySchvalovatelPrepressAccess(userId: number): Promise<boolean> {
+  if (await isAdmin(userId)) return true;
+  return hasExplicitMaketySchvalovatelPrepressRole(userId);
+}
+
+export async function hasMaketySchvalovatelFinalAccess(userId: number): Promise<boolean> {
+  if (await isAdmin(userId)) return true;
+  return hasExplicitMaketySchvalovatelFinalRole(userId);
 }
 
 /**

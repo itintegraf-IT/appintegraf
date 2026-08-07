@@ -130,16 +130,26 @@ export default function ProductImagePreview({
             </div>
             <div className="flex items-center gap-2">
               {hasPdf && (
-                <a
-                  href={`/api/iml/products/${productId}/pdf`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  Otevřít PDF
-                </a>
+                <>
+                  <a
+                    href={`/api/iml/products/${productId}/pdf`}
+                    download
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Stáhnout PDF
+                  </a>
+                  <a
+                    href={`/api/iml/products/${productId}/pdf`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    Otevřít PDF
+                  </a>
+                </>
               )}
               <button
                 type="button"

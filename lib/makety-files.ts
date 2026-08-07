@@ -31,7 +31,7 @@ export function sanitizeMaketyMimeType(mime: string | null | undefined): string 
   return /^[\w.+-]+\/[\w.+-]+$/.test(raw) ? raw : "application/octet-stream";
 }
 
-export const MAKETY_MAX_BYTES = 20 * 1024 * 1024;
+export const MAKETY_MAX_BYTES = 50 * 1024 * 1024;
 
 export const MAKETY_MAX_FILES_PER_REQUEST = 20;
 

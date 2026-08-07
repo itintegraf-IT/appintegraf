@@ -10,6 +10,8 @@ import {
   MAKETY_MAX_BYTES,
   MAKETY_MAX_FILES_PER_REQUEST,
 } from "@/lib/makety-files";
+import { isMaketaTerminalStatus } from "@/lib/makety-status";
+import type { MaketyWorkType } from "@/lib/makety-work-type";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
@@ -29,7 +31,7 @@ async function saveMaketyFile(params: {
   if (file.size > MAKETY_MAX_BYTES) {
     return {
       ok: false,
-      error: `Soubor „${file.name}“ je větší než 20 MB`,
+      error: `Soubor „${file.name}“ je větší než 50 MB`,
     };
   }
 
@@ -118,7 +120,7 @@ export async function POST(
 
   const exists = await prisma.makety.findUnique({
     where: { id: maketaId },
-    select: { id: true, status: true },
+    select: { id: true, status: true, work_type: true },
   });
   if (!exists) {
     return NextResponse.json({ error: "Maketa nenalezena" }, { status: 404 });
@@ -129,7 +131,8 @@ export async function POST(
   if (!canUpload) {
     return NextResponse.json({ error: "Nemáte oprávnění nahrávat přílohy" }, { status: 403 });
   }
-  if (exists.status === "done" || exists.status === "cancelled") {
+  const workType = (exists.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+  if (isMaketaTerminalStatus(exists.status, workType)) {
     return NextResponse.json({ error: "K archivované maketě nelze přidávat soubory" }, { status: 400 });
   }
 

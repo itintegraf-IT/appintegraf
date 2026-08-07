@@ -3,11 +3,14 @@ import {
   parseProductFormatToMm,
   syncProductFormatFromMm,
 } from "@/lib/iml/product-format";
-import { IML_LABEL_TYPES } from "@/lib/iml-constants";
+import { dieCutToProductFields } from "@/lib/iml/die-cuts";
+import { IML_LABEL_TYPES, DEFAULT_IML_PRODUCT_KIND, IML_PRODUCT_KINDS } from "@/lib/iml-constants";
 import { findMaterialForImlLegacyId } from "@/lib/materialy/iml-compat";
 import { cmykFlagsToDb, type ProductCmykFlags } from "@/lib/iml-print-colors-summary";
+import { prisma } from "@/lib/db";
 
 const VALID_LABEL_TYPES = new Set(IML_LABEL_TYPES.map((t) => t.value));
+const VALID_PRODUCT_KINDS = new Set(IML_PRODUCT_KINDS.map((k) => k.value));
 
 function parseCustomData(val: unknown): Record<string, unknown> | null {
   if (val == null) return null;
@@ -106,6 +109,16 @@ function parseLabelType(val: unknown): string | null {
   return VALID_LABEL_TYPES.has(s as (typeof IML_LABEL_TYPES)[number]["value"]) ? s : null;
 }
 
+export function parseProductKind(val: unknown): string {
+  if (val == null || val === "") return DEFAULT_IML_PRODUCT_KIND;
+  const s = String(val).trim().toLowerCase();
+  if (s === "iml" || s === "plast") return "iml";
+  if (s === "etikety" || s === "etiketa" || s === "papir" || s === "papír") return "etikety";
+  return VALID_PRODUCT_KINDS.has(s as (typeof IML_PRODUCT_KINDS)[number]["value"])
+    ? s
+    : DEFAULT_IML_PRODUCT_KIND;
+}
+
 export async function parseImlProductBody(body: Record<string, unknown>) {
   const str = (v: unknown) => (v != null && v !== "" ? String(v).trim() : null);
   const int = (v: unknown) => {
@@ -149,6 +162,7 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
     pieces_per_pallet: int(body.pieces_per_pallet),
     ...materialFields,
     labels_per_sheet: parseLabelsPerSheet(body.labels_per_sheet),
+    die_cut_id: body.die_cut_id != null && body.die_cut_id !== "" ? int(body.die_cut_id) : null,
     print_note: str(body.print_note),
     has_print_sample: !!body.has_print_sample,
     has_print_proof: !!body.has_print_proof,
@@ -160,6 +174,7 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
     print_colors_text: str(body.print_colors_text),
     ...cmykFlagsToDb(parseCmykFlagsFromBody(body)),
     label_type: parseLabelType(body.label_type),
+    product_kind: parseProductKind(body.product_kind),
     realization_log: str(body.realization_log),
     internal_note: str(body.internal_note),
     item_status: str(body.item_status),
@@ -172,10 +187,27 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
   };
 }
 
-/** Výsledek parseImlProductBody s vynulovaným foil_id při aktivním foil_material_id. */
+/** Výsledek parseImlProductBody s vynulovaným foil_id při aktivním foil_material_id
+ *  a synchronizací výsekových polí z katalogu při die_cut_id. */
 export async function parseImlProductBodyForSave(body: Record<string, unknown>) {
   const data = await parseImlProductBody(body);
   const merged = { ...data };
   if (merged.foil_material_id != null) merged.foil_id = null;
+
+  if (merged.die_cut_id != null) {
+    const dieCut = await prisma.iml_die_cuts.findUnique({ where: { id: merged.die_cut_id } });
+    if (!dieCut || !dieCut.is_active) {
+      throw new DieCutNotFoundError(merged.die_cut_id);
+    }
+    Object.assign(merged, dieCutToProductFields(dieCut));
+  }
+
   return merged;
+}
+
+export class DieCutNotFoundError extends Error {
+  constructor(public dieCutId: number) {
+    super(`Výsek #${dieCutId} nenalezen nebo není aktivní.`);
+    this.name = "DieCutNotFoundError";
+  }
 }

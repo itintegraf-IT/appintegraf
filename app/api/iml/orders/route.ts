@@ -12,6 +12,7 @@ import {
   resolveShippingSnapshot,
   validateOrderItemsProductStatus,
 } from "@/lib/iml-order-utils";
+import { requireJobNumberOrConfirm } from "@/lib/iml/order-job-number";
 
 function parseOptionalDate(v: unknown): Date | null {
   if (v == null || v === "") return null;
@@ -113,6 +114,8 @@ export async function POST(req: NextRequest) {
     const {
       customer_id,
       order_number,
+      job_number,
+      confirmed_without_job_number,
       order_date,
       expected_ship_date: bodyExpectedShip,
       status = "nová",
@@ -125,6 +128,14 @@ export async function POST(req: NextRequest) {
 
     if (!customer_id || !order_number || !order_date) {
       return NextResponse.json({ error: "Vyplňte zákazníka, číslo objednávky a datum" }, { status: 400 });
+    }
+
+    const jobCheck = requireJobNumberOrConfirm({
+      job_number,
+      confirmed_without_job_number,
+    });
+    if (!jobCheck.ok) {
+      return NextResponse.json({ error: jobCheck.error, field: "job_number" }, { status: 400 });
     }
 
     const customerId = parseInt(customer_id, 10);
@@ -190,6 +201,7 @@ export async function POST(req: NextRequest) {
         data: {
           customer_id: customerId,
           order_number: String(order_number).trim(),
+          job_number: jobCheck.jobNumber,
           order_date: orderDate,
           expected_ship_date: expectedShipDate,
           status: String(status).trim() || "nová",

@@ -9,6 +9,7 @@ import { AdminUserForm } from "../../AdminUserForm";
 import { parseStoredModuleAccess } from "@/lib/app-modules";
 import { userHasVehicleManagerRole } from "@/lib/sync-vehicle-manager-role";
 import { VEHICLE_MANAGER_ROLE } from "@/lib/resource-reservation-types";
+import { parseEmailNotifications } from "@/lib/user-email-notifications";
 
 export default async function AdminUserEditPage({
   params,
@@ -43,6 +44,7 @@ export default async function AdminUserEditPage({
       is_active: true,
       display_in_list: true,
       role_id: true,
+      email_notifications: true,
       user_roles: {
         select: { role_id: true, module_access: true, roles: { select: { name: true } } },
       },
@@ -81,7 +83,7 @@ export default async function AdminUserEditPage({
 
   const shared_mail_ids = (row.user_shared_mails ?? []).map((m) => m.shared_mail_id);
 
-  const { user_roles: _ur, user_secondary_departments: _usd, user_shared_mails: _usm, ...rest } = row;
+  const { user_roles: _ur, user_secondary_departments: _usd, user_shared_mails: _usm, email_notifications: emailNotifRaw, ...rest } = row;
   const user = {
     ...rest,
     department_id,
@@ -90,6 +92,7 @@ export default async function AdminUserEditPage({
     role_id: ur?.role_id ?? row.role_id,
     module_access,
     vehicle_manager,
+    email_notifications: parseEmailNotifications(emailNotifRaw),
   };
 
   return (

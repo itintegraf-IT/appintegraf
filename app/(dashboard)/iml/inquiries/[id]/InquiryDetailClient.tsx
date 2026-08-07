@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Pencil } from "lucide-react";
 import { BackLink } from "@/components/navigation/BackLink";
 import { PreserveReturnToLink } from "@/components/navigation/PreserveReturnToLink";
+import { CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE } from "@/lib/iml/order-job-number";
 
 type ProductMini = {
   ig_code: string | null;
@@ -44,6 +45,8 @@ type Props = {
 export function InquiryDetailClient({ initial, canWrite }: Props) {
   const [showConvert, setShowConvert] = useState(false);
   const [orderNumber, setOrderNumber] = useState("");
+  const [jobNumber, setJobNumber] = useState("");
+  const [confirmedWithoutJobNumber, setConfirmedWithoutJobNumber] = useState(false);
   const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
   const [shippingId, setShippingId] = useState("");
   const [addresses, setAddresses] = useState<AddressOpt[]>([]);
@@ -52,6 +55,8 @@ export function InquiryDetailClient({ initial, canWrite }: Props) {
 
   const openConvert = async () => {
     setError("");
+    setJobNumber("");
+    setConfirmedWithoutJobNumber(false);
     setShowConvert(true);
     const res = await fetch(`/api/iml/customers/${initial.customer_id}/shipping-addresses`);
     if (res.ok) {
@@ -69,6 +74,10 @@ export function InquiryDetailClient({ initial, canWrite }: Props) {
       setError("Vyplňte číslo objednávky");
       return;
     }
+    if (!jobNumber.trim() && !confirmedWithoutJobNumber) {
+      if (!confirm(CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE)) return;
+      setConfirmedWithoutJobNumber(true);
+    }
     setLoading(true);
     try {
       const res = await fetch(`/api/iml/inquiries/${initial.id}/convert`, {
@@ -76,6 +85,8 @@ export function InquiryDetailClient({ initial, canWrite }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           order_number: orderNumber.trim(),
+          job_number: jobNumber.trim() || null,
+          confirmed_without_job_number: confirmedWithoutJobNumber || !jobNumber.trim(),
           order_date: orderDate,
           shipping_address_id: shippingId ? parseInt(shippingId, 10) : null,
         }),
@@ -210,6 +221,39 @@ export function InquiryDetailClient({ initial, canWrite }: Props) {
             </p>
             {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
             <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Číslo zakázky
+                </label>
+                <input
+                  type="text"
+                  value={jobNumber}
+                  disabled={confirmedWithoutJobNumber}
+                  onChange={(e) => {
+                    setJobNumber(e.target.value);
+                    if (e.target.value.trim()) setConfirmedWithoutJobNumber(false);
+                  }}
+                  maxLength={50}
+                  placeholder="párování s jiným systémem"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 disabled:bg-gray-100"
+                />
+                <label className="mt-2 flex items-center gap-2 text-xs text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={confirmedWithoutJobNumber}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        if (!confirm(CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE)) return;
+                        setConfirmedWithoutJobNumber(true);
+                        setJobNumber("");
+                      } else {
+                        setConfirmedWithoutJobNumber(false);
+                      }
+                    }}
+                  />
+                  Nemám číslo zakázky (potvrdit)
+                </label>
+              </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Číslo objednávky *

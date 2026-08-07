@@ -28,6 +28,7 @@
 *.pem
 .commit-msg.tmp
 /backups/
+/storage/iml-archive/
 
 # debug
 npm-debug.log*

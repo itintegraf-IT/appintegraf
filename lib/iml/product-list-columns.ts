@@ -16,6 +16,7 @@ export type ProductListColumnId =
   | "ig_code"
   | "name"
   | "customer"
+  | "product_kind"
   | "status"
   | "pdf"
   | "actions"
@@ -71,7 +72,9 @@ export type ProductListRow = {
   approval_date: string | Date | null;
   stock_quantity: number | null;
   sku: string | null;
+  product_kind: string | null;
   item_status: string | null;
+  archived_at?: string | Date | null;
   updated_at: string | Date | null;
   iml_customers?: { id: number; name: string } | null;
   iml_foils?: { id: number; code: string | null; name: string | null } | null;
@@ -119,6 +122,7 @@ export const PRODUCT_LIST_COLUMNS: ProductListColumnMeta[] = [
   { id: "ig_code", label: "Kód IG", group: "základ", defaultVisible: true, locked: true, defaultWidthPx: 110 },
   { id: "name", label: "Název / Klient", group: "základ", defaultVisible: true, locked: true, defaultWidthPx: 220, truncate: true },
   { id: "customer", label: "Zákazník", group: "základ", defaultVisible: true, defaultWidthPx: 180, truncate: true },
+  { id: "product_kind", label: "Druh", group: "identifikace", defaultVisible: false, defaultWidthPx: 110 },
   { id: "status", label: "Stav", group: "základ", defaultVisible: true, defaultWidthPx: 90 },
   { id: "pdf", label: "PDF", group: "základ", defaultVisible: true, align: "center", defaultWidthPx: 56, minWidthPx: 48, maxWidthPx: 80, cellClassName: "text-center" },
   { id: "actions", label: "Akce", group: "základ", defaultVisible: true, locked: true, align: "right", defaultWidthPx: 120, minWidthPx: 96, maxWidthPx: 160 },

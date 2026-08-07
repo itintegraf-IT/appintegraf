@@ -8,19 +8,26 @@ import {
   maketyWorkTypeLabel,
   type MaketyWorkType,
 } from "@/lib/makety-work-type";
+import { GrafikaImlFields } from "./GrafikaImlFields";
+import { GrafikaWorkflowPicker, type WorkflowUserOpt } from "./GrafikaWorkflowPicker";
 
-type UserOpt = {
-  id: number;
-  first_name: string;
-  last_name: string;
-};
+type UserOpt = WorkflowUserOpt;
 
 type Props = {
   workType: MaketyWorkType;
   assigneeUsers: UserOpt[];
+  creatorName?: string;
+  prepressUsers?: UserOpt[];
+  finalUsers?: UserOpt[];
 };
 
-export function NewMaketyWorkForm({ workType, assigneeUsers }: Props) {
+export function NewMaketyWorkForm({
+  workType,
+  assigneeUsers,
+  creatorName = "Já",
+  prepressUsers = [],
+  finalUsers = [],
+}: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,6 +36,7 @@ export function NewMaketyWorkForm({ workType, assigneeUsers }: Props) {
   const roleLabel = maketyAssigneeRoleLabel(workType);
   const submitLabel = workType === "grafika" ? "Zapsat grafiku" : "Zapsat maketu";
   const createdQuery = workType === "grafika" ? "grafika_created=1" : "created=1";
+  const isGrafika = workType === "grafika";
 
   const onSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -57,6 +65,10 @@ export function NewMaketyWorkForm({ workType, assigneeUsers }: Props) {
   const defaultDue = new Date(nowLocal.getTime() + 24 * 60 * 60 * 1000);
   const dueDefault = formatDateTimeLocalForInput(defaultDue);
 
+  const canSubmitGrafika =
+    !isGrafika ||
+    (assigneeUsers.length > 0 && prepressUsers.length > 0 && finalUsers.length > 0);
+
   return (
     <form onSubmit={onSubmit} className="max-w-4xl space-y-6">
       <input type="hidden" name="work_type" value={workType} />
@@ -76,12 +88,14 @@ export function NewMaketyWorkForm({ workType, assigneeUsers }: Props) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-          <label className="mb-1 block text-sm font-medium text-gray-700">Číslo zakázky</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Interní označení / číslo
+          </label>
           <input
             name="order_number"
             type="text"
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            placeholder="Volitelné"
+            placeholder="Volitelné (interní reference)"
           />
         </div>
         <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -98,8 +112,22 @@ export function NewMaketyWorkForm({ workType, assigneeUsers }: Props) {
         </div>
       </div>
 
+      {isGrafika && (
+        <GrafikaWorkflowPicker
+          creatorName={creatorName}
+          grafikUsers={assigneeUsers}
+          prepressUsers={prepressUsers}
+          finalUsers={finalUsers}
+          includeAssignee
+        />
+      )}
+
+      {isGrafika && <GrafikaImlFields />}
+
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <label className="mb-1 block text-sm font-medium text-gray-700">Popis zakázky ({typeLabel}) *</label>
+        <label className="mb-1 block text-sm font-medium text-gray-700">
+          Popis zakázky ({typeLabel}) *
+        </label>
         <textarea
           name="body"
           required
@@ -141,34 +169,34 @@ export function NewMaketyWorkForm({ workType, assigneeUsers }: Props) {
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <label className="mb-1 block text-sm font-medium text-gray-700">
-          {roleLabel} *
-        </label>
-        <select
-          name="assignee_user_id"
-          required
-          disabled={assigneeUsers.length === 0}
-          className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-2 text-sm"
-        >
-          <option value="">— vyberte —</option>
-          {assigneeUsers.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.last_name} {u.first_name}
-            </option>
-          ))}
-        </select>
-      </div>
+      {!isGrafika && (
+        <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+          <label className="mb-1 block text-sm font-medium text-gray-700">{roleLabel} *</label>
+          <select
+            name="assignee_user_id"
+            required
+            disabled={assigneeUsers.length === 0}
+            className="w-full max-w-md rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">— vyberte —</option>
+            {assigneeUsers.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.last_name} {u.first_name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <p className="text-sm text-gray-500">
-        Dokumentaci (PDF, Word, Excel, obrázky, e-mail .eml/.msg) nahrajete na detailu zakázky po uložení —
-        lze nahrát více souborů najednou.
+        Dokumentaci (PDF, Word, Excel, obrázky, e-mail .eml/.msg) nahrajete na detailu zakázky po
+        uložení — lze nahrát více souborů najednou.
       </p>
 
       <div className="flex justify-center">
         <button
           type="submit"
-          disabled={loading || assigneeUsers.length === 0}
+          disabled={loading || assigneeUsers.length === 0 || !canSubmitGrafika}
           className="rounded-lg bg-violet-600 px-8 py-2.5 font-medium text-white hover:bg-violet-700 disabled:opacity-60"
         >
           {loading ? "Ukládám…" : submitLabel}

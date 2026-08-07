@@ -11,10 +11,35 @@ import { parseMaketaPriority } from "@/lib/makety-status";
 import { maketyAssigneeRoleLabel, type MaketyWorkType } from "@/lib/makety-work-type";
 import { userHasMaketyGrafikaRole } from "@/lib/makety-grafika-users";
 import { userHasMaketyVyrobaRole } from "@/lib/makety-vyroba-users";
+import {
+  parseMaketyImlFieldsFromInput,
+  resolveMaketyImlFields,
+} from "@/lib/makety-iml-fields";
+import { resolveGrafikaWorkflowAssignees } from "@/lib/makety-workflow-assignees";
 
 const includeDetail = {
   users_assignee: { select: { id: true, first_name: true, last_name: true } },
   users_creator: { select: { id: true, first_name: true, last_name: true } },
+  users_prepress: { select: { id: true, first_name: true, last_name: true } },
+  users_final_approver: { select: { id: true, first_name: true, last_name: true } },
+  iml_customers: { select: { id: true, name: true, email: true } },
+  iml_products: {
+    select: {
+      id: true,
+      ig_code: true,
+      client_code: true,
+      ig_short_name: true,
+      client_name: true,
+    },
+  },
+  iml_die_cuts: {
+    select: {
+      id: true,
+      label_shape_code: true,
+      die_cut_tool_code: true,
+      internal_name: true,
+    },
+  },
 } as const;
 
 export async function GET(
@@ -151,15 +176,92 @@ export async function PUT(
     }
 
     if (nextAssignee == null) {
-      const wt = (existing.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+      const wtMissing = (existing.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
       return NextResponse.json(
-        { error: `Musí být vybrán uživatel s rolí ${maketyAssigneeRoleLabel(wt)}` },
+        { error: `Musí být vybrán uživatel s rolí ${maketyAssigneeRoleLabel(wtMissing)}` },
         { status: 400 }
       );
     }
 
     if (!nextBody) {
       return NextResponse.json({ error: "Popis nesmí být prázdný" }, { status: 400 });
+    }
+
+    const workType = (existing.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+    let imlUpdate: {
+      customer_id: number | null;
+      product_id: number | null;
+      die_cut_id: number | null;
+      label_code: string | null;
+      job_number: string | null;
+    } = {
+      customer_id: existing.customer_id,
+      product_id: existing.product_id,
+      die_cut_id: existing.die_cut_id,
+      label_code: existing.label_code,
+      job_number: existing.job_number,
+    };
+
+    if (workType === "grafika") {
+      const hasImlKey =
+        "customer_id" in body ||
+        "product_id" in body ||
+        "die_cut_id" in body ||
+        "label_code" in body ||
+        "job_number" in body;
+      if (hasImlKey) {
+        const imlParsed = parseMaketyImlFieldsFromInput(body as Record<string, unknown>);
+        if ("error" in imlParsed) {
+          return NextResponse.json({ error: imlParsed.error }, { status: 400 });
+        }
+        const imlFields = await resolveMaketyImlFields(workType, imlParsed);
+        if ("error" in imlFields) {
+          return NextResponse.json({ error: imlFields.error }, { status: 400 });
+        }
+        imlUpdate = imlFields;
+      }
+    }
+
+    let workflowUpdate: {
+      prepress_user_id: number | null;
+      final_approver_user_id: number | null;
+    } = {
+      prepress_user_id: existing.prepress_user_id,
+      final_approver_user_id: existing.final_approver_user_id,
+    };
+
+    if (workType === "grafika" && ("prepress_user_id" in body || "final_approver_user_id" in body)) {
+      const prepressRaw =
+        "prepress_user_id" in body
+          ? body.prepress_user_id === null || body.prepress_user_id === ""
+            ? null
+            : parseInt(String(body.prepress_user_id), 10)
+          : existing.prepress_user_id;
+      const finalRaw =
+        "final_approver_user_id" in body
+          ? body.final_approver_user_id === null || body.final_approver_user_id === ""
+            ? null
+            : parseInt(String(body.final_approver_user_id), 10)
+          : existing.final_approver_user_id;
+      if (prepressRaw != null && Number.isNaN(prepressRaw)) {
+        return NextResponse.json({ error: "Neplatný schvalovatel prepress" }, { status: 400 });
+      }
+      if (finalRaw != null && Number.isNaN(finalRaw)) {
+        return NextResponse.json({ error: "Neplatný finální schvalovatel" }, { status: 400 });
+      }
+      const workflow = await resolveGrafikaWorkflowAssignees(
+        workType,
+        nextAssignee!,
+        prepressRaw,
+        finalRaw
+      );
+      if ("error" in workflow) {
+        return NextResponse.json({ error: workflow.error }, { status: 400 });
+      }
+      workflowUpdate = {
+        prepress_user_id: workflow.prepress_user_id,
+        final_approver_user_id: workflow.final_approver_user_id,
+      };
     }
 
     await prisma.makety.update({
@@ -173,6 +275,7 @@ export async function PUT(
         priority: nextPriority,
         due_at: nextDue,
         assignee_user_id: nextAssignee,
+        ...(workType === "grafika" ? { ...imlUpdate, ...workflowUpdate } : {}),
       },
     });
 
@@ -183,6 +286,7 @@ export async function PUT(
         orderNumber: nextOrder,
         kind: "deadline_changed",
         assigneeUserId: nextAssignee,
+        workType,
       });
     }
 

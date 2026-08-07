@@ -48,7 +48,7 @@ export default function ProductDetailView({
   sections: ProductDetailSection[];
 }) {
   const [mode, setMode] = useViewMode("productDetail");
-  const { withPreservedReturnTo } = useReturnTo("/iml/products");
+  const { backHref: listBackHref, withPreservedReturnTo } = useReturnTo("/iml/products");
   const visible = sections.filter((s) => !s.hidden);
 
   const tabDefs: TabDef[] = visible.map((s) => ({
@@ -97,6 +97,12 @@ export default function ProductDetailView({
               Upravit
             </Link>
           )}
+          <Link
+            href={listBackHref}
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+          >
+            Zpět na výběr
+          </Link>
           <BackLink fallbackHref="/iml/products" />
         </div>
       </div>

@@ -8,6 +8,8 @@ import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
 import { TotpAdminPanel } from "@/components/admin/TotpAdminPanel";
 import {
   hasMaketyGrafikaFlag,
+  hasMaketySchvalovatelFinalFlag,
+  hasMaketySchvalovatelPrepressFlag,
   hasMaketyVyrobaFlag,
   hasMaketyZadavatelGrafikaFlag,
   hasMaketyZadavatelMaketaFlag,
@@ -17,6 +19,8 @@ import {
 } from "@/lib/makety-module-access-flags";
 import {
   MAKETY_GRAFIKA_ROLE_LABEL,
+  MAKETY_SCHVALOVATEL_FINAL_LABEL,
+  MAKETY_SCHVALOVATEL_PREPRESS_LABEL,
   MAKETY_VYROBA_ROLE_LABEL,
   MAKETY_ZADAVATEL_GRAFIKA_LABEL,
   MAKETY_ZADAVATEL_MAKETA_LABEL,
@@ -28,10 +32,16 @@ import {
   normalizeStitkyModuleAccessForSave,
   stitkyBaseLevelFromAccess,
 } from "@/lib/stitky-module-access-flags";
+import {
+  EMAIL_NOTIFICATION_MODULES,
+  EMAIL_NOTIFICATION_MODULE_LABELS,
+  normalizeEmailNotifications,
+  type EmailNotificationsMap,
+} from "@/lib/user-email-notifications";
 
 const AVAILABLE_MODULES = [
   { key: "contacts", label: "Kontakty", icon: Users },
-  { key: "equipment", label: "Majetek", icon: Laptop },
+  { key: "equipment", label: "Majetek (admin = správce)", icon: Laptop },
   { key: "calendar", label: "Kalendář", icon: Calendar },
   { key: "planovani", label: "Plánování výroby", icon: CalendarDays },
   { key: "vyroba", label: "Výroba", icon: Factory },
@@ -100,6 +110,7 @@ type User = {
   role_id?: number | null;
   module_access?: ModuleAccessMap;
   vehicle_manager?: boolean;
+  email_notifications?: EmailNotificationsMap | null;
 };
 
 export function AdminUserForm({ user }: { user?: User }) {
@@ -137,6 +148,7 @@ export function AdminUserForm({ user }: { user?: User }) {
     is_active: user?.is_active !== false,
     display_in_list: user?.display_in_list !== false,
     vehicle_manager: user?.vehicle_manager === true,
+    email_notifications: normalizeEmailNotifications(user?.email_notifications),
     password_custom: "",
   });
 
@@ -192,6 +204,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         is_active: user.is_active !== false,
         display_in_list: user.display_in_list !== false,
         vehicle_manager: user.vehicle_manager === true,
+        email_notifications: normalizeEmailNotifications(user.email_notifications),
         password_custom: "",
       });
     }
@@ -216,6 +229,8 @@ export function AdminUserForm({ user }: { user?: User }) {
           delete next.makety_grafika;
           delete next.makety_zadavatel_maketa;
           delete next.makety_zadavatel_grafika;
+          delete next.makety_schvalovatel_prepress;
+          delete next.makety_schvalovatel_final;
         }
         if (moduleKey === "stitky") {
           delete next.stitky_tiskar;
@@ -233,20 +248,26 @@ export function AdminUserForm({ user }: { user?: User }) {
     }));
   };
 
+  const ensureMaketyBaseIfNeeded = (next: ModuleAccessMap) => {
+    if (
+      !maketyBaseLevelFromAccess(next) &&
+      (hasMaketyVyrobaFlag(next) ||
+        hasMaketyGrafikaFlag(next) ||
+        hasMaketyZadavatelMaketaFlag(next) ||
+        hasMaketyZadavatelGrafikaFlag(next) ||
+        hasMaketySchvalovatelPrepressFlag(next) ||
+        hasMaketySchvalovatelFinalFlag(next))
+    ) {
+      next.makety = "read";
+    }
+  };
+
   const setMaketyProductionFlag = (checked: boolean) => {
     setForm((prev) => {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (checked) next.makety_vyroba = "1";
       else delete next.makety_vyroba;
-      if (
-        !maketyBaseLevelFromAccess(next) &&
-        (checked ||
-          hasMaketyGrafikaFlag(next) ||
-          hasMaketyZadavatelMaketaFlag(next) ||
-          hasMaketyZadavatelGrafikaFlag(next))
-      ) {
-        next.makety = "read";
-      }
+      ensureMaketyBaseIfNeeded(next);
       return { ...prev, module_access: next };
     });
   };
@@ -256,15 +277,7 @@ export function AdminUserForm({ user }: { user?: User }) {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (checked) next.makety_grafika = "1";
       else delete next.makety_grafika;
-      if (
-        !maketyBaseLevelFromAccess(next) &&
-        (checked ||
-          hasMaketyVyrobaFlag(next) ||
-          hasMaketyZadavatelMaketaFlag(next) ||
-          hasMaketyZadavatelGrafikaFlag(next))
-      ) {
-        next.makety = "read";
-      }
+      ensureMaketyBaseIfNeeded(next);
       return { ...prev, module_access: next };
     });
   };
@@ -274,15 +287,7 @@ export function AdminUserForm({ user }: { user?: User }) {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (checked) next.makety_zadavatel_maketa = "1";
       else delete next.makety_zadavatel_maketa;
-      if (
-        !maketyBaseLevelFromAccess(next) &&
-        (checked ||
-          hasMaketyVyrobaFlag(next) ||
-          hasMaketyGrafikaFlag(next) ||
-          hasMaketyZadavatelGrafikaFlag(next))
-      ) {
-        next.makety = "read";
-      }
+      ensureMaketyBaseIfNeeded(next);
       return { ...prev, module_access: next };
     });
   };
@@ -292,15 +297,27 @@ export function AdminUserForm({ user }: { user?: User }) {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (checked) next.makety_zadavatel_grafika = "1";
       else delete next.makety_zadavatel_grafika;
-      if (
-        !maketyBaseLevelFromAccess(next) &&
-        (checked ||
-          hasMaketyVyrobaFlag(next) ||
-          hasMaketyGrafikaFlag(next) ||
-          hasMaketyZadavatelMaketaFlag(next))
-      ) {
-        next.makety = "read";
-      }
+      ensureMaketyBaseIfNeeded(next);
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setMaketySchvalovatelPrepressFlag = (checked: boolean) => {
+    setForm((prev) => {
+      const next: ModuleAccessMap = { ...prev.module_access };
+      if (checked) next.makety_schvalovatel_prepress = "1";
+      else delete next.makety_schvalovatel_prepress;
+      ensureMaketyBaseIfNeeded(next);
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setMaketySchvalovatelFinalFlag = (checked: boolean) => {
+    setForm((prev) => {
+      const next: ModuleAccessMap = { ...prev.module_access };
+      if (checked) next.makety_schvalovatel_final = "1";
+      else delete next.makety_schvalovatel_final;
+      ensureMaketyBaseIfNeeded(next);
       return { ...prev, module_access: next };
     });
   };
@@ -445,6 +462,8 @@ export function AdminUserForm({ user }: { user?: User }) {
         delete moduleAccess.makety_grafika;
         delete moduleAccess.makety_zadavatel_maketa;
         delete moduleAccess.makety_zadavatel_grafika;
+        delete moduleAccess.makety_schvalovatel_prepress;
+        delete moduleAccess.makety_schvalovatel_final;
       }
       if (isStitkyModuleEnabled(moduleAccess)) {
         moduleAccess = normalizeStitkyModuleAccessForSave(moduleAccess);
@@ -459,6 +478,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         module_access: moduleAccess,
         shared_mail_ids: form.shared_mail_ids,
         vehicle_manager: form.vehicle_manager,
+        email_notifications: normalizeEmailNotifications(form.email_notifications),
         password_custom: form.password_custom || undefined,
       };
       if (!isEdit) {
@@ -659,6 +679,46 @@ export function AdminUserForm({ user }: { user?: User }) {
                 })}
             </ul>
           )}
+        </div>
+        <div className="sm:col-span-2 rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-4">
+          <label className="mb-1 block text-sm font-medium text-gray-800">
+            E-mailové notifikace
+          </label>
+          <p className="mb-3 text-xs text-gray-500">
+            Vypne pouze e-mail; notifikace v aplikaci zůstanou. Auth e-maily (aktivace, reset hesla)
+            nejsou ovlivněny.
+          </p>
+          <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
+            {EMAIL_NOTIFICATION_MODULES.map((mod) => {
+              const checked = form.email_notifications[mod] !== false;
+              return (
+                <li key={mod} className="flex items-start gap-2">
+                  <input
+                    type="checkbox"
+                    id={`email-notif-${mod}`}
+                    checked={checked}
+                    onChange={(e) => {
+                      const enabled = e.target.checked;
+                      setForm((prev) => ({
+                        ...prev,
+                        email_notifications: {
+                          ...prev.email_notifications,
+                          [mod]: enabled,
+                        },
+                      }));
+                    }}
+                    className="mt-1 h-4 w-4 rounded border-gray-300"
+                  />
+                  <label
+                    htmlFor={`email-notif-${mod}`}
+                    className="cursor-pointer text-sm text-gray-700"
+                  >
+                    {EMAIL_NOTIFICATION_MODULE_LABELS[mod]}
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Role *</label>
@@ -973,6 +1033,26 @@ export function AdminUserForm({ user }: { user?: User }) {
                             className="rounded"
                           />
                           <span>{MAKETY_ZADAVATEL_GRAFIKA_LABEL}</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hasMaketySchvalovatelPrepressFlag(form.module_access)}
+                            onChange={(e) => setMaketySchvalovatelPrepressFlag(e.target.checked)}
+                            disabled={isAdminRoleSelected}
+                            className="rounded"
+                          />
+                          <span>{MAKETY_SCHVALOVATEL_PREPRESS_LABEL}</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hasMaketySchvalovatelFinalFlag(form.module_access)}
+                            onChange={(e) => setMaketySchvalovatelFinalFlag(e.target.checked)}
+                            disabled={isAdminRoleSelected}
+                            className="rounded"
+                          />
+                          <span>{MAKETY_SCHVALOVATEL_FINAL_LABEL}</span>
                         </label>
                       </div>
                     )}

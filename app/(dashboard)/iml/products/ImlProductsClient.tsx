@@ -16,6 +16,8 @@ const PRODUCT_LIST_FILTER_DEFAULTS = {
   search: "",
   customer_id: "",
   status: "",
+  product_kind: "",
+  archive: "",
   page: "1",
   per_page: "",
 };
@@ -34,12 +36,14 @@ function parseStoredPerPage(value: string | null): PerPageOption {
 export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const { filters, setFilter, setFilters, listHref } = useListFilters({
     defaults: PRODUCT_LIST_FILTER_DEFAULTS,
-    resetPageOnChange: ["search", "customer_id", "status", "per_page"],
+    resetPageOnChange: ["search", "customer_id", "status", "product_kind", "archive", "per_page"],
   });
 
   const search = filters.search;
   const filterCustomer = filters.customer_id;
   const filterStatus = filters.status;
+  const filterProductKind = filters.product_kind;
+  const filterArchive = filters.archive || "active";
   const page = parseInt(filters.page || "1", 10) || 1;
   const perPage = (filters.per_page || "25") as PerPageOption;
 
@@ -90,6 +94,8 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     if (search) params.set("search", search);
     if (filterCustomer) params.set("customer_id", filterCustomer);
     if (filterStatus) params.set("status", filterStatus);
+    if (filterProductKind) params.set("product_kind", filterProductKind);
+    if (filterArchive && filterArchive !== "active") params.set("archive", filterArchive);
     params.set("page", String(page));
     params.set("per_page", perPage);
     const res = await fetch(`/api/iml/products?${params}`);
@@ -112,7 +118,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   useEffect(() => {
     const t = setTimeout(() => fetchProducts(), 300);
     return () => clearTimeout(t);
-  }, [search, filterCustomer, filterStatus, page, perPage]);
+  }, [search, filterCustomer, filterStatus, filterProductKind, filterArchive, page, perPage]);
 
   const buildExportUrl = (format: string) => {
     const params = new URLSearchParams();
@@ -120,6 +126,8 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     if (search) params.set("search", search);
     if (filterCustomer) params.set("customer_id", filterCustomer);
     if (filterStatus) params.set("status", filterStatus);
+    if (filterProductKind) params.set("product_kind", filterProductKind);
+    if (filterArchive && filterArchive !== "active") params.set("archive", filterArchive);
     return `/api/iml/products/export?${params}`;
   };
 
@@ -134,7 +142,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
         alert(data.error ?? "Chyba při mazání");
       }
     },
-    [search, filterCustomer, filterStatus, page, perPage]
+    [search, filterCustomer, filterStatus, filterProductKind, filterArchive, page, perPage]
   );
 
   const cellContext = useMemo(
@@ -148,32 +156,59 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
 
   const showPageNav = perPage !== "all" && totalPages > 1;
 
+  const kindButtons: Array<{ value: string; label: string }> = [
+    { value: "", label: "Vše" },
+    { value: "iml", label: "IML" },
+    { value: "etikety", label: "Etikety" },
+  ];
+
   return (
     <div className="space-y-4">
       {canRead && (
-        <div className="flex flex-wrap items-center gap-2">
-          <a
-            href={buildExportUrl("csv")}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            download="iml-produkty.csv"
-          >
-            Export CSV
-          </a>
-          <a
-            href={buildExportUrl("xlsx")}
-            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-            download="iml-produkty.xlsx"
-          >
-            Export Excel
-          </a>
-          {tableReady && (
-            <ProductListColumnPicker
-              visibleColumnIds={visibleColumnIds}
-              onToggle={toggleColumn}
-              onReset={resetToDefaults}
-              onResetWidths={resetWidths}
-            />
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <a
+              href={buildExportUrl("csv")}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              download="iml-produkty.csv"
+            >
+              Export CSV
+            </a>
+            <a
+              href={buildExportUrl("xlsx")}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+              download="iml-produkty.xlsx"
+            >
+              Export Excel
+            </a>
+            {tableReady && (
+              <ProductListColumnPicker
+                visibleColumnIds={visibleColumnIds}
+                onToggle={toggleColumn}
+                onReset={resetToDefaults}
+                onResetWidths={resetWidths}
+              />
+            )}
+          </div>
+          <div className="inline-flex rounded-lg border border-gray-300 bg-white p-0.5 shadow-sm">
+            {kindButtons.map((btn) => {
+              const active = filterProductKind === btn.value;
+              return (
+                <button
+                  key={btn.label}
+                  type="button"
+                  onClick={() => setFilter("product_kind", btn.value)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    active
+                      ? "bg-red-600 text-white shadow-sm"
+                      : "text-gray-700 hover:bg-gray-50"
+                  }`}
+                >
+                  {btn.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
       <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -189,7 +224,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Hledat podle kódu, názvu, SKU…"
+                placeholder="Hledat podle kódu, názvu, SKU, formátu, výseku, barev…"
                 value={search}
                 onChange={(e) => setFilter("search", e.target.value)}
                 className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3"
@@ -218,6 +253,16 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
                   {imlItemStatusLabel(s)}
                 </option>
               ))}
+            </select>
+            <select
+              value={filterArchive}
+              onChange={(e) => setFilter("archive", e.target.value === "active" ? "" : e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              title="Archiv tiskových dat"
+            >
+              <option value="active">Aktivní (mimo archiv)</option>
+              <option value="archived">Jen archiv</option>
+              <option value="all">Vše včetně archivu</option>
             </select>
             <button
               type="submit"

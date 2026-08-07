@@ -456,17 +456,23 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     icon: GraduationCap,
     title: "IT Školení",
     path: "/training",
-    intro: "Evidence IT školení – přehled témat, účast uživatelů a potvrzení absolvování.",
+    intro:
+      "Výukový modul – testy s automatickým vyhodnocením, učební materiály, přidělování testů skupinám a přehled výsledků.",
     features: [
-      "Seznam školení a jejich termínů.",
-      "Sledování absolvování po uživatelích.",
-      "Správa materiálů (s oprávněním zápisu).",
+      "Přidělené testy s termíny a limitem pokusů, volně dostupné testy a materiály.",
+      "Historie vlastních výsledků (Moje výsledky).",
+      "Review správných odpovědí s vysvětlením po dokončení testu (pokud to test povoluje).",
+      "Administrace (s oprávněním zápisu): otázky a kategorie, CSV import otázek, materiály, testy, skupiny uživatelů, přiřazení a reporty s exportem CSV.",
     ],
     quickSteps: [
-      "Otevřete IT Školení.",
-      "Vyberte školení a otevřete detail.",
-      "Potvrďte absolvování (pokud máte školení přidělené).",
-      "S oprávněním zápisu spravujte termíny a materiály.",
+      "Otevřete IT Školení a spusťte přidělený nebo volně dostupný test.",
+      "Odpovězte na otázky v časovém limitu a odevzdejte.",
+      "Výsledek vidíte ihned, historii v sekci Moje výsledky.",
+      "Správci: Administrace → import otázek z CSV, sestavení testu, přiřazení skupině s termínem a limitem pokusů, vyhodnocení v sekci Výsledky.",
+    ],
+    tips: [
+      "Test bez přiřazení je dostupný všem uživatelům modulu; test s přiřazením jen členům skupin v daném termínu.",
+      "CSV šablonu pro import otázek stáhnete v Administrace → Import CSV.",
     ],
   },
 
@@ -544,7 +550,7 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     features: [
       "Změna jména, e-mailu, telefonu.",
       "Změna hesla.",
-      "Nahrání podpisu pro e-mailovou komunikaci.",
+      "Stažení HTML vizitky nebo e-mailového podpisu (vizitka.htm / podpis.htm) pro Outlook Desktop.",
       "Nastavení 2FA (Google Authenticator) – pokud admin vyžaduje nebo dobrovolně.",
     ],
     quickSteps: [

@@ -1,20 +1,17 @@
 "use client";
 
-import { Droplets, Layers, Settings, Wrench } from "lucide-react";
+import { Archive, Box, Droplets, Layers, Settings, Wrench } from "lucide-react";
 import { Tabs, type TabDef } from "../_components/Tabs";
 import { ImlCustomFieldsClient } from "./ImlCustomFieldsClient";
 import { ImlFoilSettingsTab } from "./ImlFoilSettingsTab";
 import { ImlColorSettingsTab } from "./ImlColorSettingsTab";
+import { ImlBoxTypesSettingsTab } from "./ImlBoxTypesSettingsTab";
 import { ImlThumbnailBackfillTab } from "./ImlThumbnailBackfillTab";
+import { ImlProductArchiveTab } from "./ImlProductArchiveTab";
 
 /**
  * Klientský wrapper pro stránku nastavení IML.
- * Obsahuje 3 záložky:
- *   - custom:  vlastní pole (produkty, objednávky)
- *   - foils:   číselník fólií z katalogu materiálů
- *   - pantone: číselník barev z katalogu materiálů (Pantone / CMYK)
- *
- * Aktivní záložka je v URL (?tab=custom|foils|pantone), aby šel sdílet odkaz.
+ * Aktivní záložka je v URL (?tab=…), aby šel sdílet odkaz.
  */
 export function ImlSettingsClient({
   canWrite,
@@ -41,6 +38,19 @@ export function ImlSettingsClient({
       label: "Barvy",
       icon: <Droplets className="h-4 w-4" />,
       content: <ImlColorSettingsTab canWrite={canWrite} />,
+    },
+    {
+      id: "boxes",
+      label: "Typy krabic",
+      icon: <Box className="h-4 w-4" />,
+      content: <ImlBoxTypesSettingsTab canWrite={canWrite} />,
+    },
+    {
+      id: "archive",
+      label: "Archiv produktů",
+      icon: <Archive className="h-4 w-4" />,
+      content: <ImlProductArchiveTab />,
+      hidden: !canAdmin,
     },
     {
       id: "maintenance",

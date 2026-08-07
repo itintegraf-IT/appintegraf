@@ -76,6 +76,7 @@ export function buildOrderExportFullRow(o: OrderForVariableExport): Record<Order
   return {
     id: String(o.id),
     order_number: o.order_number ?? "",
+    job_number: o.job_number ?? "",
     customer_name: o.iml_customers?.name ?? "",
     order_date: o.order_date ? new Date(o.order_date).toISOString().slice(0, 10) : "",
     expected_ship_date: o.expected_ship_date

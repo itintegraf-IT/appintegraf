@@ -1,25 +1,38 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Suspense } from "react";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { BookOpen, FileText, Plus, ClipboardList } from "lucide-react";
+import { hasModuleAccess } from "@/lib/auth-utils";
+import { getVisibleTestsForUser } from "@/lib/training/access";
+import { BookOpen, Settings, History } from "lucide-react";
 import { TrainingSuccessBanner } from "./TrainingSuccessBanner";
+import { TrainingOverviewClient } from "./TrainingOverviewClient";
 
 export default async function TrainingPage() {
-  const [tests, materials] = await Promise.all([
-    prisma.tests.findMany({
-      where: { is_active: true },
-      orderBy: { name: "asc" },
-      take: 50,
-    }),
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const userId = parseInt(session.user.id, 10);
+  if (!(await hasModuleAccess(userId, "training", "read"))) redirect("/");
+
+  const canWrite = await hasModuleAccess(userId, "training", "write");
+
+  const [tests, materials, categories] = await Promise.all([
+    getVisibleTestsForUser(userId),
     prisma.learning_materials.findMany({
+      include: { question_categories: { select: { id: true, name: true, color: true } } },
       orderBy: { title: "asc" },
-      take: 50,
+    }),
+    prisma.question_categories.findMany({
+      where: { learning_materials: { some: {} } },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, color: true },
     }),
   ]);
 
-  type TestRow = { id: number; name: string; description: string | null; time_limit: number | null; pass_percentage: number | null };
-  type MaterialRow = { id: number; title: string; source: string | null };
-  const testsTyped = tests as TestRow[];
-  const materialsTyped = materials as MaterialRow[];
+  const assignedTests = tests.filter((t) => t.assignment !== null);
+  const openTests = tests.filter((t) => t.assignment === null);
 
   return (
     <>
@@ -32,84 +45,34 @@ export default async function TrainingPage() {
           </h1>
           <p className="mt-1 text-gray-600">Testy a materiály ke školení</p>
         </div>
-        <Link
-          href="/training/create-test"
-          className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
-        >
-          <Plus className="h-4 w-4" />
-          Nový test
-        </Link>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
-            <h2 className="flex items-center gap-2 font-semibold text-gray-900">
-              <ClipboardList className="h-5 w-5 text-red-600" />
-              Testy
-            </h2>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {testsTyped.length === 0 ? (
-              <div className="px-4 py-8 text-center text-gray-500">Žádné testy</div>
-            ) : (
-              testsTyped.map((t) => (
-                <div key={t.id} className="flex items-center justify-between px-4 py-3 hover:bg-gray-50">
-                  <div>
-                    <p className="font-medium text-gray-900">{t.name}</p>
-                    {t.description && (
-                      <p className="text-sm text-gray-500 line-clamp-2">{t.description}</p>
-                    )}
-                    <p className="mt-1 text-xs text-gray-400">
-                      Čas: {t.time_limit ?? 30} min
-                      {t.pass_percentage != null && ` | Pro splnění: ${t.pass_percentage}%`}
-                    </p>
-                  </div>
-                  <Link
-                    href={`/training/test/${t.id}`}
-                    className="rounded-lg bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
-                  >
-                    Spustit
-                  </Link>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
-          <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
-            <h2 className="flex items-center gap-2 font-semibold text-gray-900">
-              <FileText className="h-5 w-5 text-red-600" />
-              Materiály
-            </h2>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {materialsTyped.length === 0 ? (
-              <div className="px-4 py-8 text-center text-gray-500">Žádné materiály</div>
-            ) : (
-              materialsTyped.map((m) => (
-                <div key={m.id} className="px-4 py-3 hover:bg-gray-50">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="font-medium text-gray-900">{m.title}</p>
-                      {m.source && (
-                        <p className="text-sm text-gray-500">Zdroj: {m.source}</p>
-                      )}
-                    </div>
-                    <Link
-                      href={`/training/material/${m.id}`}
-                      className="shrink-0 rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    >
-                      Zobrazit
-                    </Link>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/training/results"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 font-medium text-gray-700 hover:bg-gray-50"
+          >
+            <History className="h-4 w-4" />
+            Moje výsledky
+          </Link>
+          {canWrite && (
+            <Link
+              href="/training/manage"
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
+            >
+              <Settings className="h-4 w-4" />
+              Administrace
+            </Link>
+          )}
         </div>
       </div>
+
+      <Suspense fallback={<div className="text-gray-500">Načítání…</div>}>
+        <TrainingOverviewClient
+          materials={materials}
+          categories={categories}
+          assignedTests={assignedTests}
+          openTests={openTests}
+        />
+      </Suspense>
     </>
   );
 }

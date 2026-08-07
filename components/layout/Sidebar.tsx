@@ -436,7 +436,6 @@ const navItems: NavItem[] = [
     icon: Laptop,
     label: "Majetek",
     module: "equipment",
-    subItems: [{ href: "/equipment/prirazeni", label: "Přiřazení majetku" }],
     isActive: (p) => p.startsWith("/equipment"),
   },
   { href: "/calendar", icon: Calendar, label: "Kalendář", module: "calendar" },
@@ -465,6 +464,7 @@ const navItems: NavItem[] = [
     module: "iml",
     subItems: [
       { href: "/iml/inquiries", label: "Poptávky" },
+      { href: "/iml/die-cuts", label: "Výseky" },
       { href: "/iml/reports/pantone", label: "Report Pantone" },
     ],
     isActive: (p) => p.startsWith("/iml"),

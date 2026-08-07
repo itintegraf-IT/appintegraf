@@ -1,6 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { hasModuleAccess } from "@/lib/auth-utils";
+import { getTestAccessForUser } from "@/lib/training/access";
 import { TestRunClient } from "./TestRunClient";
 
 export default async function TestPage({
@@ -8,6 +11,12 @@ export default async function TestPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const userId = parseInt(session.user.id, 10);
+  if (!(await hasModuleAccess(userId, "training", "read"))) redirect("/");
+
   const id = parseInt((await params).id, 10);
   if (isNaN(id)) notFound();
 
@@ -22,6 +31,8 @@ export default async function TestPage({
   });
 
   if (!test || !test.is_active) notFound();
+
+  const access = await getTestAccessForUser(userId, id);
 
   return (
     <>
@@ -38,13 +49,22 @@ export default async function TestPage({
         </Link>
       </div>
 
-      <TestRunClient
-        testId={test.id}
-        testName={test.name}
-        timeLimit={test.time_limit ?? 30}
-        passPercentage={test.pass_percentage ?? 70}
-        questionCount={test.test_questions.length}
-      />
+      {access.allowed ? (
+        <TestRunClient
+          testId={test.id}
+          timeLimit={test.time_limit ?? 30}
+          passPercentage={test.pass_percentage ?? 70}
+        />
+      ) : (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-6">
+          <p className="font-medium text-amber-800">
+            {access.reason ?? "Test není dostupný"}
+          </p>
+          <Link href="/training" className="mt-4 inline-block text-red-600 hover:underline">
+            Zpět na školení
+          </Link>
+        </div>
+      )}
     </>
   );
 }

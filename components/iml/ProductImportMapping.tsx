@@ -9,6 +9,7 @@ export const IML_PRODUCT_IMPORT_TARGET_FIELDS = [
   { key: "client_name", label: "Název u klienta", required: false },
   { key: "sku", label: "SKU", required: false },
   { key: "customer_name", label: "Zákazník (pro párování)", required: false },
+  { key: "product_kind", label: "Druh produktu (iml/etikety)", required: false },
   { key: "requester", label: "Zadavatel", required: false },
   { key: "label_shape_code", label: "Kód tvaru etikety", required: false },
   { key: "product_format", label: "Rozměr/formát (text)", required: false },

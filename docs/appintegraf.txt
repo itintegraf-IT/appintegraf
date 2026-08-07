@@ -33,6 +33,9 @@ Kdo co vidí v dasshboardu je to podle rolí nebo oddělení?? Asi by ne všichn
 	- HOTOVO Při zadávání služební cesty zadat popis proč a kam jedu aby ten kdo schvaluje to viděl a nemusel se 	  ptát
 
 
+	Schvalovací workflow - při schvalování schvalovatel je přítomen - a je jako primární. Nyní když žádám o schválení 	události a schvalovatel má událost ve stejném termínu spadne to na dalšího v řadě. To není dobře. Pokud je 	schvalovate přítomen v době žádosti jde to na něho.
+
+
 - Kontakty
 	- Přidat generování kartičky formát vizitky 
 						1) Jméno a příjmení
@@ -76,6 +79,21 @@ Na základě poskytnutého přepisu rozhovoru jsou hlavními body diskuse a jeji
 	- požadavek na techniku - není možnost odpovědět žadateli
 	- vyhledávání podle zaměstnance a abecední řazení dle zaměstnance
 	- majetek seskupit do karet
+
+------- NOVÁ VYŠŠÍ FUNKČNOST -----
+
+- definice skupin majetku
+	- výpočetní a komunikační technika
+	- bílá technika
+	- nářadí atd. Možnost definice administrátorem
+
+- definice místností
+	- administrátor definuje místnost a vygeneruje štítek s QR kódem
+
+v podstatě půjde o komplexní aplikaci na správu majetku. Kdy pro evidenci budou použity kódy. Ty nalepíme na konkrétní zařízení, načteme v telefonu (android) a z databáze dostaneme informaci o položce včetně umístění. Při umisťování do místností načtu QR nebo jiný kód místnosti a načtu QR (nebo jiný) ze štítku zařízení a dojde k přiřazení provázání. Samozřejmostí budou inventurní sestavy a včetně hodnot majetku ...
+
+máme vytištěné QR kódy, ty nalepíme a naskenujeme a budeme chtít přiřadit majetek? vlastně i opačný postup než generování QR (to zachovat)
+
 
 - NOVÝ MODUL PŘEDPISY (kouknout do IGIS)
 

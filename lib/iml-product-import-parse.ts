@@ -47,6 +47,10 @@ const AUTO_MAP: Record<string, string> = {
   nastroj: "die_cut_tool_code",
   vysek: "die_cut_tool_code",
   vyrez: "die_cut_tool_code",
+  "druh produktu": "product_kind",
+  "typ produktu": "product_kind",
+  product_kind: "product_kind",
+  iml: "product_kind",
 };
 
 /** Normalizace hlavičky pro auto-map (malá písmena, bez diakritiky). */

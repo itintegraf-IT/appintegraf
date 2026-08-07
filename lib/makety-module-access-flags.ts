@@ -1,4 +1,4 @@
-/** Parsování rozšířených oprávnění modulu makety (základ + vyroba + grafika + zadavatel). */
+/** Parsování rozšířených oprávnění modulu makety (základ + vyroba + grafika + zadavatel + schvalovatelé). */
 
 /** Úrovně v selectu administrace (write je legacy, ukládá se jako příznaky zadavatele). */
 export const MAKETY_BASE_LEVELS = ["read", "write", "admin"] as const;
@@ -49,14 +49,30 @@ export function hasMaketyZadavatelGrafikaFlag(moduleAccess: Record<string, strin
   return isModuleAccessFlag(moduleAccess.makety_zadavatel_grafika);
 }
 
-export function isMaketyModuleEnabled(moduleAccess: Record<string, string>): boolean {
+export function hasMaketySchvalovatelPrepressFlag(moduleAccess: Record<string, string>): boolean {
+  return isModuleAccessFlag(moduleAccess.makety_schvalovatel_prepress);
+}
+
+export function hasMaketySchvalovatelFinalFlag(moduleAccess: Record<string, string>): boolean {
+  return isModuleAccessFlag(moduleAccess.makety_schvalovatel_final);
+}
+
+function anyMaketyRoleFlag(moduleAccess: Record<string, string>): boolean {
   return (
-    !!maketyBaseLevelFromAccess(moduleAccess) ||
-    legacyMaketyWrite(moduleAccess) ||
     hasMaketyVyrobaFlag(moduleAccess) ||
     hasMaketyGrafikaFlag(moduleAccess) ||
     hasMaketyZadavatelMaketaFlag(moduleAccess) ||
     hasMaketyZadavatelGrafikaFlag(moduleAccess) ||
+    hasMaketySchvalovatelPrepressFlag(moduleAccess) ||
+    hasMaketySchvalovatelFinalFlag(moduleAccess)
+  );
+}
+
+export function isMaketyModuleEnabled(moduleAccess: Record<string, string>): boolean {
+  return (
+    !!maketyBaseLevelFromAccess(moduleAccess) ||
+    legacyMaketyWrite(moduleAccess) ||
+    anyMaketyRoleFlag(moduleAccess) ||
     ["vyroba", "grafika"].includes(moduleAccess.makety?.toLowerCase() ?? "")
   );
 }
@@ -80,6 +96,9 @@ export function normalizeMaketyModuleAccessForSave(
     zadavatelGrafika = true;
   }
 
+  const schvalovatelPrepress = hasMaketySchvalovatelPrepressFlag(next);
+  const schvalovatelFinal = hasMaketySchvalovatelFinalFlag(next);
+
   let base = maketyBaseLevelFromAccess(next);
   if (legacyMakety === "admin") base = "admin";
 
@@ -88,6 +107,8 @@ export function normalizeMaketyModuleAccessForSave(
     grafika ||
     zadavatelMaketa ||
     zadavatelGrafika ||
+    schvalovatelPrepress ||
+    schvalovatelFinal ||
     legacyMakety === "vyroba" ||
     legacyMakety === "grafika" ||
     legacyMakety === "write";
@@ -100,6 +121,8 @@ export function normalizeMaketyModuleAccessForSave(
     delete next.makety_grafika;
     delete next.makety_zadavatel_maketa;
     delete next.makety_zadavatel_grafika;
+    delete next.makety_schvalovatel_prepress;
+    delete next.makety_schvalovatel_final;
     return next;
   }
 
@@ -112,6 +135,10 @@ export function normalizeMaketyModuleAccessForSave(
   else delete next.makety_zadavatel_maketa;
   if (zadavatelGrafika) next.makety_zadavatel_grafika = "1";
   else delete next.makety_zadavatel_grafika;
+  if (schvalovatelPrepress) next.makety_schvalovatel_prepress = "1";
+  else delete next.makety_schvalovatel_prepress;
+  if (schvalovatelFinal) next.makety_schvalovatel_final = "1";
+  else delete next.makety_schvalovatel_final;
 
   return next;
 }
@@ -140,6 +167,18 @@ export function roleHasMaketyZadavatelGrafikaFromDecoded(decoded: Record<string,
   return isModuleAccessFlag(decoded.makety_zadavatel_grafika);
 }
 
+export function roleHasMaketySchvalovatelPrepressFromDecoded(
+  decoded: Record<string, unknown>
+): boolean {
+  return isModuleAccessFlag(decoded.makety_schvalovatel_prepress);
+}
+
+export function roleHasMaketySchvalovatelFinalFromDecoded(
+  decoded: Record<string, unknown>
+): boolean {
+  return isModuleAccessFlag(decoded.makety_schvalovatel_final);
+}
+
 function maketyBaseFromDecoded(decoded: Record<string, unknown>): string {
   const perm = decoded.makety;
   if (typeof perm !== "string") return "";
@@ -160,7 +199,9 @@ export function roleMaketyGrantsModuleAccess(
       roleHasMaketyVyrobaFromDecoded(decoded) ||
       roleHasMaketyGrafikaFromDecoded(decoded) ||
       roleHasMaketyZadavatelMaketaFromDecoded(decoded) ||
-      roleHasMaketyZadavatelGrafikaFromDecoded(decoded)
+      roleHasMaketyZadavatelGrafikaFromDecoded(decoded) ||
+      roleHasMaketySchvalovatelPrepressFromDecoded(decoded) ||
+      roleHasMaketySchvalovatelFinalFromDecoded(decoded)
     );
   }
   if (access === "write") {

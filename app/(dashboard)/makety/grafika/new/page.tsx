@@ -2,6 +2,11 @@ import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { canZadatMaketyWork } from "@/lib/makety-access";
 import { getUsersWithMaketyGrafikaAccess } from "@/lib/makety-grafika-users";
+import {
+  getUsersWithMaketySchvalovatelFinalAccess,
+  getUsersWithMaketySchvalovatelPrepressAccess,
+} from "@/lib/makety-schvalovatel-users";
+import { prisma } from "@/lib/db";
 import { NewMaketyWorkForm } from "../../NewMaketyWorkForm";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +19,17 @@ export default async function NewGrafikaPage() {
     redirect("/makety");
   }
 
-  const grafikaUsers = await getUsersWithMaketyGrafikaAccess();
+  const [grafikaUsers, prepressUsers, finalUsers, me] = await Promise.all([
+    getUsersWithMaketyGrafikaAccess(),
+    getUsersWithMaketySchvalovatelPrepressAccess(),
+    getUsersWithMaketySchvalovatelFinalAccess(),
+    prisma.users.findUnique({
+      where: { id: userId },
+      select: { first_name: true, last_name: true },
+    }),
+  ]);
+
+  const creatorName = me ? `${me.first_name} ${me.last_name}` : "Já";
 
   return (
     <div className="space-y-6">
@@ -22,7 +37,13 @@ export default async function NewGrafikaPage() {
         <h2 className="text-lg font-semibold text-gray-900">Nová grafika</h2>
         <p className="mt-1 text-sm text-gray-600">Zadání práce pro oddělení grafiky.</p>
       </div>
-      <NewMaketyWorkForm workType="grafika" assigneeUsers={grafikaUsers} />
+      <NewMaketyWorkForm
+        workType="grafika"
+        assigneeUsers={grafikaUsers}
+        creatorName={creatorName}
+        prepressUsers={prepressUsers}
+        finalUsers={finalUsers}
+      />
     </div>
   );
 }

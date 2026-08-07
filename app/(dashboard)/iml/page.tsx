@@ -13,6 +13,7 @@ import {
   Settings,
   Upload,
   FileQuestion,
+  Layers,
 } from "lucide-react";
 import { subMonths } from "date-fns";
 
@@ -34,6 +35,7 @@ export default async function ImlPage() {
     customersCount,
     productsCount,
     ordersCount,
+    dieCutsCount,
     ordersByStatus,
     ordersToProcess,
     recentOrders,
@@ -46,6 +48,7 @@ export default async function ImlPage() {
     prisma.iml_customers.count(),
     prisma.iml_products.count({ where: { is_active: true } }),
     prisma.iml_orders.count(),
+    prisma.iml_die_cuts.count({ where: { is_active: true } }),
     prisma.iml_orders.groupBy({
       by: ["status"],
       _count: { id: true },
@@ -118,6 +121,13 @@ export default async function ImlPage() {
   const cards: DashCard[] = [
     { href: "/iml/customers", icon: Users, value: customersCount, label: "Zákazníci" },
     { href: "/iml/products", icon: Package, value: productsCount, label: "Produkty" },
+    {
+      href: "/iml/die-cuts",
+      icon: Layers,
+      value: dieCutsCount,
+      label: "Výseky",
+      hint: "Katalog tvarů etikety",
+    },
     { href: "/iml/orders", icon: ShoppingCart, value: ordersCount, label: "Objednávky" },
     {
       href: "/iml/inquiries",
@@ -136,7 +146,13 @@ export default async function ImlPage() {
       label: "Report Pantone",
       hint: "Spotřeba barev z objednávek",
     },
-    { href: "/iml/imports", icon: Upload, value: "3", label: "Importy" },
+    {
+      href: "/iml/imports",
+      icon: Upload,
+      value: "",
+      label: "Import / Export",
+      hint: "CSV · Excel · šablony XML",
+    },
   ];
   if (canWrite) {
     cards.push({
@@ -144,7 +160,7 @@ export default async function ImlPage() {
       icon: Settings,
       value: "",
       label: "Nastavení IML",
-      hint: "Vlastní pole • Fólie • Pantone",
+      hint: "Vlastní pole • Fólie • Pantone • Archiv",
     });
   }
 
@@ -174,7 +190,14 @@ export default async function ImlPage() {
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
               >
                 <Upload className="h-4 w-4" />
-                Importy
+                Import / Export
+              </Link>
+              <Link
+                href="/iml/die-cuts"
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+              >
+                <Layers className="h-4 w-4" />
+                Výseky
               </Link>
               <Link
                 href="/iml/customers/add"

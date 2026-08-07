@@ -4,6 +4,11 @@ import { auth } from "@/auth";
 import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import {
+  normalizeJobNumber,
+  parseConfirmedWithoutJobNumber,
+  requireJobNumberOrConfirm,
+} from "@/lib/iml/order-job-number";
 
 function parseCsvLine(line: string, delimiter: string): string[] {
   const result: string[] = [];
@@ -53,6 +58,9 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const mappingStr = formData.get("mapping") as string | null;
+    const confirmedWithoutJobNumber = parseConfirmedWithoutJobNumber(
+      formData.get("confirmed_without_job_number")
+    );
 
     if (!file?.size) {
       return NextResponse.json({ error: "Žádný soubor" }, { status: 400 });
@@ -120,7 +128,17 @@ export async function POST(req: NextRequest) {
     };
 
     type OrderKey = string;
-    const orderItems = new Map<OrderKey, { customerName: string; orderDate: string; status: string; notes: string; items: { productId: number; quantity: number; unitPrice: number | null }[] }>();
+    const orderItems = new Map<
+      OrderKey,
+      {
+        customerName: string;
+        orderDate: string;
+        status: string;
+        notes: string;
+        jobNumber: string | null;
+        items: { productId: number; quantity: number; unitPrice: number | null }[];
+      }
+    >();
 
     let imported = 0;
     const errors: string[] = [];
@@ -135,6 +153,7 @@ export async function POST(req: NextRequest) {
       const status = get(row, "status") || "nová";
       const notes = get(row, "notes");
       const unitPriceStr = get(row, "unit_price");
+      const jobNumber = normalizeJobNumber(get(row, "job_number"));
 
       if (!orderNumber || !customerName || !orderDate || !productIdent || !qtyStr) {
         errors.push(`Řádek ${i + 2}: Chybí povinná pole`);
@@ -168,11 +187,35 @@ export async function POST(req: NextRequest) {
           orderDate,
           status,
           notes,
+          jobNumber,
           items: [],
         });
+      } else {
+        const existingOrd = orderItems.get(key)!;
+        if (!existingOrd.jobNumber && jobNumber) {
+          existingOrd.jobNumber = jobNumber;
+        }
       }
       const ord = orderItems.get(key)!;
       ord.items.push({ productId, quantity, unitPrice: isNaN(unitPrice as number) ? null : unitPrice });
+    }
+
+    const missingJob = [...orderItems.values()].some((o) => !o.jobNumber);
+    if (missingJob) {
+      const check = requireJobNumberOrConfirm({
+        job_number: null,
+        confirmed_without_job_number: confirmedWithoutJobNumber,
+      });
+      if (!check.ok) {
+        return NextResponse.json(
+          {
+            error: check.error,
+            field: "job_number",
+            needs_job_number_confirm: true,
+          },
+          { status: 400 }
+        );
+      }
     }
 
     for (const [key, ord] of orderItems) {
@@ -196,6 +239,7 @@ export async function POST(req: NextRequest) {
           data: {
             customer_id: customerId,
             order_number: orderNumber,
+            job_number: ord.jobNumber,
             order_date: orderDate,
             status: ord.status,
             notes: ord.notes || null,
@@ -229,7 +273,11 @@ export async function POST(req: NextRequest) {
         action: "create",
         tableName: "iml_orders",
         recordId: order.id,
-        newValues: { order_number: order.order_number, customer_id: customerId },
+        newValues: {
+          order_number: order.order_number,
+          job_number: order.job_number,
+          customer_id: customerId,
+        },
       });
       imported++;
     }

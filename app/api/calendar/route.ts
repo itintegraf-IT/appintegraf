@@ -17,6 +17,7 @@ import {
 } from "@/lib/calendar-participant-sync";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import { resolveApproverDepartmentId } from "@/lib/calendar-approver-resolution";
+import { userAllowsEmailNotification } from "@/lib/user-email-notifications-db";
 
 const OUT_OF_OFFICE_TYPES = [
   "dovolena",
@@ -287,7 +288,7 @@ export async function POST(req: NextRequest) {
         where: { id: deputyIdNum },
         select: { email: true, first_name: true, last_name: true },
       });
-      if (deputy?.email) {
+      if (deputy?.email && (await userAllowsEmailNotification(deputyIdNum, "calendar"))) {
         const createdEvents = await prisma.calendar_events.findMany({
           where: { id: { in: ids } },
           select: {

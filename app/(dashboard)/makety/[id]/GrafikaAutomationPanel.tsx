@@ -1,0 +1,231 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import type { MaketyProductDraft } from "@/lib/makety-product-draft";
+
+type Props = {
+  maketaId: number;
+  canOperate: boolean;
+  /** Panel je pro schválená data → produkt IML. */
+  status: string;
+  hasCustomer: boolean;
+  hasProduct: boolean;
+};
+
+export function GrafikaAutomationPanel({
+  maketaId,
+  canOperate,
+  status,
+  hasCustomer,
+  hasProduct,
+}: Props) {
+  const router = useRouter();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const [draft, setDraft] = useState<MaketyProductDraft | null>(null);
+  const [draftOpen, setDraftOpen] = useState(false);
+  const [draftMeta, setDraftMeta] = useState<{
+    customerName: string | null;
+    dieCutLabel: string | null;
+  } | null>(null);
+
+  if (!canOperate || status !== "approved") return null;
+
+  const onPrepareDraft = async () => {
+    setBusy("draft");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/makety/${maketaId}/prepare-product-draft`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "Příprava selhala");
+        setBusy(null);
+        return;
+      }
+      setDraft(data.draft as MaketyProductDraft);
+      setDraftMeta({
+        customerName: data.customerName ?? null,
+        dieCutLabel: data.dieCutLabel ?? null,
+      });
+      setDraftOpen(true);
+    } catch {
+      setError("Síťová chyba");
+    }
+    setBusy(null);
+  };
+
+  const onApplyDraft = async () => {
+    if (!draft) return;
+    setBusy("apply");
+    setError(null);
+    try {
+      const res = await fetch(`/api/makety/${maketaId}/apply-product-draft`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "Uložení selhalo");
+        if (data.draft) setDraft(data.draft as MaketyProductDraft);
+        setBusy(null);
+        return;
+      }
+      setDraftOpen(false);
+      setDraft(null);
+      setMessage(
+        data.mode === "update"
+          ? `Produkt #${data.productId} aktualizován.`
+          : `Produkt #${data.productId} založen.`
+      );
+      router.refresh();
+    } catch {
+      setError("Síťová chyba");
+    }
+    setBusy(null);
+  };
+
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-gray-900">Produkt v IML</h3>
+      <p className="mt-1 text-xs text-gray-500">
+        Po finálním schválení můžete založit nebo aktualizovat produkt v katalogu IML
+        podle údajů zakázky.
+      </p>
+
+      {error && (
+        <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      )}
+      {message && (
+        <p className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+          {message}
+        </p>
+      )}
+
+      <div className="mt-4 space-y-2">
+        {!hasCustomer && (
+          <p className="text-xs text-amber-700">
+            Nejprve přiřaďte klienta (a ideálně kód etikety / vazbu na produkt) u zakázky.
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => void onPrepareDraft()}
+          disabled={busy != null || !hasCustomer}
+          className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+        >
+          {busy === "draft"
+            ? "Připravuji…"
+            : hasProduct
+              ? "Navrhnout aktualizaci produktu"
+              : "Navrhnout založení produktu"}
+        </button>
+      </div>
+
+      {draftOpen && draft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
+            <h4 className="text-base font-semibold text-gray-900">
+              {draft.mode === "update" ? "Aktualizovat produkt" : "Založit produkt"}
+            </h4>
+            <p className="mt-1 text-sm text-gray-500">
+              Zkontrolujte údaje a potvrďte zápis do katalogu IML.
+            </p>
+
+            <dl className="mt-4 space-y-3 text-sm">
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">Klient</dt>
+                <dd className="mt-0.5 text-gray-900">
+                  {draftMeta?.customerName ?? draft.customer_id ?? "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-medium uppercase text-gray-500">Výsek</dt>
+                <dd className="mt-0.5 text-gray-900">{draftMeta?.dieCutLabel ?? "—"}</dd>
+              </div>
+              <label className="block">
+                <span className="text-xs font-medium uppercase text-gray-500">IG kód</span>
+                <input
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                  value={draft.ig_code ?? ""}
+                  onChange={(e) =>
+                    setDraft({ ...draft, ig_code: e.target.value || null })
+                  }
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium uppercase text-gray-500">
+                  Kód klienta
+                </span>
+                <input
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                  value={draft.client_code ?? ""}
+                  onChange={(e) =>
+                    setDraft({ ...draft, client_code: e.target.value || null })
+                  }
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium uppercase text-gray-500">
+                  Krátký název
+                </span>
+                <input
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                  value={draft.ig_short_name ?? ""}
+                  onChange={(e) =>
+                    setDraft({ ...draft, ig_short_name: e.target.value || null })
+                  }
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium uppercase text-gray-500">
+                  Poznámka výroby
+                </span>
+                <textarea
+                  rows={4}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2"
+                  value={draft.production_notes ?? ""}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      production_notes: e.target.value || null,
+                    })
+                  }
+                />
+              </label>
+            </dl>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm"
+                onClick={() => setDraftOpen(false)}
+                disabled={busy != null}
+              >
+                Zrušit
+              </button>
+              <button
+                type="button"
+                className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                onClick={() => void onApplyDraft()}
+                disabled={busy != null}
+              >
+                {busy === "apply"
+                  ? "Ukládám…"
+                  : draft.mode === "update"
+                    ? "Potvrdit aktualizaci"
+                    : "Potvrdit založení"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

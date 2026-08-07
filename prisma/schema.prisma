@@ -418,20 +418,34 @@ model makety {
   due_at             DateTime             @db.DateTime(0)
   assignee_user_id   Int?
   created_by                   Int
-  status                       String               @default("open") @db.VarChar(20)
+  status                       String               @default("open") @db.VarChar(30)
   quote_price                  Decimal?             @db.Decimal(12, 2)
   quote_production_description String?              @db.Text
   quote_submitted_at           DateTime?            @db.DateTime(0)
   quote_submitted_by           Int?
   rejection_reason             String?              @db.Text
   work_type                    String               @default("maketa") @db.VarChar(20)
+  customer_id                  Int?
+  product_id                   Int?
+  die_cut_id                   Int?
+  label_code                   String?              @db.VarChar(100)
+  job_number                   String?              @db.VarChar(50)
+  product_draft                Json?
+  prepress_user_id             Int?
+  final_approver_user_id       Int?
   created_at                   DateTime             @default(now()) @db.Timestamp(0)
   updated_at                   DateTime             @default(now()) @updatedAt @db.Timestamp(0)
   users_assignee               users?               @relation("makety_assignee", fields: [assignee_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_assignee_fk")
   users_creator                users                @relation("makety_creator", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_creator_fk")
   users_quote_submitter        users?               @relation("makety_quote_submitter", fields: [quote_submitted_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_quote_submitted_by_fk")
+  users_prepress               users?               @relation("makety_prepress", fields: [prepress_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_prepress_fk")
+  users_final_approver         users?               @relation("makety_final_approver", fields: [final_approver_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_final_approver_fk")
+  iml_customers                iml_customers?       @relation(fields: [customer_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_customer_fk")
+  iml_products                 iml_products?        @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_product_fk")
+  iml_die_cuts                 iml_die_cuts?        @relation(fields: [die_cut_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_die_cut_fk")
   makety_departments makety_departments[]
   makety_comments    makety_comments[]
+  makety_status_log  makety_status_log[]
 
   @@index([assignee_user_id], map: "idx_makety_assignee")
   @@index([created_by], map: "idx_makety_creator")
@@ -439,6 +453,26 @@ model makety {
   @@index([status], map: "idx_makety_status")
   @@index([work_type], map: "idx_makety_work_type")
   @@index([work_type, assignee_user_id, queue_position], map: "idx_makety_queue")
+  @@index([customer_id], map: "idx_makety_customer")
+  @@index([product_id], map: "idx_makety_product")
+  @@index([job_number], map: "idx_makety_job_number")
+  @@index([prepress_user_id], map: "idx_makety_prepress")
+  @@index([final_approver_user_id], map: "idx_makety_final_approver")
+}
+
+model makety_status_log {
+  id          Int      @id @default(autoincrement())
+  maketa_id   Int
+  from_status String?  @db.VarChar(30)
+  to_status   String   @db.VarChar(30)
+  user_id     Int
+  comment     String?  @db.Text
+  created_at  DateTime @default(now()) @db.Timestamp(0)
+  makety      makety   @relation(fields: [maketa_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_status_log_maketa_fk")
+  users       users    @relation("makety_status_log_user", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_status_log_user_fk")
+
+  @@index([maketa_id], map: "idx_makety_status_log_maketa")
+  @@index([user_id], map: "idx_makety_status_log_user")
 }
 
 model makety_departments {
@@ -452,13 +486,15 @@ model makety_departments {
 }
 
 model makety_comments {
-  id         Int      @id @default(autoincrement())
-  maketa_id  Int
-  user_id    Int
-  body       String   @db.Text
-  created_at DateTime @default(now()) @db.Timestamp(0)
-  makety     makety   @relation(fields: [maketa_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_comments_maketa_fk")
-  users      users    @relation("makety_comments_author", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_comments_user_fk")
+  id              Int      @id @default(autoincrement())
+  maketa_id       Int
+  user_id         Int
+  body            String   @db.Text
+  /// ID uživatelů, kteří byli upozorněni (adresný komentář). Viditelný všem.
+  notify_user_ids Json?
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+  makety          makety   @relation(fields: [maketa_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_comments_maketa_fk")
+  users           users    @relation("makety_comments_author", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_comments_user_fk")
 
   @@index([maketa_id], map: "idx_makety_comments_maketa")
   @@index([user_id], map: "idx_makety_comments_user")
@@ -485,42 +521,115 @@ model equipment_assignments {
 }
 
 model equipment_categories {
-  id              Int               @id @default(autoincrement())
-  name            String            @db.VarChar(100)
-  code            String            @unique(map: "code") @db.VarChar(20)
-  description     String?           @db.Text
-  icon            String?           @db.VarChar(50)
-  is_active       Boolean?          @default(true)
-  created_at      DateTime          @default(now()) @db.Timestamp(0)
-  equipment_items equipment_items[]
+  id                         Int                              @id @default(autoincrement())
+  name                       String                           @db.VarChar(100)
+  code                       String                           @unique(map: "code") @db.VarChar(20)
+  description                String?                          @db.Text
+  icon                       String?                          @db.VarChar(50)
+  is_active                  Boolean?                         @default(true)
+  responsible_user_id        Int?
+  created_at                 DateTime                         @default(now()) @db.Timestamp(0)
+  equipment_items            equipment_items[]
+  users_responsible          users?                           @relation("equipment_categories_responsible", fields: [responsible_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_categories_responsible_fk")
+  equipment_user_category_access equipment_user_category_access[]
 
   @@index([code], map: "idx_code")
   @@index([name], map: "idx_name")
+  @@index([responsible_user_id], map: "idx_equipment_cat_responsible")
+}
+
+model equipment_rooms {
+  id                           Int                           @id @default(autoincrement())
+  name                         String                        @db.VarChar(150)
+  code                         String                        @unique(map: "equipment_rooms_code_unique") @db.VarChar(40)
+  building                     String?                       @db.VarChar(100)
+  floor                        String?                       @db.VarChar(50)
+  description                  String?                       @db.Text
+  qr_code                      String                        @unique(map: "equipment_rooms_qr_code_unique") @db.VarChar(64)
+  is_active                    Boolean                       @default(true)
+  floor_plan_id                Int?
+  /// JSON: [{ "x": 0..1, "y": 0..1 }, ...] – souřadnice relativní k obrázku plánu
+  polygon_json                 String?                       @db.LongText
+  plan_color                   String?                       @db.VarChar(20)
+  created_at                   DateTime                      @default(now()) @db.Timestamp(0)
+  updated_at                   DateTime                      @default(now()) @db.Timestamp(0)
+  equipment_items              equipment_items[]
+  location_history_from        equipment_location_history[]  @relation("equipment_loc_hist_from")
+  location_history_to          equipment_location_history[]  @relation("equipment_loc_hist_to")
+  inventory_lines_expected     equipment_inventory_lines[]
+  floor_plan                   equipment_floor_plans?        @relation(fields: [floor_plan_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_rooms_floor_plan_fk")
+
+  @@index([is_active], map: "idx_equipment_rooms_active")
+  @@index([floor_plan_id], map: "idx_equipment_rooms_floor_plan")
+}
+
+/// Půdorys budovy (1NP, 2NP…) – pozadí pro interaktivní plán místností
+model equipment_floor_plans {
+  id            Int               @id @default(autoincrement())
+  name          String            @db.VarChar(150)
+  floor_label   String            @db.VarChar(40)
+  building      String?           @db.VarChar(100)
+  image_path    String            @db.VarChar(500)
+  image_width   Int?
+  image_height  Int?
+  sort_order    Int               @default(0)
+  is_active     Boolean           @default(true)
+  created_by    Int?
+  created_at    DateTime          @default(now()) @db.Timestamp(0)
+  updated_at    DateTime          @default(now()) @db.Timestamp(0)
+  rooms         equipment_rooms[]
+  users_created users?            @relation("equipment_floor_plans_created", fields: [created_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_floor_plans_user_fk")
+
+  @@index([is_active, sort_order], map: "idx_eq_floor_plans_active_sort")
+}
+
+model equipment_user_category_access {
+  user_id             Int
+  category_id         Int
+  access_level        String               @default("read") @db.VarChar(20)
+  granted_by          Int?
+  granted_at          DateTime             @default(now()) @db.Timestamp(0)
+  users               users                @relation("equipment_uca_user", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipment_uca_user_fk")
+  equipment_categories equipment_categories @relation(fields: [category_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipment_uca_category_fk")
+  users_granted       users?               @relation("equipment_uca_granted", fields: [granted_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_uca_granted_fk")
+
+  @@id([user_id, category_id])
+  @@index([category_id], map: "idx_eq_uca_category")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
 model equipment_items {
-  id                    Int                     @id @default(autoincrement())
-  name                  String                  @db.VarChar(200)
-  brand                 String?                 @db.VarChar(100)
-  model                 String?                 @db.VarChar(100)
-  serial_number         String?                 @unique(map: "serial_number") @db.VarChar(100)
-  description           String?                 @db.Text
+  id                    Int                         @id @default(autoincrement())
+  name                  String                      @db.VarChar(200)
+  brand                 String?                     @db.VarChar(100)
+  model                 String?                     @db.VarChar(100)
+  serial_number         String?                     @unique(map: "serial_number") @db.VarChar(100)
+  asset_tag             String?                     @unique(map: "equipment_items_asset_tag_unique") @db.VarChar(40)
+  qr_code               String?                     @unique(map: "equipment_items_qr_code_unique") @db.VarChar(64)
+  description           String?                     @db.Text
   category_id           Int
-  purchase_date         DateTime?               @db.Date
-  purchase_price        Decimal?                @db.Decimal(10, 2)
-  supplier              String?                 @db.VarChar(200)
-  invoice_number        String?                 @db.VarChar(100)
-  status                String?                 @default("skladem")
-  location              String?                 @db.VarChar(200)
-  notes                 String?                 @db.Text
-  disposed_at           DateTime?               @db.DateTime(0)
-  disposal_reason       String?                 @db.Text
-  created_at            DateTime                @default(now()) @db.Timestamp(0)
-  updated_at            DateTime                @default(now()) @db.Timestamp(0)
+  purchase_date         DateTime?                   @db.Date
+  purchase_price        Decimal?                    @db.Decimal(10, 2)
+  supplier              String?                     @db.VarChar(200)
+  invoice_number        String?                     @db.VarChar(100)
+  status                String?                     @default("skladem")
+  location              String?                     @db.VarChar(200)
+  room_id               Int?
+  cover_file_id         Int?
+  warranty_until        DateTime?                   @db.Date
+  last_service_at       DateTime?                   @db.Date
+  notes                 String?                     @db.Text
+  disposed_at           DateTime?                   @db.DateTime(0)
+  disposal_reason       String?                     @db.Text
+  created_at            DateTime                    @default(now()) @db.Timestamp(0)
+  updated_at            DateTime                    @default(now()) @db.Timestamp(0)
   equipment_assignments equipment_assignments[]
-  equipment_categories  equipment_categories    @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "equipment_items_ibfk_1")
+  equipment_categories  equipment_categories        @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "equipment_items_ibfk_1")
+  equipment_rooms       equipment_rooms?            @relation(fields: [room_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_items_room_fk")
   equipment_transfers   equipment_transfers[]
+  location_history      equipment_location_history[]
+  qr_pool_entries       equipment_qr_pool[]
+  inventory_lines       equipment_inventory_lines[]
 
   @@index([brand], map: "idx_brand")
   @@index([category_id], map: "idx_category")
@@ -529,6 +638,86 @@ model equipment_items {
   @@index([name], map: "idx_name")
   @@index([serial_number], map: "idx_serial")
   @@index([status], map: "idx_status")
+  @@index([room_id], map: "idx_equipment_items_room")
+}
+
+model equipment_location_history {
+  id              Int              @id @default(autoincrement())
+  equipment_id    Int
+  from_room_id    Int?
+  to_room_id      Int
+  transferred_by  Int
+  transferred_at  DateTime         @default(now()) @db.Timestamp(0)
+  source          String           @default("manual") @db.VarChar(20)
+  notes           String?          @db.Text
+  protocol_number String?          @db.VarChar(40)
+  equipment_items equipment_items  @relation(fields: [equipment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipment_loc_hist_item_fk")
+  room_from       equipment_rooms? @relation("equipment_loc_hist_from", fields: [from_room_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_loc_hist_from_fk")
+  room_to         equipment_rooms  @relation("equipment_loc_hist_to", fields: [to_room_id], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "equipment_loc_hist_to_fk")
+  users           users            @relation("equipment_loc_hist_user", fields: [transferred_by], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "equipment_loc_hist_user_fk")
+
+  @@index([equipment_id], map: "idx_eq_loc_hist_equipment")
+  @@index([to_room_id], map: "idx_eq_loc_hist_to_room")
+  @@index([from_room_id], map: "idx_eq_loc_hist_from_room")
+  @@index([transferred_at], map: "idx_eq_loc_hist_transferred")
+}
+
+model equipment_qr_pool {
+  id              Int              @id @default(autoincrement())
+  qr_code         String           @unique(map: "equipment_qr_pool_qr_unique") @db.VarChar(64)
+  asset_tag       String           @unique(map: "equipment_qr_pool_tag_unique") @db.VarChar(40)
+  status          String           @default("available") @db.VarChar(20)
+  batch_id        String           @db.VarChar(40)
+  equipment_id    Int?
+  printed_at      DateTime?        @db.Timestamp(0)
+  assigned_at     DateTime?        @db.Timestamp(0)
+  assigned_by     Int?
+  created_at      DateTime         @default(now()) @db.Timestamp(0)
+  created_by      Int
+  notes           String?          @db.VarChar(255)
+  equipment_items equipment_items? @relation(fields: [equipment_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_qr_pool_item_fk")
+  users_created   users            @relation("equipment_qr_pool_created", fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "equipment_qr_pool_created_fk")
+  users_assigned  users?           @relation("equipment_qr_pool_assigned", fields: [assigned_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_qr_pool_assigned_fk")
+
+  @@index([batch_id], map: "idx_eq_qr_pool_batch")
+  @@index([status], map: "idx_eq_qr_pool_status")
+  @@index([equipment_id], map: "idx_eq_qr_pool_equipment")
+}
+
+model equipment_inventories {
+  id          Int                        @id @default(autoincrement())
+  name        String                     @db.VarChar(200)
+  status      String                     @default("draft") @db.VarChar(20)
+  scope_type  String                     @default("all") @db.VarChar(20)
+  scope_id    Int?
+  created_by  Int
+  completed_at DateTime?                 @db.Timestamp(0)
+  notes       String?                    @db.Text
+  created_at  DateTime                   @default(now()) @db.Timestamp(0)
+  updated_at  DateTime                   @default(now()) @db.Timestamp(0)
+  users       users                      @relation("equipment_inventories_created", fields: [created_by], references: [id], onDelete: Restrict, onUpdate: NoAction, map: "equipment_inventories_user_fk")
+  lines       equipment_inventory_lines[]
+
+  @@index([status], map: "idx_eq_inv_status")
+  @@index([created_by], map: "idx_eq_inv_created")
+}
+
+model equipment_inventory_lines {
+  id               Int                   @id @default(autoincrement())
+  inventory_id     Int
+  equipment_id     Int
+  expected_room_id Int?
+  scanned_at       DateTime?             @db.Timestamp(0)
+  scanned_by       Int?
+  line_status      String                @default("missing") @db.VarChar(20)
+  notes            String?               @db.VarChar(255)
+  inventory        equipment_inventories @relation(fields: [inventory_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipment_inv_lines_inv_fk")
+  equipment_items  equipment_items       @relation(fields: [equipment_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "equipment_inv_lines_item_fk")
+  expected_room    equipment_rooms?      @relation(fields: [expected_room_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_inv_lines_room_fk")
+  users_scanned    users?                @relation("equipment_inv_lines_scanned", fields: [scanned_by], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_inv_lines_user_fk")
+
+  @@unique([inventory_id, equipment_id], map: "equipment_inv_lines_unique")
+  @@index([equipment_id], map: "idx_eq_inv_lines_equipment")
 }
 
 /// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
@@ -660,6 +849,9 @@ model file_uploads {
   record_id         Int?
   uploaded_by       Int
   is_public         Boolean? @default(false)
+  last_accessed_at  DateTime? @db.Timestamp(0)
+  archived_at       DateTime? @db.Timestamp(0)
+  archive_path      String?   @db.VarChar(500)
   created_at        DateTime @default(now()) @db.Timestamp(0)
   users             users    @relation(fields: [uploaded_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "file_uploads_ibfk_1")
 
@@ -674,6 +866,8 @@ model learning_materials {
   category_id         Int?
   title               String               @db.VarChar(255)
   content             String               @db.Text
+  material_type       String               @default("text") @db.VarChar(20)
+  media_url           String?              @db.VarChar(500)
   source              String?              @db.VarChar(255)
   language            String?              @default("cs") @db.VarChar(10)
   created_at          DateTime             @default(now()) @db.Timestamp(0)
@@ -760,6 +954,8 @@ model questions {
   option_c            String?                  @db.Text
   option_d            String?                  @db.Text
   correct_answer      questions_correct_answer
+  /// Setříděný seznam správných odpovědí oddělený čárkou (např. "A,B"); má přednost před correct_answer
+  correct_answers     String?                  @db.VarChar(20)
   explanation         String?                  @db.Text
   source              String?                  @db.VarChar(200)
   is_active           Boolean?                 @default(true)
@@ -829,6 +1025,8 @@ model test_answers {
   attempt_id    Int
   question_id   Int
   user_answer   test_answers_user_answer?
+  /// Seznam odpovědí uživatele oddělený čárkou (pro otázky s více správnými odpověďmi)
+  user_answers  String?                   @db.VarChar(20)
   is_correct    Boolean?
   answered_at   DateTime                  @default(now()) @db.Timestamp(0)
   test_attempts test_attempts             @relation(fields: [attempt_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_answers_ibfk_1")
@@ -842,22 +1040,31 @@ model test_answers {
 model test_assignments {
   id            Int             @id @default(autoincrement())
   test_id       Int
-  group_id      Int
+  /// Skupina – vyplněno u přiřazení skupině (group_id XOR user_id)
+  group_id      Int?
+  /// Konkrétní uživatel – vyplněno u individuálního přiřazení
+  user_id       Int?
   assigned_by   Int
   start_date    DateTime?       @db.DateTime(0)
   end_date      DateTime?       @db.DateTime(0)
   max_attempts  Int?            @default(3)
   is_active     Boolean?        @default(true)
+  /// Odeslat in-app notifikaci při vytvoření přiřazení
+  notify_on_assign Boolean        @default(true)
+  /// Kolik dní před koncem termínu (end_date) poslat připomínku; null = bez připomínky
+  remind_days_before Int?
   created_at    DateTime        @default(now()) @db.Timestamp(0)
   tests         tests           @relation(fields: [test_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_assignments_ibfk_1")
-  user_groups   user_groups     @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_assignments_ibfk_2")
+  user_groups   user_groups?    @relation(fields: [group_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_assignments_ibfk_2")
   users         users           @relation(fields: [assigned_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_assignments_ibfk_3")
+  target_user   users?          @relation("test_assignments_target_user", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "test_assignments_ibfk_user")
   test_attempts test_attempts[]
 
   @@index([assigned_by], map: "assigned_by")
   @@index([is_active], map: "idx_active")
   @@index([start_date, end_date], map: "idx_dates")
   @@index([group_id], map: "idx_group")
+  @@index([user_id], map: "idx_user")
   @@index([test_id], map: "idx_test")
 }
 
@@ -1011,6 +1218,7 @@ model users {
   qr_code                                                        String?                       @db.VarChar(12)
   is_active                                                      Boolean?                      @default(true)
   display_in_list                                                Boolean?                      @default(true)
+  email_notifications                                            String?                       @db.LongText
   last_login                                                     DateTime?                     @db.DateTime(0)
   created_at                                                     DateTime                      @default(now()) @db.Timestamp(0)
   updated_at                                                     DateTime                      @default(now()) @db.Timestamp(0)
@@ -1049,12 +1257,22 @@ model users {
   equipment_transfers_equipment_transfers_from_user_idTousers    equipment_transfers[]         @relation("equipment_transfers_from_user_idTousers")
   equipment_transfers_equipment_transfers_to_user_idTousers      equipment_transfers[]         @relation("equipment_transfers_to_user_idTousers")
   equipment_transfers_equipment_transfers_transferred_byTousers  equipment_transfers[]         @relation("equipment_transfers_transferred_byTousers")
+  equipment_categories_responsible                               equipment_categories[]        @relation("equipment_categories_responsible")
+  equipment_uca_user                                             equipment_user_category_access[] @relation("equipment_uca_user")
+  equipment_uca_granted                                          equipment_user_category_access[] @relation("equipment_uca_granted")
+  equipment_loc_hist_user                                        equipment_location_history[]  @relation("equipment_loc_hist_user")
+  equipment_qr_pool_created                                      equipment_qr_pool[]           @relation("equipment_qr_pool_created")
+  equipment_qr_pool_assigned                                     equipment_qr_pool[]           @relation("equipment_qr_pool_assigned")
+  equipment_inventories_created                                  equipment_inventories[]       @relation("equipment_inventories_created")
+  equipment_inv_lines_scanned                                    equipment_inventory_lines[]   @relation("equipment_inv_lines_scanned")
+  equipment_floor_plans_created                                  equipment_floor_plans[]       @relation("equipment_floor_plans_created")
   file_uploads                                                   file_uploads[]
   person_tags                                                    person_tags[]
   presentations                                                  presentations[]
   question_imports                                               question_imports[]
   system_settings                                                system_settings[]
   test_assignments                                               test_assignments[]
+  test_assignments_target                                        test_assignments[]            @relation("test_assignments_target_user")
   test_attempts                                                  test_attempts[]
   tests                                                          tests[]
   user_deputies_user_deputies_user_idTousers                     user_deputies[]               @relation("user_deputies_user_idTousers")
@@ -1072,12 +1290,18 @@ model users {
   makety_assigned                                                makety[]                      @relation("makety_assignee")
   makety_created                                                 makety[]                      @relation("makety_creator")
   makety_quotes_submitted                                        makety[]                      @relation("makety_quote_submitter")
+  makety_prepress                                                makety[]                      @relation("makety_prepress")
+  makety_final_approver                                          makety[]                      @relation("makety_final_approver")
   makety_comments_authored                                       makety_comments[]             @relation("makety_comments_author")
+  makety_status_log_entries                                      makety_status_log[]           @relation("makety_status_log_user")
   stitky_orders_created                                          stitky_orders[]               @relation("stitky_orders_creator")
   stitky_orders_changed                                          stitky_orders[]               @relation("stitky_orders_changed")
   stitky_user_roles                                              stitky_user_roles[]
+  stitky_paletovka_templates_created                             stitky_paletovka_templates[]  @relation("stitky_paletovka_templates_creator")
+  stitky_paletovky_created                                       stitky_paletovky[]            @relation("stitky_paletovky_creator")
   notifications                                                  notifications[]
   iml_product_files_uploaded                                     iml_product_files[]           @relation("iml_product_files_uploader")
+  iml_export_templates                                           iml_export_templates[]        @relation("iml_export_templates_owner")
   projekty_owned_boards                                          Board[]                       @relation("ProjektyBoardOwner")
   projekty_board_members                                         BoardMember[]
   projekty_card_members                                          CardMember[]
@@ -1329,6 +1553,8 @@ model iml_customers {
   iml_inquiries                   iml_inquiries[]
   iml_customer_emails             iml_customer_emails[]
   iml_customer_contacts           iml_customer_contacts[]
+  iml_die_cuts                    iml_die_cuts[]
+  makety                          makety[]
 
   @@index([parent_id])
   @@index([unit_type])
@@ -1408,6 +1634,7 @@ model iml_products {
   cmyk_y_enabled       Boolean   @default(true)
   cmyk_k_enabled       Boolean   @default(true)
   label_type           String?   @db.VarChar(20)
+  product_kind         String    @default("iml") @db.VarChar(20)
   realization_log      String?   @db.Text
   internal_note        String?   @db.Text
   last_edited_by       String?   @db.VarChar(255)
@@ -1418,12 +1645,18 @@ model iml_products {
   is_active            Boolean   @default(true)
   custom_data          Json?     @db.Json
   labels_per_sheet     Int?
+  die_cut_id           Int?
+  /// Logický archiv produktu (PDF na disku); metadata zůstávají ve vyhledávání.
+  archived_at          DateTime? @db.DateTime(0)
+  /// Cesta k legacy `pdf_data` na disku (relativní vůči IML_ARCHIVE_DIR).
+  pdf_archive_path     String?   @db.VarChar(500)
 
   created_at DateTime @default(now()) @db.DateTime(0)
   updated_at DateTime @updatedAt @db.DateTime(0)
 
   iml_customers       iml_customers?       @relation(fields: [customer_id], references: [id], onDelete: SetNull)
   iml_foils           iml_foils?           @relation(fields: [foil_id], references: [id], onDelete: SetNull)
+  iml_die_cuts        iml_die_cuts?        @relation(fields: [die_cut_id], references: [id], onDelete: SetNull)
   iml_order_items     iml_order_items[]
   iml_product_colors  iml_product_colors[]
   iml_product_files   iml_product_files[]
@@ -1432,23 +1665,88 @@ model iml_products {
   color_material      materials?           @relation("ImlProductColor", fields: [color_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   paper_material        materials?           @relation("ImlProductPaper", fields: [paper_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   lacquer_material      materials?           @relation("ImlProductLacquer", fields: [lacquer_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  makety                makety[]
 
   @@index([customer_id])
   @@index([ig_code])
   @@index([sku])
   @@index([item_status])
+  @@index([product_kind])
   @@index([foil_id])
+  @@index([die_cut_id])
   @@index([foil_material_id], map: "idx_iml_products_foil_material")
   @@index([color_material_id], map: "idx_iml_products_color_material")
   @@index([paper_material_id], map: "idx_iml_products_paper_material")
   @@index([lacquer_material_id], map: "idx_iml_products_lacquer_material")
+  @@index([archived_at], map: "idx_iml_products_archived_at")
   @@map("iml_products")
+}
+
+/// Typy krabic pro katalog výseků.
+model iml_box_types {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now()) @db.DateTime(0)
+  updated_at  DateTime @updatedAt @db.DateTime(0)
+
+  iml_die_cuts iml_die_cuts[]
+
+  @@index([is_active])
+  @@map("iml_box_types")
+}
+
+/// Globální katalog výseků (unikátní kód tvaru etikety). Produkt na něj odkazuje přes die_cut_id.
+model iml_die_cuts {
+  id                 Int      @id @default(autoincrement())
+  label_shape_code   String   @unique @db.VarChar(100)
+  die_cut_tool_code  String?  @db.VarChar(100)
+  assembly_code      String?  @db.VarChar(100)
+  positions_on_sheet Int?
+  labels_per_sheet   Int?
+  pieces_per_box     Int?
+  pieces_per_pallet  Int?
+  note               String?  @db.Text
+  is_active          Boolean  @default(true)
+
+  internal_name    String? @db.VarChar(255)
+  die_cut_format   String? @db.VarChar(100)
+  customer_id      Int?
+  primary_machine  String? @db.VarChar(100)
+  box_type_id      Int?
+  note_prepress    String? @db.Text
+
+  mat_eup_60        Boolean @default(false)
+  mat_eup_60_weight String? @db.VarChar(50)
+  mat_eup_50        Boolean @default(false)
+  mat_eup_50_weight String? @db.VarChar(50)
+  mat_eth_55        Boolean @default(false)
+  mat_eth_55_weight String? @db.VarChar(50)
+  mat_elr_70        Boolean @default(false)
+  mat_elr_70_weight String? @db.VarChar(50)
+
+  created_at DateTime @default(now()) @db.DateTime(0)
+  updated_at DateTime @updatedAt @db.DateTime(0)
+
+  iml_products  iml_products[]
+  iml_customers iml_customers? @relation(fields: [customer_id], references: [id], onDelete: SetNull)
+  iml_box_types iml_box_types? @relation(fields: [box_type_id], references: [id], onDelete: SetNull)
+  makety        makety[]
+
+  @@index([is_active])
+  @@index([customer_id])
+  @@index([box_type_id])
+  @@map("iml_die_cuts")
 }
 
 model iml_orders {
   id           Int      @id @default(autoincrement())
   customer_id  Int
   order_number String   @unique @db.VarChar(50)
+  /// Číslo zakázky pro párování s jiným systémem (volitelné po výslovném potvrzení)
+  job_number          String?   @db.VarChar(50)
   order_date          DateTime  @db.DateTime(0)
   expected_ship_date DateTime? @db.DateTime(0)
   status              String    @default("nová") @db.VarChar(50)
@@ -1478,6 +1776,7 @@ model iml_orders {
   @@index([order_date])
   @@index([status])
   @@index([shipping_address_id])
+  @@index([job_number])
   @@map("iml_orders")
 }
 
@@ -1586,16 +1885,21 @@ model iml_product_colors {
 }
 
 model iml_product_files {
-  id          Int      @id @default(autoincrement())
-  product_id  Int
-  version     Int
-  filename    String   @db.VarChar(255)
-  file_size   Int
-  mime_type   String   @db.VarChar(100)
-  pdf_data    Bytes    @db.LongBlob
-  is_primary  Boolean  @default(true)
-  uploaded_by Int
-  uploaded_at DateTime @default(now()) @db.DateTime(0)
+  id               Int       @id @default(autoincrement())
+  product_id       Int
+  version          Int
+  filename         String    @db.VarChar(255)
+  file_size        Int
+  mime_type        String    @db.VarChar(100)
+  /// Hot BLOB; po archivaci NULL a data jsou na disku v archive_path.
+  pdf_data         Bytes?    @db.LongBlob
+  is_primary       Boolean   @default(true)
+  uploaded_by      Int
+  uploaded_at      DateTime  @default(now()) @db.DateTime(0)
+  last_accessed_at DateTime? @db.DateTime(0)
+  archived_at      DateTime? @db.DateTime(0)
+  /// Relativní cesta vůči IML_ARCHIVE_DIR (např. products/123/v3.pdf).
+  archive_path     String?   @db.VarChar(500)
 
   iml_products iml_products @relation(fields: [product_id], references: [id], onDelete: Cascade)
   users        users        @relation("iml_product_files_uploader", fields: [uploaded_by], references: [id], onDelete: Restrict)
@@ -1603,7 +1907,26 @@ model iml_product_files {
   @@unique([product_id, version])
   @@index([product_id, is_primary])
   @@index([uploaded_by])
+  @@index([archived_at], map: "idx_iml_product_files_archived_at")
   @@map("iml_product_files")
+}
+
+/// Uživatelské šablony exportu (produkty CSV/XML).
+model iml_export_templates {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  name       String   @db.VarChar(150)
+  entity     String   @default("products") @db.VarChar(50)
+  format     String   @default("csv") @db.VarChar(10)
+  columns    Json     @db.Json
+  filters    Json?    @db.Json
+  created_at DateTime @default(now()) @db.DateTime(0)
+  updated_at DateTime @updatedAt @db.DateTime(0)
+
+  users users @relation("iml_export_templates_owner", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, entity], map: "idx_iml_export_templates_user_entity")
+  @@map("iml_export_templates")
 }
 
 model iml_inquiries {
@@ -1896,6 +2219,40 @@ model stitky_user_roles {
 model stitky_settings {
   key   String @id @db.VarChar(50)
   value String @db.Text
+}
+
+model stitky_paletovka_templates {
+  id              Int               @id @default(autoincrement())
+  name            String            @db.VarChar(200)
+  layout_variant  String            @default("single") @db.VarChar(30)
+  blocks_per_page Int               @default(1)
+  layout_json     Json
+  defaults_json   Json
+  source_filename String?           @db.VarChar(255)
+  created_by      Int
+  created_at      DateTime          @default(now()) @db.Timestamp(0)
+  users_creator   users             @relation("stitky_paletovka_templates_creator", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stitky_paletovka_templates_creator_fk")
+  paletovky       stitky_paletovky[]
+
+  @@index([name], map: "idx_paletovka_tpl_name")
+  @@index([created_by], map: "idx_paletovka_tpl_created_by")
+}
+
+model stitky_paletovky {
+  id            Int                        @id @default(autoincrement())
+  template_id   Int
+  title         String                     @db.VarChar(200)
+  data_json     Json
+  status        String                     @default("DRAFT") @db.VarChar(20)
+  created_by    Int
+  created_at    DateTime                   @default(now()) @db.Timestamp(0)
+  updated_at    DateTime                   @default(now()) @updatedAt @db.Timestamp(0)
+  template      stitky_paletovka_templates @relation(fields: [template_id], references: [id], onUpdate: Cascade, map: "stitky_paletovky_template_fk")
+  users_creator users                      @relation("stitky_paletovky_creator", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stitky_paletovky_creator_fk")
+
+  @@index([status], map: "idx_paletovky_status")
+  @@index([created_by], map: "idx_paletovky_created_by")
+  @@index([template_id], map: "idx_paletovky_template")
 }
 
 // ===== Modul Projekty (port z integraf-pm; DB tabulky prefix projekty_) =====

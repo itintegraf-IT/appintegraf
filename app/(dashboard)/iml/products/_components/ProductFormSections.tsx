@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import {
   Boxes,
   CircleCheckBig,
@@ -14,6 +15,7 @@ import {
   IML_COLOR_COUNT_OPTIONS,
   IML_ITEM_STATUSES,
   IML_LABEL_TYPES,
+  IML_PRODUCT_KINDS,
   imlItemStatusLabel,
 } from "@/lib/iml-constants";
 import { formatProductFormatFromMm } from "@/lib/iml/product-format";
@@ -28,7 +30,20 @@ import {
   type ProductCmykFlags,
 } from "@/lib/iml-print-colors-summary";
 
+type DieCutOption = {
+  id: number;
+  label_shape_code: string;
+  die_cut_tool_code: string | null;
+  assembly_code: string | null;
+  positions_on_sheet: number | null;
+  labels_per_sheet: number | null;
+  pieces_per_box: number | null;
+  pieces_per_pallet: number | null;
+  is_active?: boolean;
+};
+
 export type ProductFormState = {
+  product_kind: string;
   customer_id: string;
   ig_code: string;
   ig_short_name: string;
@@ -36,6 +51,7 @@ export type ProductFormState = {
   client_name: string;
   requester: string;
   sku: string;
+  die_cut_id: string;
   label_shape_code: string;
   die_cut_tool_code: string;
   assembly_code: string;
@@ -113,10 +129,54 @@ export default function ProductFormSections({
   onCmykChange,
 }: Props) {
   const err = errors ?? {};
+  const [dieCuts, setDieCuts] = useState<DieCutOption[]>([]);
   const formatPreview = formatProductFormatFromMm(
     form.format_width_mm ? parseFloat(form.format_width_mm) : null,
     form.format_height_mm ? parseFloat(form.format_height_mm) : null
   );
+
+  useEffect(() => {
+    fetch("/api/iml/die-cuts?include_inactive=1")
+      .then((r) => r.json())
+      .then((d) =>
+        setDieCuts(
+          (d.die_cuts ?? []).filter(
+            (x: DieCutOption) => x.is_active !== false || String(x.id) === form.die_cut_id
+          )
+        )
+      )
+      .catch(() => setDieCuts([]));
+  }, [form.die_cut_id]);
+
+  const applyDieCut = (idStr: string) => {
+    if (!idStr) {
+      setField("die_cut_id", "");
+      setField("label_shape_code", "");
+      setField("die_cut_tool_code", "");
+      setField("assembly_code", "");
+      setField("positions_on_sheet", "");
+      setField("labels_per_sheet", "");
+      setField("pieces_per_box", "");
+      setField("pieces_per_pallet", "");
+      return;
+    }
+    const dc = dieCuts.find((d) => String(d.id) === idStr);
+    if (!dc) {
+      setField("die_cut_id", idStr);
+      return;
+    }
+    setField("die_cut_id", String(dc.id));
+    setField("label_shape_code", dc.label_shape_code ?? "");
+    setField("die_cut_tool_code", dc.die_cut_tool_code ?? "");
+    setField("assembly_code", dc.assembly_code ?? "");
+    setField("positions_on_sheet", dc.positions_on_sheet != null ? String(dc.positions_on_sheet) : "");
+    setField("labels_per_sheet", dc.labels_per_sheet != null ? String(dc.labels_per_sheet) : "");
+    setField("pieces_per_box", dc.pieces_per_box != null ? String(dc.pieces_per_box) : "");
+    setField("pieces_per_pallet", dc.pieces_per_pallet != null ? String(dc.pieces_per_pallet) : "");
+  };
+
+  const hasDieCut = !!form.die_cut_id;
+  const roCls = `${inputCls} bg-gray-50 text-gray-700`;
   const legacyApprovalStatus =
     form.approval_status &&
     !(IML_APPROVAL_STATUSES as readonly string[]).includes(form.approval_status)
@@ -154,6 +214,23 @@ export default function ProductFormSections({
       icon: <CircleCheckBig className="h-4 w-4" />,
       content: (
         <TabShell title="Identifikace" subtitle="Zákazník, interní kódy IG, kódy u klienta a zadavatel">
+          <div className="mb-4">
+            <span className="mb-2 block text-sm font-medium text-gray-700">Druh produktu</span>
+            <div className="flex flex-wrap gap-4">
+              {IML_PRODUCT_KINDS.map((kind) => (
+                <label key={kind.value} className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="radio"
+                    name="product_kind"
+                    value={kind.value}
+                    checked={form.product_kind === kind.value}
+                    onChange={() => setField("product_kind", kind.value)}
+                  />
+                  {kind.label}
+                </label>
+              ))}
+            </div>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Zákazník" error={err.customer_id}>
               <select
@@ -224,70 +301,67 @@ export default function ProductFormSections({
       label: "Výseky",
       icon: <Layers className="h-4 w-4" />,
       content: (
-        <TabShell title="Výseky a rozměry" subtitle="Kód tvaru etikety, formát, nástroje a balení">
+        <TabShell
+          title="Výseky a rozměry"
+          subtitle="Výběr z globálního katalogu výseků (kód tvaru etikety)"
+        >
+          <div className="mb-4">
+            <Field
+              label="Výsek (kód tvaru etikety)"
+              error={err.label_shape_code}
+              hint={
+                hasDieCut
+                  ? "Data se berou z katalogu. Úpravy provádějte v menu IML → Výseky."
+                  : "Vyberte výsek z katalogu, nebo nejdřív vytvořte záznam v IML → Výseky."
+              }
+            >
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={form.die_cut_id}
+                  onChange={(e) => applyDieCut(e.target.value)}
+                  className={`${inputCls} flex-1`}
+                >
+                  <option value="">— Vyberte výsek —</option>
+                  {dieCuts.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.label_shape_code}
+                      {d.die_cut_tool_code ? ` — ${d.die_cut_tool_code}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <Link
+                  href="/iml/die-cuts"
+                  className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  Správa výseků
+                </Link>
+              </div>
+            </Field>
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Kód tvaru etikety" error={err.label_shape_code}>
-              <input
-                type="text"
-                value={form.label_shape_code}
-                onChange={(e) => setField("label_shape_code", e.target.value)}
-                className={inputCls}
-              />
+            <Field label="Kód tvaru etikety">
+              <input type="text" readOnly value={form.label_shape_code} className={roCls} />
             </Field>
-            <Field label="Kód výsekového nástroje" error={err.die_cut_tool_code}>
-              <input
-                type="text"
-                value={form.die_cut_tool_code}
-                onChange={(e) => setField("die_cut_tool_code", e.target.value)}
-                className={inputCls}
-              />
+            <Field label="Kód výsekového nástroje">
+              <input type="text" readOnly value={form.die_cut_tool_code} className={roCls} />
             </Field>
-            <Field label="Kód montáže" error={err.assembly_code}>
-              <input
-                type="text"
-                value={form.assembly_code}
-                onChange={(e) => setField("assembly_code", e.target.value)}
-                className={inputCls}
-              />
+            <Field label="Kód montáže">
+              <input type="text" readOnly value={form.assembly_code} className={roCls} />
             </Field>
-            <Field label="Pozic na archu" error={err.positions_on_sheet}>
-              <input
-                type="number"
-                value={form.positions_on_sheet}
-                onChange={(e) => setField("positions_on_sheet", e.target.value)}
-                className={inputCls}
-              />
+            <Field label="Pozic na archu">
+              <input type="text" readOnly value={form.positions_on_sheet} className={roCls} />
             </Field>
             <Field
               label="Počet etiket na tiskový arch (TA)"
-              error={err.labels_per_sheet}
               hint="Potřebné pro výpočet spotřeby barvy v reportu (viz tab Barvy)."
             >
-              <input
-                type="number"
-                min={1}
-                step={1}
-                value={form.labels_per_sheet}
-                onChange={(e) => setField("labels_per_sheet", e.target.value)}
-                className={inputCls}
-                placeholder="např. 100"
-              />
+              <input type="text" readOnly value={form.labels_per_sheet} className={roCls} />
             </Field>
-            <Field label="Kusů v krabici" error={err.pieces_per_box}>
-              <input
-                type="number"
-                value={form.pieces_per_box}
-                onChange={(e) => setField("pieces_per_box", e.target.value)}
-                className={inputCls}
-              />
+            <Field label="Kusů v krabici">
+              <input type="text" readOnly value={form.pieces_per_box} className={roCls} />
             </Field>
-            <Field label="Kusů na paletě" span={2} error={err.pieces_per_pallet}>
-              <input
-                type="number"
-                value={form.pieces_per_pallet}
-                onChange={(e) => setField("pieces_per_pallet", e.target.value)}
-                className={inputCls}
-              />
+            <Field label="Kusů na paletě" span={2}>
+              <input type="text" readOnly value={form.pieces_per_pallet} className={roCls} />
             </Field>
           </div>
         </TabShell>
@@ -640,6 +714,7 @@ function Field({
 }
 
 export const emptyProductForm: ProductFormState = {
+  product_kind: "iml",
   customer_id: "",
   ig_code: "",
   ig_short_name: "",
@@ -647,6 +722,7 @@ export const emptyProductForm: ProductFormState = {
   client_name: "",
   requester: "",
   sku: "",
+  die_cut_id: "",
   label_shape_code: "",
   die_cut_tool_code: "",
   assembly_code: "",

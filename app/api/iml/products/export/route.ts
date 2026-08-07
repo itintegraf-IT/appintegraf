@@ -21,6 +21,8 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get("search")?.trim() ?? "";
   const customerId = searchParams.get("customer_id");
   const status = searchParams.get("status");
+  const productKind = searchParams.get("product_kind")?.trim() ?? "";
+  const archiveFilter = (searchParams.get("archive") ?? "active").trim().toLowerCase();
 
   const where: Record<string, unknown> = {};
   if (search) {
@@ -30,10 +32,22 @@ export async function GET(req: NextRequest) {
       { client_code: { contains: search } },
       { client_name: { contains: search } },
       { sku: { contains: search } },
+      { product_format: { contains: search } },
+      { label_shape_code: { contains: search } },
+      { die_cut_tool_code: { contains: search } },
+      { assembly_code: { contains: search } },
+      { color_coverage: { contains: search } },
+      { print_colors_text: { contains: search } },
+      { foil_type: { contains: search } },
+      { ean_code: { contains: search } },
+      { requester: { contains: search } },
     ];
   }
   if (customerId) where.customer_id = parseInt(customerId, 10);
   if (status) where.item_status = status;
+  if (productKind === "iml" || productKind === "etikety") where.product_kind = productKind;
+  if (archiveFilter === "archived") where.archived_at = { not: null };
+  else if (archiveFilter !== "all") where.archived_at = null;
 
   const products = await prisma.iml_products.findMany({
     where,
@@ -49,6 +63,7 @@ export async function GET(req: NextRequest) {
     client_code: p.client_code ?? "",
     client_name: p.client_name ?? "",
     sku: p.sku ?? "",
+    product_kind: p.product_kind ?? "iml",
     customer_name: p.iml_customers?.name ?? "",
     requester: p.requester ?? "",
     label_shape_code: p.label_shape_code ?? "",
@@ -96,7 +111,7 @@ export async function GET(req: NextRequest) {
   }
 
   const header =
-    "id;ig_code;ig_short_name;client_code;client_name;sku;customer_name;requester;label_shape_code;product_format;format_width_mm;format_height_mm;die_cut_tool_code;assembly_code;positions_on_sheet;pieces_per_box;pieces_per_pallet;foil_type;foil_material_id;color_coverage;color_material_id;paper_material_id;lacquer_material_id;ean_code;item_status;approval_status;approval_date;color_count;print_colors_text;label_type;has_print_sample;has_print_proof;is_active;created_at;updated_at";
+    "id;ig_code;ig_short_name;client_code;client_name;sku;product_kind;customer_name;requester;label_shape_code;product_format;format_width_mm;format_height_mm;die_cut_tool_code;assembly_code;positions_on_sheet;pieces_per_box;pieces_per_pallet;foil_type;foil_material_id;color_coverage;color_material_id;paper_material_id;lacquer_material_id;ean_code;item_status;approval_status;approval_date;color_count;print_colors_text;label_type;has_print_sample;has_print_proof;is_active;created_at;updated_at";
   type CsvRow = (typeof rows)[number];
   const csvRows = rows.map((r: CsvRow) =>
     [
@@ -106,6 +121,7 @@ export async function GET(req: NextRequest) {
       escapeCsv(r.client_code),
       escapeCsv(r.client_name),
       escapeCsv(r.sku),
+      escapeCsv(r.product_kind),
       escapeCsv(r.customer_name),
       escapeCsv(r.requester),
       escapeCsv(r.label_shape_code),

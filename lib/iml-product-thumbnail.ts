@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { logImlAudit } from "@/lib/iml-audit";
 import { pdfBufferToJpeg, isPdfThumbnailGenerationAvailable } from "@/lib/iml-product-preview-pdf-server";
+import { resolveProductPdfBuffer } from "@/lib/iml-product-archive";
 
 const MAX_PREVIEW_IMAGE_BYTES = 5 * 1024 * 1024;
 
@@ -69,24 +70,8 @@ export async function ensureProductThumbnailFromPdf(
 }
 
 export async function loadPrimaryPdfBuffer(productId: number): Promise<Buffer | null> {
-  const fileRow = await prisma.iml_product_files.findFirst({
-    where: { product_id: productId, is_primary: true },
-    orderBy: { version: "desc" },
-    select: { pdf_data: true },
-  });
-  if (fileRow?.pdf_data && fileRow.pdf_data.length > 0) {
-    return Buffer.isBuffer(fileRow.pdf_data) ? fileRow.pdf_data : Buffer.from(fileRow.pdf_data);
-  }
-
-  const legacy = await prisma.iml_products.findUnique({
-    where: { id: productId },
-    select: { pdf_data: true },
-  });
-  if (legacy?.pdf_data && legacy.pdf_data.length > 0) {
-    return Buffer.isBuffer(legacy.pdf_data) ? legacy.pdf_data : Buffer.from(legacy.pdf_data);
-  }
-
-  return null;
+  const resolved = await resolveProductPdfBuffer(productId, { touchAccess: false });
+  return resolved?.buffer ?? null;
 }
 
 export type BackfillThumbnailsResult = {
@@ -105,12 +90,15 @@ export async function countProductsNeedingThumbnail(): Promise<number> {
     WHERE (p.image_data IS NULL OR OCTET_LENGTH(p.image_data) = 0)
       AND (
         (p.pdf_data IS NOT NULL AND OCTET_LENGTH(p.pdf_data) > 0)
+        OR (p.pdf_archive_path IS NOT NULL AND p.pdf_archive_path <> '')
         OR EXISTS (
           SELECT 1 FROM iml_product_files f
           WHERE f.product_id = p.id
             AND f.is_primary = 1
-            AND f.pdf_data IS NOT NULL
-            AND OCTET_LENGTH(f.pdf_data) > 0
+            AND (
+              (f.pdf_data IS NOT NULL AND OCTET_LENGTH(f.pdf_data) > 0)
+              OR (f.archive_path IS NOT NULL AND f.archive_path <> '')
+            )
         )
       )
   `;
@@ -130,12 +118,15 @@ export async function backfillProductThumbnailsFromPdf(
     WHERE (p.image_data IS NULL OR OCTET_LENGTH(p.image_data) = 0)
       AND (
         (p.pdf_data IS NOT NULL AND OCTET_LENGTH(p.pdf_data) > 0)
+        OR (p.pdf_archive_path IS NOT NULL AND p.pdf_archive_path <> '')
         OR EXISTS (
           SELECT 1 FROM iml_product_files f
           WHERE f.product_id = p.id
             AND f.is_primary = 1
-            AND f.pdf_data IS NOT NULL
-            AND OCTET_LENGTH(f.pdf_data) > 0
+            AND (
+              (f.pdf_data IS NOT NULL AND OCTET_LENGTH(f.pdf_data) > 0)
+              OR (f.archive_path IS NOT NULL AND f.archive_path <> '')
+            )
         )
       )
     ORDER BY p.id ASC

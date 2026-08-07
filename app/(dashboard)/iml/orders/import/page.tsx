@@ -4,9 +4,12 @@ import { useState, useRef, useCallback } from "react";
 import Link from "next/link";
 import { ArrowLeft, Upload, FileSpreadsheet, GripVertical } from "lucide-react";
 import * as XLSX from "xlsx";
+import { PdfOrderImport } from "./PdfOrderImport";
+import { CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE } from "@/lib/iml/order-job-number";
 
 const TARGET_FIELDS = [
   { key: "order_number", label: "Číslo objednávky", required: true },
+  { key: "job_number", label: "Číslo zakázky", required: false },
   { key: "customer_name", label: "Název zákazníka", required: true },
   { key: "order_date", label: "Datum objednávky", required: true },
   { key: "status", label: "Stav", required: false },
@@ -41,7 +44,7 @@ function parseCsv(text: string): string[][] {
   return result;
 }
 
-export default function ImlOrdersImportPage() {
+function CsvOrdersImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -160,11 +163,37 @@ export default function ImlOrdersImportPage() {
     setError("");
     setResult(null);
     try {
+      const jobMapped =
+        typeof mapping.job_number === "number" && mapping.job_number >= 0;
+      let confirmedWithout = false;
+      if (!jobMapped) {
+        if (!confirm(CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE)) {
+          setLoading(false);
+          return;
+        }
+        confirmedWithout = true;
+      } else {
+        // Některé řádky mohou mít prázdné číslo zakázky — API to ověří; při 400 s needs_job_number_confirm znovu potvrdíme.
+        confirmedWithout = false;
+      }
+
       const formData = new FormData();
       formData.append("file", file);
       formData.append("mapping", JSON.stringify(mapping));
-      const res = await fetch("/api/iml/orders/import", { method: "POST", body: formData });
-      const data = await res.json().catch(() => ({}));
+      if (confirmedWithout) {
+        formData.append("confirmed_without_job_number", "1");
+      }
+      let res = await fetch("/api/iml/orders/import", { method: "POST", body: formData });
+      let data = await res.json().catch(() => ({}));
+      if (
+        !res.ok &&
+        data.needs_job_number_confirm &&
+        confirm(CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE)
+      ) {
+        formData.set("confirmed_without_job_number", "1");
+        res = await fetch("/api/iml/orders/import", { method: "POST", body: formData });
+        data = await res.json().catch(() => ({}));
+      }
       if (!res.ok) throw new Error(data.error ?? "Chyba při importu");
       setResult({ imported: data.imported, errors: data.errors ?? [] });
       setFile(null);
@@ -180,24 +209,7 @@ export default function ImlOrdersImportPage() {
   };
 
   return (
-    <>
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Import objednávek z CSV/Excel</h1>
-          <p className="mt-1 text-gray-600">
-            Nahrajte soubor, zobrazte náhled a přetáhněte sloupce na cílová pole
-          </p>
-        </div>
-        <Link
-          href="/iml/orders"
-          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Zpět
-        </Link>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6">
         {error && (
           <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
@@ -377,7 +389,54 @@ export default function ImlOrdersImportPage() {
             Zrušit
           </Link>
         </div>
-      </form>
+    </form>
+  );
+}
+
+export default function ImlOrdersImportPage() {
+  const [mode, setMode] = useState<"csv" | "pdf">("csv");
+
+  return (
+    <>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Import objednávek</h1>
+          <p className="mt-1 text-gray-600">
+            {mode === "csv"
+              ? "Nahrajte CSV/Excel, zobrazte náhled a přetáhněte sloupce na cílová pole"
+              : "Nahrajte PDF objednávku zákazníka, zkontrolujte náhled a vytvořte objednávku"}
+          </p>
+        </div>
+        <Link
+          href="/iml/orders"
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Zpět
+        </Link>
+      </div>
+
+      <div className="mb-6 inline-flex rounded-lg border border-gray-300 bg-white p-1">
+        {(
+          [
+            { key: "csv", label: "CSV / Excel" },
+            { key: "pdf", label: "PDF objednávka" },
+          ] as const
+        ).map((m) => (
+          <button
+            key={m.key}
+            type="button"
+            onClick={() => setMode(m.key)}
+            className={`rounded-md px-4 py-1.5 text-sm font-medium transition-colors ${
+              mode === m.key ? "bg-red-600 text-white" : "text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "csv" ? <CsvOrdersImport /> : <PdfOrderImport />}
     </>
   );
 }
