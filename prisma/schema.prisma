@@ -486,13 +486,15 @@ model makety_departments {
 }
 
 model makety_comments {
-  id         Int      @id @default(autoincrement())
-  maketa_id  Int
-  user_id    Int
-  body       String   @db.Text
-  created_at DateTime @default(now()) @db.Timestamp(0)
-  makety     makety   @relation(fields: [maketa_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_comments_maketa_fk")
-  users      users    @relation("makety_comments_author", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_comments_user_fk")
+  id              Int      @id @default(autoincrement())
+  maketa_id       Int
+  user_id         Int
+  body            String   @db.Text
+  /// ID uživatelů, kteří byli upozorněni (adresný komentář). Viditelný všem.
+  notify_user_ids Json?
+  created_at      DateTime @default(now()) @db.Timestamp(0)
+  makety          makety   @relation(fields: [maketa_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_comments_maketa_fk")
+  users           users    @relation("makety_comments_author", fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_comments_user_fk")
 
   @@index([maketa_id], map: "idx_makety_comments_maketa")
   @@index([user_id], map: "idx_makety_comments_user")

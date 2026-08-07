@@ -37,6 +37,7 @@ import { MaketaCommentsPanel } from "./MaketaCommentsPanel";
 import { GrafikaStatusPanel } from "./GrafikaStatusPanel";
 import { GrafikaAutomationPanel } from "./GrafikaAutomationPanel";
 import { GrafikaWorkflowPicker } from "../GrafikaWorkflowPicker";
+import { buildMaketyCommentParticipants } from "@/lib/makety-comment-participants";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
     where: { id },
     include: {
       users_assignee: { select: { first_name: true, last_name: true, id: true } },
-      users_creator: { select: { first_name: true, last_name: true } },
+      users_creator: { select: { first_name: true, last_name: true, id: true } },
       users_prepress: { select: { first_name: true, last_name: true, id: true } },
       users_final_approver: { select: { first_name: true, last_name: true, id: true } },
       iml_customers: {
@@ -119,6 +120,14 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
     maketa.iml_customers?.email?.trim() ||
     maketa.iml_customers?.iml_customer_emails[0]?.email?.trim() ||
     null;
+  const commentParticipants = buildMaketyCommentParticipants({
+    workType,
+    excludeUserId: userId,
+    creator: maketa.users_creator,
+    assignee: maketa.users_assignee,
+    prepress: maketa.users_prepress,
+    finalApprover: maketa.users_final_approver,
+  });
   const quotePriceFormatted =
     maketa.quote_price != null
       ? new Intl.NumberFormat("cs-CZ", { style: "currency", currency: "CZK" }).format(
@@ -382,7 +391,11 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
         />
       )}
 
-      <MaketaCommentsPanel maketaId={id} redirectToListAfterSubmit={showUploadHint} />
+      <MaketaCommentsPanel
+        maketaId={id}
+        participants={commentParticipants}
+        redirectToListAfterSubmit={showUploadHint}
+      />
     </div>
   );
 }

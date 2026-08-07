@@ -108,7 +108,7 @@ function notifyCopy(
     case "comment":
       return {
         title: `Nový komentář ${w.toPrep}`,
-        intro: `U ${w.genitive}${zak} byl přidán komentář.`,
+        intro: `U ${w.genitive}${zak} vám byl adresován komentář.`,
       };
     case "quote_submitted":
       return {
