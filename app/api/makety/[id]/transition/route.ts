@@ -208,7 +208,7 @@ async function notifyAfterGrafikaTransition(params: {
   if (toStatus === "data_problem") {
     await notifyMaketaUsers({
       maketaId,
-      userIds: [createdBy, prepressUserId, finalApproverUserId],
+      userIds: [createdBy],
       bodyPreview,
       orderNumber,
       kind: "data_problem",

@@ -102,8 +102,8 @@ function notifyCopy(
       };
     case "data_problem":
       return {
-        title: "Problém s daty u grafiky",
-        intro: `U grafiky${zak} byl nahlášen problém s daty.`,
+        title: "Grafika pozastavena – problém s daty",
+        intro: `Grafik pozastavil grafiku${zak} kvůli problému s daty. Doplňte podklady a uvolněte zakázku ke zpracování.`,
       };
     case "comment":
       return {

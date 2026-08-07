@@ -3,12 +3,14 @@ import {
   assertGrafikaTransition,
   getAllowedGrafikaTransitions,
   grafikaStatusLabel,
+  grafikaTransitionActionLabel,
   isMaketaTerminalStatus,
+  GRAFIKA_QUEUE_STATUSES,
 } from "@/lib/makety-grafika-status";
 
 describe("makety-grafika-status", () => {
-  it("labeluje prepress stavy", () => {
-    expect(grafikaStatusLabel("data_problem")).toBe("Problém s daty");
+  it("labeluje pozastavení a prepress stavy", () => {
+    expect(grafikaStatusLabel("data_problem")).toBe("Pozastaveno");
     expect(grafikaStatusLabel("prepress_approved")).toBe("Schváleno prepressem");
   });
 
@@ -30,10 +32,27 @@ describe("makety-grafika-status", () => {
     ).not.toThrow();
   });
 
-  it("povoluje grafikovi přechod na hotovo", () => {
+  it("povoluje grafikovi přechod na hotovo a pozastavení", () => {
     const allowed = getAllowedGrafikaTransitions("in_progress", ["grafik"]);
     expect(allowed).toContain("done");
     expect(allowed).toContain("data_problem");
+    expect(allowed).not.toContain("open");
+  });
+
+  it("grafik neuvolní pozastavenou zakázku", () => {
+    expect(getAllowedGrafikaTransitions("data_problem", ["grafik"])).toEqual([]);
+  });
+
+  it("zadavatel uvolní pozastavenou zakázku do fronty", () => {
+    expect(getAllowedGrafikaTransitions("data_problem", ["zadavatel"])).toEqual(["open"]);
+    expect(grafikaTransitionActionLabel("open", "data_problem")).toBe("Uvolnit ke zpracování");
+    expect(grafikaTransitionActionLabel("data_problem")).toBe("Pozastavit – problém s daty");
+    expect(() =>
+      assertGrafikaTransition({
+        fromStatus: "data_problem",
+        toStatus: "open",
+      })
+    ).not.toThrow();
   });
 
   it("povoluje prepress a final přechody", () => {
@@ -42,6 +61,11 @@ describe("makety-grafika-status", () => {
     expect(getAllowedGrafikaTransitions("prepress_approved", ["final"])).toContain(
       "sent_for_approval"
     );
+  });
+
+  it("vyřazuje pozastavené z fronty grafika", () => {
+    expect([...GRAFIKA_QUEUE_STATUSES]).toEqual(["open", "in_progress"]);
+    expect(GRAFIKA_QUEUE_STATUSES).not.toContain("data_problem");
   });
 
   it("rozlišuje terminální stav grafiky a makety", () => {

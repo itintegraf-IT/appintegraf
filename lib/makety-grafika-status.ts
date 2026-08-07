@@ -22,8 +22,8 @@ export const GRAFIKA_STATUSES = [
   "cancelled",
 ] as const;
 
-/** Aktivní stavy ve frontě grafika (grafik pracuje nebo čeká). */
-export const GRAFIKA_QUEUE_STATUSES = ["open", "in_progress", "data_problem"] as const;
+/** Aktivní stavy ve frontě grafika (grafik pracuje nebo čeká). Pozastavené (data_problem) sem nepatří. */
+export const GRAFIKA_QUEUE_STATUSES = ["open", "in_progress"] as const;
 
 /** Stavy po dokončení grafikem – kontrola a schvalování. */
 export const GRAFIKA_REVIEW_STATUSES = [
@@ -90,7 +90,7 @@ export function grafikaStatusLabel(status: string): string {
     case "in_progress":
       return "Rozpracováno";
     case "data_problem":
-      return "Problém s daty";
+      return "Pozastaveno";
     case "done":
       return "Hotovo";
     case "prepress_approved":
@@ -135,6 +135,8 @@ export function grafikaTransitionButtonClass(toStatus: string, selected: boolean
   const base = "rounded-lg border px-3 py-2 text-sm font-medium transition-colors";
   if (selected) {
     switch (toStatus) {
+      case "open":
+        return `${base} border-yellow-600 bg-yellow-500 text-white`;
       case "in_progress":
         return `${base} border-orange-600 bg-orange-500 text-white`;
       case "data_problem":
@@ -150,6 +152,8 @@ export function grafikaTransitionButtonClass(toStatus: string, selected: boolean
     }
   }
   switch (toStatus) {
+    case "open":
+      return `${base} border-yellow-300 bg-yellow-50 text-yellow-900 hover:bg-yellow-100`;
     case "in_progress":
       return `${base} border-orange-300 bg-orange-50 text-orange-900 hover:bg-orange-100`;
     case "data_problem":
@@ -174,24 +178,22 @@ type TransitionRule = {
 const TRANSITIONS: TransitionRule[] = [
   { from: ["open"], to: "in_progress" },
   { from: ["in_progress"], to: "data_problem", requiresComment: true },
-  { from: ["data_problem"], to: "in_progress" },
-  { from: ["data_problem"], to: "data_problem", requiresComment: true },
+  { from: ["data_problem"], to: "open" },
   { from: ["in_progress"], to: "done" },
   { from: ["done"], to: "prepress_approved" },
   { from: ["prepress_approved"], to: "sent_for_approval" },
   { from: ["sent_for_approval"], to: "approved" },
 ];
 
-export type GrafikaTransitionRole = "grafik" | "prepress" | "final";
+export type GrafikaTransitionRole = "grafik" | "prepress" | "final" | "zadavatel";
 
 const ROLE_TRANSITIONS: Record<GrafikaTransitionRole, Array<{ from: GrafikaStatus; to: GrafikaStatus }>> = {
   grafik: [
     { from: "open", to: "in_progress" },
     { from: "in_progress", to: "data_problem" },
-    { from: "data_problem", to: "in_progress" },
-    { from: "data_problem", to: "data_problem" },
     { from: "in_progress", to: "done" },
   ],
+  zadavatel: [{ from: "data_problem", to: "open" }],
   prepress: [{ from: "done", to: "prepress_approved" }],
   final: [
     { from: "prepress_approved", to: "sent_for_approval" },
@@ -237,10 +239,12 @@ export function assertGrafikaTransition(input: AssertGrafikaTransitionInput): vo
 
 export function grafikaTransitionActionLabel(toStatus: GrafikaStatus, fromStatus?: string): string {
   switch (toStatus) {
+    case "open":
+      return fromStatus === "data_problem" ? "Uvolnit ke zpracování" : "Zařadit do fronty";
     case "in_progress":
-      return fromStatus === "data_problem" ? "Pokračovat v práci" : "Zahájit práci";
+      return "Zahájit práci";
     case "data_problem":
-      return "Nahlásit problém s daty";
+      return "Pozastavit – problém s daty";
     case "done":
       return "Označit jako hotovo";
     case "prepress_approved":

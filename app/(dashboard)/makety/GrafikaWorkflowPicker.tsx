@@ -46,8 +46,9 @@ export function grafikaWorkflowActiveStep(
   switch (status) {
     case "open":
     case "in_progress":
-    case "data_problem":
       return "grafik";
+    case "data_problem":
+      return "zadavatel";
     case "done":
       return "prepress";
     case "prepress_approved":

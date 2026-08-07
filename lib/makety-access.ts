@@ -238,6 +238,7 @@ export async function getGrafikaTransitionRoles(
     select: {
       id: true,
       status: true,
+      created_by: true,
       assignee_user_id: true,
       prepress_user_id: true,
       final_approver_user_id: true,
@@ -250,6 +251,9 @@ export async function getGrafikaTransitionRoles(
 
   if (isModuleAdmin || row.assignee_user_id === userId) {
     roles.add("grafik");
+  }
+  if (isModuleAdmin || row.created_by === userId) {
+    roles.add("zadavatel");
   }
   if (isModuleAdmin || row.prepress_user_id === userId) {
     roles.add("prepress");
