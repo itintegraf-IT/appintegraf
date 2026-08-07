@@ -18,6 +18,7 @@ import ProductDetailView, {
 } from "../_components/ProductDetailView";
 import ProductImagePreview from "../_components/ProductImagePreview";
 import ProductPdfHistory from "../_components/ProductPdfHistory";
+import { ProductArchiveBanner } from "../_components/ProductArchiveBanner";
 import { consumptionKg } from "@/lib/iml-color-consumption";
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
@@ -37,6 +38,7 @@ export default async function ImlProductDetailPage({
   const userId = parseInt(session.user.id, 10);
   const canRead = await hasModuleAccess(userId, "iml", "read");
   const canWrite = await hasModuleAccess(userId, "iml", "write");
+  const canAdmin = await hasModuleAccess(userId, "iml", "admin");
 
   if (!canRead) redirect("/iml");
 
@@ -130,7 +132,8 @@ export default async function ImlProductDetailPage({
     (product.iml_foils ? `${product.iml_foils.code} — ${product.iml_foils.name}` : fmt(product.foil_type));
 
   const hasImage = !!(product.image_data && product.image_data.length > 0);
-  const hasLegacyPdf = !!(product.pdf_data && product.pdf_data.length > 0);
+  const hasLegacyPdf =
+    !!(product.pdf_data && product.pdf_data.length > 0) || !!product.pdf_archive_path;
   const hasPdf = hasLegacyPdf || hasFileTablePdf;
   const cmyk = cmykFlagsFromProduct(product);
   const hasPantoneColors = product.iml_product_colors.length > 0;
@@ -405,14 +408,23 @@ export default async function ImlProductDetailPage({
 
   return (
     <Suspense fallback={<div className="p-8 text-center text-gray-500">Načítání…</div>}>
-    <ProductDetailView
-      title={title}
-      subtitle={subtitle}
-      productId={product.id}
-      canWrite={canWrite}
-      hasPdf={hasPdf}
-      sections={sections}
-    />
+      <>
+        {product.archived_at && (
+          <ProductArchiveBanner
+            productId={product.id}
+            archivedAt={product.archived_at}
+            canAdmin={canAdmin}
+          />
+        )}
+        <ProductDetailView
+          title={title}
+          subtitle={subtitle}
+          productId={product.id}
+          canWrite={canWrite}
+          hasPdf={hasPdf}
+          sections={sections}
+        />
+      </>
     </Suspense>
   );
 }

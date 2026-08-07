@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
   const customerId = searchParams.get("customer_id");
   const status = searchParams.get("status");
   const productKind = searchParams.get("product_kind")?.trim() ?? "";
+  const archiveFilter = (searchParams.get("archive") ?? "active").trim().toLowerCase();
 
   const where: Record<string, unknown> = {};
   if (search) {
@@ -45,6 +46,8 @@ export async function GET(req: NextRequest) {
   if (customerId) where.customer_id = parseInt(customerId, 10);
   if (status) where.item_status = status;
   if (productKind === "iml" || productKind === "etikety") where.product_kind = productKind;
+  if (archiveFilter === "archived") where.archived_at = { not: null };
+  else if (archiveFilter !== "all") where.archived_at = null;
 
   const products = await prisma.iml_products.findMany({
     where,

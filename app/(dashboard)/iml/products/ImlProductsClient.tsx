@@ -17,6 +17,7 @@ const PRODUCT_LIST_FILTER_DEFAULTS = {
   customer_id: "",
   status: "",
   product_kind: "",
+  archive: "",
   page: "1",
   per_page: "",
 };
@@ -35,13 +36,14 @@ function parseStoredPerPage(value: string | null): PerPageOption {
 export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const { filters, setFilter, setFilters, listHref } = useListFilters({
     defaults: PRODUCT_LIST_FILTER_DEFAULTS,
-    resetPageOnChange: ["search", "customer_id", "status", "product_kind", "per_page"],
+    resetPageOnChange: ["search", "customer_id", "status", "product_kind", "archive", "per_page"],
   });
 
   const search = filters.search;
   const filterCustomer = filters.customer_id;
   const filterStatus = filters.status;
   const filterProductKind = filters.product_kind;
+  const filterArchive = filters.archive || "active";
   const page = parseInt(filters.page || "1", 10) || 1;
   const perPage = (filters.per_page || "25") as PerPageOption;
 
@@ -93,6 +95,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     if (filterCustomer) params.set("customer_id", filterCustomer);
     if (filterStatus) params.set("status", filterStatus);
     if (filterProductKind) params.set("product_kind", filterProductKind);
+    if (filterArchive && filterArchive !== "active") params.set("archive", filterArchive);
     params.set("page", String(page));
     params.set("per_page", perPage);
     const res = await fetch(`/api/iml/products?${params}`);
@@ -115,7 +118,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   useEffect(() => {
     const t = setTimeout(() => fetchProducts(), 300);
     return () => clearTimeout(t);
-  }, [search, filterCustomer, filterStatus, filterProductKind, page, perPage]);
+  }, [search, filterCustomer, filterStatus, filterProductKind, filterArchive, page, perPage]);
 
   const buildExportUrl = (format: string) => {
     const params = new URLSearchParams();
@@ -124,6 +127,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     if (filterCustomer) params.set("customer_id", filterCustomer);
     if (filterStatus) params.set("status", filterStatus);
     if (filterProductKind) params.set("product_kind", filterProductKind);
+    if (filterArchive && filterArchive !== "active") params.set("archive", filterArchive);
     return `/api/iml/products/export?${params}`;
   };
 
@@ -138,7 +142,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
         alert(data.error ?? "Chyba při mazání");
       }
     },
-    [search, filterCustomer, filterStatus, filterProductKind, page, perPage]
+    [search, filterCustomer, filterStatus, filterProductKind, filterArchive, page, perPage]
   );
 
   const cellContext = useMemo(
@@ -249,6 +253,16 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
                   {imlItemStatusLabel(s)}
                 </option>
               ))}
+            </select>
+            <select
+              value={filterArchive}
+              onChange={(e) => setFilter("archive", e.target.value === "active" ? "" : e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+              title="Archiv tiskových dat"
+            >
+              <option value="active">Aktivní (mimo archiv)</option>
+              <option value="archived">Jen archiv</option>
+              <option value="all">Vše včetně archivu</option>
             </select>
             <button
               type="submit"

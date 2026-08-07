@@ -74,6 +74,7 @@ export type ProductListRow = {
   sku: string | null;
   product_kind: string | null;
   item_status: string | null;
+  archived_at?: string | Date | null;
   updated_at: string | Date | null;
   iml_customers?: { id: number; name: string } | null;
   iml_foils?: { id: number; code: string | null; name: string | null } | null;

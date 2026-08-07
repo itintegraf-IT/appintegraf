@@ -59,6 +59,7 @@ const productListSelect = {
   stock_quantity: true,
   sku: true,
   is_active: true,
+  archived_at: true,
   created_at: true,
   updated_at: true,
   iml_customers: { select: { id: true, name: true } },
@@ -81,6 +82,8 @@ export async function GET(req: NextRequest) {
   const customerId = searchParams.get("customer_id");
   const status = searchParams.get("item_status") ?? searchParams.get("status");
   const productKind = searchParams.get("product_kind")?.trim() ?? "";
+  /** active (výchozí) | archived | all */
+  const archiveFilter = (searchParams.get("archive") ?? "active").trim().toLowerCase();
 
   const where: Record<string, unknown> = {};
   if (search) {
@@ -112,6 +115,11 @@ export async function GET(req: NextRequest) {
   }
   if (productKind === "iml" || productKind === "etikety") {
     where.product_kind = productKind;
+  }
+  if (archiveFilter === "archived") {
+    where.archived_at = { not: null };
+  } else if (archiveFilter !== "all") {
+    where.archived_at = null;
   }
 
   const pageParam = searchParams.get("page");
@@ -175,11 +183,14 @@ export async function GET(req: NextRequest) {
              CASE WHEN p.image_data IS NOT NULL AND OCTET_LENGTH(p.image_data) > 0 THEN 1 ELSE 0 END AS has_image,
              CASE
                WHEN (p.pdf_data IS NOT NULL AND OCTET_LENGTH(p.pdf_data) > 0) THEN 1
+               WHEN (p.pdf_archive_path IS NOT NULL AND p.pdf_archive_path <> '') THEN 1
                WHEN EXISTS (
                  SELECT 1 FROM iml_product_files f
                  WHERE f.product_id = p.id
-                   AND f.pdf_data IS NOT NULL
-                   AND OCTET_LENGTH(f.pdf_data) > 0
+                   AND (
+                     (f.pdf_data IS NOT NULL AND OCTET_LENGTH(f.pdf_data) > 0)
+                     OR (f.archive_path IS NOT NULL AND f.archive_path <> '')
+                   )
                ) THEN 1
                ELSE 0
              END AS has_pdf

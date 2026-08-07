@@ -4,22 +4,24 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { ensureProductThumbnailFromPdf } from "@/lib/iml-product-thumbnail";
+import {
+  deleteArchiveFileIfExists,
+  resolveProductPdfBuffer,
+} from "@/lib/iml-product-archive";
 
 /**
  * Verzovaný PDF endpoint pro iml_product_files.
  *
  * Chování:
- * - GET          → vrátí aktuální primary verzi PDF.
+ * - GET          → vrátí aktuální primary verzi PDF (BLOB nebo archiv na disku).
  * - GET ?version → vrátí konkrétní historickou verzi.
  * - POST         → nahraje nové PDF jako novou verzi (max(version)+1),
- *                  dřívější primary se vypne.
+ *                  dřívější primary se vypne. U archivovaného produktu zruší archived_at.
  * - DELETE       → smaže aktuální primary verzi. Pokud existuje předchozí
  *                  verze (s nejvyšším version), stane se novou primary.
  *
  * Fallback: pokud produkt nemá žádnou verzi v iml_product_files,
- * čte se legacy `iml_products.pdf_data`. Migrace Fáze 1 ale měla legacy
- * záznamy přenést – fallback je pojistka pro případ, kdy uživatel
- * mezitím něco nahrál a migrace se nerozběhla.
+ * čte se legacy `iml_products.pdf_data` / `pdf_archive_path`.
  */
 const MAX_PDF_SIZE = 50 * 1024 * 1024; // 50 MB (spec 3.4)
 
@@ -46,51 +48,20 @@ export async function GET(
   const versionNum =
     versionParam && /^\d+$/.test(versionParam) ? parseInt(versionParam, 10) : null;
 
-  const fileRow = versionNum
-    ? await prisma.iml_product_files.findUnique({
-        where: { product_id_version: { product_id: id, version: versionNum } },
-      })
-    : await prisma.iml_product_files.findFirst({
-        where: { product_id: id, is_primary: true },
-        orderBy: { version: "desc" },
-      });
-
-  if (fileRow) {
-    const buf = Buffer.isBuffer(fileRow.pdf_data)
-      ? fileRow.pdf_data
-      : Buffer.from(fileRow.pdf_data);
-    return new NextResponse(new Uint8Array(buf), {
-      headers: {
-        "Content-Type": fileRow.mime_type || "application/pdf",
-        "Content-Disposition": `inline; filename="${sanitizeFilename(fileRow.filename)}"`,
-        "Cache-Control": "private, max-age=3600",
-        "X-PDF-Version": String(fileRow.version),
-      },
-    });
+  const resolved = await resolveProductPdfBuffer(id, { version: versionNum });
+  if (!resolved) {
+    return new NextResponse("PDF nenalezeno", { status: 404 });
   }
 
-  // Fallback na legacy sloupec iml_products.pdf_data, dokud ho nedrop-neme.
-  if (!versionNum) {
-    const legacy = await prisma.iml_products.findUnique({
-      where: { id },
-      select: { pdf_data: true },
-    });
-    if (legacy?.pdf_data && legacy.pdf_data.length > 0) {
-      const buf = Buffer.isBuffer(legacy.pdf_data)
-        ? legacy.pdf_data
-        : Buffer.from(legacy.pdf_data);
-      return new NextResponse(new Uint8Array(buf), {
-        headers: {
-          "Content-Type": "application/pdf",
-          "Content-Disposition": 'inline; filename="tiskova-data.pdf"',
-          "Cache-Control": "private, max-age=3600",
-          "X-PDF-Version": "legacy",
-        },
-      });
-    }
-  }
-
-  return new NextResponse("PDF nenalezeno", { status: 404 });
+  return new NextResponse(new Uint8Array(resolved.buffer), {
+    headers: {
+      "Content-Type": resolved.mimeType || "application/pdf",
+      "Content-Disposition": `inline; filename="${sanitizeFilename(resolved.filename)}"`,
+      "Cache-Control": "private, max-age=3600",
+      "X-PDF-Version": String(resolved.version),
+      "X-PDF-Source": resolved.source,
+    },
+  });
 }
 
 export async function POST(
@@ -175,6 +146,7 @@ export async function POST(
           pdf_data: buffer,
           is_primary: true,
           uploaded_by: userId,
+          last_accessed_at: new Date(),
         },
         select: {
           id: true,
@@ -187,6 +159,14 @@ export async function POST(
           uploaded_at: true,
         },
       });
+
+      // Nový upload = produkt je znovu „hot“ (zruš archivní příznak).
+      if (existing.archived_at) {
+        await tx.iml_products.update({
+          where: { id },
+          data: { archived_at: null, is_active: true },
+        });
+      }
 
       return created;
     });
@@ -274,6 +254,7 @@ export async function DELETE(
       });
 
       if (primary) {
+        const archivePath = primary.archive_path;
         await tx.iml_product_files.delete({ where: { id: primary.id } });
 
         // Po smazání primary povýšíme nejnovější zbývající verzi.
@@ -290,17 +271,29 @@ export async function DELETE(
         return {
           deleted_version: primary.version,
           promoted_version: next?.version ?? null,
+          archive_path: archivePath,
         };
       }
 
-      // Jinak zkus legacy sloupec.
+      // Jinak zkus legacy sloupec / archiv.
       const legacy = await tx.iml_products.findUnique({
         where: { id },
-        select: { pdf_data: true },
+        select: { pdf_data: true, pdf_archive_path: true },
       });
-      if (legacy?.pdf_data && legacy.pdf_data.length > 0) {
-        await tx.iml_products.update({ where: { id }, data: { pdf_data: null } });
-        return { deleted_version: "legacy", promoted_version: null as number | null };
+      if (
+        (legacy?.pdf_data && legacy.pdf_data.length > 0) ||
+        legacy?.pdf_archive_path
+      ) {
+        const archivePath = legacy.pdf_archive_path;
+        await tx.iml_products.update({
+          where: { id },
+          data: { pdf_data: null, pdf_archive_path: null },
+        });
+        return {
+          deleted_version: "legacy" as const,
+          promoted_version: null as number | null,
+          archive_path: archivePath,
+        };
       }
       return null;
     });
@@ -308,6 +301,8 @@ export async function DELETE(
     if (!result) {
       return NextResponse.json({ error: "Žádné PDF k odstranění" }, { status: 404 });
     }
+
+    await deleteArchiveFileIfExists(result.archive_path);
 
     await logImlAudit({
       userId,
@@ -318,7 +313,11 @@ export async function DELETE(
       newValues: { promoted_version: result.promoted_version },
     });
 
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json({
+      success: true,
+      deleted_version: result.deleted_version,
+      promoted_version: result.promoted_version,
+    });
   } catch (e) {
     console.error("IML product PDF delete error:", e);
     return NextResponse.json({ error: "Chyba při mazání PDF" }, { status: 500 });

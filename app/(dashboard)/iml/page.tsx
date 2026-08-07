@@ -147,6 +147,13 @@ export default async function ImlPage() {
       hint: "Spotřeba barev z objednávek",
     },
     { href: "/iml/imports", icon: Upload, value: "3", label: "Importy" },
+    {
+      href: "/iml/exports",
+      icon: FileText,
+      value: "",
+      label: "Exporty produktů",
+      hint: "Šablony CSV / XML",
+    },
   ];
   if (canWrite) {
     cards.push({

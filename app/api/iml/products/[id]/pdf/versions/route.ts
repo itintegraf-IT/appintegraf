@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import { deleteArchiveFileIfExists } from "@/lib/iml-product-archive";
 
 /**
  * Historie verzí PDF k produktu.
@@ -96,7 +97,7 @@ export async function DELETE(
 
   const row = await prisma.iml_product_files.findUnique({
     where: { product_id_version: { product_id: id, version: versionNum } },
-    select: { id: true, is_primary: true },
+    select: { id: true, is_primary: true, archive_path: true },
   });
   if (!row) {
     return NextResponse.json({ error: "Verze neexistuje" }, { status: 404 });
@@ -112,6 +113,7 @@ export async function DELETE(
   }
 
   await prisma.iml_product_files.delete({ where: { id: row.id } });
+  await deleteArchiveFileIfExists(row.archive_path);
 
   await logImlAudit({
     userId,

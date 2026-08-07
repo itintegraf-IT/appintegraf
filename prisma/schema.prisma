@@ -1301,6 +1301,7 @@ model users {
   stitky_paletovky_created                                       stitky_paletovky[]            @relation("stitky_paletovky_creator")
   notifications                                                  notifications[]
   iml_product_files_uploaded                                     iml_product_files[]           @relation("iml_product_files_uploader")
+  iml_export_templates                                           iml_export_templates[]        @relation("iml_export_templates_owner")
   projekty_owned_boards                                          Board[]                       @relation("ProjektyBoardOwner")
   projekty_board_members                                         BoardMember[]
   projekty_card_members                                          CardMember[]
@@ -1645,6 +1646,10 @@ model iml_products {
   custom_data          Json?     @db.Json
   labels_per_sheet     Int?
   die_cut_id           Int?
+  /// Logický archiv produktu (PDF na disku); metadata zůstávají ve vyhledávání.
+  archived_at          DateTime? @db.DateTime(0)
+  /// Cesta k legacy `pdf_data` na disku (relativní vůči IML_ARCHIVE_DIR).
+  pdf_archive_path     String?   @db.VarChar(500)
 
   created_at DateTime @default(now()) @db.DateTime(0)
   updated_at DateTime @updatedAt @db.DateTime(0)
@@ -1673,6 +1678,7 @@ model iml_products {
   @@index([color_material_id], map: "idx_iml_products_color_material")
   @@index([paper_material_id], map: "idx_iml_products_paper_material")
   @@index([lacquer_material_id], map: "idx_iml_products_lacquer_material")
+  @@index([archived_at], map: "idx_iml_products_archived_at")
   @@map("iml_products")
 }
 
@@ -1879,16 +1885,21 @@ model iml_product_colors {
 }
 
 model iml_product_files {
-  id          Int      @id @default(autoincrement())
-  product_id  Int
-  version     Int
-  filename    String   @db.VarChar(255)
-  file_size   Int
-  mime_type   String   @db.VarChar(100)
-  pdf_data    Bytes    @db.LongBlob
-  is_primary  Boolean  @default(true)
-  uploaded_by Int
-  uploaded_at DateTime @default(now()) @db.DateTime(0)
+  id               Int       @id @default(autoincrement())
+  product_id       Int
+  version          Int
+  filename         String    @db.VarChar(255)
+  file_size        Int
+  mime_type        String    @db.VarChar(100)
+  /// Hot BLOB; po archivaci NULL a data jsou na disku v archive_path.
+  pdf_data         Bytes?    @db.LongBlob
+  is_primary       Boolean   @default(true)
+  uploaded_by      Int
+  uploaded_at      DateTime  @default(now()) @db.DateTime(0)
+  last_accessed_at DateTime? @db.DateTime(0)
+  archived_at      DateTime? @db.DateTime(0)
+  /// Relativní cesta vůči IML_ARCHIVE_DIR (např. products/123/v3.pdf).
+  archive_path     String?   @db.VarChar(500)
 
   iml_products iml_products @relation(fields: [product_id], references: [id], onDelete: Cascade)
   users        users        @relation("iml_product_files_uploader", fields: [uploaded_by], references: [id], onDelete: Restrict)
@@ -1896,7 +1907,26 @@ model iml_product_files {
   @@unique([product_id, version])
   @@index([product_id, is_primary])
   @@index([uploaded_by])
+  @@index([archived_at], map: "idx_iml_product_files_archived_at")
   @@map("iml_product_files")
+}
+
+/// Uživatelské šablony exportu (produkty CSV/XML).
+model iml_export_templates {
+  id         Int      @id @default(autoincrement())
+  user_id    Int
+  name       String   @db.VarChar(150)
+  entity     String   @default("products") @db.VarChar(50)
+  format     String   @default("csv") @db.VarChar(10)
+  columns    Json     @db.Json
+  filters    Json?    @db.Json
+  created_at DateTime @default(now()) @db.DateTime(0)
+  updated_at DateTime @updatedAt @db.DateTime(0)
+
+  users users @relation("iml_export_templates_owner", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, entity], map: "idx_iml_export_templates_user_entity")
+  @@map("iml_export_templates")
 }
 
 model iml_inquiries {

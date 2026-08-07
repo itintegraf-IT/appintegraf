@@ -79,7 +79,17 @@ export function renderProductListCell(
       );
     case "status":
       return (
-        <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">{product.item_status ?? "-"}</span>
+        <span className="inline-flex flex-wrap items-center gap-1">
+          <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">{product.item_status ?? "-"}</span>
+          {product.archived_at ? (
+            <span
+              className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
+              title="Tisková data jsou v archivu na disku"
+            >
+              Archiv
+            </span>
+          ) : null}
+        </span>
       );
     case "pdf":
       return product.has_pdf ? (

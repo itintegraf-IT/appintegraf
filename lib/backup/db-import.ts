@@ -86,7 +86,7 @@ function prepareRowForInsert(
     }
   }
 
-  // iml_product_files.pdf_data je v DB povinné; v JSON může být null (starší záloha / chybějící _blob)
+  // iml_product_files.pdf_data může být NULL (archiv na disku); v JSON může být null
   if (table.name === "iml_product_files") {
     const pid = Number(out.product_id);
     const fid = Number(out.id);
@@ -96,7 +96,7 @@ function prepareRowForInsert(
       Number.isFinite(fid)
     ) {
       const blobKey = imlProductFileBlobPath(pid, fid);
-      out.pdf_data = zipEntries.get(blobKey) ?? Buffer.alloc(0);
+      out.pdf_data = zipEntries.get(blobKey) ?? null;
     }
   }
 
