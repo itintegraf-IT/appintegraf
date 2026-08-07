@@ -10,6 +10,9 @@ export type LabelGridSpec = {
   rowGapMm: number;
 };
 
+/** Volitelné přepsání rozměrů mřížky podle componentKey (standard / neut / oriflame). */
+export type LabelGridOverridesMap = Record<string, Partial<LabelGridSpec>>;
+
 export const LABEL_GRID_SPECS: Record<string, LabelGridSpec> = {
   standard: {
     cols: 2,
@@ -40,9 +43,15 @@ export const LABEL_GRID_SPECS: Record<string, LabelGridSpec> = {
   },
 };
 
-export function getGridSpec(componentKey: string): LabelGridSpec {
+export function getGridSpec(
+  componentKey: string,
+  overrides?: LabelGridOverridesMap | null
+): LabelGridSpec {
   const key = componentKey === "pending" ? "standard" : componentKey;
-  return LABEL_GRID_SPECS[key] ?? LABEL_GRID_SPECS.standard;
+  const base = LABEL_GRID_SPECS[key] ?? LABEL_GRID_SPECS.standard;
+  const over = overrides?.[key];
+  if (!over) return base;
+  return { ...base, ...over };
 }
 
 /** Pozice levého horního rohu štítku na stránce (mm od levého a horního okraje). */

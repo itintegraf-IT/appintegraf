@@ -1,6 +1,10 @@
 "use client";
 
-import { getGridSpec, labelPositionMm } from "@/lib/stitky/label-layout";
+import {
+  getGridSpec,
+  labelPositionMm,
+  type LabelGridOverridesMap,
+} from "@/lib/stitky/label-layout";
 import { type LabelCell } from "@/lib/stitky/ciselna-rada";
 import { BarcodeImage } from "./BarcodeImage";
 
@@ -8,6 +12,7 @@ type Props = {
   templateKey: string;
   componentKey: string;
   pages: LabelCell[][];
+  gridOverrides?: LabelGridOverridesMap;
 };
 
 function StandardLabel({ cell }: { cell: LabelCell }) {
@@ -75,8 +80,13 @@ function LabelCellView({ cell, componentKey }: { cell: LabelCell; componentKey: 
   );
 }
 
-export function LabelPreviewGrid({ templateKey, componentKey, pages }: Props) {
-  const spec = getGridSpec(componentKey);
+export function LabelPreviewGrid({
+  templateKey,
+  componentKey,
+  pages,
+  gridOverrides,
+}: Props) {
+  const spec = getGridSpec(componentKey, gridOverrides);
 
   return (
     <div className="stitky-preview-root space-y-6">

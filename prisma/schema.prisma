@@ -1295,6 +1295,8 @@ model users {
   stitky_orders_created                                          stitky_orders[]               @relation("stitky_orders_creator")
   stitky_orders_changed                                          stitky_orders[]               @relation("stitky_orders_changed")
   stitky_user_roles                                              stitky_user_roles[]
+  stitky_paletovka_templates_created                             stitky_paletovka_templates[]  @relation("stitky_paletovka_templates_creator")
+  stitky_paletovky_created                                       stitky_paletovky[]            @relation("stitky_paletovky_creator")
   notifications                                                  notifications[]
   iml_product_files_uploaded                                     iml_product_files[]           @relation("iml_product_files_uploader")
   projekty_owned_boards                                          Board[]                       @relation("ProjektyBoardOwner")
@@ -2185,6 +2187,40 @@ model stitky_user_roles {
 model stitky_settings {
   key   String @id @db.VarChar(50)
   value String @db.Text
+}
+
+model stitky_paletovka_templates {
+  id              Int               @id @default(autoincrement())
+  name            String            @db.VarChar(200)
+  layout_variant  String            @default("single") @db.VarChar(30)
+  blocks_per_page Int               @default(1)
+  layout_json     Json
+  defaults_json   Json
+  source_filename String?           @db.VarChar(255)
+  created_by      Int
+  created_at      DateTime          @default(now()) @db.Timestamp(0)
+  users_creator   users             @relation("stitky_paletovka_templates_creator", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stitky_paletovka_templates_creator_fk")
+  paletovky       stitky_paletovky[]
+
+  @@index([name], map: "idx_paletovka_tpl_name")
+  @@index([created_by], map: "idx_paletovka_tpl_created_by")
+}
+
+model stitky_paletovky {
+  id            Int                        @id @default(autoincrement())
+  template_id   Int
+  title         String                     @db.VarChar(200)
+  data_json     Json
+  status        String                     @default("DRAFT") @db.VarChar(20)
+  created_by    Int
+  created_at    DateTime                   @default(now()) @db.Timestamp(0)
+  updated_at    DateTime                   @default(now()) @updatedAt @db.Timestamp(0)
+  template      stitky_paletovka_templates @relation(fields: [template_id], references: [id], onUpdate: Cascade, map: "stitky_paletovky_template_fk")
+  users_creator users                      @relation("stitky_paletovky_creator", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "stitky_paletovky_creator_fk")
+
+  @@index([status], map: "idx_paletovky_status")
+  @@index([created_by], map: "idx_paletovky_created_by")
+  @@index([template_id], map: "idx_paletovky_template")
 }
 
 // ===== Modul Projekty (port z integraf-pm; DB tabulky prefix projekty_) =====
