@@ -146,13 +146,12 @@ export default async function ImlPage() {
       label: "Report Pantone",
       hint: "Spotřeba barev z objednávek",
     },
-    { href: "/iml/imports", icon: Upload, value: "3", label: "Importy" },
     {
-      href: "/iml/exports",
-      icon: FileText,
+      href: "/iml/imports",
+      icon: Upload,
       value: "",
-      label: "Exporty produktů",
-      hint: "Šablony CSV / XML",
+      label: "Import / Export",
+      hint: "CSV · Excel · šablony XML",
     },
   ];
   if (canWrite) {
@@ -161,7 +160,7 @@ export default async function ImlPage() {
       icon: Settings,
       value: "",
       label: "Nastavení IML",
-      hint: "Vlastní pole • Fólie • Pantone",
+      hint: "Vlastní pole • Fólie • Pantone • Archiv",
     });
   }
 
@@ -191,7 +190,7 @@ export default async function ImlPage() {
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
               >
                 <Upload className="h-4 w-4" />
-                Importy
+                Import / Export
               </Link>
               <Link
                 href="/iml/die-cuts"

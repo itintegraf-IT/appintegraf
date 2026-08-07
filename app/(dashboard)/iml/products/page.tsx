@@ -44,10 +44,10 @@ export default async function ImlProductsPage() {
             </Link>
           )}
           <Link
-            href="/iml/exports"
+            href="/iml/imports#export"
             className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
           >
-            Exporty…
+            Import / Export…
           </Link>
           {canWrite && (
             <>

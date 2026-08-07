@@ -24,8 +24,7 @@ export default async function ImlSettingsPage() {
             Nastavení IML
           </h1>
           <p className="mt-1 text-gray-600">
-            Vlastní pole u produktů a objednávek, číselník fólií a barev (Pantone, CMYK) propojený s
-            katalogem materiálů.
+            Vlastní pole, číselníky, archiv tiskových dat produktů a údržba miniatur.
           </p>
         </div>
         <Link
