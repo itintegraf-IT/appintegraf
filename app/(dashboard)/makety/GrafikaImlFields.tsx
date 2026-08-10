@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 export type GrafikaImlInitial = {
   customer_id: number | null;
@@ -31,6 +32,8 @@ type Props = {
   initial?: GrafikaImlInitial;
 };
 
+const EMPTY_CUSTOMER_LABEL = "— bez klienta —";
+
 function productLabel(p: ProductOpt): string {
   const code = p.ig_code || p.client_code || `#${p.id}`;
   const name = p.ig_short_name || p.client_name;
@@ -59,9 +62,11 @@ export function GrafikaImlFields({ initial }: Props) {
   );
   const [labelCode, setLabelCode] = useState(initial?.label_code ?? "");
   const [jobNumber, setJobNumber] = useState(initial?.job_number ?? "");
-  const [customerQ, setCustomerQ] = useState("");
+  const [customerQuery, setCustomerQuery] = useState("");
+  const [customerOpen, setCustomerOpen] = useState(false);
   const [customersLoading, setCustomersLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const customerBoxRef = useRef<HTMLDivElement>(null);
 
   const loadCustomers = useCallback(async () => {
     setCustomersLoading(true);
@@ -87,11 +92,32 @@ export function GrafikaImlFields({ initial }: Props) {
     void loadCustomers();
   }, [loadCustomers]);
 
+  const selectedCustomer = useMemo(
+    () => allCustomers.find((c) => String(c.id) === customerId) ?? null,
+    [allCustomers, customerId]
+  );
+
   const filteredCustomers = useMemo(() => {
-    const q = customerQ.trim().toLocaleLowerCase("cs");
+    const q = customerQuery.trim().toLocaleLowerCase("cs");
     if (!q) return allCustomers;
     return allCustomers.filter((c) => c.name.toLocaleLowerCase("cs").includes(q));
-  }, [allCustomers, customerQ]);
+  }, [allCustomers, customerQuery]);
+
+  useEffect(() => {
+    if (!customerOpen) {
+      setCustomerQuery(selectedCustomer?.name ?? "");
+    }
+  }, [selectedCustomer, customerOpen]);
+
+  useEffect(() => {
+    const onDocClick = (e: MouseEvent) => {
+      if (customerBoxRef.current && !customerBoxRef.current.contains(e.target as Node)) {
+        setCustomerOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, []);
 
   useEffect(() => {
     if (!customerId) {
@@ -128,6 +154,7 @@ export function GrafikaImlFields({ initial }: Props) {
     setProductId("");
     setDieCutId("");
     setLabelCode("");
+    setCustomerOpen(false);
   };
 
   const onProductChange = (value: string) => {
@@ -140,7 +167,11 @@ export function GrafikaImlFields({ initial }: Props) {
     if (p.die_cut_id != null) setDieCutId(String(p.die_cut_id));
   };
 
-  const listSize = Math.min(10, Math.max(4, filteredCustomers.length + 1));
+  const displayValue = customerOpen
+    ? customerQuery
+    : selectedCustomer
+      ? selectedCustomer.name
+      : EMPTY_CUSTOMER_LABEL;
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -158,34 +189,88 @@ export function GrafikaImlFields({ initial }: Props) {
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <label className="mb-1 block text-sm font-medium text-gray-700">Klient</label>
-          <input
-            type="search"
-            value={customerQ}
-            onChange={(e) => setCustomerQ(e.target.value)}
-            placeholder="Hledat v seznamu klientů…"
-            className="mb-2 w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-            aria-label="Filtrovat seznam klientů"
-          />
-          <select
-            name="customer_id"
-            value={customerId}
-            onChange={(e) => onCustomerChange(e.target.value)}
-            size={listSize}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          >
-            <option value="">— bez klienta —</option>
-            {filteredCustomers.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <input type="hidden" name="customer_id" value={customerId} />
+          <div ref={customerBoxRef} className="relative">
+            <div className="relative">
+              <input
+                type="text"
+                role="combobox"
+                aria-expanded={customerOpen}
+                aria-controls="grafika-customer-listbox"
+                aria-autocomplete="list"
+                value={displayValue}
+                disabled={customersLoading}
+                placeholder={EMPTY_CUSTOMER_LABEL}
+                onChange={(e) => {
+                  setCustomerQuery(e.target.value);
+                  setCustomerOpen(true);
+                  if (!e.target.value.trim()) onCustomerChange("");
+                }}
+                onFocus={() => {
+                  setCustomerOpen(true);
+                  setCustomerQuery(selectedCustomer?.name ?? "");
+                }}
+                className={`w-full rounded-lg border border-gray-300 py-2 pl-3 pr-9 text-sm disabled:bg-gray-50 ${
+                  !selectedCustomer && !customerOpen ? "text-gray-500" : "text-gray-900"
+                }`}
+              />
+              <button
+                type="button"
+                tabIndex={-1}
+                aria-label="Otevřít seznam klientů"
+                disabled={customersLoading}
+                onClick={() => {
+                  setCustomerOpen((o) => !o);
+                  if (!customerOpen) setCustomerQuery(selectedCustomer?.name ?? "");
+                }}
+                className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 hover:text-gray-600"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </div>
+            {customerOpen && !customersLoading && (
+              <ul
+                id="grafika-customer-listbox"
+                role="listbox"
+                className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+              >
+                <li role="option" aria-selected={!customerId}>
+                  <button
+                    type="button"
+                    onClick={() => onCustomerChange("")}
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                      !customerId ? "bg-red-50 text-red-800" : "text-gray-500"
+                    }`}
+                  >
+                    {EMPTY_CUSTOMER_LABEL}
+                  </button>
+                </li>
+                {filteredCustomers.length === 0 ? (
+                  <li className="px-3 py-2 text-sm text-gray-500">Žádný klient</li>
+                ) : (
+                  filteredCustomers.map((c) => (
+                    <li key={c.id} role="option" aria-selected={String(c.id) === customerId}>
+                      <button
+                        type="button"
+                        onClick={() => onCustomerChange(String(c.id))}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                          String(c.id) === customerId
+                            ? "bg-red-50 text-red-800"
+                            : "text-gray-800"
+                        }`}
+                      >
+                        {c.name}
+                      </button>
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
+          </div>
           <p className="mt-1 text-xs text-gray-500">
             {customersLoading
               ? "Načítání klientů…"
-              : customerQ.trim()
-                ? `Zobrazeno ${filteredCustomers.length} z ${allCustomers.length} klientů`
-                : `${allCustomers.length} klientů z IML katalogu — vyberte ze seznamu`}
+              : "Rozevírací seznam — pište pro vyhledání, výchozí je bez klienta"}
           </p>
         </div>
 
