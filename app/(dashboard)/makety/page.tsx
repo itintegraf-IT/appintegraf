@@ -10,21 +10,17 @@ import {
   canZadatAnyMaketyWork,
   canZadatMaketyWork,
 } from "@/lib/makety-access";
-import { MaketyAdminRowActions } from "./MaketyAdminRowActions";
 import { sortMaketyProductionQueueByAssignee } from "@/lib/makety-queue";
 import {
   isMaketyWorkType,
-  maketyWorkTypeLabel,
   type MaketyWorkType,
 } from "@/lib/makety-work-type";
-import { formatDateTimeCz } from "@/lib/datetime-cz";
 import {
-  maketaPriorityBadgeClass,
-  maketaPriorityLabel,
-  maketaStatusBadgeClass,
   maketaStatusLabel,
   isMaketaTerminalStatus,
 } from "@/lib/makety-status";
+import type { MaketyListRow } from "@/lib/makety/makety-list-columns";
+import { MaketyActiveTableClient } from "./_components/MaketyActiveTableClient";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +120,7 @@ export default async function MaketyListPage({
     include: {
       users_assignee: { select: { first_name: true, last_name: true } },
       users_creator: { select: { first_name: true, last_name: true } },
+      iml_customers: { select: { id: true, name: true } },
     },
   });
   const allForTerm = sortMaketyProductionQueueByAssignee(allForTermRaw);
@@ -148,12 +145,57 @@ export default async function MaketyListPage({
           )
       );
 
+  const tableRows: MaketyListRow[] = rows.map((r) => {
+    const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+    const canEditRow =
+      (wt === "grafika" ? canWriteGrafika : canWriteMaketa) &&
+      r.created_by === userId &&
+      r.status !== "done" &&
+      r.status !== "cancelled";
+    const canCopyRow = wt === "grafika" ? canWriteGrafika : canWriteMaketa;
+    return {
+      id: r.id,
+      due_at: r.due_at.toISOString(),
+      work_type: r.work_type,
+      order_number: r.order_number,
+      body: r.body,
+      priority: r.priority,
+      status: r.status,
+      label_code: r.label_code,
+      job_number: r.job_number,
+      creator_name: r.users_creator
+        ? `${r.users_creator.first_name} ${r.users_creator.last_name}`
+        : null,
+      assignee_name: r.users_assignee
+        ? `${r.users_assignee.first_name} ${r.users_assignee.last_name}`
+        : null,
+      customer_name: r.iml_customers?.name ?? null,
+      created_by: r.created_by,
+      can_edit: canEditRow,
+      can_copy: canCopyRow,
+    };
+  });
+
   const tableHeading = selectedStatus
     ? maketaStatusLabel(selectedStatus)
     : canModuleAdmin
       ? "Přehled aktivních zakázek"
       : "Aktivní zakázky";
-  const tableColSpan = canModuleAdmin ? 9 : 8;
+
+  const headingExtraParts: string[] = [];
+  if (selectedWorkType) {
+    headingExtraParts.push(selectedWorkType === "grafika" ? "· Grafika" : "· Makety");
+  }
+  if (selectedTerm) {
+    headingExtraParts.push(
+      selectedTerm === "overdue"
+        ? "· po termínu"
+        : selectedTerm === "today"
+          ? "· termín dnes"
+          : "· termín do 7 dní"
+    );
+  }
+  const headingExtra = headingExtraParts.length > 0 ? headingExtraParts.join(" ") : null;
 
   const showVyrobaHint = canModuleAdmin || (await hasMaketyVyrobaAccess(userId));
   const showGrafikaHint = canModuleAdmin || (await hasMaketyGrafikaAccess(userId));
@@ -314,125 +356,12 @@ export default async function MaketyListPage({
         })}
       </section>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700">
-          {tableHeading}
-          {selectedWorkType ? (
-            <span className="ml-2 font-normal text-gray-500">
-              · {selectedWorkType === "grafika" ? "Grafika" : "Makety"}
-            </span>
-          ) : null}
-          {selectedTerm ? (
-            <span className="ml-2 font-normal text-gray-500">
-              ·{" "}
-              {selectedTerm === "overdue"
-                ? "po termínu"
-                : selectedTerm === "today"
-                  ? "termín dnes"
-                  : "termín do 7 dní"}
-            </span>
-          ) : null}
-        </div>
-        <table className="min-w-full text-left text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 font-semibold text-gray-700">Termín</th>
-              <th className="px-4 py-3 font-semibold text-gray-700">Typ</th>
-              <th className="px-4 py-3 font-semibold text-gray-700">Zakázka</th>
-              <th className="px-4 py-3 font-semibold text-gray-700">Popis</th>
-              {canModuleAdmin && (
-                <th className="px-4 py-3 font-semibold text-gray-700">Zadal</th>
-              )}
-              <th className="px-4 py-3 font-semibold text-gray-700">Přiřazeno</th>
-              <th className="px-4 py-3 font-semibold text-gray-700">Priorita</th>
-              <th className="px-4 py-3 font-semibold text-gray-700">Stav</th>
-              <th className="px-4 py-3 font-semibold text-gray-700">Akce</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr>
-                <td colSpan={tableColSpan} className="px-4 py-10 text-center text-gray-500">
-                  Žádné zakázky k zobrazení.
-                </td>
-              </tr>
-            ) : (
-              rows.map((r) => {
-                const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
-                const canEditRow =
-                  (wt === "grafika" ? canWriteGrafika : canWriteMaketa) &&
-                  r.created_by === userId &&
-                  r.status !== "done" &&
-                  r.status !== "cancelled";
-                return (
-                  <tr key={r.id} className="border-b border-gray-100 hover:bg-gray-50/80">
-                    <td className="px-4 py-3 text-gray-800">{formatDateTimeCz(new Date(r.due_at))}</td>
-                    <td className="px-4 py-3">
-                      <span className="inline-flex rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700">
-                        {maketyWorkTypeLabel(wt)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">{r.order_number ?? "—"}</td>
-                    <td className="max-w-xs px-4 py-3">
-                      <Link href={`/makety/${r.id}`} className="font-medium text-violet-600 hover:underline">
-                        {r.body.replace(/\s+/g, " ").trim().slice(0, 80)}
-                        {r.body.length > 80 ? "…" : ""}
-                      </Link>
-                    </td>
-                    {canModuleAdmin && (
-                      <td className="px-4 py-3 text-gray-700">
-                        {r.users_creator
-                          ? `${r.users_creator.first_name} ${r.users_creator.last_name}`
-                          : "—"}
-                      </td>
-                    )}
-                    <td className="px-4 py-3 text-gray-700">
-                      {r.users_assignee
-                        ? `${r.users_assignee.first_name} ${r.users_assignee.last_name}`
-                        : "—"}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaPriorityBadgeClass(r.priority)}`}
-                      >
-                        {maketaPriorityLabel(r.priority)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(r.status)}`}
-                      >
-                        {maketaStatusLabel(r.status)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {canEditRow && (
-                          <Link
-                            href={`/makety/${r.id}/edit`}
-                            className="text-sm font-medium text-violet-600 hover:underline"
-                          >
-                            Upravit
-                          </Link>
-                        )}
-                        {canModuleAdmin ? (
-                          <MaketyAdminRowActions
-                            id={r.id}
-                            priority={r.priority}
-                            status={r.status}
-                          />
-                        ) : (
-                          !canEditRow && <span className="text-gray-400">—</span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <MaketyActiveTableClient
+        heading={tableHeading}
+        headingExtra={headingExtra}
+        rows={tableRows}
+        canModuleAdmin={canModuleAdmin}
+      />
     </div>
   );
 }

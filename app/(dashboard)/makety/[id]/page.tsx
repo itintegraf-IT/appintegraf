@@ -16,12 +16,14 @@ import {
   userCanSubmitMaketaQuote,
   userCanApproveMaketaQuote,
   userCanOperateGrafikaAutomation,
+  userCanCopyMaketa,
   canManageMaketyQueue,
 } from "@/lib/makety-access";
 import { MaketaQuoteForm } from "./MaketaQuoteForm";
 import { MaketaApprovalPanel } from "./MaketaApprovalPanel";
 import { MaketyDetailPrioritySelect } from "./MaketyDetailPrioritySelect";
 import { DeleteMaketaButton } from "./DeleteMaketaButton";
+import { CopyMaketaButton } from "./CopyMaketaButton";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import {
   maketaPriorityBadgeClass,
@@ -108,6 +110,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
   const workType = (maketa.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
   const canEdit = await userCanEditMaketa(userId, id);
   const canDelete = await userCanDeleteMaketa(userId, id);
+  const canCopy = await userCanCopyMaketa(userId, id);
   const canComplete = await userCanCompleteMaketa(userId, id);
   const canSubmitQuote = await userCanSubmitMaketaQuote(userId, id);
   const canApproveQuote = await userCanApproveMaketaQuote(userId, id);
@@ -161,6 +164,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
                 </p>
               </div>
               <div className="flex flex-wrap gap-2">
+                {canCopy && <CopyMaketaButton id={maketa.id} />}
                 {canEdit && (
                   <Link
                     href={`/makety/${maketa.id}/edit`}

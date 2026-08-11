@@ -17,9 +17,10 @@ export const dynamic = "force-dynamic";
 
 type PageProps = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ copied?: string }>;
 };
 
-export default async function MaketaEditPage({ params }: PageProps) {
+export default async function MaketaEditPage({ params, searchParams }: PageProps) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
   const userId = parseInt(session.user.id, 10);
@@ -33,6 +34,9 @@ export default async function MaketaEditPage({ params }: PageProps) {
   if (!(await userCanEditMaketa(userId, id))) {
     redirect(`/makety/${id}`);
   }
+
+  const sp = await searchParams;
+  const justCopied = sp.copied === "1";
 
   const maketa = await prisma.makety.findUnique({
     where: { id },
@@ -61,6 +65,12 @@ export default async function MaketaEditPage({ params }: PageProps) {
       <Link href={`/makety/${id}`} className="inline-block text-sm text-violet-600 hover:underline">
         ← Zpět na detail
       </Link>
+      {justCopied && (
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+          Kopie zakázky byla vytvořena. Upravte klienta nebo drobnosti a uložte. Soubory ze
+          zdroje se nezkopírovaly — přidejte je na detailu.
+        </div>
+      )}
       <div>
         <h2 className="text-xl font-semibold text-gray-900">
           Upravit {maketyWorkTypeLabel(workType).toLowerCase()} #{id}

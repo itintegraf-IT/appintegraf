@@ -172,6 +172,21 @@ export async function userCanEditMaketa(userId: number, maketaId: number): Promi
   return true;
 }
 
+/**
+ * Kopie zakázky – kdo ji vidí a zároveň smí zadávat daný typ (maketa/grafika).
+ * Soubory, komentáře a historie stavů se nekopírují.
+ */
+export async function userCanCopyMaketa(userId: number, maketaId: number): Promise<boolean> {
+  if (!(await userCanViewMaketa(userId, maketaId))) return false;
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId },
+    select: { work_type: true },
+  });
+  if (!row) return false;
+  const workType = (row.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+  return canZadatMaketyWork(userId, workType);
+}
+
 /** Výrobce odešle kalkulaci ceny (jen maketa, stav awaiting_quote). */
 export async function userCanSubmitMaketaQuote(userId: number, maketaId: number): Promise<boolean> {
   const row = await prisma.makety.findFirst({
