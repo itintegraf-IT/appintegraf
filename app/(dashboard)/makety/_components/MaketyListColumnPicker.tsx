@@ -7,11 +7,13 @@ import {
   availableMaketyListColumns,
   type MaketyListColumnId,
 } from "@/lib/makety/makety-list-columns";
+import { MaketyListColumnOrderList } from "./MaketyListColumnOrderList";
 
 type Props = {
   canModuleAdmin: boolean;
   visibleColumnIds: MaketyListColumnId[];
   onToggle: (id: MaketyListColumnId) => void;
+  onReorder: (activeId: MaketyListColumnId, overId: MaketyListColumnId) => void;
   onReset: () => void;
 };
 
@@ -19,6 +21,7 @@ export function MaketyListColumnPicker({
   canModuleAdmin,
   visibleColumnIds,
   onToggle,
+  onReorder,
   onReset,
 }: Props) {
   const [open, setOpen] = useState(false);
@@ -67,6 +70,12 @@ export function MaketyListColumnPicker({
               Výchozí
             </button>
           </div>
+
+          <MaketyListColumnOrderList
+            columnIds={visibleColumnIds}
+            canModuleAdmin={canModuleAdmin}
+            onReorder={onReorder}
+          />
 
           <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
             {MAKETY_LIST_COLUMN_GROUPS.map((group) => {

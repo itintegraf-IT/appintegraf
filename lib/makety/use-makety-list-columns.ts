@@ -8,8 +8,10 @@ import {
   getMaketyListColumnMeta,
   lockedMaketyListColumnIds,
   parseStoredMaketyListColumnPrefs,
+  reorderMaketyListColumnIds,
   resolveVisibleMaketyListColumnIds,
   serializeMaketyListColumnPrefs,
+  MAKETY_LIST_COLUMNS_PREF_VERSION,
   type MaketyListColumnId,
   type MaketyListColumnMeta,
   type MaketyListColumnPrefs,
@@ -20,6 +22,7 @@ export type UseMaketyListColumnsResult = {
   visibleColumns: MaketyListColumnMeta[];
   isColumnVisible: (id: MaketyListColumnId) => boolean;
   toggleColumn: (id: MaketyListColumnId) => void;
+  reorderColumns: (activeId: MaketyListColumnId, overId: MaketyListColumnId) => void;
   resetToDefaults: () => void;
   prefs: MaketyListColumnPrefs;
   ready: boolean;
@@ -82,6 +85,17 @@ export function useMaketyListColumns(canModuleAdmin: boolean): UseMaketyListColu
     setVisibleColumnIds(defaults);
   }, [defaults, setVisibleColumnIds]);
 
+  const reorderColumns = useCallback(
+    (activeId: MaketyListColumnId, overId: MaketyListColumnId) => {
+      setVisibleColumnIdsState((prev) => {
+        const next = reorderMaketyListColumnIds(prev, activeId, overId, canModuleAdmin);
+        persist(next);
+        return next;
+      });
+    },
+    [canModuleAdmin]
+  );
+
   const visibleColumns = useMemo(
     () =>
       visibleColumnIds
@@ -98,7 +112,7 @@ export function useMaketyListColumns(canModuleAdmin: boolean): UseMaketyListColu
 
   const prefs = useMemo(
     () => ({
-      version: 1 as const,
+      version: MAKETY_LIST_COLUMNS_PREF_VERSION,
       visibleColumnIds: resolveVisibleMaketyListColumnIds(visibleColumnIds, canModuleAdmin),
     }),
     [visibleColumnIds, canModuleAdmin]
@@ -109,6 +123,7 @@ export function useMaketyListColumns(canModuleAdmin: boolean): UseMaketyListColu
     visibleColumns,
     isColumnVisible,
     toggleColumn,
+    reorderColumns,
     resetToDefaults,
     prefs,
     ready,

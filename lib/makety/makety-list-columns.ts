@@ -3,7 +3,7 @@
  */
 
 export const MAKETY_LIST_COLUMNS_STORAGE_KEY = "makety-list-visible-columns";
-export const MAKETY_LIST_COLUMNS_PREF_VERSION = 1 as const;
+export const MAKETY_LIST_COLUMNS_PREF_VERSION = 2 as const;
 
 export type MaketyListColumnId =
   | "due_at"
@@ -118,16 +118,56 @@ export function resolveVisibleMaketyListColumnIds(
   const availableIds = new Set(available.map((c) => c.id));
   const defaults = defaultVisibleMaketyListColumnIds(canModuleAdmin);
   const locked = lockedMaketyListColumnIds(canModuleAdmin);
-
-  const chosen = new Set<MaketyListColumnId>();
-  for (const id of locked) chosen.add(id);
+  const lockedSet = new Set(locked);
 
   const source = storedIds && storedIds.length > 0 ? storedIds : defaults;
+  const result: MaketyListColumnId[] = [];
+  const seen = new Set<MaketyListColumnId>();
+
   for (const id of source) {
-    if (availableIds.has(id)) chosen.add(id);
+    if (availableIds.has(id) && !lockedSet.has(id) && !seen.has(id)) {
+      result.push(id);
+      seen.add(id);
+    }
   }
 
-  return available.filter((c) => chosen.has(c.id)).map((c) => c.id);
+  for (const id of locked) {
+    if (availableIds.has(id)) {
+      result.push(id);
+      seen.add(id);
+    }
+  }
+
+  return result;
+}
+
+export function isMaketyListColumnDraggable(
+  id: MaketyListColumnId,
+  canModuleAdmin: boolean
+): boolean {
+  const meta = getMaketyListColumnMeta(id);
+  if (!meta || meta.locked) return false;
+  if (meta.adminOnly && !canModuleAdmin) return false;
+  return true;
+}
+
+export function reorderMaketyListColumnIds(
+  ids: MaketyListColumnId[],
+  activeId: MaketyListColumnId,
+  overId: MaketyListColumnId,
+  canModuleAdmin: boolean
+): MaketyListColumnId[] {
+  const resolved = resolveVisibleMaketyListColumnIds(ids, canModuleAdmin);
+  if (!isMaketyListColumnDraggable(activeId, canModuleAdmin)) return resolved;
+  if (!isMaketyListColumnDraggable(overId, canModuleAdmin)) return resolved;
+
+  const oldIndex = resolved.indexOf(activeId);
+  const newIndex = resolved.indexOf(overId);
+  if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return resolved;
+
+  const next = [...resolved];
+  next.splice(newIndex, 0, next.splice(oldIndex, 1)[0]!);
+  return resolveVisibleMaketyListColumnIds(next, canModuleAdmin);
 }
 
 export function parseStoredMaketyListColumnPrefs(

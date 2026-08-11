@@ -17,6 +17,7 @@ import { useMaketyListColumns } from "@/lib/makety/use-makety-list-columns";
 import { MaketyAdminRowActions } from "../MaketyAdminRowActions";
 import { CopyMaketaButton } from "../[id]/CopyMaketaButton";
 import { MaketyListColumnPicker } from "./MaketyListColumnPicker";
+import { MaketyListSortableTableHead } from "./MaketyListSortableTableHead";
 
 type Props = {
   heading: string;
@@ -111,7 +112,7 @@ export function MaketyActiveTableClient({
   rows,
   canModuleAdmin,
 }: Props) {
-  const { visibleColumnIds, visibleColumns, toggleColumn, resetToDefaults, ready } =
+  const { visibleColumnIds, visibleColumns, toggleColumn, reorderColumns, resetToDefaults, ready } =
     useMaketyListColumns(canModuleAdmin);
 
   return (
@@ -128,20 +129,29 @@ export function MaketyActiveTableClient({
             canModuleAdmin={canModuleAdmin}
             visibleColumnIds={visibleColumnIds}
             onToggle={toggleColumn}
+            onReorder={reorderColumns}
             onReset={resetToDefaults}
           />
         )}
       </div>
       <table className="min-w-full text-left text-sm">
-        <thead className="border-b border-gray-200 bg-gray-50">
-          <tr>
-            {visibleColumns.map((col) => (
-              <th key={col.id} className="px-4 py-3 font-semibold text-gray-700">
-                {col.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        {ready ? (
+          <MaketyListSortableTableHead
+            columns={visibleColumns}
+            canModuleAdmin={canModuleAdmin}
+            onReorder={reorderColumns}
+          />
+        ) : (
+          <thead className="border-b border-gray-200 bg-gray-50">
+            <tr>
+              {visibleColumns.map((col) => (
+                <th key={col.id} className="px-4 py-3 font-semibold text-gray-700">
+                  {col.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+        )}
         <tbody>
           {rows.length === 0 ? (
             <tr>
