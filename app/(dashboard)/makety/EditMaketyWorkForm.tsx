@@ -18,6 +18,7 @@ export type EditMaketyInitial = {
   body: string;
   order_number: string | null;
   priority: string;
+  data_kind?: string;
   due_at: Date;
   quantity: number | null;
   assignee_user_id: number | null;
@@ -83,6 +84,7 @@ export function EditMaketyWorkForm({
     };
 
     if (isGrafika) {
+      payload.data_kind = String(fd.get("data_kind") ?? "nova_data");
       payload.customer_id = String(fd.get("customer_id") ?? "").trim() || null;
       payload.product_id = String(fd.get("product_id") ?? "").trim() || null;
       payload.die_cut_id = String(fd.get("die_cut_id") ?? "").trim() || null;
@@ -157,6 +159,19 @@ export function EditMaketyWorkForm({
             <option value="urgent">Urgentní</option>
           </select>
         </div>
+        {isGrafika && (
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Typ dat</label>
+            <select
+              name="data_kind"
+              defaultValue={initial.data_kind ?? "nova_data"}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="nova_data">nová data</option>
+              <option value="uprava_dat">úprava dat</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {isGrafika && (

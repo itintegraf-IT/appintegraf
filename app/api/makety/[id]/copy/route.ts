@@ -81,6 +81,7 @@ export async function POST(
         dimensions: source.dimensions,
         quantity: source.quantity,
         priority: source.priority,
+        data_kind: source.data_kind,
         queue_position,
         due_at: source.due_at,
         assignee_user_id: workflow.assignee_user_id,

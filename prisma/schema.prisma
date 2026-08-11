@@ -413,6 +413,7 @@ model makety {
   dimensions         String?              @db.VarChar(255)
   quantity           Int?
   priority           String               @default("normal") @db.VarChar(20)
+  data_kind          String               @default("nova_data") @db.VarChar(20)
   queue_position     Int?
   assigned_at        DateTime             @default(now()) @db.DateTime(0)
   due_at             DateTime             @db.DateTime(0)

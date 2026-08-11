@@ -7,6 +7,7 @@ import { userCanViewMaketa, userCanEditMaketa, userCanDeleteMaketa } from "@/lib
 import { revalidateMaketyViews } from "@/lib/makety-revalidate";
 import { notifyMaketaRecipients } from "@/lib/makety-notify";
 import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
+import { parseMaketyDataKind } from "@/lib/makety-data-kind";
 import { parseMaketaPriority } from "@/lib/makety-status";
 import { maketyAssigneeRoleLabel, type MaketyWorkType } from "@/lib/makety-work-type";
 import { userHasMaketyGrafikaRole } from "@/lib/makety-grafika-users";
@@ -118,6 +119,12 @@ export async function PUT(
       typeof body.priority === "string"
         ? parseMaketaPriority(body.priority)
         : existing.priority;
+
+    const workTypeEarly = (existing.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+    const nextDataKind =
+      workTypeEarly === "grafika" && typeof body.data_kind === "string"
+        ? parseMaketyDataKind(body.data_kind)
+        : existing.data_kind;
 
     let nextQuantity: number | null = existing.quantity;
     if ("quantity" in body) {
@@ -273,6 +280,7 @@ export async function PUT(
         dimensions: nextDimensions,
         quantity: nextQuantity,
         priority: nextPriority,
+        data_kind: nextDataKind,
         due_at: nextDue,
         assignee_user_id: nextAssignee,
         ...(workType === "grafika" ? { ...imlUpdate, ...workflowUpdate } : {}),

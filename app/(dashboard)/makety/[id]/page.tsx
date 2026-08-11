@@ -22,6 +22,7 @@ import {
 import { MaketaQuoteForm } from "./MaketaQuoteForm";
 import { MaketaApprovalPanel } from "./MaketaApprovalPanel";
 import { MaketyDetailPrioritySelect } from "./MaketyDetailPrioritySelect";
+import { MaketyDetailDataKindSelect } from "./MaketyDetailDataKindSelect";
 import { DeleteMaketaButton } from "./DeleteMaketaButton";
 import { CopyMaketaButton } from "./CopyMaketaButton";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
@@ -32,6 +33,7 @@ import {
   maketaStatusLabel,
   isMaketaTerminalStatus,
 } from "@/lib/makety-status";
+import { maketyDataKindLabel } from "@/lib/makety-data-kind";
 import { CompleteMaketaButton } from "./CompleteMaketaButton";
 import { StartMaketaButton } from "./StartMaketaButton";
 import { MaketaFilesPanel } from "./MaketaFilesPanel";
@@ -117,6 +119,8 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
   const isArchived = isMaketaTerminalStatus(maketa.status, workType);
   const canManagePriority =
     (await canManageMaketyQueue(userId)) && !isArchived;
+  const canEditDataKind =
+    workType === "grafika" && !isArchived && (canEdit || canManagePriority);
   const canGrafikaAutomation =
     workType === "grafika" &&
     (await userCanOperateGrafikaAutomation(userId, id)).allowed;
@@ -212,6 +216,21 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
                   </dd>
                 )}
               </div>
+              {workType === "grafika" && (
+                <div>
+                  <dt className="text-xs font-medium uppercase text-gray-500">Typ dat</dt>
+                  {canEditDataKind ? (
+                    <MaketyDetailDataKindSelect
+                      maketaId={maketa.id}
+                      initialDataKind={maketa.data_kind}
+                    />
+                  ) : (
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {maketyDataKindLabel(maketa.data_kind)}
+                    </dd>
+                  )}
+                </div>
+              )}
               <div>
                 <dt className="text-xs font-medium uppercase text-gray-500">Termín</dt>
                 <dd className="mt-1 text-sm text-gray-900">{formatDateTimeCz(new Date(maketa.due_at))}</dd>

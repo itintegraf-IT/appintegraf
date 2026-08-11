@@ -91,6 +91,7 @@ export default async function MaketaEditPage({ params, searchParams }: PageProps
           body: maketa.body,
           order_number: maketa.order_number,
           priority: maketa.priority,
+          data_kind: maketa.data_kind,
           due_at: maketa.due_at,
           quantity: maketa.quantity,
           assignee_user_id: maketa.assignee_user_id,

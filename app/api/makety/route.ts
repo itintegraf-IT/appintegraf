@@ -6,6 +6,7 @@ import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { buildMaketyListWhere, canZadatMaketyWork } from "@/lib/makety-access";
 import { notifyGrafikaWorkflowCreated, notifyMaketaRecipients } from "@/lib/makety-notify";
 import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
+import { parseMaketyDataKind } from "@/lib/makety-data-kind";
 import { parseMaketaPriority, maketyActiveWhereClause } from "@/lib/makety-status";
 import { maketyAssigneeRoleLabel, parseMaketyWorkType } from "@/lib/makety-work-type";
 import { userHasMaketyGrafikaRole } from "@/lib/makety-grafika-users";
@@ -63,6 +64,10 @@ export async function POST(req: NextRequest) {
     const dueRaw = String(formData.get("due_at") ?? "").trim();
 
     const work_type = parseMaketyWorkType(String(formData.get("work_type") ?? "maketa"));
+    const data_kind =
+      work_type === "grafika"
+        ? parseMaketyDataKind(String(formData.get("data_kind") ?? "nova_data"))
+        : "nova_data";
 
     if (!(await canZadatMaketyWork(userId, work_type))) {
       return NextResponse.json({ error: "Nemáte oprávnění zadávat tento typ zakázky" }, { status: 403 });
@@ -153,6 +158,7 @@ export async function POST(req: NextRequest) {
         dimensions,
         quantity,
         priority,
+        data_kind,
         queue_position,
         due_at,
         assignee_user_id: workflow.assignee_user_id,

@@ -110,6 +110,19 @@ export function NewMaketyWorkForm({
             <option value="urgent">Urgentní</option>
           </select>
         </div>
+        {isGrafika && (
+          <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+            <label className="mb-1 block text-sm font-medium text-gray-700">Typ dat</label>
+            <select
+              name="data_kind"
+              defaultValue="nova_data"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="nova_data">nová data</option>
+              <option value="uprava_dat">úprava dat</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {isGrafika && (
