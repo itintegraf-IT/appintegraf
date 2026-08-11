@@ -16,6 +16,7 @@ import {
   type MaketyWorkType,
 } from "@/lib/makety-work-type";
 import {
+  maketaStatusBadgeClass,
   maketaStatusLabel,
   isMaketaTerminalStatus,
 } from "@/lib/makety-status";
