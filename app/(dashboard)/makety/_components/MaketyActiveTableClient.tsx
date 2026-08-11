@@ -8,6 +8,7 @@ import {
   maketaStatusLabel,
 } from "@/lib/makety-status";
 import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type";
+import { maketyDataKindLabel } from "@/lib/makety-data-kind";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import {
   type MaketyListColumnId,
@@ -76,6 +77,15 @@ function renderCell(
           {maketaStatusLabel(row.status)}
         </span>
       );
+    case "data_kind": {
+      const wt = (row.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+      if (wt !== "grafika") return "—";
+      return (
+        <span className="inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-800">
+          {maketyDataKindLabel(row.data_kind)}
+        </span>
+      );
+    }
     case "customer":
       return dash(row.customer_name);
     case "label_code":

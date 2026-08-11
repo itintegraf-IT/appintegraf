@@ -162,6 +162,7 @@ export default async function MaketyListPage({
       body: r.body,
       priority: r.priority,
       status: r.status,
+      data_kind: r.data_kind,
       label_code: r.label_code,
       job_number: r.job_number,
       creator_name: r.users_creator

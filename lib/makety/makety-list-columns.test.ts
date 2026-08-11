@@ -13,6 +13,7 @@ describe("makety-list-columns", () => {
     expect(ids).toContain("creator");
     expect(ids).not.toContain("customer");
     expect(ids).not.toContain("label_code");
+    expect(ids).not.toContain("data_kind");
   });
 
   it("hides creator for non-admin defaults", () => {

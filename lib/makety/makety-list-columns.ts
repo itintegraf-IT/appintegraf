@@ -14,6 +14,7 @@ export type MaketyListColumnId =
   | "assignee"
   | "priority"
   | "status"
+  | "data_kind"
   | "customer"
   | "label_code"
   | "job_number"
@@ -44,6 +45,7 @@ export type MaketyListRow = {
   body: string;
   priority: string;
   status: string;
+  data_kind: string;
   label_code: string | null;
   job_number: string | null;
   creator_name: string | null;
@@ -78,6 +80,7 @@ export const MAKETY_LIST_COLUMNS: MaketyListColumnMeta[] = [
   { id: "assignee", label: "Přiřazeno", group: "zaklad", defaultVisible: true },
   { id: "priority", label: "Priorita", group: "zaklad", defaultVisible: true },
   { id: "status", label: "Stav", group: "zaklad", defaultVisible: true },
+  { id: "data_kind", label: "Typ dat", group: "zaklad", defaultVisible: false },
   { id: "customer", label: "Klient", group: "iml", defaultVisible: false },
   { id: "label_code", label: "Kód etikety", group: "iml", defaultVisible: false },
   { id: "job_number", label: "Číslo zakázky (ERP)", group: "iml", defaultVisible: false },
