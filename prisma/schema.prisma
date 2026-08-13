@@ -447,6 +447,7 @@ model makety {
   makety_departments makety_departments[]
   makety_comments    makety_comments[]
   makety_status_log  makety_status_log[]
+  makety_file_events makety_file_events[]
 
   @@index([assignee_user_id], map: "idx_makety_assignee")
   @@index([created_by], map: "idx_makety_creator")
@@ -474,6 +475,22 @@ model makety_status_log {
 
   @@index([maketa_id], map: "idx_makety_status_log_maketa")
   @@index([user_id], map: "idx_makety_status_log_user")
+}
+
+model makety_file_events {
+  id         Int      @id @default(autoincrement())
+  maketa_id  Int
+  file_id    Int?
+  event_type String   @db.VarChar(40)
+  user_id    Int?
+  meta       Json?
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  makety     makety   @relation(fields: [maketa_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_file_events_maketa_fk")
+  users      users?   @relation("makety_file_events_user", fields: [user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_file_events_user_fk")
+
+  @@index([maketa_id], map: "idx_makety_file_events_maketa")
+  @@index([file_id], map: "idx_makety_file_events_file")
+  @@index([created_at], map: "idx_makety_file_events_created")
 }
 
 model makety_departments {
@@ -1295,6 +1312,7 @@ model users {
   makety_final_approver                                          makety[]                      @relation("makety_final_approver")
   makety_comments_authored                                       makety_comments[]             @relation("makety_comments_author")
   makety_status_log_entries                                      makety_status_log[]           @relation("makety_status_log_user")
+  makety_file_events_entries                                     makety_file_events[]          @relation("makety_file_events_user")
   stitky_orders_created                                          stitky_orders[]               @relation("stitky_orders_creator")
   stitky_orders_changed                                          stitky_orders[]               @relation("stitky_orders_changed")
   stitky_user_roles                                              stitky_user_roles[]

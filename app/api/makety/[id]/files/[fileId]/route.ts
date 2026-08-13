@@ -9,6 +9,8 @@ import {
   resolveMaketyFileDiskPath,
   sanitizeMaketyMimeType,
 } from "@/lib/makety-files";
+import { requireMaketyFileKind } from "@/lib/makety-file-kind";
+import { recordMaketyFileEvent } from "@/lib/makety-file-events";
 import { readFile, unlink } from "fs/promises";
 
 export const runtime = "nodejs";
@@ -59,6 +61,19 @@ export async function GET(
       );
     }
 
+    await recordMaketyFileEvent({
+      maketaId,
+      fileId: fileRow.id,
+      eventType: "downloaded",
+      userId,
+      meta: { filename: fileRow.original_filename, document_type: fileRow.document_type },
+    });
+
+    await prisma.file_uploads.update({
+      where: { id: fileRow.id },
+      data: { last_accessed_at: new Date() },
+    });
+
     return new NextResponse(new Uint8Array(buf), {
       headers: {
         "Content-Type": sanitizeMaketyMimeType(fileRow.mime_type),
@@ -71,6 +86,75 @@ export async function GET(
     console.error("GET /api/makety/[id]/files/[fileId]", e);
     return new NextResponse("Chyba při načítání souboru", { status: 500 });
   }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string; fileId: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
+  }
+  const userId = parseInt(session.user.id, 10);
+  if (!(await canAccessMaketyModule(userId))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
+  }
+
+  const maketaId = parseInt((await params).id, 10);
+  const fileId = parseInt((await params).fileId, 10);
+  if (Number.isNaN(maketaId) || Number.isNaN(fileId)) {
+    return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
+  }
+
+  if (!(await userCanViewMaketa(userId, maketaId))) {
+    return NextResponse.json({ error: "Maketa nenalezena" }, { status: 404 });
+  }
+
+  const canEdit =
+    (await userCanEditMaketa(userId, maketaId)) || (await userCanViewMaketa(userId, maketaId));
+  if (!canEdit) {
+    return NextResponse.json({ error: "Nemáte oprávnění měnit typ souboru" }, { status: 403 });
+  }
+
+  let body: { document_type?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Neplatný JSON" }, { status: 400 });
+  }
+
+  const kindParsed = requireMaketyFileKind(body.document_type);
+  if (!kindParsed.ok) {
+    return NextResponse.json({ error: kindParsed.error }, { status: 400 });
+  }
+
+  const fileRow = await prisma.file_uploads.findFirst({
+    where: { id: fileId, module: MAKETY_FILE_MODULE, record_id: maketaId },
+  });
+  if (!fileRow) {
+    return NextResponse.json({ error: "Soubor nenalezen" }, { status: 404 });
+  }
+
+  const fromType = fileRow.document_type;
+  await prisma.file_uploads.update({
+    where: { id: fileId },
+    data: { document_type: kindParsed.kind },
+  });
+
+  await recordMaketyFileEvent({
+    maketaId,
+    fileId,
+    eventType: "type_changed",
+    userId,
+    meta: {
+      filename: fileRow.original_filename,
+      from: fromType,
+      to: kindParsed.kind,
+    },
+  });
+
+  return NextResponse.json({ success: true, document_type: kindParsed.kind });
 }
 
 export async function DELETE(
@@ -117,6 +201,17 @@ export async function DELETE(
   } catch {
     /* soubor na disku už nemusí existovat */
   }
+
+  await recordMaketyFileEvent({
+    maketaId,
+    fileId: fileRow.id,
+    eventType: "deleted",
+    userId,
+    meta: {
+      filename: fileRow.original_filename,
+      document_type: fileRow.document_type,
+    },
+  });
 
   await prisma.file_uploads.delete({ where: { id: fileId } });
   return NextResponse.json({ success: true });

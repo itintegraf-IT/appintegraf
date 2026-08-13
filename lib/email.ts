@@ -651,6 +651,8 @@ export type SendMaketySoftproofEmailParams = {
   labelCode: string | null;
   downloadUrl: string;
   fileName: string;
+  /** Volitelný doprovodný text od odesílatele. */
+  message?: string;
   /** Volitelná příloha (malé soubory); jinak stačí odkaz. */
   attachment?: { filename: string; content: Buffer; contentType: string };
 };
@@ -679,6 +681,12 @@ export async function sendMaketySoftproofEmail(
   const label = params.labelCode
     ? `<p><strong>Kód etikety:</strong> ${params.labelCode}</p>`
     : "";
+  const messageHtml = params.message
+    ? `<div style="margin: 16px 0; padding: 12px; background: #f8fafc; border-left: 3px solid #2563eb;"><p style="margin:0; white-space: pre-wrap;">${params.message
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")}</p></div>`
+    : "";
   const html = `
 <!DOCTYPE html>
 <html>
@@ -688,6 +696,7 @@ export async function sendMaketySoftproofEmail(
   <p>zasíláme Vám softproof grafiky ke schválení.</p>
   ${zak}
   ${label}
+  ${messageHtml}
   <p><strong>Soubor:</strong> ${params.fileName}</p>
   <p><a href="${params.downloadUrl}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">Stáhnout softproof</a></p>
   <p style="color: #666; font-size: 12px;">Odkaz je platný 7 dní. Pokud tlačítko nefunguje, zkopírujte: ${params.downloadUrl}</p>

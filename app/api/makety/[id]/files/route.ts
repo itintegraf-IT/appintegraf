@@ -10,6 +10,8 @@ import {
   MAKETY_MAX_BYTES,
   MAKETY_MAX_FILES_PER_REQUEST,
 } from "@/lib/makety-files";
+import { requireMaketyFileKind, type MaketyFileKind } from "@/lib/makety-file-kind";
+import { recordMaketyFileEvent } from "@/lib/makety-file-events";
 import { isMaketaTerminalStatus } from "@/lib/makety-status";
 import type { MaketyWorkType } from "@/lib/makety-work-type";
 import { mkdir, writeFile } from "fs/promises";
@@ -19,8 +21,9 @@ async function saveMaketyFile(params: {
   file: File;
   maketaId: number;
   userId: number;
+  documentType: MaketyFileKind;
 }): Promise<{ ok: true; row: Awaited<ReturnType<typeof prisma.file_uploads.create>> } | { ok: false; error: string }> {
-  const { file, maketaId, userId } = params;
+  const { file, maketaId, userId, documentType } = params;
 
   if (!isMaketyUploadAllowed({ name: file.name, type: file.type || "" })) {
     return {
@@ -55,12 +58,25 @@ async function saveMaketyFile(params: {
       file_size: buf.length,
       mime_type: mime.slice(0, 100),
       module: MAKETY_FILE_MODULE,
+      document_type: documentType,
       record_id: maketaId,
       uploaded_by: userId,
       is_public: false,
     },
     include: {
       users: { select: { first_name: true, last_name: true } },
+    },
+  });
+
+  await recordMaketyFileEvent({
+    maketaId,
+    fileId: row.id,
+    eventType: "uploaded",
+    userId,
+    meta: {
+      filename: row.original_filename,
+      document_type: documentType,
+      file_size: row.file_size,
     },
   });
 
@@ -137,6 +153,11 @@ export async function POST(
   }
 
   const formData = await req.formData();
+  const kindParsed = requireMaketyFileKind(String(formData.get("document_type") ?? ""));
+  if (!kindParsed.ok) {
+    return NextResponse.json({ error: kindParsed.error }, { status: 400 });
+  }
+
   const incoming = formData
     .getAll("file")
     .filter((f): f is File => f instanceof File && f.size > 0);
@@ -155,7 +176,12 @@ export async function POST(
   const errors: string[] = [];
 
   for (const file of incoming) {
-    const result = await saveMaketyFile({ file, maketaId, userId });
+    const result = await saveMaketyFile({
+      file,
+      maketaId,
+      userId,
+      documentType: kindParsed.kind,
+    });
     if (result.ok) {
       uploaded.push(result.row);
     } else {

@@ -20,6 +20,8 @@ import {
   notifyMaketaDone,
   notifyMaketaUsers,
 } from "@/lib/makety-notify";
+import { recordMaketyFileEvent } from "@/lib/makety-file-events";
+import { maketaStatusLabel } from "@/lib/makety-status";
 
 export async function GET(
   _req: NextRequest,
@@ -176,6 +178,20 @@ export async function POST(
         },
       });
     }
+
+    await recordMaketyFileEvent({
+      tx,
+      maketaId: id,
+      eventType: "workflow_transition",
+      userId,
+      meta: {
+        from_status: maketa.status,
+        to_status: toStatus,
+        from_label: maketaStatusLabel(maketa.status, "grafika"),
+        to_label: maketaStatusLabel(toStatus, "grafika"),
+        comment: comment || null,
+      },
+    });
   });
 
   await notifyAfterGrafikaTransition({

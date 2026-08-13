@@ -29,7 +29,7 @@ import {
   maketaStatusLabel,
   type MaketaPriority,
 } from "@/lib/makety-status";
-import { type MaketyWorkType } from "@/lib/makety-work-type";
+import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type";
 
 type QueueItem = {
   id: number;
@@ -55,10 +55,12 @@ type Props = {
 function SortableQueueRow({
   item,
   index,
+  workType,
   onPriorityChange,
 }: {
   item: QueueItem;
   index: number;
+  workType: MaketyWorkType;
   onPriorityChange: (id: number, priority: MaketaPriority) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -107,7 +109,9 @@ function SortableQueueRow({
       </span>
       <div className="min-w-0 flex-1">
         <Link href={`/makety/${item.id}`} className="font-medium text-violet-600 hover:underline">
-          {item.order_number ? `Zak. ${item.order_number}` : `Maketa #${item.id}`}
+          {item.order_number
+            ? `Zak. ${item.order_number}`
+            : `${maketyWorkTypeLabel(workType)} #${item.id}`}
         </Link>
         <p className="truncate text-sm text-gray-600">
           {item.body.replace(/\s+/g, " ").trim().slice(0, 80)}
@@ -125,10 +129,12 @@ function SortableQueueRow({
 
 function AssigneeQueueBlock({
   group,
+  workType,
   onReorder,
   onPriorityChange,
 }: {
   group: AssigneeGroup;
+  workType: MaketyWorkType;
   onReorder: (assigneeId: number, orderedIds: number[]) => Promise<void>;
   onPriorityChange: (id: number, priority: MaketaPriority) => void;
 }) {
@@ -182,6 +188,7 @@ function AssigneeQueueBlock({
                 key={item.id}
                 item={item}
                 index={idx}
+                workType={workType}
                 onPriorityChange={onPriorityChange}
               />
             ))}
@@ -300,6 +307,7 @@ export function MaketyQueueDashboard({ initialTab }: Props) {
             <AssigneeQueueBlock
               key={g.assignee.id}
               group={g}
+              workType={tab}
               onReorder={handleReorder}
               onPriorityChange={handlePriorityChange}
             />

@@ -8,6 +8,7 @@ import {
   sanitizeMaketyMimeType,
 } from "@/lib/makety-files";
 import { verifySoftproofToken } from "@/lib/makety-softproof-token";
+import { recordMaketyFileEvent } from "@/lib/makety-file-events";
 
 export const runtime = "nodejs";
 
@@ -56,6 +57,14 @@ export async function GET(
     await prisma.file_uploads.update({
       where: { id: fileRow.id },
       data: { last_accessed_at: new Date() },
+    });
+
+    await recordMaketyFileEvent({
+      maketaId: payload.maketaId,
+      fileId: fileRow.id,
+      eventType: "softproof_downloaded",
+      userId: null,
+      meta: { filename: fileRow.original_filename },
     });
 
     return new NextResponse(new Uint8Array(buf), {

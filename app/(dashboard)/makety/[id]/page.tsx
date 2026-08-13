@@ -40,6 +40,7 @@ import { MaketaFilesPanel } from "./MaketaFilesPanel";
 import { MaketaCommentsPanel } from "./MaketaCommentsPanel";
 import { GrafikaStatusPanel } from "./GrafikaStatusPanel";
 import { GrafikaAutomationPanel } from "./GrafikaAutomationPanel";
+import { MaketyFileEventsPanel } from "./MaketyFileEventsPanel";
 import { GrafikaWorkflowPicker } from "../GrafikaWorkflowPicker";
 import { buildMaketyCommentParticipants } from "@/lib/makety-comment-participants";
 
@@ -399,11 +400,13 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
           showUploadHint={showUploadHint}
           uploadHintText={
             workType === "grafika"
-              ? "Nahrajte podklady pro grafiku — můžete vybrat více souborů najednou."
-              : "Nahrajte podklady pro výrobu makety — můžete vybrat více souborů najednou."
+              ? "Nejdřív vyberte typ souboru (softproof / tisková data / jiné), pak nahrajte přílohy."
+              : "Nejdřív vyberte typ souboru, pak nahrajte podklady pro výrobu makety."
           }
         />
       )}
+
+      {workType === "grafika" && <MaketyFileEventsPanel maketaId={id} />}
 
       {workType === "grafika" && canGrafikaAutomation && (
         <GrafikaAutomationPanel

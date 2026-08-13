@@ -76,6 +76,7 @@ export async function GET(req: NextRequest) {
     groups: groups.map((g) => ({
       assignee: g.assignee,
       items: g.items.map((r) => ({
+        work_type: r.work_type,
         id: r.id,
         body: r.body,
         order_number: r.order_number,

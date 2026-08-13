@@ -16,6 +16,8 @@ import {
 import { signSoftproofToken } from "@/lib/makety-softproof-token";
 import { assertGrafikaTransition } from "@/lib/makety-grafika-status";
 import { notifyMaketaUsers } from "@/lib/makety-notify";
+import { recordMaketyFileEvent } from "@/lib/makety-file-events";
+import { parseMaketyFileKind } from "@/lib/makety-file-kind";
 
 export const runtime = "nodejs";
 
@@ -52,7 +54,13 @@ export async function POST(
     return NextResponse.json({ error: "Zakázka nenalezena" }, { status: 404 });
   }
 
-  let body: { fileId?: number; toEmail?: string; attachFile?: boolean; acknowledgeOverride?: boolean };
+  let body: {
+    fileId?: number;
+    toEmail?: string;
+    attachFile?: boolean;
+    acknowledgeOverride?: boolean;
+    message?: string;
+  };
   try {
     body = await req.json();
   } catch {
@@ -129,6 +137,18 @@ export async function POST(
   if (!fileRow) {
     return NextResponse.json({ error: "Soubor nenalezen" }, { status: 404 });
   }
+  if (parseMaketyFileKind(fileRow.document_type) !== "softproof") {
+    return NextResponse.json(
+      {
+        error:
+          "Klientovi lze odeslat jen soubor typu Softproof (náhled). U souboru nastavte typ Softproof.",
+      },
+      { status: 400 }
+    );
+  }
+
+  const message =
+    typeof body.message === "string" ? body.message.trim().slice(0, 4000) : "";
 
   const diskPath = resolveMaketyFileDiskPath(fileRow.file_path);
   if (!diskPath) {
@@ -165,6 +185,7 @@ export async function POST(
     labelCode: maketa.label_code,
     downloadUrl,
     fileName: fileRow.original_filename,
+    message: message || undefined,
     attachment: attach,
   });
 
@@ -176,6 +197,10 @@ export async function POST(
   }
 
   let status = maketa.status;
+  const commentBody = message
+    ? `Softproof (${fileRow.original_filename}) odeslán na ${toEmail}\n\nDoprovodný text:\n${message}`
+    : `Softproof (${fileRow.original_filename}) odeslán na ${toEmail}`;
+
   if (maketa.status === "prepress_approved") {
     try {
       assertGrafikaTransition({
@@ -201,7 +226,31 @@ export async function POST(
           data: {
             maketa_id: maketaId,
             user_id: userId,
-            body: `Softproof (${fileRow.original_filename}) odeslán na ${toEmail}`,
+            body: commentBody,
+          },
+        });
+        await recordMaketyFileEvent({
+          tx,
+          maketaId,
+          fileId: fileRow.id,
+          eventType: "softproof_sent",
+          userId,
+          meta: {
+            filename: fileRow.original_filename,
+            to_email: toEmail,
+            message: message || null,
+            attached: Boolean(attach),
+          },
+        });
+        await recordMaketyFileEvent({
+          tx,
+          maketaId,
+          eventType: "workflow_transition",
+          userId,
+          meta: {
+            from_status: maketa.status,
+            to_status: "sent_for_approval",
+            via: "softproof_email",
           },
         });
       });
@@ -232,7 +281,22 @@ export async function POST(
       data: {
         maketa_id: maketaId,
         user_id: userId,
-        body: `Softproof (${fileRow.original_filename}) znovu odeslán na ${toEmail}`,
+        body: message
+          ? `Softproof (${fileRow.original_filename}) znovu odeslán na ${toEmail}\n\nDoprovodný text:\n${message}`
+          : `Softproof (${fileRow.original_filename}) znovu odeslán na ${toEmail}`,
+      },
+    });
+    await recordMaketyFileEvent({
+      maketaId,
+      fileId: fileRow.id,
+      eventType: "softproof_sent",
+      userId,
+      meta: {
+        filename: fileRow.original_filename,
+        to_email: toEmail,
+        message: message || null,
+        attached: Boolean(attach),
+        resend: true,
       },
     });
   }
