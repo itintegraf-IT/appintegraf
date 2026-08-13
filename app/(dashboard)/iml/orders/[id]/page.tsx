@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import { BackLink } from "@/components/navigation/BackLink";
 import { PreserveReturnToLink } from "@/components/navigation/PreserveReturnToLink";
+import { ImlOrderDetailTemplateExport } from "./ImlOrderDetailTemplateExport";
 
 export default async function ImlOrderDetailPage({
   params,
@@ -79,6 +80,7 @@ export default async function ImlOrderDetailPage({
           >
             Export XML
           </a>
+          <ImlOrderDetailTemplateExport orderId={order.id} />
           {canWrite && (
             <PreserveReturnToLink
               href={`/iml/orders/${order.id}/edit`}

@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Eye, Pencil, Trash2, Download, Printer } from "lucide-react";
 import { ImlVariableExportModal } from "./ImlVariableExportModal";
+import { ImlOrderTemplateExportButton } from "./ImlOrderTemplateExportButton";
 import { useListFilters } from "@/lib/navigation/use-list-filters";
 import { withReturnTo } from "@/lib/navigation/return-to";
 
@@ -138,14 +139,17 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
             Filtrovat
           </button>
           {canRead && (
-            <button
-              type="button"
-              onClick={() => setBulkExportOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              <Download className="h-4 w-4" />
-              Export
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setBulkExportOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <Download className="h-4 w-4" />
+                Export
+              </button>
+              <ImlOrderTemplateExportButton />
+            </>
           )}
         </form>
       </div>
@@ -293,6 +297,11 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
                             >
                               <Download className="h-4 w-4" />
                             </button>
+                            <ImlOrderTemplateExportButton
+                              orderIds={[o.id]}
+                              variant="menu"
+                              label="Export šablonou"
+                            />
                           </>
                         )}
                         {canWrite && (

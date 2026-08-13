@@ -6,8 +6,16 @@ import {
   sanitizeProductExportColumns,
   sanitizeProductExportFilters,
 } from "@/lib/iml-export-product-columns";
+import {
+  sanitizeOrderExportColumns,
+  sanitizeOrderExportFilters,
+} from "@/lib/iml-export-order-columns";
 
-export async function GET() {
+function parseEntity(raw: unknown): "products" | "orders" {
+  return raw === "orders" ? "orders" : "products";
+}
+
+export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
@@ -17,12 +25,14 @@ export async function GET() {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
+  const entity = parseEntity(req.nextUrl.searchParams.get("entity"));
+
   const templates = await prisma.iml_export_templates.findMany({
-    where: { user_id: userId, entity: "products" },
+    where: { user_id: userId, entity },
     orderBy: { updated_at: "desc" },
   });
 
-  return NextResponse.json({ templates });
+  return NextResponse.json({ templates, entity });
 }
 
 export async function POST(req: NextRequest) {
@@ -45,15 +55,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Název šablony je povinný" }, { status: 400 });
   }
 
+  const entity = parseEntity(body.entity);
   const format = body.format === "xml" ? "xml" : "csv";
-  const columns = sanitizeProductExportColumns(body.columns);
-  const filters = sanitizeProductExportFilters(body.filters);
+  const columns =
+    entity === "orders"
+      ? sanitizeOrderExportColumns(body.columns)
+      : sanitizeProductExportColumns(body.columns);
+  const filters =
+    entity === "orders"
+      ? sanitizeOrderExportFilters(body.filters)
+      : sanitizeProductExportFilters(body.filters);
 
   const created = await prisma.iml_export_templates.create({
     data: {
       user_id: userId,
       name,
-      entity: "products",
+      entity,
       format,
       columns,
       filters,

@@ -160,7 +160,12 @@ export function ImlVariableExportModal({
         <p className="mt-1 text-sm text-gray-600">
           {mode === "single"
             ? "Zaškrtněte pole, která mají být v souboru (data z detailu objednávky v exportním formátu)."
-            : "Zvolte filtry (volitelně), pole a formát (CSV / Excel / XML). Bez filtru až 2000 objednávek."}
+            : "Zvolte filtry (volitelně), pole a formát (CSV / Excel / XML). Bez filtru až 2000 objednávek."}{" "}
+          Pro export po řádcích položek se šablonami použijte{" "}
+          <a href="/iml/imports#export" className="font-medium text-violet-700 underline">
+            Import / Export → Objednávky
+          </a>
+          .
         </p>
 
         {mode === "bulk" && (

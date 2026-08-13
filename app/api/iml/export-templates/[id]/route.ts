@@ -7,6 +7,10 @@ import {
   sanitizeProductExportColumns,
   sanitizeProductExportFilters,
 } from "@/lib/iml-export-product-columns";
+import {
+  sanitizeOrderExportColumns,
+  sanitizeOrderExportFilters,
+} from "@/lib/iml-export-order-columns";
 
 export async function PATCH(
   req: NextRequest,
@@ -38,6 +42,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Neplatné tělo" }, { status: 400 });
   }
 
+  const entity = existing.entity === "orders" ? "orders" : "products";
   const data: Prisma.iml_export_templatesUpdateInput = {};
 
   if (typeof body.name === "string") {
@@ -49,10 +54,16 @@ export async function PATCH(
   }
   if (body.format === "csv" || body.format === "xml") data.format = body.format;
   if (body.columns !== undefined) {
-    data.columns = sanitizeProductExportColumns(body.columns);
+    data.columns =
+      entity === "orders"
+        ? sanitizeOrderExportColumns(body.columns)
+        : sanitizeProductExportColumns(body.columns);
   }
   if (body.filters !== undefined) {
-    const filters = sanitizeProductExportFilters(body.filters);
+    const filters =
+      entity === "orders"
+        ? sanitizeOrderExportFilters(body.filters)
+        : sanitizeProductExportFilters(body.filters);
     data.filters = Object.keys(filters).length > 0 ? filters : Prisma.JsonNull;
   }
 
