@@ -172,6 +172,17 @@ if [[ "$stitky_migrate_exit" -ne 0 ]]; then
   echo ""
 fi
 
+echo "==> SQL: modul Projekty (db:projekty-migrate)"
+set +e
+npm run db:projekty-migrate
+projekty_migrate_exit=$?
+set -e
+if [[ "$projekty_migrate_exit" -ne 0 ]]; then
+  echo "Upozornění: db:projekty-migrate skončil s kódem $projekty_migrate_exit."
+  echo "  Na serveru spusťte ručně: npm run db:projekty-migrate"
+  echo ""
+fi
+
 echo "==> SQL: IML CMYK přepínače (db:iml-cmyk-flags)"
 set +e
 npm run db:iml-cmyk-flags
