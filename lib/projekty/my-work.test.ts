@@ -48,12 +48,35 @@ describe("sectionForDue", () => {
     expect(sectionForDue(null)).toBe("noDue");
   });
 
-  it("hranice dne se počítá kalendářně, ne přes +24 h (DST)", () => {
-    // 29. 3. 2026 je v ČR jarní přechod na letní čas → neděle má 23 hodin.
+  it("hranice dne se počítá kalendářně, ne přes +24 h", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 2, 28, 23, 30));
     expect(sectionForDue(new Date(2026, 2, 29, 0, 30))).toBe("week");
     expect(sectionForDue(new Date(2026, 2, 28, 8, 0))).toBe("today");
+  });
+
+  it("hranice week/later drží i přes přechod na letní čas", () => {
+    // V ČR se na letní čas přechází v neděli 29. 3. 2026 ve 2:00 — ten den má
+    // 23 hodin. Kdyby se weekEnd počítal jako now + 7*24 h, posunul by se
+    // o hodinu a termín přesně na hranici by spadl do špatné sekce.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 2, 25, 12, 0)); // středa před přechodem
+
+    // +6 dní = úterý 31. 3. (už po přechodu) musí být pořád „tento týden"
+    expect(sectionForDue(new Date(2026, 2, 31, 12, 0))).toBe("week");
+    // +7 dní = středa 1. 4. je první den, který do týdne nepatří
+    expect(sectionForDue(new Date(2026, 3, 1, 0, 30))).toBe("later");
+    // Den přechodu samotný
+    expect(sectionForDue(new Date(2026, 2, 29, 23, 0))).toBe("week");
+  });
+
+  it("hranice week/later drží i přes přechod na zimní čas", () => {
+    // Zpátky na zimní čas: neděle 25. 10. 2026, ten den má 25 hodin.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 9, 22, 12, 0)); // čtvrtek před přechodem
+
+    expect(sectionForDue(new Date(2026, 9, 28, 12, 0))).toBe("week"); // +6 dní
+    expect(sectionForDue(new Date(2026, 9, 29, 0, 30))).toBe("later"); // +7 dní
   });
 });
 

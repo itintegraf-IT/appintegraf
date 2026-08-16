@@ -17,6 +17,7 @@ import {
 import { SearchX } from "lucide-react";
 import { type ListData } from "./BoardListColumn";
 import { EmptyState } from "@/components/projekty/ui/empty-state";
+import { deleteCardFilterParams, hasAnyCardFilter } from "@/lib/projekty/card-filters";
 import { ListGroupHeader } from "./ListGroupHeader";
 import { ListCardRow } from "./ListCardRow";
 import { DropLine } from "./DropLine";
@@ -57,12 +58,7 @@ export function BoardListView({
   );
 
   const totalCards = displayedLists.reduce((acc, l) => acc + l.cards.length, 0);
-  const hasActiveFilter =
-    !!searchParams.get("q") ||
-    !!searchParams.get("members") ||
-    !!searchParams.get("labels") ||
-    !!searchParams.get("due") ||
-    !!searchParams.get("completed");
+  const hasActiveFilter = hasAnyCardFilter(searchParams);
 
   // Flat ordered list of card IDs in display order — used for shift-range selection
   const orderedCardIds = useMemo(
@@ -72,11 +68,7 @@ export function BoardListView({
 
   function clearFilters() {
     const sp = new URLSearchParams(searchParams.toString());
-    sp.delete("q");
-    sp.delete("members");
-    sp.delete("labels");
-    sp.delete("due");
-    sp.delete("completed");
+    deleteCardFilterParams(sp);
     router.replace(`${pathname}${sp.toString() ? `?${sp.toString()}` : ""}`);
   }
 

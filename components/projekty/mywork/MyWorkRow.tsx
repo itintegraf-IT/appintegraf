@@ -91,21 +91,27 @@ export function MyWorkRow({
   return (
     <li className="border-b border-border/60 last:border-b-0">
       <div className={rowClass}>
+        {/* aria-label nese název karty, ne akci — stav už sděluje aria-checked
+            a bez názvu zní všechny řádky ve screen readeru stejně. */}
         <span
           role="checkbox"
           aria-checked={item.completed}
-          aria-label={item.completed ? "Označit jako nedokončené" : "Označit jako hotové"}
+          aria-label={item.title}
+          aria-disabled={busy}
           tabIndex={0}
-          onClick={() => onToggleCard(item)}
+          onClick={() => {
+            if (!busy) onToggleCard(item);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              onToggleCard(item);
+              if (!busy) onToggleCard(item);
             }
           }}
           className={cn(
             "grid size-4 shrink-0 cursor-pointer place-items-center rounded border border-border transition-colors duration-150 hover:bg-accent motion-reduce:transition-none",
             item.completed && "border-emerald-600 bg-emerald-600 dark:border-emerald-500 dark:bg-emerald-500",
+            busy && "cursor-not-allowed opacity-50",
           )}
         >
           {item.completed ? (

@@ -67,11 +67,22 @@ export function BulkPriorityPicker({
                 if (bucket) bucket.push(id);
                 else groups.set(prev, [id]);
               }
-              void Promise.all(
+              // allSettled, ne all: každý request je serverově atomický, takže
+              // úspěšné skupiny jsou v DB i když jiná spadne. Bez refreshe by
+              // UI ukazovalo stav, který v DB není.
+              void Promise.allSettled(
                 [...groups].map(([prev, groupIds]) => setPriority(groupIds, prev)),
-              )
-                .then(onApplied)
-                .catch(() => toast.error("Vrácení priority selhalo."));
+              ).then((outcomes) => {
+                onApplied();
+                const failed = outcomes.filter((o) => o.status === "rejected").length;
+                if (failed > 0) {
+                  toast.error(
+                    failed === outcomes.length
+                      ? "Vrácení priority selhalo."
+                      : "Část priorit se nepodařilo vrátit.",
+                  );
+                }
+              });
             },
           },
         },

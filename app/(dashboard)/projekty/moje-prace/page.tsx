@@ -10,7 +10,7 @@ import { MyWorkView, type MyWorkCard } from "@/components/projekty/mywork/MyWork
 export default async function MyWorkPage() {
   const user = await requireSession();
 
-  const [cardMemberships, todos, archived, boards] = await Promise.all([
+  const [cardMemberships, activeTodos, doneTodos, archived, boards] = await Promise.all([
     // assignedAt je na vazbě člen–karta, ne na kartě → jdeme přes CardMember.
     prisma.cardMember.findMany({
       where: { userId: user.id, card: { archived: false } },
@@ -29,9 +29,16 @@ export default async function MyWorkPage() {
         },
       },
     }),
+    // Nedokončené bez limitu (jsou to živé úkoly), hotové jen posledních 50 —
+    // jinak by se do klienta serializovala celá historie včetně Tiptap popisů.
     prisma.personalTodo.findMany({
-      where: { ownerId: user.id, archivedAt: null },
+      where: { ownerId: user.id, archivedAt: null, status: { not: "DONE" } },
       orderBy: { createdAt: "desc" },
+    }),
+    prisma.personalTodo.findMany({
+      where: { ownerId: user.id, archivedAt: null, status: "DONE" },
+      orderBy: { completedAt: "desc" },
+      take: 50,
     }),
     prisma.personalTodo.findMany({
       where: { ownerId: user.id, archivedAt: { not: null } },
@@ -94,5 +101,12 @@ export default async function MyWorkPage() {
     assignedAt: m.assignedAt,
   }));
 
-  return <MyWorkView cards={cards} todos={todos} archived={archived} boards={boards} />;
+  return (
+    <MyWorkView
+      cards={cards}
+      todos={[...activeTodos, ...doneTodos]}
+      archived={archived}
+      boards={boards}
+    />
+  );
 }
