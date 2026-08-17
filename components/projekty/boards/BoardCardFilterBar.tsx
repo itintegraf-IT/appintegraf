@@ -6,7 +6,12 @@ import { Button } from "@/components/projekty/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/projekty/ui/popover";
 import { Search, Users, Tag, Calendar, X, CheckCircle2, Flag } from "lucide-react";
 import { UserAvatar } from "@/components/projekty/UserAvatar";
-import { type CardFilters, parseCardFilters, serializeCardFilters } from "@/lib/projekty/card-filters";
+import {
+  type CardFilters,
+  deleteCardFilterParams,
+  parseCardFilters,
+  serializeCardFilters,
+} from "@/lib/projekty/card-filters";
 import {
   CARD_PRIORITIES,
   PRIORITY_DOT_CLASSES,
@@ -33,7 +38,7 @@ export function BoardCardFilterBar({
   function update(patch: Partial<CardFilters>) {
     const next = { ...filters, ...patch };
     const sp = new URLSearchParams(searchParams.toString());
-    for (const k of ["q", "members", "labels", "due", "completed", "priority"]) sp.delete(k);
+    deleteCardFilterParams(sp);
     for (const [k, v] of serializeCardFilters(next).entries()) sp.set(k, v);
     router.replace(`${pathname}${sp.toString() ? `?${sp.toString()}` : ""}`);
   }

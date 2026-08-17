@@ -152,8 +152,9 @@ export function ListCardRow({
         {card.title}
       </span>
 
-      {/* Priorita */}
-      <span className="hidden w-24 shrink-0 items-center md:flex">
+      {/* Priorita — až od lg: na md už součet pevných sloupců nenechá názvu karty
+          prakticky žádné místo (název je flex-1 truncate, tedy se smrskne na nulu). */}
+      <span className="hidden w-24 shrink-0 items-center lg:flex">
         <PriorityChip priority={card.priority} />
       </span>
 

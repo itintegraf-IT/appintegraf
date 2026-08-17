@@ -47,17 +47,46 @@ export function MyWorkView({
   const [promoteTodo, setPromoteTodo] = useState<PersonalTodo | null>(null);
   const [detailTodoId, setDetailTodoId] = useState<string | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
-  // Optimistic překryv nad server daty — drží zaškrtnutí, než doběhne refresh.
+  // Optimistic překryvy nad server daty — drží změnu, než doběhne refresh.
+  // Čistí je výhradně refetch(); každá úspěšná mutace proto musí volat jeho,
+  // ne holé router.refresh(), jinak override přebíjí čerstvá data napořád.
   const [cardOverrides, setCardOverrides] = useState<Record<string, boolean>>({});
+  const [todoOverrides, setTodoOverrides] = useState<Record<string, PersonalTodo["status"]>>({});
+
+  // Reset překryvů při příchodu čerstvých serverových dat (React pattern
+  // „adjusting state when props change" — setState při renderu, ne v efektu).
+  // Bez něj by override přebíjel server napořád: kdyby kartu odškrtl někdo
+  // jiný, zůstala by tu zobrazená jako hotová až do tvrdého reloadu.
+  const [lastServerData, setLastServerData] = useState<unknown>(cards);
+  if (lastServerData !== cards) {
+    setLastServerData(cards);
+    setCardOverrides({});
+    setTodoOverrides({});
+  }
 
   const detailTodo = detailTodoId ? todos.find((t) => t.id === detailTodoId) ?? null : null;
 
   function refetch() {
     setCardOverrides({});
+    setTodoOverrides({});
     router.refresh();
   }
 
-  const todoById = useMemo(() => new Map(todos.map((t) => [t.id, t])), [todos]);
+  // Úkoly s aplikovaným optimistickým stavem — checkbox z nich počítá další
+  // stav, takže druhý klik před dokončením refreshe nepošle tentýž cíl znovu.
+  const effectiveTodos = useMemo(
+    () =>
+      todos.map((t) => {
+        const override = todoOverrides[t.id];
+        return override && override !== t.status ? { ...t, status: override } : t;
+      }),
+    [todos, todoOverrides],
+  );
+
+  const todoById = useMemo(
+    () => new Map(effectiveTodos.map((t) => [t.id, t])),
+    [effectiveTodos],
+  );
 
   const items: WorkItem[] = useMemo(() => {
     const now = new Date();
@@ -72,7 +101,7 @@ export function MyWorkView({
       context: `${c.boardName} · ${c.listName}`,
       href: `/projekty/boards/${c.boardId}?card=${c.id}`,
     }));
-    const todoItems: WorkItem[] = todos.map((t) => ({
+    const todoItems: WorkItem[] = effectiveTodos.map((t) => ({
       kind: "todo",
       id: t.id,
       title: t.title,
@@ -85,7 +114,7 @@ export function MyWorkView({
       href: null,
     }));
     return [...cardItems, ...todoItems];
-  }, [cards, todos, cardOverrides]);
+  }, [cards, effectiveTodos, cardOverrides]);
 
   const activeItems = items.filter((i) => !i.completed);
   const doneItems = items.filter((i) => i.completed);
@@ -110,41 +139,59 @@ export function MyWorkView({
     return res.ok;
   }
 
+  function dropCardOverride(cardId: string) {
+    setCardOverrides((prev) => {
+      const copy = { ...prev };
+      delete copy[cardId];
+      return copy;
+    });
+  }
+
   async function toggleCard(item: WorkItem) {
+    if (busyIds.has(item.id)) return;
     const next = !item.completed;
     setCardOverrides((prev) => ({ ...prev, [item.id]: next }));
     withBusy(item.id, true);
 
-    const ok = await patchCard(item.id, next);
-    withBusy(item.id, false);
+    // try/finally je nutné: odmítnutá promisa z fetch (offline, uspaný notebook)
+    // není totéž co !res.ok — bez něj by zůstal viset optimistický stav i busy flag.
+    try {
+      const ok = await patchCard(item.id, next);
+      if (!ok) {
+        dropCardOverride(item.id);
+        toast.error("Změna se nezdařila");
+        return;
+      }
 
-    if (!ok) {
-      setCardOverrides((prev) => {
-        const copy = { ...prev };
-        delete copy[item.id];
-        return copy;
-      });
-      toast.error("Změna se nezdařila");
-      return;
-    }
-
-    if (next) {
-      toast.success(`Hotovo: ${item.title}`, {
-        action: {
-          label: "Zpět",
-          onClick: () => {
-            void patchCard(item.id, false).then((undone) => {
-              if (undone) refetch();
-              else toast.error("Vrácení se nezdařilo");
-            });
+      if (next) {
+        toast.success(`Hotovo: ${item.title}`, {
+          action: {
+            label: "Zpět",
+            onClick: () => {
+              void patchCard(item.id, false)
+                .then((undone) => {
+                  if (undone) refetch();
+                  else toast.error("Vrácení se nezdařilo");
+                })
+                .catch(() => toast.error("Vrácení se nezdařilo"));
+            },
           },
-        },
-      });
+        });
+      }
+      // Překryv nechávám — smaže ho až příchod čerstvých dat, takže řádek
+      // mezi odpovědí API a dokončením refreshe neproblikne zpět.
+      router.refresh();
+    } catch {
+      dropCardOverride(item.id);
+      toast.error("Změna se nezdařila");
+    } finally {
+      withBusy(item.id, false);
     }
-    router.refresh();
   }
 
   async function setTodoStatus(todo: PersonalTodo, next: PersonalTodo["status"]) {
+    if (busyIds.has(todo.id)) return;
+    setTodoOverrides((prev) => ({ ...prev, [todo.id]: next }));
     withBusy(todo.id, true);
     try {
       const res = await fetch(`/api/projekty/personal-todos/${todo.id}`, {
@@ -153,8 +200,15 @@ export function MyWorkView({
         body: JSON.stringify({ status: next }),
       });
       if (!res.ok) throw new Error("API error");
+      // Překryv nechávám — smaže ho až příchod čerstvých dat, takže řádek
+      // mezi odpovědí API a dokončením refreshe neproblikne zpět.
       router.refresh();
     } catch {
+      setTodoOverrides((prev) => {
+        const copy = { ...prev };
+        delete copy[todo.id];
+        return copy;
+      });
       toast.error("Změna se nezdařila");
     } finally {
       withBusy(todo.id, false);
@@ -277,9 +331,13 @@ function TabButton({
     <button
       type="button"
       onClick={onClick}
+      // Aktivní stav nesla jen barva pozadí — assistivní technologie o něm nevěděly.
+      aria-pressed={active}
       className={cn(
         "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-150 motion-reduce:transition-none",
-        active ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground",
+        active
+          ? "bg-muted font-semibold text-foreground"
+          : "text-muted-foreground hover:text-foreground",
       )}
     >
       {icon}

@@ -35,8 +35,11 @@ export function QuickCaptureDialog({
         body: JSON.stringify({ title }),
       });
       if (!res.ok) throw new Error("API error");
-      toast.success("Úkol přidán do To Do listu", {
-        action: { label: "Otevřít list", onClick: () => router.push("/projekty/todo") },
+      toast.success("Úkol přidán do Moje práce", {
+        action: {
+          label: "Otevřít",
+          onClick: () => router.push("/projekty/moje-prace"),
+        },
       });
       onOpenChange(false);
       router.refresh();

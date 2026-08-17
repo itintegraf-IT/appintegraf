@@ -11,6 +11,32 @@ export type CardFilters = {
   priorities?: (CardPriorityValue | "none")[];
 };
 
+/**
+ * Všechny URL parametry patřící filtrům karet — jediný zdroj pravdy.
+ * Seznam se dřív opakoval ve třech komponentách a přidání priority se do dvou
+ * z nich nepromítlo: „Vymazat filtry" filtr nesmazalo a empty state se nezobrazil.
+ */
+export const CARD_FILTER_PARAMS = [
+  "q",
+  "members",
+  "labels",
+  "due",
+  "completed",
+  "priority",
+] as const;
+
+/** Je aktivní aspoň jeden filtr karet? */
+export function hasAnyCardFilter(
+  searchParams: URLSearchParams | { get(k: string): string | null },
+): boolean {
+  return CARD_FILTER_PARAMS.some((k) => Boolean(searchParams.get(k)));
+}
+
+/** Odstraní z URL všechny filtrovací parametry (mutuje předaný objekt). */
+export function deleteCardFilterParams(sp: URLSearchParams): void {
+  for (const k of CARD_FILTER_PARAMS) sp.delete(k);
+}
+
 export function parseCardFilters(
   searchParams: URLSearchParams | { get(k: string): string | null },
 ): CardFilters {

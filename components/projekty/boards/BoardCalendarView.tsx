@@ -16,6 +16,7 @@ import { CalendarGrid } from "./CalendarGrid";
 import { Button } from "@/components/projekty/ui/button";
 import { EmptyState } from "@/components/projekty/ui/empty-state";
 import { buildMonthGrid } from "@/lib/projekty/calendar";
+import { deleteCardFilterParams, hasAnyCardFilter } from "@/lib/projekty/card-filters";
 import { parseCalendarMonth } from "@/lib/projekty/board-view";
 import { type CardData } from "./CardItem";
 import { useResponsiveSensors } from "@/lib/projekty/dnd-sensors";
@@ -169,11 +170,7 @@ export function BoardCalendarView({
 
   function clearFilters() {
     const sp = new URLSearchParams(searchParams.toString());
-    sp.delete("q");
-    sp.delete("members");
-    sp.delete("labels");
-    sp.delete("due");
-    sp.delete("completed");
+    deleteCardFilterParams(sp);
     router.replace(`${pathname}${sp.toString() ? `?${sp.toString()}` : ""}`);
   }
 
@@ -184,12 +181,7 @@ export function BoardCalendarView({
     router.replace(`${pathname}${sp.toString() ? `?${sp.toString()}` : ""}`);
   }
 
-  const hasActiveFilters =
-    searchParams.has("q") ||
-    searchParams.has("members") ||
-    searchParams.has("labels") ||
-    searchParams.has("due") ||
-    searchParams.has("completed");
+  const hasActiveFilters = hasAnyCardFilter(searchParams);
 
   // Empty state s aktivním filtrem nahradíme grid celkem (uživatel chce vidět
   // "nic nematchne"). Bez filtru ukážeme grid normálně, jen s informací o
