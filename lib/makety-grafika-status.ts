@@ -181,6 +181,7 @@ const TRANSITIONS: TransitionRule[] = [
   { from: ["data_problem"], to: "open" },
   { from: ["in_progress"], to: "done" },
   { from: ["done"], to: "prepress_approved" },
+  { from: ["done"], to: "in_progress", requiresComment: true },
   { from: ["prepress_approved"], to: "sent_for_approval" },
   { from: ["sent_for_approval"], to: "approved" },
 ];
@@ -194,7 +195,10 @@ const ROLE_TRANSITIONS: Record<GrafikaTransitionRole, Array<{ from: GrafikaStatu
     { from: "in_progress", to: "done" },
   ],
   zadavatel: [{ from: "data_problem", to: "open" }],
-  prepress: [{ from: "done", to: "prepress_approved" }],
+  prepress: [
+    { from: "done", to: "prepress_approved" },
+    { from: "done", to: "in_progress" },
+  ],
   final: [
     { from: "prepress_approved", to: "sent_for_approval" },
     { from: "sent_for_approval", to: "approved" },
@@ -291,8 +295,20 @@ export function assertGrafikaTransition(input: AssertGrafikaTransitionInput): vo
     throw new Error(`Přechod ze stavu „${grafikaStatusLabel(from)}“ do „${grafikaStatusLabel(to)}“ není povolen.`);
   }
   if (rule.requiresComment && !(input.comment ?? "").trim()) {
-    throw new Error("U tohoto přechodu je povinný komentář s popisem problému.");
+    throw new Error(
+      to === "in_progress"
+        ? "U vrácení grafikovi je povinný komentář s důvodem."
+        : "U tohoto přechodu je povinný komentář s popisem problému."
+    );
   }
+}
+
+export function grafikaTransitionRequiresComment(fromStatus: string, toStatus: string): boolean {
+  const from = parseGrafikaStatus(fromStatus);
+  const to = parseGrafikaStatus(toStatus);
+  if (!from || !to) return false;
+  const rule = TRANSITIONS.find((r) => r.to === to && r.from.includes(from));
+  return rule?.requiresComment === true;
 }
 
 export function grafikaTransitionActionLabel(toStatus: GrafikaStatus, fromStatus?: string): string {
@@ -300,7 +316,7 @@ export function grafikaTransitionActionLabel(toStatus: GrafikaStatus, fromStatus
     case "open":
       return fromStatus === "data_problem" ? "Uvolnit ke zpracování" : "Zařadit do fronty";
     case "in_progress":
-      return "Zahájit práci";
+      return fromStatus === "done" ? "Vrátit grafikovi (DTP)" : "Zahájit práci";
     case "data_problem":
       return "Pozastavit – problém s daty";
     case "done":

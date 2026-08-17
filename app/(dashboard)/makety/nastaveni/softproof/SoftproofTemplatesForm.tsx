@@ -122,7 +122,7 @@ export function SoftproofTemplatesForm() {
             onClick={() => setActiveLocale(t.locale)}
             className={`rounded-lg border px-3 py-1.5 text-sm ${
               t.locale === current?.locale
-                ? "border-red-600 bg-red-50 font-medium text-red-800"
+                ? "border-violet-600 bg-violet-50 font-medium text-violet-800"
                 : "border-gray-200 text-gray-700 hover:bg-gray-50"
             }`}
           >
@@ -214,7 +214,7 @@ export function SoftproofTemplatesForm() {
           type="button"
           onClick={() => void save()}
           disabled={saving}
-          className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+          className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-medium text-white hover:bg-violet-800 disabled:opacity-50"
         >
           {saving ? "Ukládám…" : "Uložit šablony"}
         </button>

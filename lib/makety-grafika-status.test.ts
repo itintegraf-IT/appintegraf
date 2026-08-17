@@ -57,11 +57,32 @@ describe("makety-grafika-status", () => {
   });
 
   it("povoluje prepress a final přechody", () => {
-    expect(getAllowedGrafikaTransitions("done", ["prepress"])).toEqual(["prepress_approved"]);
+    expect(getAllowedGrafikaTransitions("done", ["prepress"])).toEqual([
+      "prepress_approved",
+      "in_progress",
+    ]);
     expect(getAllowedGrafikaTransitions("done", ["grafik"])).not.toContain("prepress_approved");
     expect(getAllowedGrafikaTransitions("prepress_approved", ["final"])).toContain(
       "sent_for_approval"
     );
+  });
+
+  it("prepress vrátí grafiku grafikovi s povinným komentářem", () => {
+    expect(grafikaTransitionActionLabel("in_progress", "done")).toBe("Vrátit grafikovi (DTP)");
+    expect(() =>
+      assertGrafikaTransition({
+        fromStatus: "done",
+        toStatus: "in_progress",
+        comment: "",
+      })
+    ).toThrow(/důvod/i);
+    expect(() =>
+      assertGrafikaTransition({
+        fromStatus: "done",
+        toStatus: "in_progress",
+        comment: "Špatný spad",
+      })
+    ).not.toThrow();
   });
 
   it("zadavatel bez override nevidí schválení prepressem", () => {
@@ -73,6 +94,7 @@ describe("makety-grafika-status", () => {
     const opts = listGrafikaTransitionOptions("done", ["zadavatel"], true);
     expect(opts).toEqual([
       { toStatus: "prepress_approved", viaOverride: true, actingAs: "prepress" },
+      { toStatus: "in_progress", viaOverride: true, actingAs: "prepress" },
     ]);
   });
 
@@ -80,6 +102,7 @@ describe("makety-grafika-status", () => {
     const opts = listGrafikaTransitionOptions("done", ["prepress", "zadavatel"], true);
     expect(opts).toEqual([
       { toStatus: "prepress_approved", viaOverride: false, actingAs: "prepress" },
+      { toStatus: "in_progress", viaOverride: false, actingAs: "prepress" },
     ]);
   });
 

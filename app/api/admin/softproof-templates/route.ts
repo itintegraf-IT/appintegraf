@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { isAdmin } from "@/lib/auth-utils";
+import { canViewAllMaketyTypes } from "@/lib/makety-access";
 import {
   loadSoftproofTemplates,
   saveSoftproofTemplates,
@@ -13,7 +13,7 @@ export async function GET() {
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
-  if (!(await isAdmin(userId))) {
+  if (!(await canViewAllMaketyTypes(userId))) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
   const templates = await loadSoftproofTemplates();
@@ -26,7 +26,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
-  if (!(await isAdmin(userId))) {
+  if (!(await canViewAllMaketyTypes(userId))) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
@@ -45,3 +45,4 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 }
+

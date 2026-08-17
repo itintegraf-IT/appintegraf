@@ -109,6 +109,13 @@ describe("validateSoftproofDecision", () => {
   it("approve bez důvodu je ok", () => {
     const r = validateSoftproofDecision("approved", "");
     expect(r.ok).toBe(true);
+    if (r.ok) expect(r.reason).toBeNull();
+  });
+
+  it("approve ignoruje zaslanou poznámku", () => {
+    const r = validateSoftproofDecision("approved", "neměla by se uložit");
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.reason).toBeNull();
   });
 
   it("reject s důvodem je ok", () => {

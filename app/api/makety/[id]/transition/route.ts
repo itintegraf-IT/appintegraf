@@ -12,6 +12,7 @@ import {
   assertGrafikaTransition,
   grafikaActingAsLabel,
   grafikaTransitionActionLabel,
+  grafikaTransitionRequiresComment,
   listGrafikaTransitionOptions,
   parseGrafikaStatus,
   type GrafikaStatus,
@@ -63,7 +64,7 @@ export async function GET(
       label: o.viaOverride
         ? `${grafikaTransitionActionLabel(o.toStatus, maketa.status)} (převzetí: ${grafikaActingAsLabel(o.actingAs)})`
         : grafikaTransitionActionLabel(o.toStatus, maketa.status),
-      requiresComment: o.toStatus === "data_problem",
+      requiresComment: grafikaTransitionRequiresComment(maketa.status, o.toStatus),
       requiresOverrideAck: o.viaOverride,
       actingAs: o.actingAs,
     })),
@@ -256,6 +257,19 @@ async function notifyAfterGrafikaTransition(params: {
       bodyPreview,
       orderNumber,
       kind: "data_problem",
+      workType: "grafika",
+      excludeUserId: actorUserId,
+    });
+    return;
+  }
+
+  if (toStatus === "in_progress" && maketa.status === "done") {
+    await notifyMaketaUsers({
+      maketaId,
+      userIds: [assigneeUserId, createdBy],
+      bodyPreview,
+      orderNumber,
+      kind: "returned_to_dtp",
       workType: "grafika",
       excludeUserId: actorUserId,
     });

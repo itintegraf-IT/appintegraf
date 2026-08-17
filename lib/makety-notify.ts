@@ -24,6 +24,7 @@ export type MaketaNotifyKind =
   | "client_rejected"
   | "approved"
   | "data_problem"
+  | "returned_to_dtp"
   | "comment"
   | "quote_submitted"
   | "quote_approved"
@@ -116,6 +117,11 @@ function notifyCopy(
       return {
         title: "Grafika pozastavena – problém s daty",
         intro: `Grafik pozastavil grafiku${zak} kvůli problému s daty. Doplňte podklady a uvolněte zakázku ke zpracování.`,
+      };
+    case "returned_to_dtp":
+      return {
+        title: "Grafika vrácena grafikovi",
+        intro: `Prepress vrátil grafiku${zak} k úpravě. Důvod je v komentáři u zakázky.`,
       };
     case "comment":
       return {

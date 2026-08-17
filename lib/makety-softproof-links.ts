@@ -45,7 +45,7 @@ export function validateSoftproofDecision(
   return {
     ok: true,
     action,
-    reason: action === "rejected" ? reasonText.slice(0, 4000) : reasonText ? reasonText.slice(0, 4000) : null,
+    reason: action === "rejected" ? reasonText.slice(0, 4000) : null,
   };
 }
 

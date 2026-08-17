@@ -56,6 +56,9 @@ export function MaketaFilesPanel({
   const [documentType, setDocumentType] = useState<MaketyFileKind | "">("");
   const [dragOver, setDragOver] = useState(false);
   const [downloadingId, setDownloadingId] = useState<number | null>(null);
+  const [dragReadyIds, setDragReadyIds] = useState<Set<number>>(() => new Set());
+  const [prefetchingIds, setPrefetchingIds] = useState<Set<number>>(() => new Set());
+  const [dragHint, setDragHint] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -174,6 +177,7 @@ export function MaketaFilesPanel({
   const prefetchForDrag = (f: FileRow) => {
     if (dragFileCache.current.has(f.id) || prefetchingRef.current.has(f.id)) return;
     prefetchingRef.current.add(f.id);
+    setPrefetchingIds((prev) => new Set(prev).add(f.id));
     void fetch(fileApiUrl(maketaId, f.id, true), { credentials: "same-origin" })
       .then((res) => {
         if (!res.ok) throw new Error("fetch failed");
@@ -183,31 +187,36 @@ export function MaketaFilesPanel({
         dragFileCache.current.set(
           f.id,
           new File([blob], f.original_filename, {
-            type: blob.type || "application/octet-stream",
+            type: "application/octet-stream",
           })
         );
+        setDragReadyIds((prev) => new Set(prev).add(f.id));
       })
-      .catch(() => {})
+      .catch(() => {
+        setDragHint("Soubor se nepodařilo připravit k přetažení — použijte Stáhnout.");
+      })
       .finally(() => {
         prefetchingRef.current.delete(f.id);
+        setPrefetchingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(f.id);
+          return next;
+        });
       });
   };
 
   const onDragStartFile = (e: React.DragEvent, f: FileRow) => {
     const cached = dragFileCache.current.get(f.id);
-    if (cached) {
-      e.dataTransfer.items.add(cached);
-      e.dataTransfer.effectAllowed = "copy";
+    if (!cached) {
+      e.preventDefault();
+      setDragHint("Počkejte na načtení souboru, pak přetáhněte znovu.");
+      prefetchForDrag(f);
       return;
     }
-
-    const url = `${window.location.origin}${fileApiUrl(maketaId, f.id, true)}`;
-    e.dataTransfer.setData(
-      "DownloadURL",
-      `application/octet-stream:${f.original_filename}:${url}`
-    );
-    e.dataTransfer.setData("text/uri-list", url);
+    e.dataTransfer.clearData();
+    e.dataTransfer.items.add(cached);
     e.dataTransfer.effectAllowed = "copy";
+    setDragHint(null);
   };
 
   const onDownloadFile = async (f: FileRow) => {
@@ -306,6 +315,7 @@ export function MaketaFilesPanel({
 
       {uploadProgress && <p className="mb-2 text-sm text-violet-700">{uploadProgress}</p>}
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
+      {dragHint && <p className="mb-2 text-sm text-amber-800">{dragHint}</p>}
       {warnings.length > 0 && (
         <ul className="mb-2 list-inside list-disc text-sm text-amber-800">
           {warnings.map((w, i) => (
@@ -319,21 +329,35 @@ export function MaketaFilesPanel({
         <p className="text-sm text-gray-500">Zatím žádné přílohy.</p>
       ) : (
         <ul className="space-y-2">
-          {files.map((f) => (
+          {files.map((f) => {
+            const ready = dragReadyIds.has(f.id);
+            const waiting = prefetchingIds.has(f.id);
+            return (
             <li
               key={f.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-2 py-2 text-sm"
+              onMouseEnter={() => prefetchForDrag(f)}
+              onPointerEnter={() => prefetchForDrag(f)}
             >
               <div className="flex min-w-0 flex-1 items-start gap-2">
                 <span
-                  draggable
+                  draggable={ready}
                   role="button"
                   tabIndex={0}
-                  title="Přetáhněte na plochu pro stažení"
+                  title={
+                    ready
+                      ? "Přetáhněte na plochu pro stažení souboru"
+                      : waiting
+                        ? "Načítám soubor…"
+                        : "Najetím se soubor připraví ke stažení na plochu"
+                  }
                   aria-label={`Přetáhnout ${f.original_filename} na plochu`}
-                  onPointerDown={() => prefetchForDrag(f)}
                   onDragStart={(e) => onDragStartFile(e, f)}
-                  className="mt-0.5 shrink-0 cursor-grab rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing"
+                  className={`mt-0.5 shrink-0 rounded p-0.5 ${
+                    ready
+                      ? "cursor-grab text-gray-500 hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing"
+                      : "cursor-wait text-gray-300"
+                  }`}
                 >
                   <GripVertical className="h-4 w-4" />
                 </span>
@@ -402,7 +426,8 @@ export function MaketaFilesPanel({
                 )}
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

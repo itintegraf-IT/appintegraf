@@ -248,14 +248,19 @@ export function GrafikaStatusPanel({
         {selected && selectedTransition?.requiresComment && (
           <div className="mt-3">
             <label className="mb-1 block text-xs font-medium text-gray-700">
-              Popis problému <span className="text-red-600">*</span>
+              {selected === "in_progress" ? "Důvod vrácení grafikovi" : "Popis problému"}{" "}
+              <span className="text-red-600">*</span>
             </label>
             <textarea
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={2}
               className="w-full rounded-lg border border-gray-300 px-2 py-1.5 text-sm"
-              placeholder="Popište problém s daty…"
+              placeholder={
+                selected === "in_progress"
+                  ? "Popište, co má grafik upravit…"
+                  : "Popište problém s daty…"
+              }
             />
           </div>
         )}

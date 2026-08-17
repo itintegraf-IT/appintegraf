@@ -4,7 +4,7 @@ import { redirectWithError } from "@/lib/navigation-errors";
 import Link from "next/link";
 import { isAdmin } from "@/lib/auth-utils";
 import { ArrowLeft, Languages } from "lucide-react";
-import { SoftproofTemplatesForm } from "./SoftproofTemplatesForm";
+import { SoftproofTemplatesForm } from "@/app/(dashboard)/makety/nastaveni/softproof/SoftproofTemplatesForm";
 
 export default async function AdminSoftproofTemplatesPage() {
   const session = await auth();

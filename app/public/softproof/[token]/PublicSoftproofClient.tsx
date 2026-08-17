@@ -29,6 +29,7 @@ export function PublicSoftproofClient({ token }: { token: string }) {
   const [blocked, setBlocked] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  const [rejectOpen, setRejectOpen] = useState(false);
   const [submitting, setSubmitting] = useState<"approved" | "rejected" | null>(null);
   const [done, setDone] = useState<"approved" | "rejected" | null>(null);
 
@@ -63,18 +64,25 @@ export function PublicSoftproofClient({ token }: { token: string }) {
 
   const decide = async (action: "approved" | "rejected") => {
     setError(null);
+    if (action === "rejected" && !reason.trim()) {
+      setError("U zamítnutí uveďte důvod");
+      return;
+    }
     setSubmitting(action);
     try {
       const res = await fetch(apiBase, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, reason }),
+        body: JSON.stringify(
+          action === "approved" ? { action } : { action, reason: reason.trim() }
+        ),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(typeof data.error === "string" ? data.error : typeof data.message === "string" ? data.message : "Akce se nezdařila");
         return;
       }
+      setRejectOpen(false);
       setDone(action);
     } catch {
       setError("Síťová chyba");
@@ -156,17 +164,7 @@ export function PublicSoftproofClient({ token }: { token: string }) {
         </a>
 
         <div className="mt-6 space-y-3 border-t border-gray-100 pt-4">
-          <label className="block text-sm font-medium text-gray-700">
-            {meta.texts.rejectReasonLabel}
-            <textarea
-              rows={4}
-              className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              disabled={submitting != null}
-            />
-          </label>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && !rejectOpen && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -179,14 +177,66 @@ export function PublicSoftproofClient({ token }: { token: string }) {
             <button
               type="button"
               disabled={submitting != null}
-              onClick={() => void decide("rejected")}
+              onClick={() => {
+                setError(null);
+                setRejectOpen(true);
+              }}
               className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
             >
-              {submitting === "rejected" ? "…" : meta.texts.rejectLabel}
+              {meta.texts.rejectLabel}
             </button>
           </div>
         </div>
       </div>
+
+      {rejectOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="softproof-reject-title"
+            className="w-full max-w-md rounded-xl bg-white p-6 shadow-lg"
+          >
+            <h2 id="softproof-reject-title" className="text-lg font-semibold text-gray-900">
+              {meta.texts.rejectLabel}
+            </h2>
+            <label className="mt-4 block text-sm font-medium text-gray-700">
+              {meta.texts.rejectReasonLabel}
+              <textarea
+                rows={4}
+                autoFocus
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                disabled={submitting != null}
+              />
+            </label>
+            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={submitting != null}
+                onClick={() => {
+                  setRejectOpen(false);
+                  setReason("");
+                  setError(null);
+                }}
+                className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Zrušit
+              </button>
+              <button
+                type="button"
+                disabled={submitting != null}
+                onClick={() => void decide("rejected")}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {submitting === "rejected" ? "…" : meta.texts.rejectLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
