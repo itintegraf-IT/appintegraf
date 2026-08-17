@@ -3,6 +3,7 @@ import {
   defaultVisibleMaketyListColumnIds,
   reorderMaketyListColumnIds,
   resolveVisibleMaketyListColumnIds,
+  type MaketyListColumnId,
 } from "./makety-list-columns";
 
 describe("makety-list-columns", () => {
@@ -37,7 +38,7 @@ describe("makety-list-columns", () => {
   });
 
   it("preserves custom column order from storage", () => {
-    const stored = ["status", "body", "due_at", "actions"];
+    const stored: MaketyListColumnId[] = ["status", "body", "due_at", "actions"];
     const ids = resolveVisibleMaketyListColumnIds(stored, true);
     expect(ids.slice(0, 3)).toEqual(["status", "body", "due_at"]);
     expect(ids.at(-1)).toBe("actions");

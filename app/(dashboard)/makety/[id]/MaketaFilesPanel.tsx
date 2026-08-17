@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Download, GripVertical, Upload } from "lucide-react";
 import {
   MAKETY_FILE_KINDS,
   maketyFileKindBadgeClass,
@@ -22,6 +23,11 @@ type FileRow = {
   users: { first_name: string; last_name: string } | null;
 };
 
+function fileApiUrl(maketaId: number, fileId: number, download = false): string {
+  const base = `/api/makety/${maketaId}/files/${fileId}`;
+  return download ? `${base}?download=1` : base;
+}
+
 export function MaketaFilesPanel({
   maketaId,
   canDelete,
@@ -36,6 +42,11 @@ export function MaketaFilesPanel({
   canChangeType?: boolean;
 }) {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragFileCache = useRef<Map<number, File>>(new Map());
+  const prefetchingRef = useRef<Set<number>>(new Set());
+  const dragZoneCounter = useRef(0);
+
   const [files, setFiles] = useState<FileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -43,6 +54,8 @@ export function MaketaFilesPanel({
   const [error, setError] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [documentType, setDocumentType] = useState<MaketyFileKind | "">("");
+  const [dragOver, setDragOver] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -59,13 +72,11 @@ export function MaketaFilesPanel({
     void load();
   }, [maketaId]);
 
-  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files;
-    if (!selected?.length) return;
+  const uploadFiles = async (selected: File[]) => {
+    if (!selected.length) return;
 
     if (!documentType) {
       setError("Nejdřív vyberte typ souboru (softproof / tisková data / jiné)");
-      e.target.value = "";
       return;
     }
 
@@ -76,8 +87,8 @@ export function MaketaFilesPanel({
 
     const fd = new FormData();
     fd.append("document_type", documentType);
-    for (let i = 0; i < selected.length; i++) {
-      fd.append("file", selected[i]);
+    for (const file of selected) {
+      fd.append("file", file);
     }
 
     try {
@@ -102,13 +113,44 @@ export function MaketaFilesPanel({
 
     setUploading(false);
     setUploadProgress(null);
+  };
+
+  const onFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files;
+    if (!selected?.length) return;
+    await uploadFiles(Array.from(selected));
     e.target.value = "";
+  };
+
+  const onDropFiles = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragZoneCounter.current = 0;
+    setDragOver(false);
+    const dropped = Array.from(e.dataTransfer.files);
+    if (dropped.length) await uploadFiles(dropped);
+  };
+
+  const onDragEnterZone = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragZoneCounter.current += 1;
+    setDragOver(true);
+  };
+
+  const onDragLeaveZone = (e: React.DragEvent) => {
+    e.preventDefault();
+    dragZoneCounter.current -= 1;
+    if (dragZoneCounter.current <= 0) {
+      dragZoneCounter.current = 0;
+      setDragOver(false);
+    }
   };
 
   const onDeleteFile = async (fileId: number) => {
     if (!confirm("Smazat soubor?")) return;
     const res = await fetch(`/api/makety/${maketaId}/files/${fileId}`, { method: "DELETE" });
     if (res.ok) {
+      dragFileCache.current.delete(fileId);
       await load();
       router.refresh();
     }
@@ -128,6 +170,67 @@ export function MaketaFilesPanel({
       setError(typeof data.error === "string" ? data.error : "Změna typu se nezdařila");
     }
   };
+
+  const prefetchForDrag = (f: FileRow) => {
+    if (dragFileCache.current.has(f.id) || prefetchingRef.current.has(f.id)) return;
+    prefetchingRef.current.add(f.id);
+    void fetch(fileApiUrl(maketaId, f.id, true), { credentials: "same-origin" })
+      .then((res) => {
+        if (!res.ok) throw new Error("fetch failed");
+        return res.blob();
+      })
+      .then((blob) => {
+        dragFileCache.current.set(
+          f.id,
+          new File([blob], f.original_filename, {
+            type: blob.type || "application/octet-stream",
+          })
+        );
+      })
+      .catch(() => {})
+      .finally(() => {
+        prefetchingRef.current.delete(f.id);
+      });
+  };
+
+  const onDragStartFile = (e: React.DragEvent, f: FileRow) => {
+    const cached = dragFileCache.current.get(f.id);
+    if (cached) {
+      e.dataTransfer.items.add(cached);
+      e.dataTransfer.effectAllowed = "copy";
+      return;
+    }
+
+    const url = `${window.location.origin}${fileApiUrl(maketaId, f.id, true)}`;
+    e.dataTransfer.setData(
+      "DownloadURL",
+      `application/octet-stream:${f.original_filename}:${url}`
+    );
+    e.dataTransfer.setData("text/uri-list", url);
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
+  const onDownloadFile = async (f: FileRow) => {
+    setDownloadingId(f.id);
+    setError(null);
+    try {
+      const res = await fetch(fileApiUrl(maketaId, f.id, true), { credentials: "same-origin" });
+      if (!res.ok) throw new Error("download failed");
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = f.original_filename;
+      anchor.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      setError("Stažení se nezdařilo");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const uploadDisabled = uploading || !documentType;
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -158,14 +261,49 @@ export function MaketaFilesPanel({
         </select>
       </div>
 
-      <input
-        type="file"
-        multiple
-        accept={ACCEPT}
-        disabled={uploading || !documentType}
-        onChange={onUpload}
-        className="mb-3 block w-full text-sm text-gray-700 file:mr-3 file:rounded-md file:border-0 file:bg-violet-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-violet-700 disabled:opacity-50"
-      />
+      <div
+        onDragEnter={onDragEnterZone}
+        onDragOver={(e) => e.preventDefault()}
+        onDragLeave={onDragLeaveZone}
+        onDrop={onDropFiles}
+        className={`mb-3 rounded-xl border-2 border-dashed p-6 text-center transition-colors ${
+          uploadDisabled
+            ? "cursor-not-allowed border-gray-200 bg-gray-50 opacity-70"
+            : dragOver
+              ? "border-violet-400 bg-violet-50"
+              : "border-gray-300 bg-gray-50 hover:border-gray-400"
+        }`}
+      >
+        <Upload className="mx-auto mb-2 h-8 w-8 text-gray-400" />
+        <p className="text-sm text-gray-700">
+          {documentType
+            ? "Přetáhněte soubory sem nebo "
+            : "Nejdřív zvolte typ souboru, pak přetáhněte soubory sem nebo "}
+          <button
+            type="button"
+            disabled={uploadDisabled}
+            onClick={() => fileInputRef.current?.click()}
+            className="font-medium text-violet-700 underline disabled:cursor-not-allowed disabled:no-underline disabled:text-gray-400"
+          >
+            vyberte soubory
+          </button>
+        </p>
+        <p className="mt-1 text-xs text-gray-500">
+          {documentType
+            ? "Podporované formáty: PDF, Word, Excel, obrázky, e-mail"
+            : "Typ souboru je povinný před nahráním"}
+        </p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={ACCEPT}
+          disabled={uploadDisabled}
+          onChange={onFileInputChange}
+          className="hidden"
+        />
+      </div>
+
       {uploadProgress && <p className="mb-2 text-sm text-violet-700">{uploadProgress}</p>}
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
       {warnings.length > 0 && (
@@ -186,52 +324,83 @@ export function MaketaFilesPanel({
               key={f.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-2 py-2 text-sm"
             >
-              <div className="min-w-0 flex-1 space-y-1">
-                <a
-                  href={`/api/makety/${maketaId}/files/${f.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="break-all font-medium text-violet-600 hover:underline"
+              <div className="flex min-w-0 flex-1 items-start gap-2">
+                <span
+                  draggable
+                  role="button"
+                  tabIndex={0}
+                  title="Přetáhněte na plochu pro stažení"
+                  aria-label={`Přetáhnout ${f.original_filename} na plochu`}
+                  onPointerDown={() => prefetchForDrag(f)}
+                  onDragStart={(e) => onDragStartFile(e, f)}
+                  className="mt-0.5 shrink-0 cursor-grab rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 active:cursor-grabbing"
                 >
-                  {f.original_filename}
-                </a>
-                <div className="flex flex-wrap items-center gap-2">
-                  {canChangeType ? (
-                    <select
-                      value={f.document_type && MAKETY_FILE_KINDS.includes(f.document_type as MaketyFileKind) ? f.document_type : ""}
-                      onChange={(e) => {
-                        const v = e.target.value as MaketyFileKind;
-                        if (v) void onChangeType(f.id, v);
-                      }}
-                      className="rounded border border-gray-300 px-1.5 py-0.5 text-xs"
-                      aria-label="Typ souboru"
-                    >
-                      {!f.document_type && <option value="">Bez typu</option>}
-                      {MAKETY_FILE_KINDS.map((k) => (
-                        <option key={k} value={k}>
-                          {maketyFileKindLabel(k)}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketyFileKindBadgeClass(f.document_type)}`}
-                    >
-                      {maketyFileKindLabel(f.document_type)}
-                    </span>
-                  )}
-                  <span className="text-xs text-gray-500">{Math.round(f.file_size / 1024)} kB</span>
+                  <GripVertical className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1 space-y-1">
+                  <a
+                    href={fileApiUrl(maketaId, f.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="break-all font-medium text-violet-600 hover:underline"
+                  >
+                    {f.original_filename}
+                  </a>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {canChangeType ? (
+                      <select
+                        value={
+                          f.document_type &&
+                          MAKETY_FILE_KINDS.includes(f.document_type as MaketyFileKind)
+                            ? f.document_type
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const v = e.target.value as MaketyFileKind;
+                          if (v) void onChangeType(f.id, v);
+                        }}
+                        className="rounded border border-gray-300 px-1.5 py-0.5 text-xs"
+                        aria-label="Typ souboru"
+                      >
+                        {!f.document_type && <option value="">Bez typu</option>}
+                        {MAKETY_FILE_KINDS.map((k) => (
+                          <option key={k} value={k}>
+                            {maketyFileKindLabel(k)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span
+                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketyFileKindBadgeClass(f.document_type)}`}
+                      >
+                        {maketyFileKindLabel(f.document_type)}
+                      </span>
+                    )}
+                    <span className="text-xs text-gray-500">{Math.round(f.file_size / 1024)} kB</span>
+                  </div>
                 </div>
               </div>
-              {canDelete && (
+              <div className="flex shrink-0 items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => onDeleteFile(f.id)}
-                  className="shrink-0 text-sm text-red-600 hover:underline"
+                  onClick={() => void onDownloadFile(f)}
+                  disabled={downloadingId === f.id}
+                  className="inline-flex items-center gap-1 text-sm text-violet-700 hover:underline disabled:opacity-50"
+                  title="Stáhnout soubor"
                 >
-                  Smazat
+                  <Download className="h-3.5 w-3.5" />
+                  {downloadingId === f.id ? "…" : "Stáhnout"}
                 </button>
-              )}
+                {canDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDeleteFile(f.id)}
+                    className="text-sm text-red-600 hover:underline"
+                  >
+                    Smazat
+                  </button>
+                )}
+              </div>
             </li>
           ))}
         </ul>

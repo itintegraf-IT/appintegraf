@@ -15,15 +15,20 @@ export function resolveMaketyFileDiskPath(filePath: string): string | null {
   return null;
 }
 
+export type MaketyFileDisposition = "inline" | "attachment";
+
 /** HTTP hlavička Content-Disposition – pouze ASCII v filename=, UTF-8 v filename*. */
-export function maketyFileContentDisposition(originalName: string): string {
+export function maketyFileContentDisposition(
+  originalName: string,
+  mode: MaketyFileDisposition = "inline"
+): string {
   const name = (originalName || "soubor").replace(/[\r\n"]/g, "_").trim() || "soubor";
   const ascii = name
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-zA-Z0-9._ -]/g, "_")
     .slice(0, 150) || "soubor";
-  return `inline; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+  return `${mode}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 }
 
 export function sanitizeMaketyMimeType(mime: string | null | undefined): string {
