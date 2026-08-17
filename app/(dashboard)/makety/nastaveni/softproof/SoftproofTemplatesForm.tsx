@@ -27,6 +27,7 @@ export function SoftproofTemplatesForm() {
   const [activeLocale, setActiveLocale] = useState("cs");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
   const [message, setMessage] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [newLocale, setNewLocale] = useState("");
   const [newLabel, setNewLabel] = useState("");
@@ -99,6 +100,38 @@ export function SoftproofTemplatesForm() {
       setMessage({ type: "err", text: "Síťová chyba" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const sendTest = async () => {
+    if (!current) return;
+    setTesting(true);
+    setMessage(null);
+    try {
+      const res = await fetch("/api/admin/softproof-templates/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ locale: current.locale, template: current }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMessage({
+          type: "err",
+          text: typeof data.error === "string" ? data.error : "Odeslání testu selhalo",
+        });
+        return;
+      }
+      const to = typeof data.toEmail === "string" ? data.toEmail : "";
+      setMessage({
+        type: "ok",
+        text: to
+          ? `Testovací e-mail (${current.label}) odeslán na ${to}`
+          : `Testovací e-mail (${current.label}) odeslán`,
+      });
+    } catch {
+      setMessage({ type: "err", text: "Síťová chyba" });
+    } finally {
+      setTesting(false);
     }
   };
 
@@ -209,14 +242,22 @@ export function SoftproofTemplatesForm() {
         </p>
       )}
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => void save()}
-          disabled={saving}
+          disabled={saving || testing}
           className="rounded-lg bg-violet-700 px-4 py-2 text-sm font-medium text-white hover:bg-violet-800 disabled:opacity-50"
         >
           {saving ? "Ukládám…" : "Uložit šablony"}
+        </button>
+        <button
+          type="button"
+          onClick={() => void sendTest()}
+          disabled={saving || testing || !current}
+          className="rounded-lg border border-violet-300 bg-white px-4 py-2 text-sm font-medium text-violet-800 hover:bg-violet-50 disabled:opacity-50"
+        >
+          {testing ? "Odesílám test…" : "Odeslat test na můj e-mail"}
         </button>
       </div>
     </div>

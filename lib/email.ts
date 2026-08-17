@@ -4,6 +4,7 @@ import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
 import {
   buildSoftproofEmailHtml,
   getSoftproofTemplate,
+  type SoftproofTemplate,
 } from "@/lib/makety-softproof-templates";
 
 /**
@@ -659,6 +660,8 @@ export type SendMaketySoftproofEmailParams = {
   locale?: string;
   /** Volitelný doprovodný text od odesílatele. */
   message?: string;
+  /** Pokud je zadáno, nebere se šablona z DB (test z formuláře). */
+  templateOverride?: SoftproofTemplate;
   /** Volitelná příloha (malé soubory); jinak stačí odkaz. */
   attachment?: { filename: string; content: Buffer; contentType: string };
 };
@@ -681,7 +684,9 @@ export async function sendMaketySoftproofEmail(
     };
   }
 
-  const templates = await loadSoftproofTemplates();
+  const templates = params.templateOverride
+    ? [params.templateOverride]
+    : await loadSoftproofTemplates();
   const template = getSoftproofTemplate(templates, params.locale);
   const vars = {
     toName: params.toName,
