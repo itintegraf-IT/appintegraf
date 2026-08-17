@@ -197,6 +197,7 @@ export async function POST(
 
   await notifyAfterGrafikaTransition({
     maketaId: id,
+    fromStatus: maketa.status,
     toStatus,
     actorUserId: userId,
     bodyPreview: comment || maketa.body,
@@ -216,6 +217,7 @@ export async function POST(
 
 async function notifyAfterGrafikaTransition(params: {
   maketaId: number;
+  fromStatus: string;
   toStatus: GrafikaStatus;
   actorUserId: number;
   bodyPreview: string;
@@ -227,6 +229,7 @@ async function notifyAfterGrafikaTransition(params: {
 }): Promise<void> {
   const {
     maketaId,
+    fromStatus,
     toStatus,
     actorUserId,
     bodyPreview,
@@ -263,7 +266,7 @@ async function notifyAfterGrafikaTransition(params: {
     return;
   }
 
-  if (toStatus === "in_progress" && maketa.status === "done") {
+  if (toStatus === "in_progress" && fromStatus === "done") {
     await notifyMaketaUsers({
       maketaId,
       userIds: [assigneeUserId, createdBy],
