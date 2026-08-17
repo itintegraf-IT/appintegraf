@@ -35,6 +35,9 @@ function metaSummary(meta: Record<string, unknown> | null): string | null {
   if (typeof meta.message === "string" && meta.message) {
     parts.push(`„${meta.message.slice(0, 80)}${meta.message.length > 80 ? "…" : ""}“`);
   }
+  if (typeof meta.reason === "string" && meta.reason) {
+    parts.push(`„${meta.reason.slice(0, 80)}${meta.reason.length > 80 ? "…" : ""}“`);
+  }
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 

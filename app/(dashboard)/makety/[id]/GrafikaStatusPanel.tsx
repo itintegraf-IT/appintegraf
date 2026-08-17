@@ -163,6 +163,7 @@ export function GrafikaStatusPanel({
     toEmail: string;
     attachFile: boolean;
     message: string;
+    locale: string;
   }) => {
     if (needsOverrideAck && !overrideAck) {
       setError("Potvrďte, že víte, že přebíráte cizí roli ve workflow.");
@@ -179,6 +180,7 @@ export function GrafikaStatusPanel({
           toEmail: payload.toEmail,
           attachFile: payload.attachFile,
           message: payload.message || undefined,
+          locale: payload.locale,
           acknowledgeOverride: needsOverrideAck || undefined,
         }),
       });

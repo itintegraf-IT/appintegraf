@@ -13,7 +13,9 @@ import {
   resolveMaketyFileDiskPath,
   sanitizeMaketyMimeType,
 } from "@/lib/makety-files";
-import { signSoftproofToken } from "@/lib/makety-softproof-token";
+import { createSoftproofLink, revokeOpenSoftproofLinks } from "@/lib/makety-softproof-links";
+import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
+import { getSoftproofTemplate, normalizeSoftproofLocale } from "@/lib/makety-softproof-templates";
 import { assertGrafikaTransition } from "@/lib/makety-grafika-status";
 import { notifyMaketaUsers } from "@/lib/makety-notify";
 import { recordMaketyFileEvent } from "@/lib/makety-file-events";
@@ -60,6 +62,7 @@ export async function POST(
     attachFile?: boolean;
     acknowledgeOverride?: boolean;
     message?: string;
+    locale?: string;
   };
   try {
     body = await req.json();
@@ -165,8 +168,17 @@ export async function POST(
     );
   }
 
-  const token = await signSoftproofToken({ maketaId, fileId });
-  const downloadUrl = `${getBaseUrl(req)}/api/makety/softproof/${encodeURIComponent(token)}`;
+  const templates = await loadSoftproofTemplates();
+  const locale = getSoftproofTemplate(templates, normalizeSoftproofLocale(body.locale ?? "cs")).locale;
+
+  const { rawToken } = await createSoftproofLink({
+    maketaId,
+    fileId: fileRow.id,
+    locale,
+    sentToEmail: toEmail,
+    createdBy: userId,
+  });
+  const pageUrl = `${getBaseUrl(req)}/public/softproof/${encodeURIComponent(rawToken)}`;
 
   const attach =
     body.attachFile === true && buf.length <= ATTACH_MAX_BYTES
@@ -183,13 +195,15 @@ export async function POST(
     maketaId,
     orderNumber: maketa.job_number || maketa.order_number,
     labelCode: maketa.label_code,
-    downloadUrl,
+    pageUrl,
     fileName: fileRow.original_filename,
+    locale,
     message: message || undefined,
     attachment: attach,
   });
 
   if (!sent.success) {
+    await revokeOpenSoftproofLinks(maketaId);
     return NextResponse.json(
       { error: sent.error ?? "Odeslání e-mailu selhalo" },
       { status: 502 }
@@ -237,6 +251,7 @@ export async function POST(
           userId,
           meta: {
             filename: fileRow.original_filename,
+            locale,
             to_email: toEmail,
             message: message || null,
             attached: Boolean(attach),
@@ -292,10 +307,11 @@ export async function POST(
       eventType: "softproof_sent",
       userId,
       meta: {
-        filename: fileRow.original_filename,
-        to_email: toEmail,
-        message: message || null,
-        attached: Boolean(attach),
+            filename: fileRow.original_filename,
+            to_email: toEmail,
+            locale,
+            message: message || null,
+            attached: Boolean(attach),
         resend: true,
       },
     });
@@ -305,7 +321,7 @@ export async function POST(
     success: true,
     status,
     toEmail,
-    downloadUrl,
+    pageUrl,
     attached: Boolean(attach),
   });
 }

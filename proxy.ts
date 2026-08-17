@@ -10,6 +10,7 @@ const publicPaths = [
   "/api/health",
   "/public",
   "/api/public",
+  "/api/makety/softproof",
 ];
 
 /** Stránky pro přihlášení/registraci, na kterých nemá smysl být, pokud je uživatel přihlášen. */

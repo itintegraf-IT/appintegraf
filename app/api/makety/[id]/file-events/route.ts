@@ -46,7 +46,9 @@ export async function GET(
       created_at: r.created_at,
       user: r.users
         ? `${r.users.first_name} ${r.users.last_name}`
-        : r.event_type === "softproof_downloaded"
+        : r.event_type === "softproof_downloaded" ||
+            r.event_type === "client_approved" ||
+            r.event_type === "client_rejected"
           ? "Klient (veřejný odkaz)"
           : null,
     })),

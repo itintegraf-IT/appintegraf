@@ -129,6 +129,22 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
     maketa.iml_customers?.email?.trim() ||
     maketa.iml_customers?.iml_customer_emails[0]?.email?.trim() ||
     null;
+  const clientSoftproofDecision =
+    workType === "grafika"
+      ? await prisma.makety_softproof_links.findFirst({
+          where: {
+            maketa_id: id,
+            used_action: { in: ["approved", "rejected"] },
+          },
+          orderBy: { used_at: "desc" },
+          select: {
+            used_action: true,
+            used_at: true,
+            reject_reason: true,
+            sent_to_email: true,
+          },
+        })
+      : null;
   const commentParticipants = buildMaketyCommentParticipants({
     workType,
     excludeUserId: userId,
@@ -376,6 +392,32 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
           </div>
         )}
       </div>
+
+      {clientSoftproofDecision?.used_action === "approved" && (
+        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+          Klient schválil softproof
+          {clientSoftproofDecision.sent_to_email
+            ? ` (${clientSoftproofDecision.sent_to_email})`
+            : ""}
+          . Stav zakázky se nemění — finální schválení dokončete ve workflow.
+        </div>
+      )}
+      {clientSoftproofDecision?.used_action === "rejected" && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+          <p>
+            Klient zamítl softproof
+            {clientSoftproofDecision.sent_to_email
+              ? ` (${clientSoftproofDecision.sent_to_email})`
+              : ""}
+            .
+          </p>
+          {clientSoftproofDecision.reject_reason && (
+            <p className="mt-1 whitespace-pre-wrap">
+              Důvod: {clientSoftproofDecision.reject_reason}
+            </p>
+          )}
+        </div>
+      )}
 
       {workType === "maketa" && canSubmitQuote && (
         <MaketaQuoteForm maketaId={id} rejectionReason={maketa.rejection_reason} />

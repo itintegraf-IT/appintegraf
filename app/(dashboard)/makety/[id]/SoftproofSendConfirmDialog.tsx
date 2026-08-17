@@ -21,6 +21,7 @@ type Props = {
     toEmail: string;
     attachFile: boolean;
     message: string;
+    locale: string;
   }) => void;
 };
 
@@ -41,6 +42,10 @@ export function SoftproofSendConfirmDialog({
   const [clientEmail, setClientEmail] = useState(defaultEmail);
   const [attachFile, setAttachFile] = useState(false);
   const [message, setMessage] = useState("");
+  const [locale, setLocale] = useState("cs");
+  const [locales, setLocales] = useState<Array<{ locale: string; label: string }>>([
+    { locale: "cs", label: "Čeština" },
+  ]);
   const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -50,6 +55,15 @@ export function SoftproofSendConfirmDialog({
     setMessage("");
     setLocalError(null);
     setFileId(softproofFiles.length === 1 ? softproofFiles[0]!.id : "");
+    void fetch("/api/makety/softproof-locales")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.locales) && data.locales.length > 0) {
+          setLocales(data.locales);
+          setLocale(data.locales[0].locale);
+        }
+      })
+      .catch(() => {});
   }, [open, defaultEmail, softproofFiles]);
 
   if (!open) return null;
@@ -71,6 +85,7 @@ export function SoftproofSendConfirmDialog({
       toEmail: clientEmail.trim(),
       attachFile,
       message: message.trim(),
+      locale,
     });
   };
 
@@ -135,6 +150,22 @@ export function SoftproofSendConfirmDialog({
                 onChange={(e) => setClientEmail(e.target.value)}
                 disabled={submitting}
               />
+            </label>
+
+            <label className="block text-sm font-medium text-gray-700">
+              Jazyk e-mailu a stránky <span className="text-red-600">*</span>
+              <select
+                className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                value={locale}
+                onChange={(e) => setLocale(e.target.value)}
+                disabled={submitting}
+              >
+                {locales.map((l) => (
+                  <option key={l.locale} value={l.locale}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="block text-sm font-medium text-gray-700">

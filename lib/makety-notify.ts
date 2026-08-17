@@ -20,6 +20,8 @@ export type MaketaNotifyKind =
   | "awaiting_final"
   | "prepress_ok"
   | "sent_for_client"
+  | "client_approved"
+  | "client_rejected"
   | "approved"
   | "data_problem"
   | "comment"
@@ -94,6 +96,16 @@ function notifyCopy(
       return {
         title: "Grafika odeslána ke schválení",
         intro: `Grafika${zak} byla odeslána ke schválení (klient / další krok).`,
+      };
+    case "client_approved":
+      return {
+        title: "Klient schválil softproof",
+        intro: `Klient schválil softproof grafiky${zak}. Stav zakázky se nemění – dokončete finální schválení v aplikaci.`,
+      };
+    case "client_rejected":
+      return {
+        title: "Klient zamítl softproof",
+        intro: `Klient zamítl softproof grafiky${zak}. Důvod je v komentáři u zakázky.`,
       };
     case "approved":
       return {

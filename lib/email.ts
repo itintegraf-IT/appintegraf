@@ -1,5 +1,10 @@
 import nodemailer from "nodemailer";
 import { getEmailSettings } from "./email-settings";
+import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
+import {
+  buildSoftproofEmailHtml,
+  getSoftproofTemplate,
+} from "@/lib/makety-softproof-templates";
 
 /**
  * Kanonická URL aplikace pro absolutní odkazy v e-mailech.
@@ -649,8 +654,9 @@ export type SendMaketySoftproofEmailParams = {
   maketaId: number;
   orderNumber: string | null;
   labelCode: string | null;
-  downloadUrl: string;
+  pageUrl: string;
   fileName: string;
+  locale?: string;
   /** Volitelný doprovodný text od odesílatele. */
   message?: string;
   /** Volitelná příloha (malé soubory); jinak stačí odkaz. */
@@ -658,7 +664,7 @@ export type SendMaketySoftproofEmailParams = {
 };
 
 /**
- * Softproof klientovi – odkaz ke stažení (JWT) a volitelně příloha.
+ * Softproof klientovi – odkaz na veřejný náhled (šablona dle jazyka) a volitelně příloha.
  */
 export async function sendMaketySoftproofEmail(
   params: SendMaketySoftproofEmailParams
@@ -675,36 +681,21 @@ export async function sendMaketySoftproofEmail(
     };
   }
 
-  const zak = params.orderNumber
-    ? `<p><strong>Zakázka:</strong> ${params.orderNumber}</p>`
-    : "";
-  const label = params.labelCode
-    ? `<p><strong>Kód etikety:</strong> ${params.labelCode}</p>`
-    : "";
-  const messageHtml = params.message
-    ? `<div style="margin: 16px 0; padding: 12px; background: #f8fafc; border-left: 3px solid #2563eb;"><p style="margin:0; white-space: pre-wrap;">${params.message
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")}</p></div>`
-    : "";
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
-  <p>Dobrý den, ${params.toName},</p>
-  <p>zasíláme Vám softproof grafiky ke schválení.</p>
-  ${zak}
-  ${label}
-  ${messageHtml}
-  <p><strong>Soubor:</strong> ${params.fileName}</p>
-  <p><a href="${params.downloadUrl}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">Stáhnout softproof</a></p>
-  <p style="color: #666; font-size: 12px;">Odkaz je platný 7 dní. Pokud tlačítko nefunguje, zkopírujte: ${params.downloadUrl}</p>
-  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-  <p style="color: #999; font-size: 11px;">Tento e-mail byl odeslán automaticky z aplikace INTEGRAF.</p>
-</body>
-</html>
-  `.trim();
+  const templates = await loadSoftproofTemplates();
+  const template = getSoftproofTemplate(templates, params.locale);
+  const vars = {
+    toName: params.toName,
+    maketaId: params.maketaId,
+    orderNumber: params.orderNumber,
+    labelCode: params.labelCode,
+    fileName: params.fileName,
+    pageUrl: params.pageUrl,
+  };
+  const built = buildSoftproofEmailHtml({
+    template,
+    vars,
+    extraMessage: params.message,
+  });
 
   try {
     const transporter = nodemailer.createTransport({
@@ -726,11 +717,9 @@ export async function sendMaketySoftproofEmail(
         ? `"${settings.fromName}" <${settings.from}>`
         : settings.from,
       to: params.toEmail,
-      subject: params.orderNumber
-        ? `Softproof ke schválení – ${params.orderNumber}`
-        : `Softproof ke schválení – grafika #${params.maketaId}`,
-      text: `Softproof ke schválení.\nSoubor: ${params.fileName}\nStažení: ${params.downloadUrl}`,
-      html,
+      subject: built.subject,
+      text: built.text,
+      html: built.html,
       attachments: params.attachment
         ? [
             {
