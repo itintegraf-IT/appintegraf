@@ -10,6 +10,7 @@ describe("makety-list-columns", () => {
   it("defaults include core columns and lock actions", () => {
     const ids = defaultVisibleMaketyListColumnIds(true);
     expect(ids).toContain("due_at");
+    expect(ids).toContain("id");
     expect(ids).toContain("actions");
     expect(ids).toContain("creator");
     expect(ids).not.toContain("customer");

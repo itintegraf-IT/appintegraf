@@ -48,6 +48,8 @@ function renderCell(
         </span>
       );
     }
+    case "id":
+      return <span className="font-mono text-sm">#{row.id}</span>;
     case "order_number":
       return dash(row.order_number);
     case "body":

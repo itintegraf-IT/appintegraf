@@ -8,6 +8,7 @@ export const MAKETY_LIST_COLUMNS_PREF_VERSION = 2 as const;
 export type MaketyListColumnId =
   | "due_at"
   | "work_type"
+  | "id"
   | "order_number"
   | "body"
   | "creator"
@@ -68,6 +69,7 @@ export const MAKETY_LIST_COLUMN_GROUPS: Array<{
 export const MAKETY_LIST_COLUMNS: MaketyListColumnMeta[] = [
   { id: "due_at", label: "Termín", group: "zaklad", defaultVisible: true },
   { id: "work_type", label: "Typ", group: "zaklad", defaultVisible: true },
+  { id: "id", label: "Číslo", group: "zaklad", defaultVisible: true },
   { id: "order_number", label: "Zakázka", group: "zaklad", defaultVisible: true },
   { id: "body", label: "Popis", group: "zaklad", defaultVisible: true },
   {
