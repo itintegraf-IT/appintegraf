@@ -140,5 +140,9 @@ describe("detectOrderPdfTemplate", () => {
     expect(
       detectOrderPdfTemplate("FRUTA Podivín, a.s.\nOBJEDNÁVKA\nČíslo dokladu 2600445")?.key
     ).toBe("fruta");
+    expect(
+      detectOrderPdfTemplate("PRIMÁTOR a.s.\nObjednávka zboží číslo:\n9000508\npavel.novak@primator.cz")
+        ?.key
+    ).toBe("primator");
   });
 });

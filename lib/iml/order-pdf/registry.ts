@@ -5,6 +5,7 @@ import { sfaOrderPdfTemplate } from "./sfa";
 import { jepaOrderPdfTemplate } from "./jepa";
 import { jokeyOrderPdfTemplate } from "./jokey";
 import { frutaOrderPdfTemplate } from "./fruta";
+import { primatorOrderPdfTemplate } from "./primator";
 
 /** Šablony PDF objednávek – nové zákazníky přidávej sem. */
 export const ORDER_PDF_TEMPLATES: OrderPdfTemplate[] = [
@@ -14,6 +15,7 @@ export const ORDER_PDF_TEMPLATES: OrderPdfTemplate[] = [
   jepaOrderPdfTemplate,
   jokeyOrderPdfTemplate,
   frutaOrderPdfTemplate,
+  primatorOrderPdfTemplate,
 ];
 
 export function getOrderPdfTemplate(key: string): OrderPdfTemplate | null {
