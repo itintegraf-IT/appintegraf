@@ -11,6 +11,7 @@ import { recordMaketyFileEvent } from "@/lib/makety-file-events";
 import { notifyMaketaUsers } from "@/lib/makety-notify";
 import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
 import {
+  getSoftproofPublicChrome,
   getSoftproofTemplate,
   renderSoftproofTemplate,
 } from "@/lib/makety-softproof-templates";
@@ -40,10 +41,24 @@ async function resolveLink(rawToken: string) {
   });
 
   if (access === "used") {
-    return { error: jsonError(410, { status: "used", message: rendered.usedMessage }) };
+    return {
+      error: jsonError(410, {
+        status: "used",
+        message: rendered.usedMessage,
+        locale: link.locale,
+        texts: getSoftproofPublicChrome(link.locale),
+      }),
+    };
   }
   if (access === "expired" || access === "revoked") {
-    return { error: jsonError(410, { status: "expired", message: rendered.expiredMessage }) };
+    return {
+      error: jsonError(410, {
+        status: "expired",
+        message: rendered.expiredMessage,
+        locale: link.locale,
+        texts: getSoftproofPublicChrome(link.locale),
+      }),
+    };
   }
 
   const maketa = await prisma.makety.findFirst({
@@ -139,6 +154,7 @@ export async function GET(
         rejectLabel: rendered.rejectLabel,
         rejectReasonLabel: rendered.rejectReasonLabel,
         legalHtml: rendered.legalHtml,
+        ...getSoftproofPublicChrome(link.locale),
       },
     });
   } catch (e) {

@@ -122,6 +122,60 @@ export function normalizeSoftproofLocale(raw: string): string {
   return raw.trim().toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 8);
 }
 
+export type SoftproofPublicChrome = {
+  loading: string;
+  invalidLink: string;
+  cannotOpen: string;
+  networkError: string;
+  actionFailed: string;
+  rejectRequired: string;
+  cancelLabel: string;
+  approvedThanks: string;
+  rejectedThanks: string;
+};
+
+const SOFTPROOF_PUBLIC_CHROME: Record<"cs" | "en" | "de", SoftproofPublicChrome> = {
+  cs: {
+    loading: "Načítám náhled…",
+    invalidLink: "Odkaz není platný.",
+    cannotOpen: "Odkaz nelze otevřít.",
+    networkError: "Síťová chyba",
+    actionFailed: "Akce se nezdařila",
+    rejectRequired: "U zamítnutí uveďte důvod",
+    cancelLabel: "Zrušit",
+    approvedThanks: "Děkujeme, schválení bylo zaznamenáno. Tento odkaz už nelze znovu použít.",
+    rejectedThanks: "Děkujeme, zamítnutí bylo zaznamenáno. Tento odkaz už nelze znovu použít.",
+  },
+  en: {
+    loading: "Loading preview…",
+    invalidLink: "This link is not valid.",
+    cannotOpen: "This link cannot be opened.",
+    networkError: "Network error",
+    actionFailed: "The action failed",
+    rejectRequired: "Please enter a reason for rejection",
+    cancelLabel: "Cancel",
+    approvedThanks: "Thank you, the approval has been recorded. This link can no longer be used.",
+    rejectedThanks: "Thank you, the rejection has been recorded. This link can no longer be used.",
+  },
+  de: {
+    loading: "Vorschau wird geladen…",
+    invalidLink: "Dieser Link ist ungültig.",
+    cannotOpen: "Dieser Link kann nicht geöffnet werden.",
+    networkError: "Netzwerkfehler",
+    actionFailed: "Die Aktion ist fehlgeschlagen",
+    rejectRequired: "Bitte geben Sie einen Ablehnungsgrund an",
+    cancelLabel: "Abbrechen",
+    approvedThanks: "Vielen Dank, die Freigabe wurde erfasst. Dieser Link kann nicht erneut verwendet werden.",
+    rejectedThanks: "Vielen Dank, die Ablehnung wurde erfasst. Dieser Link kann nicht erneut verwendet werden.",
+  },
+};
+
+export function getSoftproofPublicChrome(locale: string | null | undefined): SoftproofPublicChrome {
+  const wanted = normalizeSoftproofLocale(locale ?? "");
+  if (wanted === "en" || wanted === "de") return SOFTPROOF_PUBLIC_CHROME[wanted];
+  return SOFTPROOF_PUBLIC_CHROME.cs;
+}
+
 export function applySoftproofPlaceholders(text: string, vars: SoftproofTemplateVars): string {
   const orderNumber =
     (vars.orderNumber && vars.orderNumber.trim()) ||

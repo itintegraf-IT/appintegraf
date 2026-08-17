@@ -3,6 +3,7 @@ import {
   applySoftproofPlaceholders,
   buildSoftproofEmailHtml,
   DEFAULT_SOFTPROOF_TEMPLATES,
+  getSoftproofPublicChrome,
   getSoftproofTemplate,
   parseSoftproofTemplatesJson,
   sanitizeSoftproofTemplate,
@@ -58,6 +59,22 @@ describe("softproof templates", () => {
     expect(built.html).toContain("https://app.example/public/softproof/abc");
     expect(built.html).toContain("Otevřít náhled");
     expect(built.html).not.toContain("/api/makety/softproof/");
+  });
+});
+
+describe("softproof public chrome", () => {
+  it("vrátí anglické nápisy pro en", () => {
+    expect(getSoftproofPublicChrome("en").cancelLabel).toBe("Cancel");
+    expect(getSoftproofPublicChrome("en").approvedThanks).toMatch(/Thank you/i);
+  });
+
+  it("vrátí německé nápisy pro de", () => {
+    expect(getSoftproofPublicChrome("de").cancelLabel).toBe("Abbrechen");
+  });
+
+  it("neznámý locale padá na cs", () => {
+    expect(getSoftproofPublicChrome("xx").cancelLabel).toBe("Zrušit");
+    expect(getSoftproofPublicChrome(null).loading).toMatch(/Načítám/);
   });
 });
 

@@ -1,8 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  getSoftproofPublicChrome,
+  type SoftproofPublicChrome,
+} from "@/lib/makety-softproof-templates";
 
-type Texts = {
+type Texts = SoftproofPublicChrome & {
   pageTitle: string;
   pageHint: string;
   downloadLabel: string;
@@ -14,6 +18,7 @@ type Texts = {
 
 type MetaOk = {
   status: "ok";
+  locale: string;
   fileName: string;
   mime: string;
   canPreview: boolean;
@@ -22,6 +27,11 @@ type MetaOk = {
   maketaId: number;
   texts: Texts;
 };
+
+function applyHtmlLang(locale: string | null | undefined) {
+  const lang = (locale ?? "cs").split("-")[0] || "cs";
+  document.documentElement.lang = lang;
+}
 
 export function PublicSoftproofClient({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
@@ -32,8 +42,16 @@ export function PublicSoftproofClient({ token }: { token: string }) {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [submitting, setSubmitting] = useState<"approved" | "rejected" | null>(null);
   const [done, setDone] = useState<"approved" | "rejected" | null>(null);
+  const [chrome, setChrome] = useState<SoftproofPublicChrome>(() => getSoftproofPublicChrome("cs"));
 
   const apiBase = `/api/public/softproof/${encodeURIComponent(token)}`;
+
+  useEffect(() => {
+    const previousLang = document.documentElement.lang || "cs";
+    return () => {
+      document.documentElement.lang = previousLang;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -41,18 +59,30 @@ export function PublicSoftproofClient({ token }: { token: string }) {
       .then(async (res) => {
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
+        if (typeof data.locale === "string") {
+          applyHtmlLang(data.locale);
+          setChrome(getSoftproofPublicChrome(data.locale));
+        }
         if (res.status === 410 || res.status === 404) {
-          setBlocked(typeof data.message === "string" ? data.message : "Odkaz není platný.");
+          const fallback = getSoftproofPublicChrome(
+            typeof data.locale === "string" ? data.locale : "cs"
+          );
+          setBlocked(
+            typeof data.message === "string" ? data.message : fallback.invalidLink
+          );
           return;
         }
         if (!res.ok || data.status !== "ok") {
-          setBlocked(typeof data.error === "string" ? data.error : "Odkaz nelze otevřít.");
+          const fallback = getSoftproofPublicChrome(
+            typeof data.locale === "string" ? data.locale : "cs"
+          );
+          setBlocked(typeof data.error === "string" ? data.error : fallback.cannotOpen);
           return;
         }
         setMeta(data as MetaOk);
       })
       .catch(() => {
-        if (!cancelled) setBlocked("Síťová chyba");
+        if (!cancelled) setBlocked(getSoftproofPublicChrome("cs").networkError);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -62,10 +92,12 @@ export function PublicSoftproofClient({ token }: { token: string }) {
     };
   }, [apiBase]);
 
+  const ui = meta?.texts ?? chrome;
+
   const decide = async (action: "approved" | "rejected") => {
     setError(null);
     if (action === "rejected" && !reason.trim()) {
-      setError("U zamítnutí uveďte důvod");
+      setError(ui.rejectRequired);
       return;
     }
     setSubmitting(action);
@@ -79,20 +111,26 @@ export function PublicSoftproofClient({ token }: { token: string }) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(typeof data.error === "string" ? data.error : typeof data.message === "string" ? data.message : "Akce se nezdařila");
+        setError(
+          typeof data.error === "string"
+            ? data.error
+            : typeof data.message === "string"
+              ? data.message
+              : ui.actionFailed
+        );
         return;
       }
       setRejectOpen(false);
       setDone(action);
     } catch {
-      setError("Síťová chyba");
+      setError(ui.networkError);
     } finally {
       setSubmitting(null);
     }
   };
 
   if (loading) {
-    return <p className="text-sm text-gray-600">Načítám náhled…</p>;
+    return <p className="text-sm text-gray-600">{chrome.loading}</p>;
   }
 
   if (blocked) {
@@ -111,9 +149,7 @@ export function PublicSoftproofClient({ token }: { token: string }) {
           {done === "approved" ? meta?.texts.approveLabel ?? "OK" : meta?.texts.rejectLabel ?? "OK"}
         </h1>
         <p className="mt-2 text-sm text-green-900">
-          {done === "approved"
-            ? "Děkujeme, schválení bylo zaznamenáno. Tento odkaz už nelze znovu použít."
-            : "Děkujeme, zamítnutí bylo zaznamenáno. Tento odkaz už nelze znovu použít."}
+          {done === "approved" ? ui.approvedThanks : ui.rejectedThanks}
         </p>
       </div>
     );
@@ -223,7 +259,7 @@ export function PublicSoftproofClient({ token }: { token: string }) {
                 }}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
-                Zrušit
+                {ui.cancelLabel}
               </button>
               <button
                 type="button"
