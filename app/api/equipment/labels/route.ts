@@ -12,9 +12,16 @@ export async function POST(req: NextRequest) {
   const userId = parseInt(session.user.id, 10);
 
   const body = await req.json().catch(() => ({}));
-  const ids: number[] = Array.isArray(body.ids)
-    ? [...new Set(body.ids.map((x: unknown) => parseInt(String(x), 10)).filter((n: number) => Number.isFinite(n)))]
+  const rawIds = Array.isArray((body as { ids?: unknown }).ids)
+    ? (body as { ids: unknown[] }).ids
     : [];
+  const ids: number[] = [
+    ...new Set(
+      rawIds
+        .map((x) => parseInt(String(x), 10))
+        .filter((n): n is number => Number.isFinite(n))
+    ),
+  ];
 
   if (ids.length === 0) {
     return NextResponse.json({ error: "Vyberte položky k tisku" }, { status: 400 });
