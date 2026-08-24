@@ -95,6 +95,18 @@ export function parseMaketaPriority(raw: string | null | undefined): MaketaPrior
   return "normal";
 }
 
+/** Pořadí priority: urgent → high → normal (menší = dřív). */
+export function prioritySortKey(priority: string): number {
+  switch (priority) {
+    case "urgent":
+      return 0;
+    case "high":
+      return 1;
+    default:
+      return 2;
+  }
+}
+
 export function isMaketaPreApprovalStatus(status: string): boolean {
   return status === "awaiting_quote" || status === "quote_submitted";
 }

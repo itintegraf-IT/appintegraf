@@ -8,6 +8,7 @@ import {
   maketaPriorityLabel,
   maketaStatusBadgeClass,
   maketaStatusLabel,
+  prioritySortKey,
 } from "@/lib/makety-status";
 import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type";
 import { maketyDataKindLabel } from "@/lib/makety-data-kind";
@@ -21,7 +22,6 @@ import { MaketyAdminRowActions } from "../MaketyAdminRowActions";
 import { CopyMaketaButton } from "../[id]/CopyMaketaButton";
 import { MaketyListColumnPicker } from "./MaketyListColumnPicker";
 import { MaketyListSortableTableHead } from "./MaketyListSortableTableHead";
-import { prioritySortKey } from "@/lib/makety-queue";
 
 type Props = {
   heading: string;

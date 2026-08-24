@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/db";
-import type { MaketaPriority } from "@/lib/makety-status";
+import {
+  MAKETY_PRODUCTION_QUEUE_STATUSES,
+  prioritySortKey,
+  type MaketaPriority,
+} from "@/lib/makety-status";
 import { type MaketyWorkType } from "@/lib/makety-work-type";
 
 export type MaketyQueueRow = {
@@ -14,20 +18,9 @@ export type MaketyQueueRow = {
   assignee_user_id: number | null;
 };
 
-import { MAKETY_PRODUCTION_QUEUE_STATUSES } from "@/lib/makety-status";
-
 const ACTIVE_STATUSES = MAKETY_PRODUCTION_QUEUE_STATUSES;
 
-export function prioritySortKey(priority: string): number {
-  switch (priority) {
-    case "urgent":
-      return 0;
-    case "high":
-      return 1;
-    default:
-      return 2;
-  }
-}
+export { prioritySortKey };
 
 /** Výchozí pořadí bez ručního queue_position (termín + priorita). */
 export function defaultQueueSortKey(row: {
