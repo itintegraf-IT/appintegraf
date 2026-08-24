@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, Pencil, UserPlus, Trash2, Printer, FileText } from "lucide-react";
+import { Eye, Pencil, UserPlus, Trash2, Printer, FileText, QrCode } from "lucide-react";
 
 type Props = {
   equipmentId: number;
@@ -59,11 +59,18 @@ export function EquipmentTableActions({
         <Link
           href={`/equipment/${equipmentId}`}
           className="rounded p-2 text-gray-600 hover:bg-gray-100"
-          title="Přiřadit"
+          title="Přiřadit držiteli"
         >
           <UserPlus className="h-4 w-4" />
         </Link>
       )}
+      <a
+        href={`/api/equipment/${equipmentId}/label`}
+        className="rounded p-2 text-gray-600 hover:bg-gray-100"
+        title="Tisk QR štítku"
+      >
+        <QrCode className="h-4 w-4" />
+      </a>
       {assignmentId != null && (
         <>
           <Link

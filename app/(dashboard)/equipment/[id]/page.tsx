@@ -10,6 +10,7 @@ import { EquipmentPhotoGallery } from "../_components/EquipmentPhotoGallery";
 import { EquipmentDocumentsPanel } from "../_components/EquipmentDocumentsPanel";
 import { EquipmentTransferModal } from "../_components/EquipmentTransferModal";
 import { EquipmentCodeBadge } from "../_components/EquipmentCodeBadge";
+import { EquipmentResponsibleEditor } from "../_components/EquipmentResponsibleEditor";
 import { formatEquipmentPrice } from "@/lib/equipment/format-price";
 import { canReadEquipment, canWriteEquipment } from "@/lib/equipment/access";
 
@@ -297,18 +298,22 @@ export default async function EquipmentViewPage({
               }
             />
           ) : null}
-          {item.equipment_categories.users_responsible ? (
-            <div className="rounded-xl border bg-white p-4 text-sm shadow-sm">
-              <p className="text-gray-500">Zodpovědný za skupinu</p>
-              <p className="font-medium">
-                {item.equipment_categories.users_responsible.last_name}{" "}
-                {item.equipment_categories.users_responsible.first_name}
-              </p>
-            </div>
-          ) : null}
+          <div className="rounded-xl border bg-white p-4 text-sm shadow-sm">
+            <EquipmentResponsibleEditor
+              categoryId={item.equipment_categories.id}
+              categoryName={item.equipment_categories.name}
+              currentUserId={item.equipment_categories.responsible_user_id}
+              currentPerson={item.equipment_categories.users_responsible}
+              canEdit={canWrite}
+            />
+          </div>
         </div>
       </div>
 
+      <p className="text-sm text-gray-600">
+        Držitel je osoba, která má tento kus u sebe. Zodpovědná osoba výše platí pro celou
+        skupinu majetku.
+      </p>
       <EquipmentAssignClient
         equipmentId={item.id}
         assignmentId={activeAssignment?.id ?? null}

@@ -115,7 +115,7 @@ export function EquipmentAssignClient({
 
   return (
     <div className="mt-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h3 className="mb-4 text-lg font-semibold text-gray-900">Přiřazení</h3>
+      <h3 className="mb-4 text-lg font-semibold text-gray-900">Držitel</h3>
 
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
@@ -175,14 +175,14 @@ export function EquipmentAssignClient({
           className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
         >
           <UserPlus className="h-4 w-4" />
-          Přiřadit uživateli
+          Přiřadit držiteli
         </button>
       )}
 
       {isAvailable && canAssign && showAssignForm && (
         <form onSubmit={handleAssign} className="mt-4 space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Uživatel *</label>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Držitel *</label>
             <select
               required
               value={assignUserId}

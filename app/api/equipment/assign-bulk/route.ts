@@ -4,11 +4,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { assignEquipmentToUser } from "@/lib/equipment/assign-to-user";
 
-/** POST – přiřazení vybavení uživateli */
-export async function POST(
-  req: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
@@ -20,17 +16,18 @@ export async function POST(
     return NextResponse.json({ error: "Nemáte oprávnění přiřazovat vybavení" }, { status: 403 });
   }
 
-  const equipmentId = parseInt((await params).id, 10);
-  if (isNaN(equipmentId)) {
-    return NextResponse.json({ error: "Neplatné ID vybavení" }, { status: 400 });
-  }
-
   const body = await req.json().catch(() => ({}));
-  const { user_id: targetUserId, notes } = body;
+  const targetUser = parseInt(String(body.user_id ?? ""), 10);
+  const notes = body.notes ? String(body.notes) : null;
+  const ids: number[] = Array.isArray(body.equipment_ids)
+    ? body.equipment_ids.map((x: unknown) => parseInt(String(x), 10)).filter((n: number) => Number.isFinite(n))
+    : [];
 
-  const targetUser = targetUserId != null ? parseInt(String(targetUserId), 10) : null;
-  if (!targetUser || isNaN(targetUser)) {
+  if (!Number.isFinite(targetUser) || targetUser <= 0) {
     return NextResponse.json({ error: "Vyberte uživatele" }, { status: 400 });
+  }
+  if (ids.length === 0) {
+    return NextResponse.json({ error: "Vyberte položky" }, { status: 400 });
   }
 
   const targetUserExists = await prisma.users.findFirst({
@@ -41,17 +38,25 @@ export async function POST(
     return NextResponse.json({ error: "Uživatel nenalezen nebo není aktivní" }, { status: 400 });
   }
 
-  try {
-    const { assignmentId } = await assignEquipmentToUser({
-      equipmentId,
-      targetUserId: targetUser,
-      assignedBy: userId,
-      notes: notes ? String(notes) : null,
-    });
-    return NextResponse.json({ success: true, assignmentId });
-  } catch (e) {
-    const message = e instanceof Error ? e.message : "Chyba přiřazení";
-    const status = message.includes("nenalezeno") ? 404 : 400;
-    return NextResponse.json({ error: message }, { status });
+  const assigned: number[] = [];
+  const errors: string[] = [];
+  for (const equipmentId of ids) {
+    try {
+      const r = await assignEquipmentToUser({
+        equipmentId,
+        targetUserId: targetUser,
+        assignedBy: userId,
+        notes,
+      });
+      assigned.push(r.assignmentId);
+    } catch (e) {
+      errors.push(e instanceof Error ? e.message : `Položka #${equipmentId}`);
+    }
   }
+
+  return NextResponse.json({
+    ok: errors.length === 0,
+    assigned: assigned.length,
+    errors,
+  });
 }

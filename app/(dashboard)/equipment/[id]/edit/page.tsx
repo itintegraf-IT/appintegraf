@@ -9,8 +9,15 @@ import {
   isEquipmentItemStatus,
   type EquipmentItemStatus,
 } from "@/lib/equipment-status";
+import { EquipmentResponsibleEditor } from "../../_components/EquipmentResponsibleEditor";
 
-type Category = { id: number; name: string; code: string };
+type Category = {
+  id: number;
+  name: string;
+  code: string;
+  responsible_user_id?: number | null;
+  users_responsible?: { id: number; first_name: string; last_name: string } | null;
+};
 type Room = { id: number; name: string; code: string };
 
 type EquipmentFormState = {
@@ -216,6 +223,22 @@ export default function EditEquipmentPage() {
               ))}
             </select>
           </div>
+          {form.category_id ? (
+            <div className="sm:col-span-2">
+              <EquipmentResponsibleEditor
+                key={form.category_id}
+                categoryId={parseInt(form.category_id, 10)}
+                categoryName={categories.find((c) => String(c.id) === form.category_id)?.name ?? ""}
+                currentUserId={
+                  categories.find((c) => String(c.id) === form.category_id)?.responsible_user_id ?? null
+                }
+                currentPerson={
+                  categories.find((c) => String(c.id) === form.category_id)?.users_responsible ?? null
+                }
+                canEdit
+              />
+            </div>
+          ) : null}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Status</label>
             <select

@@ -76,7 +76,10 @@ export default async function EquipmentPage({
     purchase_date: Date | null;
     purchase_price: unknown;
     created_at: Date;
-    equipment_categories?: { name: string };
+    equipment_categories?: {
+      name: string;
+      users_responsible?: { first_name: string; last_name: string } | null;
+    };
     assignment_id?: number | null;
     assigned_to_name?: string | null;
     assigned_to_user_id?: number | null;
@@ -89,7 +92,12 @@ export default async function EquipmentPage({
       where: unassigned ? { room_id: null } : undefined,
       orderBy: { id: "desc" },
       include: {
-        equipment_categories: { select: { name: true } },
+        equipment_categories: {
+          select: {
+            name: true,
+            users_responsible: { select: { first_name: true, last_name: true } },
+          },
+        },
         equipment_assignments: {
           where: { returned_at: null },
           orderBy: { assigned_at: "desc" },
@@ -122,7 +130,14 @@ export default async function EquipmentPage({
       where: { user_id: userId, returned_at: null },
       include: {
         equipment_items: {
-          include: { equipment_categories: { select: { name: true } } },
+          include: {
+            equipment_categories: {
+              select: {
+                name: true,
+                users_responsible: { select: { first_name: true, last_name: true } },
+              },
+            },
+          },
         },
         users_equipment_assignments_user_idTousers: {
           select: { first_name: true, last_name: true },
@@ -158,6 +173,9 @@ export default async function EquipmentPage({
           brandModel: [e.brand, e.model].filter(Boolean).join(" / "),
           serialNumber: e.serial_number,
           categoryName: e.equipment_categories?.name ?? null,
+          responsibleName: e.equipment_categories?.users_responsible
+            ? `${e.equipment_categories.users_responsible.last_name} ${e.equipment_categories.users_responsible.first_name}`.trim()
+            : null,
           status: e.status,
           quantity: e.quantity ?? 1,
           assignedToName: e.assigned_to_name ?? null,
@@ -325,7 +343,22 @@ export default async function EquipmentPage({
             >
               Nezařazené
             </Link>
+            {unassigned ? (
+              <Link
+                href="/equipment/scan"
+                className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                <QrCode className="h-3.5 w-3.5" />
+                Spárovat s místností (sken)
+              </Link>
+            ) : null}
           </div>
+          {unassigned ? (
+            <p className="mb-3 text-sm text-gray-600">
+              Položky bez místnosti. Vyberte je v tabulce a umístěte, přiřaďte držiteli, nebo
+              naskenujte nejdřív QR místnosti a potom QR majetku.
+            </p>
+          ) : null}
           <EquipmentListClient
             rows={adminListRows}
             sort={sort}
@@ -347,6 +380,7 @@ export default async function EquipmentPage({
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Značka / Model</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Sériové č.</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kategorie</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Zodpovědná osoba</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nákup</th>
                   <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cena</th>
@@ -357,7 +391,7 @@ export default async function EquipmentPage({
               <tbody>
                 {equipment.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={10} className="px-4 py-8 text-center text-gray-500">
                       Žádné vybavení
                     </td>
                   </tr>
@@ -372,6 +406,11 @@ export default async function EquipmentPage({
                         </td>
                         <td className="px-4 py-3 font-mono text-sm">{e.serial_number ?? "-"}</td>
                         <td className="px-4 py-3">{e.equipment_categories?.name ?? "-"}</td>
+                        <td className="px-4 py-3 text-sm">
+                          {e.equipment_categories?.users_responsible
+                            ? `${e.equipment_categories.users_responsible.last_name} ${e.equipment_categories.users_responsible.first_name}`.trim()
+                            : "—"}
+                        </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-col gap-1">
                             <span className="w-fit rounded bg-gray-100 px-2 py-0.5 text-sm">

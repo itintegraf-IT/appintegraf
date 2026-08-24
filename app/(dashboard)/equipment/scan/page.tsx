@@ -54,7 +54,7 @@ export default function EquipmentScanClient() {
       }
       if (data.type === "item") {
         if (!room) {
-          setError("Nejdřív naskenujte místnost");
+          setError("Nejdřív naskenujte QR místnosti");
           return;
         }
         const placeRes = await fetch("/api/equipment/placement", {
@@ -148,10 +148,15 @@ export default function EquipmentScanClient() {
   return (
     <div className="mx-auto max-w-lg space-y-4 p-2">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Skenovat</h1>
-        <Link href="/equipment" className="text-sm text-red-700">
-          Zpět
-        </Link>
+        <h1 className="text-xl font-bold">Skenovat a spárovat</h1>
+        <div className="flex gap-3 text-sm">
+          <Link href="/equipment?scope=all&unassigned=1" className="text-red-700">
+            Nezařazené
+          </Link>
+          <Link href="/equipment" className="text-red-700">
+            Zpět
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-2">
@@ -160,7 +165,7 @@ export default function EquipmentScanClient() {
           className={`flex-1 rounded-lg py-2 text-sm ${mode === "place" ? "bg-red-600 text-white" : "border"}`}
           onClick={() => setMode("place")}
         >
-          Umístit majetek
+          Spárovat s místností
         </button>
         <button
           type="button"
@@ -183,7 +188,10 @@ export default function EquipmentScanClient() {
           </button>
         </div>
       ) : mode === "place" ? (
-        <p className="text-sm text-gray-600">1) Naskenujte QR místnosti</p>
+        <p className="text-sm text-gray-600">
+          Nejdřív naskenujte QR místnosti, potom QR majetku. Místnost zůstane nastavená,
+          další kusy jdou za sebou.
+        </p>
       ) : (
         <p className="text-sm text-gray-600">Naskenujte volný QR ze štítku fondu</p>
       )}

@@ -138,6 +138,7 @@ export function buildEquipmentImportPlan(
   for (const cat of parsed.categories) {
     const existing = existingCatByName.get(normalizeCategoryName(cat.name));
     if (existing) {
+      // Existující skupinu nepřepisujeme (včetně zodpovědné osoby).
       categoriesReuse.push({ id: existing.id, name: existing.name });
       continue;
     }

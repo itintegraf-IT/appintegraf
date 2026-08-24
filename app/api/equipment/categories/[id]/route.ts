@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { canAdministerEquipment, canReadEquipment } from "@/lib/equipment/access";
+import { canAdministerEquipment, canReadEquipment, canWriteEquipment } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
 
 export async function GET(
@@ -42,9 +42,7 @@ export async function PATCH(
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
-  if (!(await canAdministerEquipment(userId))) {
-    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
-  }
+  const admin = await canAdministerEquipment(userId);
 
   const id = parseInt((await params).id, 10);
   if (Number.isNaN(id)) {
@@ -55,6 +53,11 @@ export async function PATCH(
   if (!existing) return NextResponse.json({ error: "Nenalezeno" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
+  const keys = Object.keys(body).filter((k) => body[k] !== undefined);
+  const onlyResponsible = keys.length === 1 && keys[0] === "responsible_user_id";
+  if (!admin && !(onlyResponsible && (await canWriteEquipment(userId, id)))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
+  }
   const data: {
     name?: string;
     code?: string;
