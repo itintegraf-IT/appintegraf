@@ -19,6 +19,7 @@ export type EquipmentListRow = {
   serialNumber: string | null;
   categoryName: string | null;
   status: string | null;
+  quantity?: number | null;
   assignedToName: string | null;
   assignedToUserId: number | null;
   assignmentId: number | null;
@@ -33,17 +34,24 @@ type Props = {
   sort: EquipmentListSortKey;
   dir: EquipmentListSortDir;
   view: EquipmentListView;
+  unassigned?: boolean;
   canEdit: boolean;
   canAssign: boolean;
   canDelete: boolean;
 };
 
-function buildHref(sort: EquipmentListSortKey, dir: EquipmentListSortDir, view: EquipmentListView) {
+function buildHref(
+  sort: EquipmentListSortKey,
+  dir: EquipmentListSortDir,
+  view: EquipmentListView,
+  unassigned?: boolean
+) {
   const q = new URLSearchParams();
   q.set("scope", "all");
   if (sort !== "zapis") q.set("sort", sort);
   if (dir !== (sort === "zapis" ? "desc" : "asc")) q.set("dir", dir);
   if (view !== "table") q.set("view", view);
+  if (unassigned) q.set("unassigned", "1");
   return `/equipment?${q.toString()}`;
 }
 
@@ -77,6 +85,7 @@ export function EquipmentListClient({
   sort,
   dir,
   view,
+  unassigned = false,
   canEdit,
   canAssign,
   canDelete,
@@ -84,7 +93,7 @@ export function EquipmentListClient({
   const router = useRouter();
 
   const navigate = (nextSort: EquipmentListSortKey, nextDir: EquipmentListSortDir, nextView: EquipmentListView) => {
-    router.push(buildHref(nextSort, nextDir, nextView));
+    router.push(buildHref(nextSort, nextDir, nextView, unassigned));
   };
 
   const toggleDir = () => {
@@ -170,6 +179,9 @@ export function EquipmentListClient({
                       <div className="min-w-0">
                         <Link href={`/equipment/${row.id}`} className="font-medium text-red-700 hover:underline">
                           {row.name}
+                          {row.quantity != null && row.quantity > 1 ? (
+                            <span className="ml-2 text-xs font-normal text-gray-500">Ks: {row.quantity}</span>
+                          ) : null}
                         </Link>
                         {row.brandModel ? <p className="text-xs text-gray-500">{row.brandModel}</p> : null}
                         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
@@ -216,7 +228,12 @@ export function EquipmentListClient({
             <tbody>
               {rows.map((row) => (
                 <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{row.name}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {row.name}
+                    {row.quantity != null && row.quantity > 1 ? (
+                      <span className="ml-2 text-xs font-normal text-gray-500">Ks: {row.quantity}</span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3">{row.brandModel || "-"}</td>
                   <td className="px-4 py-3 font-mono text-sm">{row.serialNumber ?? "-"}</td>
                   <td className="px-4 py-3">{row.categoryName ?? "-"}</td>

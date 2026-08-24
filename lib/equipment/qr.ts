@@ -46,6 +46,39 @@ function randomDigits(n: number): string {
   return s;
 }
 
+/** Hromadná alokace unikátních kódů bez DB roundtripu na každý pokus. */
+export function allocateUniqueNumericCodes(
+  count: number,
+  length: number,
+  existing: Iterable<string>,
+  format: (digits: string) => string = (d) => d
+): string[] {
+  if (count <= 0) return [];
+  const used = new Set(existing);
+  const out: string[] = [];
+  const maxAttempts = Math.max(count * 80, count + 200);
+  let attempts = 0;
+  while (out.length < count && attempts < maxAttempts) {
+    attempts += 1;
+    const code = format(randomDigits(length));
+    if (used.has(code)) continue;
+    used.add(code);
+    out.push(code);
+  }
+  if (out.length < count) {
+    throw new Error("Nepodařilo se vygenerovat unikátní kódy");
+  }
+  return out;
+}
+
+export function allocateUniqueEqQrCodes(count: number, existing: Iterable<string>): string[] {
+  return allocateUniqueNumericCodes(count, 12, existing);
+}
+
+export function allocateUniqueRmQrCodes(count: number, existing: Iterable<string>): string[] {
+  return allocateUniqueNumericCodes(count, 12, existing, (d) => `RM-${d}`);
+}
+
 export async function generateUniqueEqQrCode(): Promise<string> {
   for (let i = 0; i < 20; i++) {
     const code = randomDigits(12);

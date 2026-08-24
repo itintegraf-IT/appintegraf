@@ -71,7 +71,11 @@ export async function GET(req: NextRequest) {
         ? categoryFilter
         : { in: accessible.filter((id) => id === categoryFilter) };
   }
-  if (roomId) where.room_id = parseInt(roomId, 10);
+  if (roomId === "unassigned" || roomId === "null") {
+    where.room_id = null;
+  } else if (roomId) {
+    where.room_id = parseInt(roomId, 10);
+  }
   if (status) where.status = status;
   if (q) {
     where.OR = [
@@ -86,7 +90,7 @@ export async function GET(req: NextRequest) {
 
   const items = await prisma.equipment_items.findMany({
     where,
-    take: 500,
+    take: 2000,
     orderBy: { id: "desc" },
     include: {
       equipment_categories: { select: { id: true, name: true } },

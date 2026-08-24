@@ -2,9 +2,15 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canAdministerEquipment } from "@/lib/equipment/access";
-import { FolderTree, QrCode, Shield } from "lucide-react";
+import { FolderTree, QrCode, Shield, Upload } from "lucide-react";
 
 const cards = [
+  {
+    href: "/equipment/import",
+    icon: Upload,
+    title: "Import z Excelu",
+    hint: "Hromadné zavedení majetku jako nezařazeného",
+  },
   {
     href: "/equipment/settings/categories",
     icon: FolderTree,
@@ -34,7 +40,7 @@ export default async function EquipmentSettingsHubPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Nastavení majetku</h1>
-        <p className="mt-1 text-gray-600">Skupiny, přístupy a fond QR kódů</p>
+        <p className="mt-1 text-gray-600">Import, skupiny, přístupy a fond QR kódů</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

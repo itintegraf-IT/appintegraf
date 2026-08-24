@@ -653,6 +653,7 @@ model equipment_items {
   supplier              String?                     @db.VarChar(200)
   invoice_number        String?                     @db.VarChar(100)
   status                String?                     @default("skladem")
+  quantity              Int                         @default(1)
   location              String?                     @db.VarChar(200)
   room_id               Int?
   cover_file_id         Int?

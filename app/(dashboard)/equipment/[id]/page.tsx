@@ -160,6 +160,12 @@ export default async function EquipmentViewPage({
                 <p className="text-sm text-gray-500">Status</p>
                 <p className="font-medium">{item.status ?? "—"}</p>
               </div>
+              {item.quantity != null && item.quantity > 1 ? (
+                <div>
+                  <p className="text-sm text-gray-500">Množství</p>
+                  <p className="font-medium">{item.quantity} ks</p>
+                </div>
+              ) : null}
               <div>
                 <p className="text-sm text-gray-500">Pořizovací cena</p>
                 <p className="text-lg font-semibold text-gray-900">{fmtPrice(item.purchase_price)}</p>

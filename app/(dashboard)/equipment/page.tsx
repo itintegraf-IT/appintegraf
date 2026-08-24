@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { Laptop, Plus, ClipboardList, UserCheck, DoorOpen, QrCode, ArrowRightLeft, ClipboardCheck, BarChart3, Map } from "lucide-react";
+import { Laptop, Plus, ClipboardList, UserCheck, DoorOpen, QrCode, ArrowRightLeft, ClipboardCheck, BarChart3, Map, Upload } from "lucide-react";
 import { equipmentAgeFromRecord } from "@/lib/equipment-age";
 import {
   parseEquipmentListDir,
@@ -15,6 +15,9 @@ import { EquipmentTableActions } from "./EquipmentTableActions";
 import { EquipmentListClient } from "./EquipmentListClient";
 import { formatEquipmentPrice } from "@/lib/equipment/format-price";
 import { isEquipmentAssignedStatus } from "@/lib/equipment-status";
+import { canAdministerEquipment } from "@/lib/equipment/access";
+
+const EQUIPMENT_LIST_TAKE = 2000;
 
 /** Zachová `tab`, `scope` a řazení při přepínání záložek. */
 function equipmentListPath(opts: {
@@ -23,6 +26,7 @@ function equipmentListPath(opts: {
   sort?: string;
   dir?: string;
   view?: string;
+  unassigned?: boolean;
 }) {
   const q = new URLSearchParams();
   if (opts.tab === "requests") q.set("tab", "requests");
@@ -30,6 +34,7 @@ function equipmentListPath(opts: {
   if (opts.sort) q.set("sort", opts.sort);
   if (opts.dir) q.set("dir", opts.dir);
   if (opts.view) q.set("view", opts.view);
+  if (opts.unassigned) q.set("unassigned", "1");
   const s = q.toString();
   return s ? `/equipment?${s}` : "/equipment";
 }
@@ -37,11 +42,19 @@ function equipmentListPath(opts: {
 export default async function EquipmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ scope?: string; tab?: string; sort?: string; dir?: string; view?: string }>;
+  searchParams: Promise<{
+    scope?: string;
+    tab?: string;
+    sort?: string;
+    dir?: string;
+    view?: string;
+    unassigned?: string;
+  }>;
 }) {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
   const admin = await isAdmin(userId);
+  const canAdminEquipment = await canAdministerEquipment(userId);
   const equipmentRead = await hasModuleAccess(userId, "equipment", "read");
   const equipmentWrite = await hasModuleAccess(userId, "equipment", "write");
   const params = await searchParams;
@@ -50,6 +63,7 @@ export default async function EquipmentPage({
   const sort = parseEquipmentListSort(params.sort);
   const dir = parseEquipmentListDir(params.dir, sort);
   const view = parseEquipmentListView(params.view);
+  const unassigned = params.unassigned === "1";
 
   type EquipmentRow = {
     id: number;
@@ -58,6 +72,7 @@ export default async function EquipmentPage({
     model: string | null;
     serial_number: string | null;
     status: string | null;
+    quantity?: number | null;
     purchase_date: Date | null;
     purchase_price: unknown;
     created_at: Date;
@@ -70,7 +85,8 @@ export default async function EquipmentPage({
 
   if (admin && scope === "all") {
     const rows = await prisma.equipment_items.findMany({
-      take: 200,
+      take: EQUIPMENT_LIST_TAKE,
+      where: unassigned ? { room_id: null } : undefined,
       orderBy: { id: "desc" },
       include: {
         equipment_categories: { select: { name: true } },
@@ -143,6 +159,7 @@ export default async function EquipmentPage({
           serialNumber: e.serial_number,
           categoryName: e.equipment_categories?.name ?? null,
           status: e.status,
+          quantity: e.quantity ?? 1,
           assignedToName: e.assigned_to_name ?? null,
           assignedToUserId: e.assigned_to_user_id ?? null,
           assignmentId: e.assignment_id ?? null,
@@ -179,6 +196,7 @@ export default async function EquipmentPage({
                   sort: params.sort,
                   dir: params.dir,
                   view: params.view,
+                  unassigned,
                 })}
                 className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                   tab === "requests"
@@ -195,6 +213,7 @@ export default async function EquipmentPage({
                   sort: params.sort,
                   dir: params.dir,
                   view: params.view,
+                  unassigned,
                 })}
                 className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                   tab === "equipment"
@@ -213,11 +232,21 @@ export default async function EquipmentPage({
                 href={equipmentListPath({
                   tab: onRequestsTab ? "requests" : undefined,
                   scope: scope === "all" ? undefined : "all",
+                  unassigned: scope === "all" ? unassigned : false,
                 })}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
                 {scope === "all" ? "Moje vybavení" : "Všechno vybavení"}
               </Link>
+              {canAdminEquipment ? (
+                <Link
+                  href="/equipment/import"
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <Upload className="h-4 w-4" />
+                  Import Excel
+                </Link>
+              ) : null}
               <Link
                 href="/equipment/add"
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
@@ -263,15 +292,51 @@ export default async function EquipmentPage({
       {tab === "requests" ? (
         <EquipmentRequestsTab />
       ) : showAdminList ? (
-        <EquipmentListClient
-          rows={adminListRows}
-          sort={sort}
-          dir={dir}
-          view={view}
-          canEdit={admin}
-          canAssign={admin || equipmentWrite}
-          canDelete={admin}
-        />
+        <>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Link
+              href={equipmentListPath({
+                scope: "all",
+                sort: params.sort,
+                dir: params.dir,
+                view: params.view,
+              })}
+              className={`rounded-full border px-3 py-1 text-sm ${
+                !unassigned
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Vše
+            </Link>
+            <Link
+              href={equipmentListPath({
+                scope: "all",
+                sort: params.sort,
+                dir: params.dir,
+                view: params.view,
+                unassigned: true,
+              })}
+              className={`rounded-full border px-3 py-1 text-sm ${
+                unassigned
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Nezařazené
+            </Link>
+          </div>
+          <EquipmentListClient
+            rows={adminListRows}
+            sort={sort}
+            dir={dir}
+            view={view}
+            unassigned={unassigned}
+            canEdit={admin}
+            canAssign={admin || equipmentWrite}
+            canDelete={admin}
+          />
+        </>
       ) : (
         <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
