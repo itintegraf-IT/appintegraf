@@ -1,5 +1,6 @@
 "use client";
 
+import type { CSSProperties, ReactNode } from "react";
 import {
   DndContext,
   PointerSensor,
@@ -24,16 +25,17 @@ import {
 type SortableHeaderCellProps = {
   column: MaketyListColumnMeta;
   canModuleAdmin: boolean;
+  extra?: ReactNode;
 };
 
-function SortableHeaderCell({ column, canModuleAdmin }: SortableHeaderCellProps) {
+function SortableHeaderCell({ column, canModuleAdmin, extra }: SortableHeaderCellProps) {
   const draggable = isMaketyListColumnDraggable(column.id, canModuleAdmin);
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: column.id,
     disabled: !draggable,
   });
 
-  const style: React.CSSProperties = {
+  const style: CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
@@ -60,6 +62,7 @@ function SortableHeaderCell({ column, canModuleAdmin }: SortableHeaderCellProps)
           <span className="w-5 shrink-0" aria-hidden />
         )}
         <span>{column.label}</span>
+        {extra ? <div className="ml-0.5 flex items-center gap-0.5">{extra}</div> : null}
       </div>
     </th>
   );
@@ -69,9 +72,15 @@ type Props = {
   columns: MaketyListColumnMeta[];
   canModuleAdmin: boolean;
   onReorder: (activeId: MaketyListColumnId, overId: MaketyListColumnId) => void;
+  columnExtras?: Partial<Record<MaketyListColumnId, ReactNode>>;
 };
 
-export function MaketyListSortableTableHead({ columns, canModuleAdmin, onReorder }: Props) {
+export function MaketyListSortableTableHead({
+  columns,
+  canModuleAdmin,
+  onReorder,
+  columnExtras,
+}: Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
   );
@@ -92,7 +101,12 @@ export function MaketyListSortableTableHead({ columns, canModuleAdmin, onReorder
         <thead className="border-b border-gray-200 bg-gray-50">
           <tr>
             {columns.map((col) => (
-              <SortableHeaderCell key={col.id} column={col} canModuleAdmin={canModuleAdmin} />
+              <SortableHeaderCell
+                key={col.id}
+                column={col}
+                canModuleAdmin={canModuleAdmin}
+                extra={columnExtras?.[col.id]}
+              />
             ))}
           </tr>
         </thead>
