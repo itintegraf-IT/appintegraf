@@ -432,6 +432,7 @@ model makety {
   label_code                   String?              @db.VarChar(100)
   job_number                   String?              @db.VarChar(50)
   product_draft                Json?
+  iml_applied_at               DateTime?            @db.DateTime(0)
   prepress_user_id             Int?
   final_approver_user_id       Int?
   created_at                   DateTime             @default(now()) @db.Timestamp(0)

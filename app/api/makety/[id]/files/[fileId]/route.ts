@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { userCanViewMaketa, userCanEditMaketa } from "@/lib/makety-access";
+import { userCanViewMaketa, userCanEditMaketa, userCanDeleteMaketyFile } from "@/lib/makety-access";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import {
   MAKETY_FILE_MODULE,
@@ -185,9 +185,12 @@ export async function DELETE(
     return NextResponse.json({ error: "Maketa nenalezena" }, { status: 404 });
   }
 
-  const canDelete = await userCanEditMaketa(userId, maketaId);
+  const canDelete = await userCanDeleteMaketyFile(userId, maketaId);
   if (!canDelete) {
-    return NextResponse.json({ error: "Smazat soubor může jen zadavatel" }, { status: 403 });
+    return NextResponse.json(
+      { error: "Soubor teď nemůžete smazat (po odeslání dál jen zadavatel, grafik jen do Hotovo)" },
+      { status: 403 }
+    );
   }
 
   const fileRow = await prisma.file_uploads.findFirst({

@@ -17,7 +17,6 @@ import { createSoftproofLink, revokeOpenSoftproofLinks } from "@/lib/makety-soft
 import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
 import { getSoftproofTemplate, normalizeSoftproofLocale } from "@/lib/makety-softproof-templates";
 import { assertGrafikaTransition } from "@/lib/makety-grafika-status";
-import { notifyMaketaUsers } from "@/lib/makety-notify";
 import { recordMaketyFileEvent } from "@/lib/makety-file-events";
 import { parseMaketyFileKind } from "@/lib/makety-file-kind";
 
@@ -180,12 +179,15 @@ export async function POST(
   });
   const pageUrl = `${getBaseUrl(req)}/public/softproof/${encodeURIComponent(rawToken)}`;
 
+  const mime = sanitizeMaketyMimeType(fileRow.mime_type);
+  const smallEnough = buf.length <= ATTACH_MAX_BYTES;
+  const isImage = mime.startsWith("image/");
   const attach =
-    body.attachFile === true && buf.length <= ATTACH_MAX_BYTES
+    smallEnough && (body.attachFile === true || isImage)
       ? {
           filename: fileRow.original_filename,
           content: buf,
-          contentType: sanitizeMaketyMimeType(fileRow.mime_type),
+          contentType: mime,
         }
       : undefined;
 
@@ -271,19 +273,7 @@ export async function POST(
       });
       status = "sent_for_approval";
 
-      await notifyMaketaUsers({
-        maketaId,
-        userIds: [
-          maketa.created_by,
-          maketa.assignee_user_id,
-          maketa.prepress_user_id,
-        ],
-        bodyPreview: `Softproof odeslán na ${toEmail}`,
-        orderNumber: maketa.order_number,
-        kind: "sent_for_client",
-        workType: "grafika",
-        excludeUserId: userId,
-      });
+      /* Interní hromadný e-mail sent_for_client je vypnutý — klient dostane softproof. */
     } catch (e) {
       console.error("softproof status transition", e);
       return NextResponse.json(

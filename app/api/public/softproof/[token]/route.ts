@@ -68,6 +68,7 @@ async function resolveLink(rawToken: string) {
       order_number: true,
       job_number: true,
       label_code: true,
+      status: true,
       created_by: true,
       assignee_user_id: true,
       prepress_user_id: true,
@@ -210,6 +211,22 @@ export async function POST(
       },
     });
 
+    if (decision.action === "rejected") {
+      await prisma.makety.update({
+        where: { id: maketa.id },
+        data: { status: "in_progress" },
+      });
+      await prisma.makety_status_log.create({
+        data: {
+          maketa_id: maketa.id,
+          from_status: maketa.status,
+          to_status: "in_progress",
+          user_id: link.created_by,
+          comment: decision.reason,
+        },
+      });
+    }
+
     await recordMaketyFileEvent({
       maketaId: maketa.id,
       fileId: fileRow.id,
@@ -222,19 +239,25 @@ export async function POST(
       },
     });
 
-    await notifyMaketaUsers({
-      maketaId: maketa.id,
-      userIds: [
-        maketa.created_by,
-        maketa.assignee_user_id,
-        maketa.prepress_user_id,
-        maketa.final_approver_user_id,
-      ],
-      bodyPreview: commentBody,
-      orderNumber: maketa.order_number,
-      kind: decision.action === "approved" ? "client_approved" : "client_rejected",
-      workType: "grafika",
-    });
+    if (decision.action === "approved") {
+      await notifyMaketaUsers({
+        maketaId: maketa.id,
+        userIds: [maketa.created_by],
+        bodyPreview: commentBody,
+        orderNumber: maketa.order_number,
+        kind: "client_approved",
+        workType: "grafika",
+      });
+    } else {
+      await notifyMaketaUsers({
+        maketaId: maketa.id,
+        userIds: [maketa.assignee_user_id, maketa.created_by],
+        bodyPreview: commentBody,
+        orderNumber: maketa.order_number,
+        kind: "client_rejected",
+        workType: "grafika",
+      });
+    }
 
     return NextResponse.json({ success: true, action: decision.action });
   } catch (e) {

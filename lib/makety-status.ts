@@ -50,19 +50,19 @@ export function maketaStatusBadgeClass(status: string, workType?: MaketyWorkType
   }
   switch (status) {
     case "awaiting_quote":
-      return "bg-sky-100 text-sky-800";
+      return "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-100";
     case "quote_submitted":
-      return "bg-indigo-100 text-indigo-800";
+      return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-100";
     case "done":
-      return "bg-green-100 text-green-800";
+      return "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100";
     case "in_progress":
-      return "bg-violet-100 text-violet-800";
+      return "bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-100";
     case "cancelled":
-      return "bg-gray-200 text-gray-700";
+      return "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200";
     case "open":
-      return "bg-amber-100 text-amber-800";
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-100";
     default:
-      return "bg-gray-100 text-gray-700";
+      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
   }
 }
 
@@ -81,11 +81,11 @@ export function maketaPriorityLabel(priority: string): string {
 export function maketaPriorityBadgeClass(priority: string): string {
   switch (priority) {
     case "urgent":
-      return "bg-red-100 text-red-800";
+      return "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-100";
     case "high":
-      return "bg-orange-100 text-orange-800";
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-100";
     default:
-      return "bg-gray-100 text-gray-700";
+      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
   }
 }
 
@@ -99,4 +99,9 @@ export function isMaketaPreApprovalStatus(status: string): boolean {
   return status === "awaiting_quote" || status === "quote_submitted";
 }
 
-export { isMaketaTerminalStatus, maketyActiveWhereClause, maketyArchiveWhereClause } from "@/lib/makety-grafika-status";
+export {
+  isMaketaTerminalStatus,
+  isGrafikaImlArchived,
+  maketyActiveWhereClause,
+  maketyArchiveWhereClause,
+} from "@/lib/makety-grafika-status";

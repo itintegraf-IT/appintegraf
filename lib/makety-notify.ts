@@ -399,19 +399,6 @@ export async function notifyMaketaDone(params: {
         excludeUserId: params.doneByUserId,
       });
     }
-    if (params.creatorUserId !== params.doneByUserId) {
-      const intro = `${doneByName} dokončil/a grafiku${orderSuffix(params.orderNumber)} – čeká na schválení prepressem.`;
-      await notifyMaketaCreator({
-        maketaId: params.maketaId,
-        creatorUserId: params.creatorUserId,
-        title: "Grafika hotová – čeká na prepress",
-        message: intro,
-        type: "makety_done",
-        orderNumber: params.orderNumber,
-        bodyPreview: params.bodyPreview,
-        workType,
-      });
-    }
     return;
   }
 

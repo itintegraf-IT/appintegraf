@@ -11,6 +11,8 @@ type EmailSettings = {
   password: string;
   from: string;
   fromName: string;
+  fromMakety: string;
+  fromNameMakety: string;
   passwordSet: boolean;
 };
 
@@ -28,6 +30,8 @@ export function EmailSettingsForm() {
     password: "",
     from: "",
     fromName: "INTEGRAF",
+    fromMakety: "",
+    fromNameMakety: "",
     passwordSet: false,
   });
 
@@ -47,6 +51,8 @@ export function EmailSettingsForm() {
             password: "",
             from: data.from ?? "",
             fromName: data.fromName ?? "INTEGRAF",
+            fromMakety: data.fromMakety ?? "",
+            fromNameMakety: data.fromNameMakety ?? "",
             passwordSet: data.passwordSet ?? false,
           });
         }
@@ -79,6 +85,8 @@ export function EmailSettingsForm() {
           password: form.password || undefined,
           from: form.from,
           fromName: form.fromName,
+          fromMakety: form.fromMakety,
+          fromNameMakety: form.fromNameMakety,
         }),
       });
       const data = await res.json();
@@ -271,7 +279,36 @@ export function EmailSettingsForm() {
         </div>
       </div>
 
-      <div className="mt-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-800">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="fromMakety" className="mb-1 block text-sm font-medium text-gray-700">
+            Odesílatel makety / grafika (e-mail)
+          </label>
+          <input
+            id="fromMakety"
+            type="email"
+            value={form.fromMakety}
+            onChange={(e) => setForm((p) => ({ ...p, fromMakety: e.target.value }))}
+            placeholder="prázdné = stejný jako výše"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2"
+          />
+        </div>
+        <div>
+          <label htmlFor="fromNameMakety" className="mb-1 block text-sm font-medium text-gray-700">
+            Jméno odesílatele (makety)
+          </label>
+          <input
+            id="fromNameMakety"
+            type="text"
+            value={form.fromNameMakety}
+            onChange={(e) => setForm((p) => ({ ...p, fromNameMakety: e.target.value }))}
+            placeholder="prázdné = stejné jako výše"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2"
+          />
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-lg bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
         <strong>Office 365:</strong> Použijte účet s povoleným SMTP. Při MFA vytvořte v Microsoft účtu
         heslo aplikace a použijte ho místo běžného hesla.
       </div>

@@ -1,5 +1,5 @@
 import nodemailer from "nodemailer";
-import { getEmailSettings } from "./email-settings";
+import { getEmailSettings, formatSmtpFrom } from "./email-settings";
 import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
 import {
   buildSoftproofEmailHtml,
@@ -700,6 +700,11 @@ export async function sendMaketySoftproofEmail(
     template,
     vars,
     extraMessage: params.message,
+    previewImageCid:
+      params.attachment?.contentType.startsWith("image/") ? "softproof-preview" : undefined,
+    previewPdfNote:
+      params.attachment?.contentType === "application/pdf" ||
+      params.fileName.toLowerCase().endsWith(".pdf"),
   });
 
   try {
@@ -718,9 +723,7 @@ export async function sendMaketySoftproofEmail(
     });
 
     await transporter.sendMail({
-      from: settings.fromName
-        ? `"${settings.fromName}" <${settings.from}>`
-        : settings.from,
+      from: formatSmtpFrom(settings, "makety"),
       to: params.toEmail,
       subject: built.subject,
       text: built.text,
@@ -731,6 +734,9 @@ export async function sendMaketySoftproofEmail(
               filename: params.attachment.filename,
               content: params.attachment.content,
               contentType: params.attachment.contentType,
+              cid: params.attachment.contentType.startsWith("image/")
+                ? "softproof-preview"
+                : undefined,
             },
           ]
         : undefined,
@@ -740,6 +746,56 @@ export async function sendMaketySoftproofEmail(
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("sendMaketySoftproofEmail error:", msg);
+    return { success: false, error: msg };
+  }
+}
+
+/** Prostý e-mail klientovi z grafiky (např. důvod pozastavení). */
+export async function sendMaketyClientPlainEmail(params: {
+  toEmail: string;
+  subject: string;
+  text: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const settings = await getEmailSettings();
+  if (!settings.enabled) {
+    return { success: true };
+  }
+  if (!settings.user || !settings.password || !settings.from) {
+    return {
+      success: false,
+      error: "E-mail není nakonfigurován (chybí SMTP údaje nebo odesílatel)",
+    };
+  }
+  try {
+    const transporter = nodemailer.createTransport({
+      host: settings.host,
+      port: settings.port,
+      secure: settings.secure,
+      auth: {
+        user: settings.user,
+        pass: settings.password,
+      },
+      tls:
+        settings.host.includes("office365") || settings.host.includes("outlook")
+          ? { ciphers: "SSLv3", rejectUnauthorized: false }
+          : undefined,
+    });
+    const html = `<p style="font-family:Arial,sans-serif;white-space:pre-wrap;">${params.text
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/\n/g, "<br/>")}</p>`;
+    await transporter.sendMail({
+      from: formatSmtpFrom(settings, "makety"),
+      to: params.toEmail,
+      subject: params.subject,
+      text: params.text,
+      html,
+    });
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("sendMaketyClientPlainEmail error:", msg);
     return { success: false, error: msg };
   }
 }

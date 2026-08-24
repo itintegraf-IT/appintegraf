@@ -10,6 +10,8 @@ const KEYS = {
   password: "email_smtp_password",
   from: "email_from",
   fromName: "email_from_name",
+  fromMakety: "email_from_makety",
+  fromNameMakety: "email_from_name_makety",
 } as const;
 
 export type EmailSettings = {
@@ -21,6 +23,8 @@ export type EmailSettings = {
   password: string;
   from: string;
   fromName: string;
+  fromMakety: string;
+  fromNameMakety: string;
 };
 
 const DEFAULTS: EmailSettings = {
@@ -32,6 +36,8 @@ const DEFAULTS: EmailSettings = {
   password: "",
   from: "",
   fromName: "INTEGRAF",
+  fromMakety: "",
+  fromNameMakety: "",
 };
 
 async function getSetting(key: string): Promise<string | null> {
@@ -43,7 +49,7 @@ async function getSetting(key: string): Promise<string | null> {
 }
 
 export async function getEmailSettings(): Promise<EmailSettings> {
-  const [enabled, host, port, secure, user, password, from, fromName] =
+  const [enabled, host, port, secure, user, password, from, fromName, fromMakety, fromNameMakety] =
     await Promise.all([
       getSetting(KEYS.enabled),
       getSetting(KEYS.host),
@@ -53,6 +59,8 @@ export async function getEmailSettings(): Promise<EmailSettings> {
       getSetting(KEYS.password),
       getSetting(KEYS.from),
       getSetting(KEYS.fromName),
+      getSetting(KEYS.fromMakety),
+      getSetting(KEYS.fromNameMakety),
     ]);
 
   return {
@@ -64,7 +72,25 @@ export async function getEmailSettings(): Promise<EmailSettings> {
     password: password ?? DEFAULTS.password,
     from: from ?? DEFAULTS.from,
     fromName: fromName ?? DEFAULTS.fromName,
+    fromMakety: fromMakety ?? DEFAULTS.fromMakety,
+    fromNameMakety: fromNameMakety ?? DEFAULTS.fromNameMakety,
   };
+}
+
+/** From pro klientské e-maily maket/grafiky (fallback na globální odesílatele). */
+export function formatSmtpFrom(
+  settings: EmailSettings,
+  kind: "default" | "makety" = "default"
+): string {
+  const addr =
+    kind === "makety" && settings.fromMakety.trim()
+      ? settings.fromMakety.trim()
+      : settings.from;
+  const name =
+    kind === "makety" && settings.fromNameMakety.trim()
+      ? settings.fromNameMakety.trim()
+      : settings.fromName;
+  return name ? `"${name}" <${addr}>` : addr;
 }
 
 /** Vrátí nastavení bez hesla (pro zobrazení v adminu) */
@@ -114,6 +140,8 @@ export async function saveEmailSettings(
     upsert(KEYS.secure, data.secure),
     upsert(KEYS.from, data.from),
     upsert(KEYS.fromName, data.fromName),
+    upsert(KEYS.fromMakety, data.fromMakety),
+    upsert(KEYS.fromNameMakety, data.fromNameMakety),
   ];
   if (data.user !== undefined) tasks.push(upsert(KEYS.user, data.user));
   if (data.password !== undefined && data.password !== "")

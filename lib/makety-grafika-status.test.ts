@@ -5,12 +5,17 @@ import {
   grafikaStatusLabel,
   grafikaTransitionActionLabel,
   isMaketaTerminalStatus,
+  isGrafikaImlArchived,
   listGrafikaTransitionOptions,
   GRAFIKA_QUEUE_STATUSES,
 } from "@/lib/makety-grafika-status";
 
 describe("makety-grafika-status", () => {
   it("labeluje pozastavení a prepress stavy", () => {
+    expect(grafikaStatusLabel("open")).toBe("Přijato");
+    expect(grafikaStatusLabel("in_progress")).toBe("U grafika");
+    expect(grafikaStatusLabel("done")).toBe("Hotovo grafikem");
+    expect(grafikaStatusLabel("approved")).toBe("Schváleno klientem");
     expect(grafikaStatusLabel("data_problem")).toBe("Pozastaveno");
     expect(grafikaStatusLabel("prepress_approved")).toBe("Schváleno prepressem");
   });
@@ -40,8 +45,8 @@ describe("makety-grafika-status", () => {
     expect(allowed).not.toContain("open");
   });
 
-  it("grafik neuvolní pozastavenou zakázku", () => {
-    expect(getAllowedGrafikaTransitions("data_problem", ["grafik"])).toEqual([]);
+  it("grafik uvolní pozastavenou zakázku zpět do práce", () => {
+    expect(getAllowedGrafikaTransitions("data_problem", ["grafik"])).toEqual(["in_progress"]);
   });
 
   it("zadavatel uvolní pozastavenou zakázku do fronty", () => {
@@ -115,5 +120,7 @@ describe("makety-grafika-status", () => {
     expect(isMaketaTerminalStatus("done", "grafika")).toBe(false);
     expect(isMaketaTerminalStatus("approved", "grafika")).toBe(true);
     expect(isMaketaTerminalStatus("done", "maketa")).toBe(true);
+    expect(isGrafikaImlArchived("approved", null)).toBe(false);
+    expect(isGrafikaImlArchived("approved", new Date())).toBe(true);
   });
 });

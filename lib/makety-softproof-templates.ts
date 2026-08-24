@@ -312,6 +312,10 @@ export function buildSoftproofEmailHtml(params: {
   template: SoftproofTemplate;
   vars: SoftproofTemplateVars;
   extraMessage?: string;
+  /** CID náhled obrázku (cid:softproof-preview). */
+  previewImageCid?: string;
+  /** PDF bez rasteru – text + CTA. */
+  previewPdfNote?: boolean;
 }): { subject: string; html: string; text: string } {
   const t = renderSoftproofTemplate(params.template, params.vars);
   const zak = params.vars.orderNumber?.trim()
@@ -327,6 +331,11 @@ export function buildSoftproofEmailHtml(params: {
     ? `<div style="margin: 16px 0; padding: 12px; background: #eff6ff; border-left: 3px solid #2563eb;">${softproofTextToEmailHtml(t.legalHtml)}</div>`
     : "";
   const pageUrl = params.vars.pageUrl?.trim() || "";
+  const preview = params.previewImageCid
+    ? `<p style="margin:16px 0;"><img src="cid:${params.previewImageCid}" alt="${escapeHtml(params.vars.fileName || "náhled")}" style="max-width:560px;height:auto;border:1px solid #e5e7eb;border-radius:6px;" /></p>`
+    : params.previewPdfNote
+      ? `<p style="margin:16px 0;padding:12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;">Náhled PDF v e-mailu (Outlook) není spolehlivý. Otevřete soubor tlačítkem níže nebo v příloze.</p>`
+      : "";
   const html = `
 <!DOCTYPE html>
 <html>
@@ -339,6 +348,7 @@ export function buildSoftproofEmailHtml(params: {
   ${extra}
   ${legal}
   ${params.vars.fileName ? `<p><strong>${escapeHtml(t.locale === "de" ? "Datei" : t.locale === "en" ? "File" : "Soubor")}:</strong> ${escapeHtml(params.vars.fileName)}</p>` : ""}
+  ${preview}
   <p><a href="${escapeHtml(pageUrl)}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">${escapeHtml(t.ctaLabel)}</a></p>
   <p style="color: #666; font-size: 12px;">${escapeHtml(t.validityNote)}</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">

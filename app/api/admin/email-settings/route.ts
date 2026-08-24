@@ -42,6 +42,8 @@ export async function PUT(req: NextRequest) {
       password,
       from,
       fromName,
+      fromMakety,
+      fromNameMakety,
     } = body;
 
     await saveEmailSettings(
@@ -54,6 +56,8 @@ export async function PUT(req: NextRequest) {
         password: typeof password === "string" ? password : undefined,
         from: typeof from === "string" ? from.trim() : undefined,
         fromName: typeof fromName === "string" ? fromName.trim() : undefined,
+        fromMakety: typeof fromMakety === "string" ? fromMakety.trim() : undefined,
+        fromNameMakety: typeof fromNameMakety === "string" ? fromNameMakety.trim() : undefined,
       },
       userId
     );

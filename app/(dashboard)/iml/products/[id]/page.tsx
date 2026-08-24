@@ -164,7 +164,8 @@ export default async function ImlProductDetailPage({
                 className="h-60 w-full md:w-60"
               />
               <p className="mt-1 text-center text-xs text-gray-400">
-                Kliknutím zvětšit{hasPdf ? " · detail z PDF" : ""}
+                Kliknutím zvětšit
+                {hasImage ? " · softproof" : hasPdf ? " · detail z PDF" : ""}
               </p>
             </div>
           )}
@@ -338,7 +339,8 @@ export default async function ImlProductDetailPage({
                     className="h-60 w-full"
                   />
                   <p className="mt-1 text-center text-xs text-gray-400">
-                    Kliknutím zvětšit · detail z PDF
+                    Kliknutím zvětšit
+                    {hasImage ? " · softproof" : " · detail z PDF"}
                   </p>
                 </div>
                 <div className="flex flex-col gap-2">

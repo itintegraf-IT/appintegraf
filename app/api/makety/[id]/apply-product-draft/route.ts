@@ -62,8 +62,9 @@ export async function POST(
     where: { id: maketaId, work_type: "grafika" },
     include: {
       iml_products: {
-        select: { ig_code: true, client_code: true, ig_short_name: true },
+        select: { ig_code: true, client_code: true, ig_short_name: true, client_name: true },
       },
+      iml_customers: { select: { name: true } },
       users_creator: { select: { first_name: true, last_name: true } },
     },
   });
@@ -80,6 +81,7 @@ export async function POST(
           die_cut_id: maketa.die_cut_id,
           label_code: maketa.label_code,
           body: maketa.body,
+          customer_name: maketa.iml_customers?.name ?? null,
           product: maketa.iml_products,
         });
 
@@ -92,6 +94,10 @@ export async function POST(
 
   if (draft.customer_id == null) draft.missing_fields.push("customer_id");
   if (!draft.ig_code?.trim()) draft.missing_fields.push("ig_code");
+
+  if (!draft.client_name?.trim() && maketa.iml_customers?.name) {
+    draft.client_name = maketa.iml_customers.name;
+  }
 
   if (draft.missing_fields.length > 0) {
     return NextResponse.json(
@@ -121,6 +127,7 @@ export async function POST(
         data: {
           product_id: draft.product_id,
           product_draft: Prisma.DbNull,
+          iml_applied_at: new Date(),
         },
       });
 
@@ -152,6 +159,7 @@ export async function POST(
         product_id: created.id,
         label_code: draft.ig_code,
         product_draft: Prisma.DbNull,
+        iml_applied_at: new Date(),
       },
     });
 

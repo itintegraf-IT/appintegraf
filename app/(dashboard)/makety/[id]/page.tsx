@@ -18,6 +18,7 @@ import {
   userCanOperateGrafikaAutomation,
   userCanCopyMaketa,
   canManageMaketyQueue,
+  userCanDeleteMaketyFile,
 } from "@/lib/makety-access";
 import { MaketaQuoteForm } from "./MaketaQuoteForm";
 import { MaketaApprovalPanel } from "./MaketaApprovalPanel";
@@ -32,6 +33,7 @@ import {
   maketaStatusBadgeClass,
   maketaStatusLabel,
   isMaketaTerminalStatus,
+  isGrafikaImlArchived,
 } from "@/lib/makety-status";
 import { maketyDataKindLabel } from "@/lib/makety-data-kind";
 import { CompleteMaketaButton } from "./CompleteMaketaButton";
@@ -117,7 +119,11 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
   const canComplete = await userCanCompleteMaketa(userId, id);
   const canSubmitQuote = await userCanSubmitMaketaQuote(userId, id);
   const canApproveQuote = await userCanApproveMaketaQuote(userId, id);
-  const isArchived = isMaketaTerminalStatus(maketa.status, workType);
+  const isArchived =
+    workType === "grafika"
+      ? isGrafikaImlArchived(maketa.status, maketa.iml_applied_at)
+      : isMaketaTerminalStatus(maketa.status, workType);
+  const canDeleteFile = await userCanDeleteMaketyFile(userId, id);
   const canManagePriority =
     (await canManageMaketyQueue(userId)) && !isArchived;
   const canEditDataKind =
@@ -394,7 +400,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
       </div>
 
       {clientSoftproofDecision?.used_action === "approved" && (
-        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900">
+        <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100">
           Klient schválil softproof
           {clientSoftproofDecision.sent_to_email
             ? ` (${clientSoftproofDecision.sent_to_email})`
@@ -403,7 +409,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
         </div>
       )}
       {clientSoftproofDecision?.used_action === "rejected" && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
           <p>
             Klient zamítl softproof
             {clientSoftproofDecision.sent_to_email
@@ -438,7 +444,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
       {!isArchived && (
         <MaketaFilesPanel
           maketaId={id}
-          canDelete={canEdit}
+          canDelete={canDeleteFile}
           showUploadHint={showUploadHint}
           uploadHintText={
             workType === "grafika"
@@ -457,6 +463,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
           status={maketa.status}
           hasCustomer={maketa.customer_id != null}
           hasProduct={maketa.product_id != null}
+          imlApplied={maketa.iml_applied_at != null}
         />
       )}
 

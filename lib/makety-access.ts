@@ -357,3 +357,24 @@ export async function userCanOperateGrafikaAutomation(
   }
   return { allowed: false, viaOverride: false };
 }
+
+const GRAFIKA_FILE_DELETE_STATUSES = new Set(["open", "in_progress", "data_problem"]);
+
+/** Zadavatel u aktivní zakázky, nebo přiřazený grafik do odeslání dál (hotovo). */
+export async function userCanDeleteMaketyFile(
+  userId: number,
+  maketaId: number
+): Promise<boolean> {
+  if (await userCanEditMaketa(userId, maketaId)) return true;
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId },
+    select: {
+      work_type: true,
+      status: true,
+      assignee_user_id: true,
+    },
+  });
+  if (!row || row.work_type !== "grafika") return false;
+  if (row.assignee_user_id !== userId) return false;
+  return GRAFIKA_FILE_DELETE_STATUSES.has(row.status);
+}

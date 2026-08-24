@@ -27,6 +27,7 @@
     "db:makety-work-type": "node scripts/run-makety-work-type-migration.mjs",
     "db:makety-queue": "node scripts/run-makety-queue-migration.mjs",
     "db:makety-quote": "node scripts/run-makety-quote-migration.mjs",
+    "db:makety-iml-applied": "node scripts/run-makety-iml-applied-migration.mjs",
     "db:stitky-migrate": "node scripts/run-stitky-migration.mjs",
     "db:training-multi-answer": "node scripts/run-training-multi-answer-migration.mjs",
     "db:training-assignment-users": "node scripts/run-training-assignment-users-migration.mjs",

@@ -9,6 +9,7 @@ export type MaketyProductDraft = {
   ig_code: string | null;
   client_code: string | null;
   ig_short_name: string | null;
+  client_name: string | null;
   production_notes: string | null;
   item_status: string;
   approval_status: string;
@@ -21,10 +22,12 @@ export function buildMaketyProductDraft(input: {
   die_cut_id: number | null;
   label_code: string | null;
   body: string;
+  customer_name?: string | null;
   product?: {
     ig_code: string | null;
     client_code: string | null;
     ig_short_name: string | null;
+    client_name?: string | null;
   } | null;
 }): MaketyProductDraft {
   const mode = input.product_id != null ? "update" : "create";
@@ -37,6 +40,10 @@ export function buildMaketyProductDraft(input: {
     input.product?.ig_short_name?.trim() ||
     (ig_code ? `Grafika ${ig_code}` : null);
   const production_notes = input.body.trim().slice(0, 5000) || null;
+  const client_name =
+    input.product?.client_name?.trim() ||
+    input.customer_name?.trim() ||
+    null;
 
   const missing_fields: string[] = [];
   if (input.customer_id == null) missing_fields.push("customer_id");
@@ -50,6 +57,7 @@ export function buildMaketyProductDraft(input: {
     ig_code,
     client_code,
     ig_short_name,
+    client_name,
     production_notes,
     item_status: "Aktivní",
     approval_status: "approved",
@@ -67,6 +75,7 @@ export function draftToProductCreateScalars(
     ig_code: draft.ig_code,
     client_code: draft.client_code,
     ig_short_name: draft.ig_short_name,
+    client_name: draft.client_name,
     production_notes: draft.production_notes,
     item_status: draft.item_status,
     approval_status: draft.approval_status,
@@ -86,6 +95,7 @@ export function draftToProductUpdateScalars(
     ig_code: draft.ig_code ?? undefined,
     client_code: draft.client_code ?? undefined,
     ig_short_name: draft.ig_short_name ?? undefined,
+    client_name: draft.client_name ?? undefined,
     production_notes: draft.production_notes ?? undefined,
     item_status: draft.item_status,
     approval_status: draft.approval_status,

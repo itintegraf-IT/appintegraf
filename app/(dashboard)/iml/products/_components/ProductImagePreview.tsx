@@ -8,8 +8,8 @@ const LIGHTBOX_PDF_MAX_HEIGHT = 1200;
 
 /**
  * Klikatelný náhled produktu s lightboxem.
- * - miniatura z uloženého JPEG nebo vykreslení z PDF
- * - lightbox preferuje vysoké rozlišení z PDF (pokud existuje)
+ * - miniatura: softproof (uložený JPEG) nebo první stránka PDF
+ * - lightbox: softproof, pokud existuje; PDF jen když softproof chybí
  * - zoom kolečkem myši a tlačítky +/−
  */
 export default function ProductImagePreview({
@@ -28,6 +28,10 @@ export default function ProductImagePreview({
   const [open, setOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [lightboxPdfHeight, setLightboxPdfHeight] = useState(LIGHTBOX_PDF_MAX_HEIGHT);
+
+  /** Softproof (náhled) má přednost před ostrými tiskovými daty (PDF). */
+  const lightboxShowsSoftproof = hasImage;
+  const lightboxShowsPdf = !hasImage && hasPdf;
 
   useEffect(() => {
     if (!open) {
@@ -68,7 +72,7 @@ export default function ProductImagePreview({
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
       src={`/api/iml/products/${productId}/image`}
-      alt="Náhled produktu"
+      alt="Softproof produktu"
       className={imgClassName}
     />
   ) : (
@@ -84,7 +88,7 @@ export default function ProductImagePreview({
           "group relative overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition hover:border-red-400 " +
           className
         }
-        title="Kliknutím zvětšit"
+        title={lightboxShowsSoftproof ? "Kliknutím zvětšit softproof" : "Kliknutím zvětšit"}
       >
         {thumbnail}
         <span className="pointer-events-none absolute inset-0 bg-black/0 transition group-hover:bg-black/5" />
@@ -127,6 +131,9 @@ export default function ProductImagePreview({
               >
                 <RotateCcw className="h-4 w-4" />
               </button>
+              <span className="ml-2 hidden text-sm text-white/70 sm:inline">
+                {lightboxShowsSoftproof ? "Softproof" : "Náhled z PDF"}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               {hasPdf && (
@@ -137,7 +144,7 @@ export default function ProductImagePreview({
                     className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    Stáhnout PDF
+                    Stáhnout tisková data
                   </a>
                   <a
                     href={`/api/iml/products/${productId}/pdf`}
@@ -171,20 +178,20 @@ export default function ProductImagePreview({
               style={{ transform: `scale(${zoom})`, transformOrigin: "center center" }}
               className="transition-transform"
             >
-              {hasPdf ? (
+              {lightboxShowsSoftproof ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={`/api/iml/products/${productId}/image`}
+                  alt="Softproof produktu"
+                  className="max-h-[85vh] max-w-[95vw] rounded-lg bg-white object-contain shadow-2xl"
+                />
+              ) : lightboxShowsPdf ? (
                 <ProductPdfThumbnail
                   productId={productId}
                   maxHeight={lightboxPdfHeight}
                   className="shadow-2xl"
                 />
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={`/api/iml/products/${productId}/image`}
-                  alt="Náhled produktu"
-                  className="max-h-[85vh] max-w-[95vw] rounded-lg bg-white object-contain shadow-2xl"
-                />
-              )}
+              ) : null}
             </div>
           </div>
         </div>

@@ -54,11 +54,13 @@ describe("softproof templates", () => {
         fileName: "soft.pdf",
         pageUrl: "https://app.example/public/softproof/abc",
       },
+      previewPdfNote: true,
     });
     expect(built.subject).toContain("Z-1");
     expect(built.html).toContain("https://app.example/public/softproof/abc");
     expect(built.html).toContain("Otevřít náhled");
     expect(built.html).not.toContain("/api/makety/softproof/");
+    expect(built.html).toContain("Outlook");
   });
 });
 

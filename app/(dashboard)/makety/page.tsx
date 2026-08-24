@@ -10,7 +10,7 @@ import {
   canZadatAnyMaketyWork,
   canZadatMaketyWork,
 } from "@/lib/makety-access";
-import { sortMaketyProductionQueueByAssignee } from "@/lib/makety-queue";
+import { sortMaketyOverviewByPriority } from "@/lib/makety-queue";
 import {
   isMaketyWorkType,
   type MaketyWorkType,
@@ -18,7 +18,8 @@ import {
 import {
   maketaStatusBadgeClass,
   maketaStatusLabel,
-  isMaketaTerminalStatus,
+  isGrafikaImlArchived,
+  type MaketaPriority,
 } from "@/lib/makety-status";
 import type { MaketyListRow } from "@/lib/makety/makety-list-columns";
 import { MaketyActiveTableClient } from "./_components/MaketyActiveTableClient";
@@ -53,11 +54,18 @@ function applyTermToWhere(
   }
 }
 
-function buildListQuery(term: string, status?: string, workType?: string): string {
+function buildListQuery(
+  term: string,
+  status?: string,
+  workType?: string,
+  extra?: { q?: string; priority?: string }
+): string {
   const p = new URLSearchParams();
   if (workType) p.set("work_type", workType);
   if (term) p.set("term", term);
   if (status) p.set("status", status);
+  if (extra?.q) p.set("q", extra.q);
+  if (extra?.priority) p.set("priority", extra.priority);
   const q = p.toString();
   return q ? `/makety?${q}` : "/makety";
 }
@@ -81,6 +89,8 @@ export default async function MaketyListPage({
     grafika_created?: string;
     comment_sent?: string;
     completed?: string;
+    q?: string;
+    priority?: string;
   }>;
 }) {
   const session = await auth();
@@ -98,6 +108,11 @@ export default async function MaketyListPage({
       : "";
   const rawWorkType = params.work_type ?? "";
   const selectedWorkType: MaketyWorkType | "" = isMaketyWorkType(rawWorkType) ? rawWorkType : "";
+  const searchQ = (params.q ?? "").trim();
+  const selectedPriority: MaketaPriority | "" =
+    params.priority === "urgent" || params.priority === "high" || params.priority === "normal"
+      ? params.priority
+      : "";
   const created = params.created === "1";
   const grafikaCreated = params.grafika_created === "1";
   const commentSent = params.comment_sent === "1";
@@ -114,6 +129,25 @@ export default async function MaketyListPage({
   const baseWhere = await buildMaketyListWhere(userId, {});
   applyTermToWhere(baseWhere, selectedTerm, termBounds);
   if (selectedWorkType) applyWorkTypeToWhere(baseWhere, [selectedWorkType]);
+  if (selectedPriority) baseWhere.priority = selectedPriority;
+  if (searchQ) {
+    const idRaw = searchQ.replace(/^#/, "").trim();
+    const idNum = parseInt(idRaw, 10);
+    const or: Prisma.maketyWhereInput[] = [
+      { label_code: { contains: searchQ } },
+      { job_number: { contains: searchQ } },
+      { order_number: { contains: searchQ } },
+    ];
+    if (!Number.isNaN(idNum) && String(idNum) === idRaw) {
+      or.push({ id: idNum });
+    }
+    const existingAnd = Array.isArray(baseWhere.AND)
+      ? baseWhere.AND
+      : baseWhere.AND
+        ? [baseWhere.AND]
+        : [];
+    baseWhere.AND = [...existingAnd, { OR: or }];
+  }
 
   const allForTermRaw = await prisma.makety.findMany({
     where: baseWhere,
@@ -124,9 +158,13 @@ export default async function MaketyListPage({
       iml_customers: { select: { id: true, name: true } },
     },
   });
-  const allForTerm = sortMaketyProductionQueueByAssignee(allForTermRaw);
+  const allForTerm = sortMaketyOverviewByPriority(allForTermRaw);
 
-  const grouped = STATUS_ORDER.map((status) => {
+  const statusCards = selectedWorkType === "grafika"
+    ? STATUS_ORDER.filter((s) => s !== "awaiting_quote" && s !== "quote_submitted")
+    : STATUS_ORDER;
+
+  const grouped = statusCards.map((status) => {
     const items = allForTerm.filter((r) => r.status === status);
     return {
       status,
@@ -138,13 +176,13 @@ export default async function MaketyListPage({
 
   const rows = selectedStatus
     ? allForTerm.filter((r) => r.status === selectedStatus)
-    : allForTerm.filter(
-        (r) =>
-          !isMaketaTerminalStatus(
-            r.status,
-            (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType
-          )
-      );
+    : allForTerm.filter((r) => {
+        const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
+        if (r.status === "cancelled") return false;
+        if (wt === "maketa" && r.status === "done") return false;
+        if (wt === "grafika" && isGrafikaImlArchived(r.status, r.iml_applied_at)) return false;
+        return true;
+      });
 
   const tableRows: MaketyListRow[] = rows.map((r) => {
     const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
@@ -207,22 +245,22 @@ export default async function MaketyListPage({
   return (
     <div className="space-y-5">
       {created && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100">
           Maketa byla úspěšně vytvořena.
         </div>
       )}
       {grafikaCreated && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100">
           Zakázka grafiky byla úspěšně vytvořena.
         </div>
       )}
       {commentSent && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100">
           Komentář byl odeslán. Zakázka je zapsaná v přehledu.
         </div>
       )}
       {completed && (
-        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+        <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100">
           Maketa byla dokončena a přesunuta do archivu.
         </div>
       )}
@@ -264,19 +302,28 @@ export default async function MaketyListPage({
 
       <div className="flex flex-wrap gap-2">
         <Link
-          href={buildListQuery(selectedTerm, selectedStatus || undefined)}
+          href={buildListQuery(selectedTerm, selectedStatus || undefined, undefined, {
+            q: searchQ || undefined,
+            priority: selectedPriority || undefined,
+          })}
           className={workTypeToggleClass(!selectedWorkType)}
         >
           Vše
         </Link>
         <Link
-          href={buildListQuery(selectedTerm, selectedStatus || undefined, "maketa")}
+          href={buildListQuery(selectedTerm, selectedStatus || undefined, "maketa", {
+            q: searchQ || undefined,
+            priority: selectedPriority || undefined,
+          })}
           className={workTypeToggleClass(selectedWorkType === "maketa")}
         >
           Makety
         </Link>
         <Link
-          href={buildListQuery(selectedTerm, selectedStatus || undefined, "grafika")}
+          href={buildListQuery(selectedTerm, selectedStatus || undefined, "grafika", {
+            q: searchQ || undefined,
+            priority: selectedPriority || undefined,
+          })}
           className={workTypeToggleClass(selectedWorkType === "grafika")}
         >
           Grafika
@@ -306,6 +353,28 @@ export default async function MaketyListPage({
               <option value="week">Do 7 dní</option>
             </select>
           </div>
+          <div className="min-w-[160px]">
+            <label className="mb-1 block text-xs font-medium uppercase text-gray-500">Priorita</label>
+            <select
+              name="priority"
+              defaultValue={selectedPriority}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="">Vše</option>
+              <option value="urgent">Urgentní</option>
+              <option value="high">Vysoká</option>
+              <option value="normal">Normální</option>
+            </select>
+          </div>
+          <div className="min-w-[200px] flex-1">
+            <label className="mb-1 block text-xs font-medium uppercase text-gray-500">Hledat</label>
+            <input
+              name="q"
+              defaultValue={searchQ}
+              placeholder="#id, kód, zakázka…"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            />
+          </div>
           <button
             type="submit"
             className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700"
@@ -331,7 +400,10 @@ export default async function MaketyListPage({
           return (
             <Link
               key={g.status}
-              href={buildListQuery(selectedTerm, g.status, selectedWorkType || undefined)}
+              href={buildListQuery(selectedTerm, g.status, selectedWorkType || undefined, {
+                q: searchQ || undefined,
+                priority: selectedPriority || undefined,
+              })}
               className={`block rounded-xl border bg-white p-4 shadow-sm transition-colors hover:border-violet-300 hover:bg-violet-50/30 ${
                 active ? "border-violet-400 ring-2 ring-violet-200" : "border-gray-200"
               }`}

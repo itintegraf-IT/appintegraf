@@ -66,6 +66,18 @@ export function sortMaketyProductionQueue<T extends MaketyQueueRow>(rows: T[]): 
 }
 
 /** Fronta per přiřazený uživatel (work_type × assignee). */
+export function sortMaketyOverviewByPriority<
+  T extends { priority: string; due_at: Date; id: number },
+>(rows: T[]): T[] {
+  return [...rows].sort((a, b) => {
+    const p = prioritySortKey(a.priority) - prioritySortKey(b.priority);
+    if (p !== 0) return p;
+    const d = new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
+    if (d !== 0) return d;
+    return a.id - b.id;
+  });
+}
+
 export function sortMaketyProductionQueueByAssignee<
   T extends MaketyQueueRow & { assignee_user_id: number | null },
 >(rows: T[]): T[] {

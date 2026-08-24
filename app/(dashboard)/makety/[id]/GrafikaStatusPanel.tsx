@@ -39,6 +39,7 @@ export function GrafikaStatusPanel({
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [overrideAck, setOverrideAck] = useState(false);
+  const [emailClient, setEmailClient] = useState(false);
 
   const [files, setFiles] = useState<SoftproofFileOption[]>([]);
   const [skipEmail, setSkipEmail] = useState(false);
@@ -103,6 +104,7 @@ export function GrafikaStatusPanel({
     setComment("");
     setSkipEmail(false);
     setOverrideAck(false);
+    setEmailClient(false);
     setSoftproofDialogOpen(false);
     router.refresh();
     await load();
@@ -129,6 +131,7 @@ export function GrafikaStatusPanel({
               ? comment.trim() || "Odesláno ke schválení bez e-mailu softproofu"
               : comment.trim() || undefined,
           acknowledgeOverride: needsOverrideAck || undefined,
+          emailClient: selected === "data_problem" && emailClient ? true : undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -265,8 +268,24 @@ export function GrafikaStatusPanel({
           </div>
         )}
 
+        {selected === "data_problem" && (
+          <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={emailClient}
+              onChange={(e) => setEmailClient(e.target.checked)}
+              disabled={submitting != null}
+            />
+            <span>
+              Odeslat důvod klientovi
+              {defaultClientEmail ? ` (${defaultClientEmail})` : " (doplňte e-mail u zákazníka v IML)"}
+            </span>
+          </label>
+        )}
+
         {needsOverrideAck && selected && (
-          <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-950">
+          <label className="mt-3 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
             <input
               type="checkbox"
               className="mt-0.5"
@@ -286,7 +305,7 @@ export function GrafikaStatusPanel({
         )}
 
         {needsSoftproof && (
-          <div className="mt-3 space-y-2 rounded-lg border border-blue-200 bg-blue-50/60 p-2.5">
+          <div className="mt-3 space-y-2 rounded-lg border border-blue-200 bg-blue-50/60 p-2.5 dark:border-blue-800 dark:bg-blue-950/40">
             <label className="flex items-start gap-2 text-xs text-blue-950">
               <input
                 type="checkbox"

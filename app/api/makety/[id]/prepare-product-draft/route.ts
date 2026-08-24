@@ -41,7 +41,7 @@ export async function POST(
     where: { id: maketaId, work_type: "grafika" },
     include: {
       iml_products: {
-        select: { ig_code: true, client_code: true, ig_short_name: true },
+        select: { ig_code: true, client_code: true, ig_short_name: true, client_name: true },
       },
       iml_customers: { select: { id: true, name: true } },
       iml_die_cuts: {
@@ -64,6 +64,7 @@ export async function POST(
     die_cut_id: maketa.die_cut_id,
     label_code: maketa.label_code,
     body: maketa.body,
+    customer_name: maketa.iml_customers?.name ?? null,
     product: maketa.iml_products,
   });
 

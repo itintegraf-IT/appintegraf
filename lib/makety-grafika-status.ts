@@ -53,32 +53,46 @@ export function isMaketaTerminalStatus(status: string, workType: MaketyWorkType)
   return status === "done";
 }
 
+/** Grafika je v archivu až po potvrzení zápisu do IML. */
+export function isGrafikaImlArchived(
+  status: string,
+  imlAppliedAt: Date | null | undefined
+): boolean {
+  return status === "approved" && imlAppliedAt != null;
+}
+
 /** Prisma where pro aktivní (nearxivní) zakázky v přehledu. */
-export function maketyActiveWhereClause(): {
-  NOT: {
-    OR: Array<{ status: string } | { work_type: string; status: string }>;
-  };
-} {
+export function maketyActiveWhereClause() {
   return {
     NOT: {
       OR: [
         { status: "cancelled" },
         { work_type: "maketa", status: "done" },
-        { work_type: "grafika", status: "approved" },
+        {
+          AND: [
+            { work_type: "grafika" },
+            { status: "approved" },
+            { iml_applied_at: { not: null } },
+          ],
+        },
       ],
     },
   };
 }
 
 /** Prisma where pro archiv. */
-export function maketyArchiveWhereClause(): {
-  OR: Array<{ status: string } | { work_type: string; status: string }>;
-} {
+export function maketyArchiveWhereClause() {
   return {
     OR: [
       { status: "cancelled" },
       { work_type: "maketa", status: "done" },
-      { work_type: "grafika", status: "approved" },
+      {
+        AND: [
+          { work_type: "grafika" },
+          { status: "approved" },
+          { iml_applied_at: { not: null } },
+        ],
+      },
     ],
   };
 }
@@ -86,19 +100,19 @@ export function maketyArchiveWhereClause(): {
 export function grafikaStatusLabel(status: string): string {
   switch (status) {
     case "open":
-      return "Ve frontě";
+      return "Přijato";
     case "in_progress":
-      return "Rozpracováno";
+      return "U grafika";
     case "data_problem":
       return "Pozastaveno";
     case "done":
-      return "Hotovo";
+      return "Hotovo grafikem";
     case "prepress_approved":
       return "Schváleno prepressem";
     case "sent_for_approval":
       return "Odesláno ke schválení";
     case "approved":
-      return "Schváleno";
+      return "Schváleno klientem";
     case "cancelled":
       return "Zrušená";
     default:
@@ -110,23 +124,23 @@ export function grafikaStatusLabel(status: string): string {
 export function grafikaStatusBadgeClass(status: string): string {
   switch (status) {
     case "open":
-      return "bg-yellow-100 text-yellow-900";
+      return "bg-yellow-100 text-yellow-900 dark:bg-yellow-900/40 dark:text-yellow-100";
     case "in_progress":
-      return "bg-orange-100 text-orange-900";
+      return "bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-100";
     case "data_problem":
-      return "bg-red-100 text-red-800";
+      return "bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-100";
     case "done":
-      return "bg-green-100 text-green-800";
+      return "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-100";
     case "prepress_approved":
-      return "bg-emerald-100 text-emerald-900";
+      return "bg-emerald-100 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100";
     case "sent_for_approval":
-      return "bg-blue-100 text-blue-800";
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-100";
     case "approved":
-      return "bg-green-200 text-green-900";
+      return "bg-green-200 text-green-900 dark:bg-green-800/60 dark:text-green-50";
     case "cancelled":
-      return "bg-gray-200 text-gray-700";
+      return "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200";
     default:
-      return "bg-gray-100 text-gray-700";
+      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200";
   }
 }
 
@@ -179,6 +193,8 @@ const TRANSITIONS: TransitionRule[] = [
   { from: ["open"], to: "in_progress" },
   { from: ["in_progress"], to: "data_problem", requiresComment: true },
   { from: ["data_problem"], to: "open" },
+  { from: ["data_problem"], to: "in_progress" },
+  { from: ["sent_for_approval"], to: "in_progress", requiresComment: true },
   { from: ["in_progress"], to: "done" },
   { from: ["done"], to: "prepress_approved" },
   { from: ["done"], to: "in_progress", requiresComment: true },
@@ -193,6 +209,7 @@ const ROLE_TRANSITIONS: Record<GrafikaTransitionRole, Array<{ from: GrafikaStatu
     { from: "open", to: "in_progress" },
     { from: "in_progress", to: "data_problem" },
     { from: "in_progress", to: "done" },
+    { from: "data_problem", to: "in_progress" },
   ],
   zadavatel: [{ from: "data_problem", to: "open" }],
   prepress: [
@@ -316,7 +333,12 @@ export function grafikaTransitionActionLabel(toStatus: GrafikaStatus, fromStatus
     case "open":
       return fromStatus === "data_problem" ? "Uvolnit ke zpracování" : "Zařadit do fronty";
     case "in_progress":
-      return fromStatus === "done" ? "Vrátit grafikovi (DTP)" : "Zahájit práci";
+      if (fromStatus === "done") return "Vrátit grafikovi (DTP)";
+      if (fromStatus === "data_problem") return "Uvolnit a pokračovat";
+      if (fromStatus === "sent_for_approval") return "Vrátit grafikovi k opravě";
+      return "Zahájit práci";
+    case "approved":
+      return "Schválit finálně (schváleno klientem)";
     case "data_problem":
       return "Pozastavit – problém s daty";
     case "done":
@@ -325,8 +347,6 @@ export function grafikaTransitionActionLabel(toStatus: GrafikaStatus, fromStatus
       return "Schválit prepressem";
     case "sent_for_approval":
       return "Odeslat ke schválení klientovi";
-    case "approved":
-      return "Schválit finálně";
     default:
       return grafikaStatusLabel(toStatus);
   }

@@ -113,7 +113,7 @@ export function MaketaCommentsPanel({
             return (
               <li key={c.id} className="rounded-lg bg-gray-50 px-3 py-2 text-sm">
                 <p className="font-medium text-gray-800">
-                  {c.users.first_name} {c.users.last_name}
+                  {/^Klient (schválil|zamítl)/.test(c.body) ? "Klient" : `${c.users.first_name} ${c.users.last_name}`}
                   <span className="ml-2 text-xs font-normal text-gray-500">
                     {formatDateTimeCz(new Date(c.created_at))}
                   </span>

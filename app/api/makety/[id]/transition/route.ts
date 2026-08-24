@@ -17,10 +17,8 @@ import {
   parseGrafikaStatus,
   type GrafikaStatus,
 } from "@/lib/makety-grafika-status";
-import {
-  notifyMaketaDone,
-  notifyMaketaUsers,
-} from "@/lib/makety-notify";
+import { sendMaketyClientPlainEmail } from "@/lib/email";
+import { notifyMaketaDone, notifyMaketaUsers } from "@/lib/makety-notify";
 import { recordMaketyFileEvent } from "@/lib/makety-file-events";
 import { maketaStatusLabel } from "@/lib/makety-status";
 
@@ -89,7 +87,7 @@ export async function POST(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
-  let body: { toStatus?: string; comment?: string; acknowledgeOverride?: boolean };
+  let body: { toStatus?: string; comment?: string; acknowledgeOverride?: boolean; emailClient?: boolean };
   try {
     body = await req.json();
   } catch {
@@ -129,6 +127,7 @@ export async function POST(
       assignee_user_id: true,
       prepress_user_id: true,
       final_approver_user_id: true,
+      customer_id: true,
     },
   });
   if (!maketa || maketa.work_type !== "grafika") {
@@ -208,6 +207,40 @@ export async function POST(
     finalApproverUserId: maketa.final_approver_user_id,
   });
 
+  if (toStatus === "data_problem" && body.emailClient === true && comment) {
+    const customer = maketa.customer_id
+      ? await prisma.iml_customers.findUnique({
+          where: { id: maketa.customer_id },
+          select: {
+            email: true,
+            name: true,
+            iml_customer_emails: {
+              where: { is_primary: true },
+              take: 1,
+              select: { email: true },
+            },
+          },
+        })
+      : null;
+    const toEmail =
+      customer?.email?.trim() || customer?.iml_customer_emails[0]?.email?.trim() || "";
+    if (toEmail) {
+      const sent = await sendMaketyClientPlainEmail({
+        toEmail,
+        subject: `Grafika #${id} – pozastaveno (chybí data)`,
+        text: `Dobrý den,\n\nzakázka grafiky #${id}${maketa.order_number ? ` (${maketa.order_number})` : ""} je pozastavená z důvodu problému s daty.\n\n${comment}\n\nINTEGRAF`,
+      });
+      if (!sent.success) {
+        return NextResponse.json({
+          success: true,
+          status: toStatus,
+          viaOverride: access.viaOverride,
+          warning: sent.error ?? "Stav uložen, e-mail klientovi se nepodařilo odeslat",
+        });
+      }
+    }
+  }
+
   return NextResponse.json({
     success: true,
     status: toStatus,
@@ -280,18 +313,20 @@ async function notifyAfterGrafikaTransition(params: {
   }
 
   if (toStatus === "prepress_approved") {
+    if (finalApproverUserId != null && finalApproverUserId !== createdBy) {
+      await notifyMaketaUsers({
+        maketaId,
+        userIds: [finalApproverUserId],
+        bodyPreview,
+        orderNumber,
+        kind: "awaiting_final",
+        workType: "grafika",
+        excludeUserId: actorUserId,
+      });
+    }
     await notifyMaketaUsers({
       maketaId,
-      userIds: [finalApproverUserId],
-      bodyPreview,
-      orderNumber,
-      kind: "awaiting_final",
-      workType: "grafika",
-      excludeUserId: actorUserId,
-    });
-    await notifyMaketaUsers({
-      maketaId,
-      userIds: [createdBy, assigneeUserId],
+      userIds: [createdBy],
       bodyPreview,
       orderNumber,
       kind: "prepress_ok",
@@ -302,27 +337,10 @@ async function notifyAfterGrafikaTransition(params: {
   }
 
   if (toStatus === "sent_for_approval") {
-    await notifyMaketaUsers({
-      maketaId,
-      userIds: [createdBy, assigneeUserId, prepressUserId],
-      bodyPreview,
-      orderNumber,
-      kind: "sent_for_client",
-      workType: "grafika",
-      excludeUserId: actorUserId,
-    });
     return;
   }
 
   if (toStatus === "approved") {
-    await notifyMaketaUsers({
-      maketaId,
-      userIds: [createdBy, assigneeUserId, prepressUserId],
-      bodyPreview,
-      orderNumber,
-      kind: "approved",
-      workType: "grafika",
-      excludeUserId: actorUserId,
-    });
+    return;
   }
 }
