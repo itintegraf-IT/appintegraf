@@ -164,11 +164,16 @@ export default async function MaketyListPage({
     ? STATUS_ORDER.filter((s) => s !== "awaiting_quote" && s !== "quote_submitted")
     : STATUS_ORDER;
 
+  const labelWorkType: MaketyWorkType | undefined =
+    selectedWorkType === "grafika" || selectedWorkType === "maketa"
+      ? selectedWorkType
+      : undefined;
+
   const grouped = statusCards.map((status) => {
     const items = allForTerm.filter((r) => r.status === status);
     return {
       status,
-      label: maketaStatusLabel(status),
+      label: maketaStatusLabel(status, labelWorkType),
       count: items.length,
       preview: items.slice(0, 3),
     };
@@ -217,7 +222,7 @@ export default async function MaketyListPage({
   });
 
   const tableHeading = selectedStatus
-    ? maketaStatusLabel(selectedStatus)
+    ? maketaStatusLabel(selectedStatus, labelWorkType)
     : canModuleAdmin
       ? "Přehled aktivních zakázek"
       : "Aktivní zakázky";
@@ -410,7 +415,7 @@ export default async function MaketyListPage({
             >
               <div className="mb-2 flex items-center justify-between">
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(g.status)}`}
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(g.status, labelWorkType)}`}
                 >
                   {g.label}
                 </span>

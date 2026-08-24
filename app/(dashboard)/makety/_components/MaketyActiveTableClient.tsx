@@ -71,14 +71,16 @@ function renderCell(
           {maketaPriorityLabel(row.priority)}
         </span>
       );
-    case "status":
+    case "status": {
+      const wt = (row.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
       return (
         <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(row.status)}`}
+          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(row.status, wt)}`}
         >
-          {maketaStatusLabel(row.status)}
+          {maketaStatusLabel(row.status, wt)}
         </span>
       );
+    }
     case "data_kind": {
       const wt = (row.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
       if (wt !== "grafika") return "—";

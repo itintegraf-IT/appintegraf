@@ -80,7 +80,7 @@ export default async function MaketyArchivePage() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(r.status)}`}
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(r.status, wt)}`}
                     >
                       {maketaStatusLabel(r.status, wt)}
                     </span>

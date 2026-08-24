@@ -103,9 +103,9 @@ function SortableQueueRow({
         <option value="urgent">Urgentní</option>
       </select>
       <span
-        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(item.status)}`}
+        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(item.status, workType)}`}
       >
-        {maketaStatusLabel(item.status)}
+        {maketaStatusLabel(item.status, workType)}
       </span>
       <div className="min-w-0 flex-1">
         <Link href={`/makety/${item.id}`} className="font-medium text-violet-600 hover:underline">

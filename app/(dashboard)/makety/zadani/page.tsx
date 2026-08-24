@@ -110,9 +110,15 @@ export default async function MaketyZadaniPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span
-                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(r.status)}`}
+                      className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(
+                        r.status,
+                        (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType
+                      )}`}
                     >
-                      {maketaStatusLabel(r.status)}
+                      {maketaStatusLabel(
+                        r.status,
+                        (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType
+                      )}
                     </span>
                   </td>
                   <td className="px-4 py-3">
