@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { Search } from "lucide-react";
+import { normalizeEquipmentSearch } from "../_components/EquipmentFilterCombobox";
 
 type Room = {
   id: number;
@@ -23,6 +25,7 @@ export default function RoomsClient() {
   const [error, setError] = useState("");
   const [okMsg, setOkMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
   const formRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
@@ -163,6 +166,18 @@ export default function RoomsClient() {
     await load();
   };
 
+  const filteredRooms = useMemo(() => {
+    const q = normalizeEquipmentSearch(search);
+    if (!q) return rooms;
+    return rooms.filter((r) => {
+      const hay = [r.code, r.name, r.building, r.floor]
+        .filter(Boolean)
+        .map((s) => normalizeEquipmentSearch(String(s)))
+        .join(" ");
+      return hay.includes(q);
+    });
+  }, [rooms, search]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -227,6 +242,27 @@ export default function RoomsClient() {
       </div>
 
       <div className="overflow-x-auto rounded-xl border bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b bg-gray-50 px-3 py-2">
+          <p className="text-sm text-gray-600">
+            Místností: <strong>{rooms.length}</strong>
+            {search.trim() ? (
+              <>
+                {" "}
+                · zobrazeno <strong>{filteredRooms.length}</strong>
+              </>
+            ) : null}
+          </p>
+          <label className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="kód, název…"
+              className="w-56 rounded-lg border border-gray-300 bg-white py-1.5 pl-8 pr-2.5 text-sm"
+            />
+          </label>
+        </div>
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 text-left">
             <tr>
@@ -244,8 +280,14 @@ export default function RoomsClient() {
                   Zatím žádné místnosti.
                 </td>
               </tr>
+            ) : filteredRooms.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                  Žádná místnost neodpovídá hledání.
+                </td>
+              </tr>
             ) : (
-              rooms.map((r) => {
+              filteredRooms.map((r) => {
                 const active = r.is_active !== false;
                 return (
                   <tr
