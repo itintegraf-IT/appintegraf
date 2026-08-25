@@ -11,6 +11,7 @@ import {
   MapPin,
   Printer,
   QrCode,
+  Search,
   UserPlus,
 } from "lucide-react";
 import type {
@@ -21,12 +22,18 @@ import type {
 import { formatEquipmentPrice } from "@/lib/equipment/format-price";
 import { EquipmentTableActions } from "./EquipmentTableActions";
 import { isEquipmentAssignedStatus } from "@/lib/equipment-status";
+import {
+  EquipmentFilterCombobox,
+  normalizeEquipmentSearch,
+} from "./_components/EquipmentFilterCombobox";
 
 export type EquipmentListRow = {
   id: number;
   name: string;
   brandModel: string;
   serialNumber: string | null;
+  assetTag: string | null;
+  location: string | null;
   categoryName: string | null;
   responsibleName: string | null;
   status: string | null;
@@ -77,6 +84,27 @@ function personLabel(u: UserOpt) {
   return `${u.last_name} ${u.first_name}`.trim();
 }
 
+const RESPONSIBLE_NONE = "__none__";
+
+function rowMatchesSearch(row: EquipmentListRow, q: string): boolean {
+  if (!q) return true;
+  const hay = [
+    row.name,
+    row.assetTag,
+    row.serialNumber,
+    row.brandModel,
+    row.categoryName,
+    row.responsibleName,
+    row.assignedToName,
+    row.status,
+    row.location,
+  ]
+    .filter(Boolean)
+    .map((s) => normalizeEquipmentSearch(String(s)))
+    .join(" ");
+  return hay.includes(q);
+}
+
 function groupByUser(rows: EquipmentListRow[]) {
   const map = new Map<string, EquipmentListRow[]>();
   for (const row of rows) {
@@ -117,6 +145,9 @@ export function EquipmentListClient({
   const [busy, setBusy] = useState<"room" | "user" | "print" | null>(null);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [responsibleFilter, setResponsibleFilter] = useState("");
 
   useEffect(() => {
     setSelected([]);
@@ -135,8 +166,44 @@ export function EquipmentListClient({
     }
   }, [canAssign]);
 
-  const allIds = useMemo(() => rows.map((r) => r.id), [rows]);
-  const allSelected = allIds.length > 0 && allIds.every((id) => selected.includes(id));
+  const categoryOptions = useMemo(() => {
+    const names = [...new Set(rows.map((r) => r.categoryName).filter((n): n is string => !!n))];
+    names.sort((a, b) => a.localeCompare(b, "cs", { sensitivity: "base" }));
+    return names.map((name) => ({ value: name, label: name }));
+  }, [rows]);
+
+  const responsibleOptions = useMemo(() => {
+    const names = [
+      ...new Set(rows.map((r) => r.responsibleName).filter((n): n is string => !!n)),
+    ];
+    names.sort((a, b) => a.localeCompare(b, "cs", { sensitivity: "base" }));
+    const opts = names.map((name) => ({ value: name, label: name }));
+    if (rows.some((r) => !r.responsibleName)) {
+      opts.push({ value: RESPONSIBLE_NONE, label: "— Bez zodpovědné osoby —" });
+    }
+    return opts;
+  }, [rows]);
+
+  const filteredRows = useMemo(() => {
+    const q = normalizeEquipmentSearch(search);
+    return rows.filter((row) => {
+      if (!rowMatchesSearch(row, q)) return false;
+      if (categoryFilter && row.categoryName !== categoryFilter) return false;
+      if (responsibleFilter === RESPONSIBLE_NONE && row.responsibleName) return false;
+      if (
+        responsibleFilter &&
+        responsibleFilter !== RESPONSIBLE_NONE &&
+        row.responsibleName !== responsibleFilter
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [rows, search, categoryFilter, responsibleFilter]);
+
+  const filtersActive = Boolean(search.trim() || categoryFilter || responsibleFilter);
+  const visibleIds = useMemo(() => filteredRows.map((r) => r.id), [filteredRows]);
+  const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.includes(id));
 
   const navigate = (nextSort: EquipmentListSortKey, nextDir: EquipmentListSortDir, nextView: EquipmentListView) => {
     router.push(buildHref(nextSort, nextDir, nextView, unassigned));
@@ -147,7 +214,7 @@ export function EquipmentListClient({
   };
 
   const toggleAll = () => {
-    setSelected(allSelected ? [] : allIds);
+    setSelected(allSelected ? [] : visibleIds);
   };
 
   const placeToRoom = async () => {
@@ -246,6 +313,12 @@ export function EquipmentListClient({
       <div className="flex flex-col gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-gray-600">
           Položek vybavení: <strong>{rows.length}</strong>
+          {filtersActive ? (
+            <>
+              {" "}
+              · zobrazeno <strong>{filteredRows.length}</strong>
+            </>
+          ) : null}
           {selected.length > 0 ? (
             <>
               {" "}
@@ -254,6 +327,16 @@ export function EquipmentListClient({
           ) : null}
         </p>
         <div className="flex flex-wrap items-center gap-2">
+          <label className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="název, inv. číslo, S/N…"
+              className="w-56 rounded-lg border border-gray-300 bg-white py-1.5 pl-8 pr-2.5 text-sm"
+            />
+          </label>
           <Link
             href="/equipment/scan"
             className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-700 hover:bg-gray-100"
@@ -383,11 +466,33 @@ export function EquipmentListClient({
         </div>
       ) : null}
 
+      {view === "cards" && rows.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 border-b border-gray-100 px-4 py-2">
+          <span className="text-xs text-gray-500">Filtry:</span>
+          <EquipmentFilterCombobox
+            options={categoryOptions}
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            placeholder="Skupina…"
+          />
+          <EquipmentFilterCombobox
+            options={responsibleOptions}
+            value={responsibleFilter}
+            onChange={setResponsibleFilter}
+            placeholder="Osoba…"
+          />
+        </div>
+      ) : null}
+
       {rows.length === 0 ? (
         <div className="px-4 py-10 text-center text-gray-500">Žádné vybavení</div>
+      ) : filteredRows.length === 0 ? (
+        <div className="px-4 py-10 text-center text-gray-500">
+          Žádné položky neodpovídají hledání nebo filtru.
+        </div>
       ) : view === "cards" ? (
         <div className="grid gap-4 p-4 lg:grid-cols-2">
-          {groupByUser(rows).map((group) => (
+          {groupByUser(filteredRows).map((group) => (
             <div key={group.key} className="rounded-lg border border-gray-200 bg-white shadow-sm">
               <div className="border-b border-gray-100 bg-gray-50 px-4 py-3">
                 <h3 className="font-semibold text-gray-900">{group.userName}</h3>
@@ -414,6 +519,9 @@ export function EquipmentListClient({
                               <span className="ml-2 text-xs font-normal text-gray-500">Ks: {row.quantity}</span>
                             ) : null}
                           </Link>
+                          {row.assetTag ? (
+                            <p className="font-mono text-xs text-gray-500">Inv. {row.assetTag}</p>
+                          ) : null}
                           {row.brandModel ? <p className="text-xs text-gray-500">{row.brandModel}</p> : null}
                           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-600">
                             {row.categoryName ? (
@@ -451,10 +559,31 @@ export function EquipmentListClient({
                   <input type="checkbox" checked={allSelected} onChange={toggleAll} />
                 </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Název</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Inv. číslo</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Značka / Model</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Sériové č.</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Kategorie</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Zodpovědná osoba</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                  <div className="flex flex-col gap-1.5">
+                    <span>Kategorie</span>
+                    <EquipmentFilterCombobox
+                      options={categoryOptions}
+                      value={categoryFilter}
+                      onChange={setCategoryFilter}
+                      placeholder="Skupina…"
+                    />
+                  </div>
+                </th>
+                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">
+                  <div className="flex flex-col gap-1.5">
+                    <span>Zodpovědná osoba</span>
+                    <EquipmentFilterCombobox
+                      options={responsibleOptions}
+                      value={responsibleFilter}
+                      onChange={setResponsibleFilter}
+                      placeholder="Osoba…"
+                    />
+                  </div>
+                </th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nákup</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Cena</th>
@@ -463,7 +592,7 @@ export function EquipmentListClient({
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => (
+              {filteredRows.map((row) => (
                 <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-3 py-3">
                     <input
@@ -478,6 +607,7 @@ export function EquipmentListClient({
                       <span className="ml-2 text-xs font-normal text-gray-500">Ks: {row.quantity}</span>
                     ) : null}
                   </td>
+                  <td className="px-4 py-3 font-mono text-sm">{row.assetTag ?? "—"}</td>
                   <td className="px-4 py-3">{row.brandModel || "-"}</td>
                   <td className="px-4 py-3 font-mono text-sm">{row.serialNumber ?? "-"}</td>
                   <td className="px-4 py-3">{row.categoryName ?? "-"}</td>

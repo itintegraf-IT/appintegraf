@@ -83,6 +83,8 @@ export default async function EquipmentPage({
     assignment_id?: number | null;
     assigned_to_name?: string | null;
     assigned_to_user_id?: number | null;
+    asset_tag?: string | null;
+    location?: string | null;
   };
   let equipment: EquipmentRow[] = [];
 
@@ -172,6 +174,8 @@ export default async function EquipmentPage({
           name: e.name,
           brandModel: [e.brand, e.model].filter(Boolean).join(" / "),
           serialNumber: e.serial_number,
+          assetTag: e.asset_tag ?? null,
+          location: e.location ?? null,
           categoryName: e.equipment_categories?.name ?? null,
           responsibleName: e.equipment_categories?.users_responsible
             ? `${e.equipment_categories.users_responsible.last_name} ${e.equipment_categories.users_responsible.first_name}`.trim()
