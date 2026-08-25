@@ -33,6 +33,14 @@ type PlanSummary = {
   _count?: { rooms: number };
 };
 
+type RoomItem = {
+  id: number;
+  name: string;
+  asset_tag: string | null;
+  status: string | null;
+  equipment_categories?: { name: string };
+};
+
 type PlanRoom = {
   id: number;
   name: string;
@@ -41,18 +49,11 @@ type PlanRoom = {
   polygon: PlanPoint[] | null;
   plan_color: string | null;
   _count?: { equipment_items: number };
+  items?: RoomItem[];
 };
 
 type PlanDetail = PlanSummary & {
   rooms: PlanRoom[];
-};
-
-type RoomItem = {
-  id: number;
-  name: string;
-  asset_tag: string | null;
-  status: string | null;
-  equipment_categories?: { name: string };
 };
 
 type Mode = "view" | "draw" | "pan";
@@ -76,6 +77,7 @@ export default function FloorPlanClient({
   const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null);
   const [roomItems, setRoomItems] = useState<RoomItem[]>([]);
   const [hoverRoomId, setHoverRoomId] = useState<number | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
   const [draggingItemId, setDraggingItemId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [newRoomForm, setNewRoomForm] = useState({ name: "", code: "", color: "" });
@@ -236,6 +238,11 @@ export default function FloorPlanClient({
     () => plan?.rooms.find((r) => r.id === selectedRoomId) ?? null,
     [plan, selectedRoomId]
   );
+  const hoverRoom = useMemo(
+    () => plan?.rooms.find((r) => r.id === hoverRoomId) ?? null,
+    [plan, hoverRoomId]
+  );
+  const hoverItems = hoverRoom?.items ?? [];
 
   useEffect(() => {
     if (!selectedRoomId) {
@@ -301,14 +308,25 @@ export default function FloorPlanClient({
         x: panStart.current.ox + (e.clientX - panStart.current.x),
         y: panStart.current.oy + (e.clientY - panStart.current.y),
       });
-      return;
-    }
-    const p = toNorm(e.clientX, e.clientY);
-    if (!p || mode === "draw") {
       setHoverRoomId(null);
+      setHoverPos(null);
       return;
     }
-    setHoverRoomId(findRoomAt(p)?.id ?? null);
+    const vp = viewportRef.current;
+    const p = toNorm(e.clientX, e.clientY);
+    if (!p || mode === "draw" || mode === "pan") {
+      setHoverRoomId(null);
+      setHoverPos(null);
+      return;
+    }
+    const room = findRoomAt(p);
+    setHoverRoomId(room?.id ?? null);
+    if (room && vp) {
+      const rect = vp.getBoundingClientRect();
+      setHoverPos({ x: e.clientX - rect.left, y: e.clientY - rect.top });
+    } else {
+      setHoverPos(null);
+    }
   };
 
   const onPointerUp = () => {
@@ -830,6 +848,10 @@ export default function FloorPlanClient({
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
+              onPointerLeave={() => {
+                setHoverRoomId(null);
+                setHoverPos(null);
+              }}
               onClick={onClick}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => void onDropOnCanvas(e)}
@@ -951,6 +973,42 @@ export default function FloorPlanClient({
                   ) : null}
                 </svg>
               </div>
+              {hoverRoom && hoverPos && mode === "view" && draggingItemId == null ? (
+                <div
+                  className="pointer-events-none absolute z-20 w-64 max-w-[calc(100%-16px)] rounded-lg border border-gray-200 bg-white/95 p-2.5 shadow-lg"
+                  style={{
+                    left: Math.min(hoverPos.x + 14, Math.max(8, (viewportRef.current?.clientWidth ?? 320) - 272)),
+                    top: Math.min(hoverPos.y + 14, Math.max(8, (viewportRef.current?.clientHeight ?? 240) - 180)),
+                  }}
+                >
+                  <p className="text-sm font-semibold text-gray-900">
+                    {hoverRoom.code} – {hoverRoom.name}
+                  </p>
+                  <p className="mb-1.5 text-xs text-gray-500">
+                    Majetek: {hoverRoom._count?.equipment_items ?? hoverItems.length}
+                  </p>
+                  {hoverItems.length === 0 ? (
+                    <p className="text-xs text-gray-500">Žádný majetek v místnosti.</p>
+                  ) : (
+                    <ul className="max-h-44 space-y-1 overflow-y-auto text-xs">
+                      {hoverItems.slice(0, 12).map((it) => (
+                        <li key={it.id} className="border-t border-gray-100 pt-1">
+                          <span className="font-medium text-gray-900">{it.name}</span>
+                          <span className="block text-gray-500">
+                            {it.asset_tag ?? "—"}
+                            {it.equipment_categories?.name ? ` · ${it.equipment_categories.name}` : ""}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {hoverItems.length > 12 ? (
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      a dalších {hoverItems.length - 12}…
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
 

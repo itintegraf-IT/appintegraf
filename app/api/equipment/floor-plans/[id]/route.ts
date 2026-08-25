@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { canAdministerEquipment, canReadEquipment } from "@/lib/equipment/access";
+import { canAdministerEquipment, canReadEquipment, getAccessibleCategoryIds } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
 import { parseRoomPolygon } from "@/lib/equipment/floor-plan";
 
@@ -23,6 +23,9 @@ export async function GET(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
+  const catFilter = await getAccessibleCategoryIds(userId);
+  const itemWhere = catFilter === null ? {} : { category_id: { in: catFilter } };
+
   const plan = await prisma.equipment_floor_plans.findUnique({
     where: { id },
     include: {
@@ -31,6 +34,18 @@ export async function GET(
         orderBy: { code: "asc" },
         include: {
           _count: { select: { equipment_items: true } },
+          equipment_items: {
+            where: itemWhere,
+            orderBy: { name: "asc" },
+            take: 80,
+            select: {
+              id: true,
+              name: true,
+              asset_tag: true,
+              status: true,
+              equipment_categories: { select: { name: true } },
+            },
+          },
         },
       },
     },
@@ -42,6 +57,7 @@ export async function GET(
   const rooms = plan.rooms.map((r) => ({
     ...r,
     polygon: parseRoomPolygon(r.polygon_json),
+    items: r.equipment_items,
   }));
 
   return NextResponse.json({ ...plan, rooms });
