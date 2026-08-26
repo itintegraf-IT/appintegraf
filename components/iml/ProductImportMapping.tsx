@@ -1,6 +1,7 @@
 "use client";
 
-import { GripVertical } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { GripVertical, RefreshCw } from "lucide-react";
 
 export const IML_PRODUCT_IMPORT_TARGET_FIELDS = [
   { key: "ig_code", label: "Kód IG (IMLEXport: code / Kód)", required: false },
@@ -41,6 +42,31 @@ export const IML_PRODUCT_IMPORT_TARGET_FIELDS = [
 
 export type ProductImportMapping = Record<string, number>;
 
+type MappedPreviewColumn = {
+  key: string;
+  label: string;
+  sourceIndex: number;
+  sourceHeader: string;
+};
+
+function buildMappedPreviewColumns(
+  mapping: ProductImportMapping,
+  headers: string[]
+): MappedPreviewColumn[] {
+  const cols: MappedPreviewColumn[] = [];
+  for (const field of IML_PRODUCT_IMPORT_TARGET_FIELDS) {
+    const idx = mapping[field.key];
+    if (typeof idx !== "number" || idx < 0) continue;
+    cols.push({
+      key: field.key,
+      label: field.label,
+      sourceIndex: idx,
+      sourceHeader: headers[idx] ?? `sloupec ${idx}`,
+    });
+  }
+  return cols;
+}
+
 export function ProductImportMappingPanel({
   mode = "full",
   headers,
@@ -64,6 +90,29 @@ export function ProductImportMappingPanel({
   onDropTarget: (fieldKey: string) => void;
   removeMapping: (fieldKey: string) => void;
 }) {
+  const [previewMode, setPreviewMode] = useState<"mapped" | "source">("mapped");
+  const [previewMapping, setPreviewMapping] = useState<ProductImportMapping>(mapping);
+  const [previewFlash, setPreviewFlash] = useState(false);
+
+  // Nový soubor / nové hlavičky → náhled podle aktuálního (auto) mapování
+  useEffect(() => {
+    setPreviewMapping({ ...mapping });
+    setPreviewMode("mapped");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- jen při změně hlaviček (nový soubor)
+  }, [headers]);
+
+  const mappedColumns = useMemo(
+    () => buildMappedPreviewColumns(previewMapping, headers),
+    [previewMapping, headers]
+  );
+
+  const redrawPreview = () => {
+    setPreviewMapping({ ...mapping });
+    setPreviewMode("mapped");
+    setPreviewFlash(true);
+    window.setTimeout(() => setPreviewFlash(false), 700);
+  };
+
   return (
     <>
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
@@ -147,32 +196,108 @@ export function ProductImportMappingPanel({
           </div>
         </div>
       </div>
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h3 className="mb-4 text-sm font-semibold text-gray-700">Náhled dat</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 bg-gray-50">
-                {headers.map((h, i) => (
-                  <th key={i} className="px-3 py-2 text-left font-medium text-gray-700">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row, ri) => (
-                <tr key={ri} className="border-b border-gray-100">
-                  {headers.map((_, ci) => (
-                    <td key={ci} className="max-w-[200px] truncate px-3 py-2">
-                      {row[ci] ?? ""}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+      <div
+        className={`rounded-xl border bg-white p-6 shadow-sm transition-colors ${
+          previewFlash ? "border-violet-400 ring-2 ring-violet-200" : "border-gray-200"
+        }`}
+      >
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700">Náhled dat</h3>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {previewMode === "mapped"
+                ? "Sloupce podle aktuálního mapování na cílová pole IML."
+                : "Původní sloupce ze souboru (bez mapování)."}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-lg border border-gray-200 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setPreviewMode("mapped")}
+                className={`rounded-md px-2.5 py-1.5 ${
+                  previewMode === "mapped"
+                    ? "bg-violet-600 text-white"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Podle mapování
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewMode("source")}
+                className={`rounded-md px-2.5 py-1.5 ${
+                  previewMode === "source"
+                    ? "bg-violet-600 text-white"
+                    : "text-gray-600 hover:bg-gray-50"
+                }`}
+              >
+                Zdrojové CSV
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={redrawPreview}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 text-sm font-medium text-violet-800 hover:bg-violet-100"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Překreslit náhled
+            </button>
+          </div>
         </div>
+
+        {previewMode === "mapped" && mappedColumns.length === 0 ? (
+          <p className="rounded-lg border border-dashed border-amber-300 bg-amber-50 px-3 py-4 text-sm text-amber-900">
+            Zatím není namapované žádné pole. Přetáhněte sloupce na cílová pole a stiskněte{" "}
+            <strong>Překreslit náhled</strong>.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  {previewMode === "mapped"
+                    ? mappedColumns.map((col) => (
+                        <th key={col.key} className="px-3 py-2 text-left font-medium text-gray-700">
+                          <span className="block">{col.label}</span>
+                          <span className="mt-0.5 block text-[11px] font-normal text-gray-400">
+                            ← {col.sourceHeader}
+                          </span>
+                        </th>
+                      ))
+                    : headers.map((h, i) => (
+                        <th key={i} className="px-3 py-2 text-left font-medium text-gray-700">
+                          {h}
+                          {Object.values(previewMapping).includes(i) && (
+                            <span className="ml-1 text-[10px] font-normal text-green-700">
+                              (mapováno)
+                            </span>
+                          )}
+                        </th>
+                      ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, ri) => (
+                  <tr key={ri} className="border-b border-gray-100">
+                    {previewMode === "mapped"
+                      ? mappedColumns.map((col) => (
+                          <td key={col.key} className="max-w-[220px] truncate px-3 py-2">
+                            {row[col.sourceIndex] ?? ""}
+                          </td>
+                        ))
+                      : headers.map((_, ci) => (
+                          <td key={ci} className="max-w-[200px] truncate px-3 py-2">
+                            {row[ci] ?? ""}
+                          </td>
+                        ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </>
   );
