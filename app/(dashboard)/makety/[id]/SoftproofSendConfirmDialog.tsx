@@ -15,6 +15,12 @@ type Props = {
   files: SoftproofFileOption[];
   defaultEmail: string;
   submitting: boolean;
+  /** Předvyplnění souboru (např. z posledního odeslání). */
+  initialFileId?: number | null;
+  /** Předvyplnění jazyka odkazu. */
+  initialLocale?: string | null;
+  /** Nadpis dialogu (výchozí: odeslání softproofu). */
+  title?: string;
   onClose: () => void;
   onConfirm: (payload: {
     fileId: number;
@@ -30,6 +36,9 @@ export function SoftproofSendConfirmDialog({
   files,
   defaultEmail,
   submitting,
+  initialFileId = null,
+  initialLocale = null,
+  title = "Odeslat softproof klientovi",
   onClose,
   onConfirm,
 }: Props) {
@@ -54,17 +63,30 @@ export function SoftproofSendConfirmDialog({
     setAttachFile(false);
     setMessage("");
     setLocalError(null);
-    setFileId(softproofFiles.length === 1 ? softproofFiles[0]!.id : "");
+    const preferredFile =
+      initialFileId != null && softproofFiles.some((f) => f.id === initialFileId)
+        ? initialFileId
+        : softproofFiles.length === 1
+          ? softproofFiles[0]!.id
+          : "";
+    setFileId(preferredFile);
     void fetch("/api/makety/softproof-locales")
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.locales) && data.locales.length > 0) {
           setLocales(data.locales);
-          setLocale(data.locales[0].locale);
+          const preferredLocale =
+            initialLocale &&
+            data.locales.some(
+              (l: { locale: string }) => l.locale === initialLocale
+            )
+              ? initialLocale
+              : data.locales[0].locale;
+          setLocale(preferredLocale);
         }
       })
       .catch(() => {});
-  }, [open, defaultEmail, softproofFiles]);
+  }, [open, defaultEmail, softproofFiles, initialFileId, initialLocale]);
 
   if (!open) return null;
 
@@ -98,7 +120,7 @@ export function SoftproofSendConfirmDialog({
     >
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
         <h2 id="softproof-dialog-title" className="text-lg font-semibold text-gray-900">
-          Kontrola před odesláním klientovi
+          {title}
         </h2>
         <p className="mt-1 text-sm text-gray-600">
           Klientovi vždy odchází jen <strong>softproof (náhled)</strong>. Zkontrolujte soubor a

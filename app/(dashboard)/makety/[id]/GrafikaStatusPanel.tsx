@@ -19,17 +19,32 @@ type TransitionOption = {
   actingAs?: string;
 };
 
+export type SoftproofResendPrefill = {
+  toEmail: string | null;
+  fileId: number | null;
+  locale: string | null;
+};
+
 type Props = {
   maketaId: number;
   initialStatus: string;
   /** Výchozí e-mail klienta (IML) pro softproof. */
   defaultClientEmail?: string | null;
+  /** Finální schvalovatel / override — smí znovu odeslat softproof ve sent_for_approval. */
+  canResendSoftproof?: boolean;
+  /** Odesílání softproofu přes override (zadavatel/admin). */
+  softproofViaOverride?: boolean;
+  /** Předvyplnění z posledního softproof odkazu. */
+  lastSoftproofPrefill?: SoftproofResendPrefill | null;
 };
 
 export function GrafikaStatusPanel({
   maketaId,
   initialStatus,
   defaultClientEmail = null,
+  canResendSoftproof = false,
+  softproofViaOverride = false,
+  lastSoftproofPrefill = null,
 }: Props) {
   const router = useRouter();
   const [transitions, setTransitions] = useState<TransitionOption[]>([]);
@@ -44,6 +59,11 @@ export function GrafikaStatusPanel({
   const [files, setFiles] = useState<SoftproofFileOption[]>([]);
   const [skipEmail, setSkipEmail] = useState(false);
   const [softproofDialogOpen, setSoftproofDialogOpen] = useState(false);
+  const [resendMode, setResendMode] = useState(false);
+  const [resendOverrideAck, setResendOverrideAck] = useState(false);
+
+  const showResend =
+    canResendSoftproof && initialStatus === "sent_for_approval";
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,6 +126,8 @@ export function GrafikaStatusPanel({
     setOverrideAck(false);
     setEmailClient(false);
     setSoftproofDialogOpen(false);
+    setResendMode(false);
+    setResendOverrideAck(false);
     router.refresh();
     await load();
     await loadFiles();
@@ -155,10 +177,23 @@ export function GrafikaStatusPanel({
     }
     if (needsSoftproof && !skipEmail) {
       setError(null);
+      setResendMode(false);
       void loadFiles().then(() => setSoftproofDialogOpen(true));
       return;
     }
     void runTransition();
+  };
+
+  const openResendSoftproof = () => {
+    if (softproofViaOverride && !resendOverrideAck) {
+      setError(
+        "Potvrďte, že víte, že přebíráte roli finálního schvalovatele (odeslání softproofu)."
+      );
+      return;
+    }
+    setError(null);
+    setResendMode(true);
+    void loadFiles().then(() => setSoftproofDialogOpen(true));
   };
 
   const onSoftproofConfirm = async (payload: {
@@ -168,7 +203,10 @@ export function GrafikaStatusPanel({
     message: string;
     locale: string;
   }) => {
-    if (needsOverrideAck && !overrideAck) {
+    const needAck =
+      (!resendMode && needsOverrideAck) || (resendMode && softproofViaOverride);
+    const ackOk = resendMode ? resendOverrideAck : overrideAck;
+    if (needAck && !ackOk) {
       setError("Potvrďte, že víte, že přebíráte cizí roli ve workflow.");
       return;
     }
@@ -184,7 +222,7 @@ export function GrafikaStatusPanel({
           attachFile: payload.attachFile,
           message: payload.message || undefined,
           locale: payload.locale,
-          acknowledgeOverride: needsOverrideAck || undefined,
+          acknowledgeOverride: needAck || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -208,9 +246,14 @@ export function GrafikaStatusPanel({
     );
   }
 
-  if (transitions.length === 0) {
+  if (transitions.length === 0 && !showResend) {
     return null;
   }
+
+  const dialogDefaultEmail =
+    (resendMode && lastSoftproofPrefill?.toEmail?.trim()) ||
+    defaultClientEmail ||
+    "";
 
   return (
     <>
@@ -225,28 +268,31 @@ export function GrafikaStatusPanel({
           </div>
         )}
 
-        <div className="mt-2 flex flex-col gap-1.5">
-          {transitions.map((t) => (
-            <button
-              key={t.toStatus}
-              type="button"
-              onClick={() => {
-                setSelected(t.toStatus);
-                setError(null);
-                setOverrideAck(false);
-                setSkipEmail(false);
-                setSoftproofDialogOpen(false);
-                if (!t.requiresComment) setComment("");
-              }}
-              className={`w-full text-left ${grafikaTransitionButtonClass(
-                t.toStatus,
-                selected === t.toStatus
-              )}`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        {transitions.length > 0 && (
+          <div className="mt-2 flex flex-col gap-1.5">
+            {transitions.map((t) => (
+              <button
+                key={t.toStatus}
+                type="button"
+                onClick={() => {
+                  setSelected(t.toStatus);
+                  setError(null);
+                  setOverrideAck(false);
+                  setSkipEmail(false);
+                  setSoftproofDialogOpen(false);
+                  setResendMode(false);
+                  if (!t.requiresComment) setComment("");
+                }}
+                className={`w-full text-left ${grafikaTransitionButtonClass(
+                  t.toStatus,
+                  selected === t.toStatus
+                )}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {selected && selectedTransition?.requiresComment && (
           <div className="mt-3">
@@ -358,6 +404,7 @@ export function GrafikaStatusPanel({
                 setSkipEmail(false);
                 setOverrideAck(false);
                 setSoftproofDialogOpen(false);
+                setResendMode(false);
                 setError(null);
               }}
               className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs text-gray-700 hover:bg-white"
@@ -366,14 +413,64 @@ export function GrafikaStatusPanel({
             </button>
           </div>
         )}
+
+        {showResend && (
+          <div className="mt-3 space-y-2 border-t border-gray-200 pt-3">
+            {softproofViaOverride && (
+              <label className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={resendOverrideAck}
+                  onChange={(e) => {
+                    setResendOverrideAck(e.target.checked);
+                    setError(null);
+                  }}
+                  disabled={submitting != null}
+                />
+                <span>
+                  Vím, co dělám — přebírám roli finálního schvalovatele (znovu
+                  odeslání softproofu).
+                </span>
+              </label>
+            )}
+            <button
+              type="button"
+              onClick={openResendSoftproof}
+              disabled={
+                submitting != null ||
+                (softproofViaOverride && !resendOverrideAck)
+              }
+              className="w-full rounded-lg border border-blue-300 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-950 hover:bg-blue-100 disabled:opacity-50 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-100 dark:hover:bg-blue-900/60"
+            >
+              {submitting === "sent_for_approval" && resendMode
+                ? "Odesílám softproof…"
+                : "Znovu odeslat softproof klientovi"}
+            </button>
+            <p className="text-[11px] text-gray-600 dark:text-gray-400">
+              Vytvoří nový 7denní odkaz a pošle e-mail. Starý odkaz přestane
+              platit.
+            </p>
+          </div>
+        )}
       </div>
 
       <SoftproofSendConfirmDialog
         open={softproofDialogOpen}
         files={files}
-        defaultEmail={defaultClientEmail ?? ""}
+        defaultEmail={dialogDefaultEmail}
+        initialFileId={resendMode ? lastSoftproofPrefill?.fileId : null}
+        initialLocale={resendMode ? lastSoftproofPrefill?.locale : null}
+        title={
+          resendMode
+            ? "Znovu odeslat softproof klientovi"
+            : "Kontrola před odesláním klientovi"
+        }
         submitting={submitting === "sent_for_approval"}
-        onClose={() => setSoftproofDialogOpen(false)}
+        onClose={() => {
+          setSoftproofDialogOpen(false);
+          setResendMode(false);
+        }}
         onConfirm={(payload) => void onSoftproofConfirm(payload)}
       />
     </>

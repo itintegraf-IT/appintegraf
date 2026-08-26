@@ -41,6 +41,7 @@ import { StartMaketaButton } from "./StartMaketaButton";
 import { MaketaFilesPanel } from "./MaketaFilesPanel";
 import { MaketaCommentsPanel } from "./MaketaCommentsPanel";
 import { GrafikaStatusPanel } from "./GrafikaStatusPanel";
+import { SoftproofLinkStatusBox } from "./SoftproofLinkStatusBox";
 import { GrafikaAutomationPanel } from "./GrafikaAutomationPanel";
 import { MaketyFileEventsPanel } from "./MaketyFileEventsPanel";
 import { GrafikaWorkflowPicker } from "../GrafikaWorkflowPicker";
@@ -128,13 +129,31 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
     (await canManageMaketyQueue(userId)) && !isArchived;
   const canEditDataKind =
     workType === "grafika" && !isArchived && (canEdit || canManagePriority);
-  const canGrafikaAutomation =
-    workType === "grafika" &&
-    (await userCanOperateGrafikaAutomation(userId, id)).allowed;
+  const grafikaAutomation =
+    workType === "grafika"
+      ? await userCanOperateGrafikaAutomation(userId, id)
+      : { allowed: false, viaOverride: false };
+  const canGrafikaAutomation = grafikaAutomation.allowed;
   const softproofDefaultEmail =
     maketa.iml_customers?.email?.trim() ||
     maketa.iml_customers?.iml_customer_emails[0]?.email?.trim() ||
     null;
+  const lastSoftproofLink =
+    workType === "grafika"
+      ? await prisma.makety_softproof_links.findFirst({
+          where: { maketa_id: id },
+          orderBy: { created_at: "desc" },
+          select: {
+            sent_to_email: true,
+            expires_at: true,
+            created_at: true,
+            used_at: true,
+            used_action: true,
+            file_id: true,
+            locale: true,
+          },
+        })
+      : null;
   const clientSoftproofDecision =
     workType === "grafika"
       ? await prisma.makety_softproof_links.findFirst({
@@ -360,10 +379,31 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
                 maketaId={id}
                 initialStatus={maketa.status}
                 defaultClientEmail={softproofDefaultEmail}
+                canResendSoftproof={
+                  canGrafikaAutomation && maketa.status === "sent_for_approval"
+                }
+                softproofViaOverride={grafikaAutomation.viaOverride}
+                lastSoftproofPrefill={
+                  lastSoftproofLink
+                    ? {
+                        toEmail: lastSoftproofLink.sent_to_email,
+                        fileId: lastSoftproofLink.file_id,
+                        locale: lastSoftproofLink.locale,
+                      }
+                    : null
+                }
               />
             </div>
           )}
         </div>
+
+        {workType === "grafika" &&
+          maketa.status === "sent_for_approval" &&
+          lastSoftproofLink && (
+            <div className="mt-4">
+              <SoftproofLinkStatusBox link={lastSoftproofLink} />
+            </div>
+          )}
 
         {workType === "grafika" && (
           <div className="mt-6">
