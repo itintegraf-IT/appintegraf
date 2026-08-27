@@ -1,6 +1,6 @@
 "use client";
 
-import { Archive, Box, Droplets, Layers, Settings, Wrench } from "lucide-react";
+import { Archive, Box, Droplets, Eraser, Layers, Settings, Wrench } from "lucide-react";
 import { Tabs, type TabDef } from "../_components/Tabs";
 import { ImlCustomFieldsClient } from "./ImlCustomFieldsClient";
 import { ImlFoilSettingsTab } from "./ImlFoilSettingsTab";
@@ -8,6 +8,7 @@ import { ImlColorSettingsTab } from "./ImlColorSettingsTab";
 import { ImlBoxTypesSettingsTab } from "./ImlBoxTypesSettingsTab";
 import { ImlThumbnailBackfillTab } from "./ImlThumbnailBackfillTab";
 import { ImlProductArchiveTab } from "./ImlProductArchiveTab";
+import { ImlWipePrintAssetsTab } from "./ImlWipePrintAssetsTab";
 
 /**
  * Klientský wrapper pro stránku nastavení IML.
@@ -50,6 +51,13 @@ export function ImlSettingsClient({
       label: "Archiv produktů",
       icon: <Archive className="h-4 w-4" />,
       content: <ImlProductArchiveTab />,
+      hidden: !canAdmin,
+    },
+    {
+      id: "wipe-assets",
+      label: "Mazání souborů",
+      icon: <Eraser className="h-4 w-4" />,
+      content: <ImlWipePrintAssetsTab />,
       hidden: !canAdmin,
     },
     {
