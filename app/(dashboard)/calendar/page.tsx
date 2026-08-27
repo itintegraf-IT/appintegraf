@@ -12,6 +12,7 @@ import { MonthCalendarGrid } from "./MonthCalendarGrid";
 import { CalendarSearchResults } from "./CalendarSearchResults";
 import { CalendarListView } from "./CalendarListView";
 import { getWeekStart, getWeekEnd, formatDateLocal, parseDateLocal } from "./lib/week-utils";
+import { pragueDayEnd, pragueDayStart } from "@/lib/datetime-cz";
 import { getMonthGridStart, getMonthGridEnd } from "./lib/month-utils";
 import { getHolidaysForRange } from "./lib/holidays";
 import { getUserDepartmentIds } from "@/lib/ukoly-recipients";
@@ -112,9 +113,8 @@ export default async function CalendarPage({
     }
   }
 
-  const fromDate = new Date(from);
-  const toDate = new Date(to);
-  toDate.setHours(23, 59, 59, 999);
+  const fromDate = pragueDayStart(from);
+  const toDate = pragueDayEnd(to);
 
   const baseWhere = {
     start_date: { lte: toDate } as const,

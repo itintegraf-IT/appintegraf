@@ -1,13 +1,20 @@
 import { describe, expect, it } from "vitest";
 import {
   allDayYmdRangeToIsoStrings,
+  buildWeekDayYmds,
   formatDateTimeCz,
   formatDateTimeLocalForInput,
   formatDateYmdPrague,
   formatTimeCz,
+  formatWeekColumnHeaderLabel,
+  getMonthGridDayYmds,
   getPragueHourFraction,
   getPragueParts,
+  getPragueWeekdayIndex,
+  getWeekStartYmdPrague,
   parseDateTimeLocalInput,
+  pragueDayEnd,
+  pragueDayStart,
 } from "./datetime-cz";
 
 describe("datetime-cz", () => {
@@ -45,5 +52,42 @@ describe("datetime-cz", () => {
     expect(formatTimeCz(summerUtc)).toMatch(/08:00/);
     expect(getPragueHourFraction(summerUtc)).toBe(8);
     expect(formatDateYmdPrague(summerUtc)).toBe("2026-05-28");
+  });
+
+  it("buildWeekDayYmds – sedm po sobě jdoucích pražských dnů", () => {
+    expect(buildWeekDayYmds("2026-08-29")).toEqual([
+      "2026-08-29",
+      "2026-08-30",
+      "2026-08-31",
+      "2026-09-01",
+      "2026-09-02",
+      "2026-09-03",
+      "2026-09-04",
+    ]);
+  });
+
+  it("getWeekStartYmdPrague – pondělí týdne", () => {
+    expect(getPragueWeekdayIndex("2026-09-01")).toBe(1);
+    expect(getWeekStartYmdPrague("2026-09-01")).toBe("2026-08-31");
+  });
+
+  it("getMonthGridDayYmds – 42 dní mřížky", () => {
+    const days = getMonthGridDayYmds("2026-09");
+    expect(days).toHaveLength(42);
+    expect(days[0]).toBe("2026-08-31");
+    expect(days).toContain("2026-09-01");
+  });
+
+  it("formatWeekColumnHeaderLabel a pražské hranice dne", () => {
+    expect(formatWeekColumnHeaderLabel("2026-09-01")).toMatch(/1\. 9\./);
+    const start = pragueDayStart("2026-09-01");
+    const end = pragueDayEnd("2026-09-01");
+    expect(formatDateYmdPrague(start)).toBe("2026-09-01");
+    expect(formatDateYmdPrague(end)).toBe("2026-09-01");
+    expect(start.getTime()).toBeLessThan(end.getTime());
+    const eventStart = new Date("2026-09-01T07:00:00.000Z");
+    const eventEnd = new Date("2026-09-01T09:00:00.000Z");
+    expect(eventStart >= end || eventEnd <= start).toBe(false);
+    expect(eventStart >= start && eventEnd <= end).toBe(true);
   });
 });

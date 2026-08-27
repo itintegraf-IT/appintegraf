@@ -158,3 +158,56 @@ export function getPragueHourFraction(d: Date): number {
   const p = getPragueParts(d);
   return p.hour + p.minute / 60;
 }
+
+/** Dnešní kalendářní den YYYY-MM-DD v Europe/Prague. */
+export function pragueTodayYmd(): string {
+  return formatDateYmdPrague(new Date());
+}
+
+/** Počáteční den týdne (from) + n following kalendářních dní v Praze. */
+export function buildWeekDayYmds(fromYmd: string, count = 7): string[] {
+  return Array.from({ length: count }, (_, i) => addDaysToYmdPrague(fromYmd, i));
+}
+
+/** Den v týdnu 0 = pondělí … 6 = neděle (Europe/Prague). */
+export function getPragueWeekdayIndex(ymd: string): number {
+  const d = pragueDayStart(ymd);
+  const short = d.toLocaleDateString("en-US", {
+    timeZone: APP_TIMEZONE,
+    weekday: "short",
+  });
+  const map: Record<string, number> = {
+    Mon: 0,
+    Tue: 1,
+    Wed: 2,
+    Thu: 3,
+    Fri: 4,
+    Sat: 5,
+    Sun: 6,
+  };
+  return map[short] ?? 0;
+}
+
+/** Pondělí týdne, ve kterém leží ymd (Europe/Prague). */
+export function getWeekStartYmdPrague(ymd: string): string {
+  const idx = getPragueWeekdayIndex(ymd);
+  return addDaysToYmdPrague(ymd, -idx);
+}
+
+/** 42 kalendářních dní měsíční mřížky (po–ne týdny) v Praze. */
+export function getMonthGridDayYmds(month: string): string[] {
+  const firstYmd = `${month}-01`;
+  const gridStartYmd = getWeekStartYmdPrague(firstYmd);
+  return Array.from({ length: 42 }, (_, i) => addDaysToYmdPrague(gridStartYmd, i));
+}
+
+/** Popisek sloupce týdenní mřížky: „po 1. 9.“ */
+export function formatWeekColumnHeaderLabel(ymd: string): string {
+  const d = pragueDayStart(ymd);
+  const weekday = d.toLocaleDateString("cs-CZ", {
+    timeZone: APP_TIMEZONE,
+    weekday: "short",
+  });
+  const p = getPragueParts(d);
+  return `${weekday} ${p.day}. ${p.month}.`;
+}
