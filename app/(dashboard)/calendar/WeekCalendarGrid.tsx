@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useMemo, useState, type CSSProperties, type ReactElement } from "react";
 import { useRouter } from "next/navigation";
-import { parseDateLocal, formatDateLocal } from "./lib/week-utils";
 import type { Holiday } from "./lib/holidays";
 import { isAllDayEvent, allDayEventDisplayDates, requiresDeputy } from "./lib/event-types";
 import { CreateEventModal } from "./CreateEventModal";
@@ -31,11 +30,15 @@ import { CalendarGlobalEventBlock } from "./CalendarGlobalEventBlock";
 import {
   addDaysToYmdPrague,
   allDayYmdRangeToIsoStrings,
+  buildWeekDayYmds,
   formatDateYmdPrague,
   formatTimeCz,
+  formatWeekColumnHeaderLabel,
   getPragueHourFraction,
+  parseDateTimeLocalInput,
   pragueDayEnd,
   pragueDayStart,
+  pragueTodayYmd,
 } from "@/lib/datetime-cz";
 import { formatCalendarEventTitleWithDuration } from "./lib/event-types";
 
@@ -135,14 +138,13 @@ function spanBarGridPlacement(
 /** Vypočítá top a height pro daný den – výška je vždy oříznutá na konec dne (24 hodin). */
 function getEventSliceForDay(
   event: CalendarEvent,
-  day: Date
+  dayYmd: string
 ): { top: number; height: number; sliceStart: Date; sliceEnd: Date } | null {
   const start = new Date(event.start_date);
   const end = new Date(event.end_date);
 
-  const dayStr = formatDateYmdPrague(day);
-  const dayStart = pragueDayStart(dayStr);
-  const dayEnd = pragueDayEnd(dayStr);
+  const dayStart = pragueDayStart(dayYmd);
+  const dayEnd = pragueDayEnd(dayYmd);
 
   if (end <= dayStart || start >= dayEnd) return null;
 
@@ -192,12 +194,8 @@ export function WeekCalendarGrid({
   eventMetaMode = "hidden",
 }: Props) {
   const router = useRouter();
-  const weekStart = useMemo(() => {
-    const d = parseDateLocal(from);
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, [from]);
-  const today = useMemo(() => new Date().toDateString(), []);
+  const weekDayYmds = useMemo(() => buildWeekDayYmds(from), [from]);
+  const todayYmd = useMemo(() => pragueTodayYmd(), []);
   const [modal, setModal] = useState<{
     start: Date;
     end: Date;
@@ -229,7 +227,7 @@ export function WeekCalendarGrid({
     e.dataTransfer.effectAllowed = "move";
   };
 
-  const handleDrop = (e: React.DragEvent, day: Date, hour?: number) => {
+  const handleDrop = (e: React.DragEvent, dayYmd: string, hour?: number) => {
     e.preventDefault();
     const raw = e.dataTransfer.getData("application/json");
     if (!raw) return;
@@ -242,7 +240,7 @@ export function WeekCalendarGrid({
     const event = events.find((ev) => ev.id === data.id);
     if (!event || event.created_by !== userId) return;
 
-    const dropYmd = formatDateYmdPrague(day);
+    const dropYmd = dayYmd;
 
     let newStart: Date;
     let newEnd: Date;
@@ -267,8 +265,9 @@ export function WeekCalendarGrid({
       newEnd = new Date(range.end);
     } else {
       const h = hour ?? 0;
-      newStart = new Date(day);
-      newStart.setHours(h, 0, 0, 0);
+      newStart = parseDateTimeLocalInput(
+        `${dropYmd}T${String(h).padStart(2, "0")}:00`
+      );
       const oldStart = new Date(data.start);
       const oldEnd = new Date(data.end);
       const durationMs = oldEnd.getTime() - oldStart.getTime();
@@ -290,29 +289,25 @@ export function WeekCalendarGrid({
     e.dataTransfer.dropEffect = "move";
   };
 
-  const handleCellClick = (day: Date, hour: number) => {
-    const start = new Date(day);
-    start.setHours(hour, 0, 0, 0);
-    const end = new Date(start);
-    end.setHours(hour + 1, 0, 0, 0);
+  const handleCellClick = (dayYmd: string, hour: number) => {
+    const start = parseDateTimeLocalInput(
+      `${dayYmd}T${String(hour).padStart(2, "0")}:00`
+    );
+    const end = parseDateTimeLocalInput(
+      `${dayYmd}T${String(hour + 1).padStart(2, "0")}:00`
+    );
     setModal({ start, end, allDay: false });
   };
 
-  const handleAllDayClick = (day: Date) => {
-    const start = new Date(day);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(day);
-    end.setHours(23, 59, 0, 0);
-    setModal({ start, end, allDay: true });
+  const handleAllDayClick = (dayYmd: string) => {
+    setModal({
+      start: pragueDayStart(dayYmd),
+      end: pragueDayEnd(dayYmd),
+      allDay: true,
+    });
   };
 
-  const days = useMemo(() => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(weekStart);
-      d.setDate(d.getDate() + i);
-      return d;
-    });
-  }, [weekStart]);
+  const days = weekDayYmds;
 
   const allDayEvents = useMemo(() => {
     return events.filter(
@@ -331,11 +326,6 @@ export function WeekCalendarGrid({
   }, [events]);
 
   const isGlobalMode = eventMetaMode !== "hidden";
-
-  const weekDayYmds = useMemo(
-    () => days.map((d) => formatDateYmdPrague(d)),
-    [days]
-  );
 
   type SpanBarKind = "module" | "owner" | "deputy" | "personal";
 
@@ -448,7 +438,7 @@ export function WeekCalendarGrid({
     if (!isGlobalMode) return map;
 
     for (const d of days) {
-      const dayStr = formatDateYmdPrague(d);
+      const dayStr = d;
       const dayStart = pragueDayStart(dayStr);
       const dayEnd = pragueDayEnd(dayStr);
       const items: WeekDayLayoutItem[] = [];
@@ -478,8 +468,7 @@ export function WeekCalendarGrid({
   const allDayColumnAccent = useMemo(() => {
     const m = new Map<string, string>();
     if (isGlobalMode) return m;
-    for (const d of days) {
-      const key = formatDateYmdPrague(d);
+    for (const key of days) {
       for (const e of allDayEvents) {
         if (isModuleCalendarTask(e)) continue;
         const s = new Date(e.start_date);
@@ -493,8 +482,8 @@ export function WeekCalendarGrid({
     return m;
   }, [allDayEvents, days, isGlobalMode]);
 
-  const holidaysForDay = (day: Date) =>
-    holidays.filter((h) => h.date === formatDateLocal(day));
+  const holidaysForDay = (dayYmd: string) =>
+    holidays.filter((h) => h.date === dayYmd);
 
   const totalHeight = 24 * ROW_HEIGHT;
 
@@ -508,15 +497,14 @@ export function WeekCalendarGrid({
             Celý den
           </div>
           <div className={WEEK_DAY_GRID}>
-            {days.map((d) => {
-              const dayHolidays = holidaysForDay(d);
+            {days.map((dayYmd) => {
+              const dayHolidays = holidaysForDay(dayYmd);
               const isHoliday = dayHolidays.length > 0;
-              const dayKey = formatDateYmdPrague(d);
-              const isTod = d.toDateString() === today;
-              const accent = allDayColumnAccent.get(dayKey);
+              const isTod = dayYmd === todayYmd;
+              const accent = allDayColumnAccent.get(dayYmd);
               return (
                 <div
-                  key={d.toISOString()}
+                  key={dayYmd}
                   className={`${DAY_CELL_BORDER} px-1 py-2 text-center text-sm font-medium ${
                     isTod
                       ? "text-amber-900"
@@ -527,8 +515,7 @@ export function WeekCalendarGrid({
                   style={cellAllDayShadeStyle(accent, isTod, isHoliday)}
                   title={dayHolidays.map((h) => h.name).join(", ")}
                 >
-                  {d.toLocaleDateString("cs-CZ", { weekday: "short" })} {d.getDate()}.{" "}
-                  {d.getMonth() + 1}.
+                  {formatWeekColumnHeaderLabel(dayYmd)}
                   {isHoliday && (
                     <span className="ml-0.5 text-[10px] text-slate-500">•</span>
                   )}
@@ -547,23 +534,22 @@ export function WeekCalendarGrid({
               minHeight: Math.max(44, spanAreaHeight + 36),
             }}
           >
-            {days.map((d) => {
-              const dayKey = formatDateYmdPrague(d);
-              const isTod = d.toDateString() === today;
-              const accent = allDayColumnAccent.get(dayKey);
+            {days.map((dayYmd) => {
+              const isTod = dayYmd === todayYmd;
+              const accent = allDayColumnAccent.get(dayYmd);
               return (
               <div
-                key={d.toISOString()}
-                onClick={() => handleAllDayClick(d)}
-                onDrop={(ev) => handleDrop(ev, d)}
+                key={dayYmd}
+                onClick={() => handleAllDayClick(dayYmd)}
+                onDrop={(ev) => handleDrop(ev, dayYmd)}
                 onDragOver={handleDragOver}
                 className={`flex min-h-11 cursor-pointer flex-col gap-1 px-1 py-1 align-top transition-colors hover:bg-[var(--accent)]/45 ${DAY_CELL_BORDER}`}
                 style={{
-                  ...cellAllDayShadeStyle(accent, isTod, holidaysForDay(d).length > 0),
+                  ...cellAllDayShadeStyle(accent, isTod, holidaysForDay(dayYmd).length > 0),
                   paddingTop: spanAreaHeight > 0 ? spanAreaHeight : undefined,
                 }}
               >
-                {holidaysForDay(d).map((h) => (
+                {holidaysForDay(dayYmd).map((h) => (
                   <div
                     key={h.date + h.name}
                     className="w-full shrink-0 truncate rounded bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
@@ -579,7 +565,7 @@ export function WeekCalendarGrid({
                     const end = new Date(e.end_date);
                     const dates = allDayEventDisplayDates(start, end);
                     if (isMultiDayAllDay(dates)) return false;
-                    return dates.includes(formatDateYmdPrague(d));
+                    return dates.includes(dayYmd);
                   })
                   .flatMap((e) => {
                     const barColor = e.color ?? "#DC2626";
@@ -851,25 +837,24 @@ export function WeekCalendarGrid({
             ))}
           </div>
           <div className={WEEK_DAY_GRID}>
-            {days.map((d) => {
-              const dayKey = formatDateYmdPrague(d);
-              const isTod = d.toDateString() === today;
-              const accent = allDayColumnAccent.get(dayKey);
+            {days.map((dayYmd) => {
+              const isTod = dayYmd === todayYmd;
+              const accent = allDayColumnAccent.get(dayYmd);
               return (
               <div
-                key={d.toISOString()}
+                key={dayYmd}
                 className={`relative z-0 overflow-hidden ${DAY_CELL_BORDER}`}
                 style={{
                   minHeight: totalHeight,
                   height: totalHeight,
-                  ...cellAllDayShadeStyle(accent, isTod, holidaysForDay(d).length > 0),
+                  ...cellAllDayShadeStyle(accent, isTod, holidaysForDay(dayYmd).length > 0),
                 }}
                 onDrop={(ev) => {
                   ev.preventDefault();
                   const rect = ev.currentTarget.getBoundingClientRect();
                   const y = ev.clientY - rect.top;
                   const hour = Math.min(23, Math.max(0, Math.floor(y / ROW_HEIGHT)));
-                  handleDrop(ev, d, hour);
+                  handleDrop(ev, dayYmd, hour);
                 }}
                 onDragOver={handleDragOver}
               >
@@ -877,7 +862,7 @@ export function WeekCalendarGrid({
                 {HOURS.map((h) => (
                   <div
                     key={h}
-                    onClick={() => handleCellClick(d, h)}
+                    onClick={() => handleCellClick(dayYmd, h)}
                     className="relative z-[1] cursor-pointer border-b border-gray-100 transition-colors hover:bg-[var(--accent)]/45"
                     style={{ height: ROW_HEIGHT }}
                   />
@@ -885,7 +870,7 @@ export function WeekCalendarGrid({
                 {/* Události - absolutní pozicování */}
                 {timedEvents
                       .map((e) => {
-                        const slice = getEventSliceForDay(e, d);
+                        const slice = getEventSliceForDay(e, dayYmd);
                         if (!slice) return null;
                         return {
                           e,
@@ -897,7 +882,7 @@ export function WeekCalendarGrid({
                       .map((item) => {
                   if (!item) return null;
                   const { e, slice, layoutId } = item;
-                  const dayLayout = timedLayoutByDay.get(dayKey);
+                  const dayLayout = timedLayoutByDay.get(dayYmd);
                   const layout = dayLayout?.get(layoutId);
                   const column = layout?.column ?? 0;
                   const columnCount = layout?.columnCount ?? 1;
@@ -926,7 +911,7 @@ export function WeekCalendarGrid({
                     });
                     return (
                       <div
-                        key={`${layoutId}-${d.toISOString()}`}
+                        key={`${layoutId}-${dayYmd}`}
                         className="absolute z-10 overflow-hidden rounded"
                         style={timedStyle}
                       >
@@ -953,9 +938,8 @@ export function WeekCalendarGrid({
                     ? `${e.users_deputy.first_name} ${e.users_deputy.last_name}`
                     : null;
                   const eventStart = new Date(e.start_date);
-                  const sliceDayStr = formatDateYmdPrague(d);
-                  const sliceDayStart = pragueDayStart(sliceDayStr);
-                  const sliceDayEnd = pragueDayEnd(sliceDayStr);
+                  const sliceDayStart = pragueDayStart(dayYmd);
+                  const sliceDayEnd = pragueDayEnd(dayYmd);
                   const isFirstDay = eventStart >= sliceDayStart && eventStart <= sliceDayEnd;
                   const timedEventContent = (
                     <>
@@ -999,7 +983,7 @@ export function WeekCalendarGrid({
                   };
                   return canDrag ? (
                     <div
-                      key={`${calendarGridItemKey(e)}-${d.toDateString()}`}
+                      key={`${calendarGridItemKey(e)}-${dayYmd}`}
                       draggable
                       onDragStart={(ev) => handleDragStart(ev, e)}
                       onClick={(ev) => {
@@ -1014,7 +998,7 @@ export function WeekCalendarGrid({
                     </div>
                   ) : (
                     <Link
-                      key={`${calendarGridItemKey(e)}-${d.toDateString()}`}
+                      key={`${calendarGridItemKey(e)}-${dayYmd}`}
                       href={href}
                       onClick={(ev) => ev.stopPropagation()}
                       title={tooltip}

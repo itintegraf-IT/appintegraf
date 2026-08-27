@@ -2,15 +2,17 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { getWeekStart } from "./lib/week-utils";
 import {
-  getMonthGridStart,
-  getMonthGridEnd,
   formatMonth,
 } from "./lib/month-utils";
 import { CreateEventModal } from "./CreateEventModal";
-import { WEEKDAY_NAMES_MONDAY, formatDateLocal } from "./lib/week-utils";
-import { formatDateYmdPrague } from "@/lib/datetime-cz";
+import { WEEKDAY_NAMES_MONDAY } from "./lib/week-utils";
+import {
+  getMonthGridDayYmds,
+  pragueDayEnd,
+  pragueDayStart,
+  pragueTodayYmd,
+} from "@/lib/datetime-cz";
 import type { Holiday } from "./lib/holidays";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import { isAllDayEvent, allDayEventDisplayDates } from "./lib/event-types";
@@ -66,8 +68,10 @@ function eventMetaPrimaryLine(e: CalendarEvent, eventMetaMode: CalendarEventMeta
   return extra[0] ?? null;
 }
 
-function formatDayHeading(day: Date): string {
-  return day.toLocaleDateString("cs-CZ", {
+function formatDayHeading(dayYmd: string): string {
+  const d = pragueDayStart(dayYmd);
+  return d.toLocaleDateString("cs-CZ", {
+    timeZone: "Europe/Prague",
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -75,7 +79,7 @@ function formatDayHeading(day: Date): string {
 }
 
 function renderMonthDayEventBlocks(
-  day: Date,
+  dayYmd: string,
   dayEvents: CalendarEvent[],
   eventMetaMode: CalendarEventMetaMode
 ): React.ReactNode[] {
@@ -90,7 +94,7 @@ function renderMonthDayEventBlocks(
       const ownerLines = buildCalendarGlobalOwnerBlock(e, { allDay });
       return [
         <CalendarGlobalEventBlock
-          key={`${calendarGridItemKey(e)}-${day.toDateString()}-owner`}
+          key={`${calendarGridItemKey(e)}-${dayYmd}-owner`}
           lines={ownerLines}
           color={line}
           href={calendarGridItemHref(e)}
@@ -108,7 +112,7 @@ function renderMonthDayEventBlocks(
     const isApproved = e.approval_status === "approved";
     return [
       <Link
-        key={`${calendarGridItemKey(e)}-${day.toDateString()}`}
+        key={`${calendarGridItemKey(e)}-${dayYmd}`}
         href={calendarGridItemHref(e)}
         onClick={(ev) => ev.stopPropagation()}
         title={calendarEventTooltipTitle(e, eventMetaMode)}
@@ -151,7 +155,7 @@ export function MonthCalendarGrid({
   eventMetaMode = "hidden",
 }: Props) {
   const monthDate = useMemo(() => new Date(month + "-01"), [month]);
-  const today = useMemo(() => new Date().toDateString(), []);
+  const todayYmd = useMemo(() => pragueTodayYmd(), []);
 
   const [modal, setModal] = useState<{
     start: Date;
@@ -159,57 +163,42 @@ export function MonthCalendarGrid({
     allDay: boolean;
   } | null>(null);
 
-  const gridStart = useMemo(() => getMonthGridStart(monthDate), [monthDate]);
-  const gridEnd = useMemo(() => getMonthGridEnd(monthDate), [monthDate]);
-
-  const days = useMemo(() => {
-    const result: Date[] = [];
-    const d = new Date(gridStart);
-    while (d <= gridEnd) {
-      result.push(new Date(d));
-      d.setDate(d.getDate() + 1);
-    }
-    return result;
-  }, [gridStart, gridEnd]);
+  const dayYmds = useMemo(() => getMonthGridDayYmds(month), [month]);
 
   const weeks = useMemo(() => {
-    const result: Date[][] = [];
-    for (let i = 0; i < days.length; i += 7) {
-      result.push(days.slice(i, i + 7));
+    const result: string[][] = [];
+    for (let i = 0; i < dayYmds.length; i += 7) {
+      result.push(dayYmds.slice(i, i + 7));
     }
     return result;
-  }, [days]);
+  }, [dayYmds]);
 
-  const eventsForDay = (day: Date) => {
-    const dayKey = formatDateYmdPrague(day);
-    const dayStart = new Date(day);
-    dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(day);
-    dayEnd.setHours(23, 59, 59, 999);
+  const eventsForDay = (dayYmd: string) => {
+    const dayStart = pragueDayStart(dayYmd);
+    const dayEnd = pragueDayEnd(dayYmd);
 
     return events.filter((e) => {
       const start = new Date(e.start_date);
       const end = new Date(e.end_date);
       if (isAllDayEvent(start, end)) {
-        return allDayEventDisplayDates(start, end).includes(dayKey);
+        return allDayEventDisplayDates(start, end).includes(dayYmd);
       }
       return start <= dayEnd && end >= dayStart;
     });
   };
 
-  const holidaysForDay = (day: Date) =>
-    holidays.filter((h) => h.date === formatDateLocal(day));
+  const holidaysForDay = (dayYmd: string) =>
+    holidays.filter((h) => h.date === dayYmd);
 
-  const handleDayClick = (day: Date) => {
-    const start = new Date(day);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(day);
-    end.setHours(23, 59, 0, 0);
-    setModal({ start, end, allDay: true });
+  const handleDayClick = (dayYmd: string) => {
+    setModal({
+      start: pragueDayStart(dayYmd),
+      end: pragueDayEnd(dayYmd),
+      allDay: true,
+    });
   };
 
-  const isCurrentMonth = (day: Date) =>
-    day.getMonth() === monthDate.getMonth();
+  const isCurrentMonth = (dayYmd: string) => dayYmd.startsWith(`${month}-`);
 
   return (
     <>
@@ -234,17 +223,18 @@ export function MonthCalendarGrid({
           {/* Týdny */}
           {weeks.map((week, wi) => (
             <div key={wi} className="grid min-h-[100px] grid-cols-7">
-              {week.map((day) => {
-                const dayEvents = eventsForDay(day);
-                const dayHolidays = holidaysForDay(day);
-                const isToday = day.toDateString() === today;
-                const inMonth = isCurrentMonth(day);
+              {week.map((dayYmd) => {
+                const dayEvents = eventsForDay(dayYmd);
+                const dayHolidays = holidaysForDay(dayYmd);
+                const isToday = dayYmd === todayYmd;
+                const inMonth = isCurrentMonth(dayYmd);
                 const isHoliday = dayHolidays.length > 0;
+                const dayNum = parseInt(dayYmd.slice(8, 10), 10);
 
                 return (
                   <div
-                    key={day.toISOString()}
-                    onClick={() => handleDayClick(day)}
+                    key={dayYmd}
+                    onClick={() => handleDayClick(dayYmd)}
                     className={`cursor-pointer border-r border-b border-gray-200 p-1 transition-colors last:border-r-0 hover:bg-[var(--accent)]/45 ${
                       !inMonth ? "bg-gray-50/50" : ""
                     } ${isToday ? "bg-amber-50" : ""} ${isHoliday && inMonth ? "bg-slate-50/70" : ""}`}
@@ -258,7 +248,7 @@ export function MonthCalendarGrid({
                             : "text-gray-400"
                       }`}
                     >
-                      {day.getDate()}
+                      {dayNum}
                     </span>
                     {dayHolidays.map((h) => (
                       <div
@@ -270,7 +260,7 @@ export function MonthCalendarGrid({
                       </div>
                     ))}
                     <div className="mt-1 space-y-0.5">
-                      {renderMonthDayEventBlocks(day, dayEvents.slice(0, 3), eventMetaMode)}
+                      {renderMonthDayEventBlocks(dayYmd, dayEvents.slice(0, 3), eventMetaMode)}
                       {dayEvents.length > 3 && (
                         <Popover>
                           <PopoverTrigger asChild>
@@ -290,10 +280,10 @@ export function MonthCalendarGrid({
                             onOpenAutoFocus={(ev) => ev.preventDefault()}
                           >
                             <p className="mb-2 text-sm font-semibold capitalize text-gray-900">
-                              {formatDayHeading(day)}
+                              {formatDayHeading(dayYmd)}
                             </p>
                             <div className="max-h-72 space-y-1 overflow-y-auto">
-                              {renderMonthDayEventBlocks(day, dayEvents, eventMetaMode)}
+                              {renderMonthDayEventBlocks(dayYmd, dayEvents, eventMetaMode)}
                             </div>
                           </PopoverContent>
                         </Popover>
