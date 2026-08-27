@@ -34,12 +34,12 @@ import {
   formatDateYmdPrague,
   formatTimeCz,
   formatWeekColumnHeaderLabel,
-  getPragueHourFraction,
   parseDateTimeLocalInput,
   pragueDayEnd,
   pragueDayStart,
   pragueTodayYmd,
 } from "@/lib/datetime-cz";
+import { getTimedEventSliceForDay, timedEventOverlapsDay } from "@/lib/calendar-week-slice";
 import { formatCalendarEventTitleWithDuration } from "./lib/event-types";
 
 type CalendarEvent = {
@@ -140,27 +140,13 @@ function getEventSliceForDay(
   event: CalendarEvent,
   dayYmd: string
 ): { top: number; height: number; sliceStart: Date; sliceEnd: Date } | null {
-  const start = new Date(event.start_date);
-  const end = new Date(event.end_date);
-
-  const dayStart = pragueDayStart(dayYmd);
-  const dayEnd = pragueDayEnd(dayYmd);
-
-  if (end <= dayStart || start >= dayEnd) return null;
-
-  const sliceStart = start < dayStart ? dayStart : start;
-  const sliceEnd = end > dayEnd ? dayEnd : end;
-
-  const top = getPragueHourFraction(sliceStart) * ROW_HEIGHT;
-  const durationHours =
-    (sliceEnd.getTime() - sliceStart.getTime()) / (60 * 60 * 1000);
-  let height = Math.max(18, durationHours * ROW_HEIGHT);
-
-  /** Nikdy nepřetéct pod řádek 23 (den = přesně 24 hodin od 0:00 do 23:59) */
-  const maxHeight = DAY_GRID_HEIGHT - top;
-  height = Math.min(height, maxHeight);
-
-  return { top, height, sliceStart, sliceEnd };
+  return getTimedEventSliceForDay(
+    new Date(event.start_date),
+    new Date(event.end_date),
+    dayYmd,
+    ROW_HEIGHT,
+    DAY_GRID_HEIGHT
+  );
 }
 
 /** Jemné zabarvení sloupce (hlavička / celý den / 0–23) podle první celodenní události v daném dni. */
@@ -446,7 +432,9 @@ export function WeekCalendarGrid({
       for (const e of timedEvents) {
         const start = new Date(e.start_date);
         const end = new Date(e.end_date);
-        if (end <= dayStart || start >= dayEnd) continue;
+        if (!timedEventOverlapsDay(start, end, dayStr)) continue;
+        const dayStart = pragueDayStart(dayStr);
+        const dayEnd = pragueDayEnd(dayStr);
         const sliceStart = start < dayStart ? dayStart : start;
         const sliceEnd = end > dayEnd ? dayEnd : end;
         const pairId = `ev-${e.id}`;

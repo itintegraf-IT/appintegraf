@@ -122,9 +122,8 @@ export function pragueDayStart(ymd: string): Date {
 
 /** Konec kalendářního dne YYYY-MM-DD v Europe/Prague (23:59:59.999). */
 export function pragueDayEnd(ymd: string): Date {
-  const end = parseDateTimeLocalInput(`${ymd}T23:59`);
-  end.setSeconds(59, 999);
-  return end;
+  const nextDayStart = pragueDayStart(addDaysToYmdPrague(ymd, 1));
+  return new Date(nextDayStart.getTime() - 1);
 }
 
 /** Přičte dní k YYYY-MM-DD (kalendářně, přes UTC poledne kvůli DST). */

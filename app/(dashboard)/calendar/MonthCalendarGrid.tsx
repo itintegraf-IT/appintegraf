@@ -13,6 +13,7 @@ import {
   pragueDayStart,
   pragueTodayYmd,
 } from "@/lib/datetime-cz";
+import { timedEventOverlapsDay } from "@/lib/calendar-week-slice";
 import type { Holiday } from "./lib/holidays";
 import { calendarGridItemHref, calendarGridItemKey } from "@/lib/calendar-item-href";
 import { isAllDayEvent, allDayEventDisplayDates } from "./lib/event-types";
@@ -174,16 +175,13 @@ export function MonthCalendarGrid({
   }, [dayYmds]);
 
   const eventsForDay = (dayYmd: string) => {
-    const dayStart = pragueDayStart(dayYmd);
-    const dayEnd = pragueDayEnd(dayYmd);
-
     return events.filter((e) => {
       const start = new Date(e.start_date);
       const end = new Date(e.end_date);
       if (isAllDayEvent(start, end)) {
         return allDayEventDisplayDates(start, end).includes(dayYmd);
       }
-      return start <= dayEnd && end >= dayStart;
+      return timedEventOverlapsDay(start, end, dayYmd);
     });
   };
 

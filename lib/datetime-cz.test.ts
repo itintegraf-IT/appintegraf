@@ -90,4 +90,16 @@ describe("datetime-cz", () => {
     expect(eventStart >= end || eventEnd <= start).toBe(false);
     expect(eventStart >= start && eventEnd <= end).toBe(true);
   });
+
+  it("pragueDayEnd – hranice 31. 8. neprotíná událost 1. 9.", () => {
+    const aug31End = pragueDayEnd("2026-08-31");
+    const sep1Start = pragueDayStart("2026-09-01");
+    expect(aug31End.getTime()).toBeLessThan(sep1Start.getTime());
+    expect(formatDateYmdPrague(aug31End)).toBe("2026-08-31");
+
+    const eventStart = new Date("2026-09-01T07:00:00.000Z");
+    const eventEnd = new Date("2026-09-01T09:00:00.000Z");
+    const aug31Start = pragueDayStart("2026-08-31");
+    expect(eventEnd <= aug31Start || eventStart >= aug31End).toBe(true);
+  });
 });
