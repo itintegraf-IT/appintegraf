@@ -4,14 +4,15 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import {
   getWipeAssetsStats,
+  normalizeWipeStatuses,
   runImlWipeAssetsBatch,
 } from "@/lib/iml-product-wipe-assets";
 
 /**
  * Admin: hromadné smazání tiskových PDF + softproof u produktů
- * ve stavu zablokovaná / chyba.
+ * ve stavech zablokovaná / neaktivní / chyba (výběr přes statuses[]).
  * GET  – statistiky
- * POST – { dryRun?: boolean, limit?: number }
+ * POST – { dryRun?: boolean, limit?: number, statuses?: string[] }
  */
 export async function GET() {
   const session = await auth();
@@ -42,9 +43,23 @@ export async function POST(req: NextRequest) {
   const limit =
     body?.limit != null ? parseInt(String(body.limit), 10) : undefined;
 
+  if (Array.isArray(body?.statuses) && body.statuses.length > 0) {
+    const selected = normalizeWipeStatuses(body.statuses);
+    if (selected.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "Neplatný výběr stavů. Povoleno: zablokovaná, neaktivní, chyba.",
+        },
+        { status: 400 }
+      );
+    }
+  }
+
   const result = await runImlWipeAssetsBatch({
     dryRun,
     limit: Number.isFinite(limit) ? limit : undefined,
+    statuses: Array.isArray(body?.statuses) ? body.statuses : undefined,
   });
 
   if (!dryRun && result.processed.length > 0) {
@@ -56,6 +71,7 @@ export async function POST(req: NextRequest) {
       recordId: wiped[0]?.productId ?? result.candidateIds[0] ?? 0,
       newValues: {
         wipe_print_assets_batch: true,
+        selected_statuses: result.selectedStatuses,
         candidate_ids: result.candidateIds,
         products_wiped: wiped.length,
         files_deleted: result.totalFilesDeleted,

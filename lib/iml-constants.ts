@@ -13,6 +13,7 @@ export const IML_ITEM_STATUSES = [
   "archivní",
   "testovací",
   "zablokovaná",
+  "neaktivní",
   "rozpracováno grafikem",
   "chyba",
 ] as const;
