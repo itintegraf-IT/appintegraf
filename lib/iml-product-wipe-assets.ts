@@ -1,8 +1,13 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { deleteArchiveFileIfExists } from "@/lib/iml-product-archive";
 
 /** Stavy, u kterých smí admin smazat tisková data a softproof. */
-export const IML_WIPE_ASSET_STATUSES = ["zablokovaná", "chyba"] as const;
+export const IML_WIPE_ASSET_STATUSES = [
+  "zablokovaná",
+  "neaktivní",
+  "chyba",
+] as const;
 
 export type ImlWipeAssetStatus = (typeof IML_WIPE_ASSET_STATUSES)[number];
 
@@ -20,19 +25,28 @@ export type WipeProductAssetsResult = {
 export type WipeAssetsBatchOptions = {
   dryRun?: boolean;
   limit?: number;
+  /** Podmnožina whitelistu; prázdné / neuvedené = všechny povolené. */
+  statuses?: string[];
 };
 
 export type WipeAssetsBatchResult = {
   dryRun: boolean;
   allowedStatuses: readonly string[];
+  selectedStatuses: string[];
   candidateIds: number[];
   processed: WipeProductAssetsResult[];
   totalBytesFreed: number;
   totalFilesDeleted: number;
 };
 
+export type WipeAssetsStatusCounts = {
+  products: number;
+  withAssets: number;
+};
+
 export type WipeAssetsStats = {
   allowedStatuses: readonly string[];
+  byStatus: Record<string, WipeAssetsStatusCounts>;
   productsInStatus: number;
   productsWithAssets: number;
 };
@@ -44,57 +58,79 @@ function isWipeAllowedStatus(status: string | null | undefined): status is ImlWi
   );
 }
 
+/** Validuje a seřadí stavy podle whitelistu. Prázdný vstup = všechny povolené. */
+export function normalizeWipeStatuses(input: unknown): ImlWipeAssetStatus[] {
+  if (!Array.isArray(input) || input.length === 0) {
+    return [...IML_WIPE_ASSET_STATUSES];
+  }
+  const picked = new Set(
+    input.filter((s): s is ImlWipeAssetStatus => isWipeAllowedStatus(s))
+  );
+  return IML_WIPE_ASSET_STATUSES.filter((s) => picked.has(s));
+}
+
 function blobLen(data: Buffer | Uint8Array | null | undefined): number {
   if (!data) return 0;
   return data.length;
 }
 
-/** Statistiky pro admin UI. */
-export async function getWipeAssetsStats(): Promise<WipeAssetsStats> {
-  const statuses = [...IML_WIPE_ASSET_STATUSES];
+const HAS_ASSETS_SQL = Prisma.sql`
+  (
+    (p.image_data IS NOT NULL AND OCTET_LENGTH(p.image_data) > 0)
+    OR (p.pdf_data IS NOT NULL AND OCTET_LENGTH(p.pdf_data) > 0)
+    OR (p.pdf_archive_path IS NOT NULL AND p.pdf_archive_path <> '')
+    OR EXISTS (
+      SELECT 1 FROM iml_product_files f WHERE f.product_id = p.id
+    )
+  )
+`;
 
-  const [productsInStatus, withAssets] = await Promise.all([
-    prisma.iml_products.count({
-      where: { item_status: { in: statuses } },
-    }),
-    prisma.$queryRaw<Array<{ cnt: bigint }>>`
-      SELECT COUNT(*) AS cnt
-      FROM iml_products p
-      WHERE p.item_status IN (${statuses[0]}, ${statuses[1]})
-        AND (
-          (p.image_data IS NOT NULL AND OCTET_LENGTH(p.image_data) > 0)
-          OR (p.pdf_data IS NOT NULL AND OCTET_LENGTH(p.pdf_data) > 0)
-          OR (p.pdf_archive_path IS NOT NULL AND p.pdf_archive_path <> '')
-          OR EXISTS (
-            SELECT 1 FROM iml_product_files f WHERE f.product_id = p.id
-          )
-        )
-    `,
-  ]);
+/** Statistiky pro admin UI (per povolený stav). */
+export async function getWipeAssetsStats(): Promise<WipeAssetsStats> {
+  const byStatus: Record<string, WipeAssetsStatusCounts> = {};
+
+  for (const status of IML_WIPE_ASSET_STATUSES) {
+    const [products, withAssets] = await Promise.all([
+      prisma.iml_products.count({ where: { item_status: status } }),
+      prisma.$queryRaw<Array<{ cnt: bigint }>>`
+        SELECT COUNT(*) AS cnt
+        FROM iml_products p
+        WHERE p.item_status = ${status}
+          AND ${HAS_ASSETS_SQL}
+      `,
+    ]);
+    byStatus[status] = {
+      products,
+      withAssets: Number(withAssets[0]?.cnt ?? 0),
+    };
+  }
+
+  const productsInStatus = Object.values(byStatus).reduce((a, c) => a + c.products, 0);
+  const productsWithAssets = Object.values(byStatus).reduce(
+    (a, c) => a + c.withAssets,
+    0
+  );
 
   return {
     allowedStatuses: IML_WIPE_ASSET_STATUSES,
+    byStatus,
     productsInStatus,
-    productsWithAssets: Number(withAssets[0]?.cnt ?? 0),
+    productsWithAssets,
   };
 }
 
-export async function findWipeAssetCandidates(limit: number): Promise<number[]> {
-  const statuses = [...IML_WIPE_ASSET_STATUSES];
+export async function findWipeAssetCandidates(
+  limit: number,
+  statuses: ImlWipeAssetStatus[]
+): Promise<number[]> {
+  if (statuses.length === 0) return [];
   const safeLimit = Math.min(Math.max(limit, 1), 100);
 
   const rows = await prisma.$queryRaw<Array<{ id: number }>>`
     SELECT p.id
     FROM iml_products p
-    WHERE p.item_status IN (${statuses[0]}, ${statuses[1]})
-      AND (
-        (p.image_data IS NOT NULL AND OCTET_LENGTH(p.image_data) > 0)
-        OR (p.pdf_data IS NOT NULL AND OCTET_LENGTH(p.pdf_data) > 0)
-        OR (p.pdf_archive_path IS NOT NULL AND p.pdf_archive_path <> '')
-        OR EXISTS (
-          SELECT 1 FROM iml_product_files f WHERE f.product_id = p.id
-        )
-      )
+    WHERE p.item_status IN (${Prisma.join(statuses)})
+      AND ${HAS_ASSETS_SQL}
     ORDER BY p.id ASC
     LIMIT ${safeLimit}
   `;
@@ -104,10 +140,11 @@ export async function findWipeAssetCandidates(limit: number): Promise<number[]> 
 
 /**
  * Smaže všechna tisková PDF (verze + legacy + disk) a softproof (`image_data`).
- * Metadata produktu zůstávají. Povoleno jen pro zablokovaná / chyba.
+ * Metadata produktu zůstávají. Povoleno jen pro stavy z whitelistu / běhu.
  */
 export async function wipeProductPrintAndPreview(
-  productId: number
+  productId: number,
+  statusesForRun: ImlWipeAssetStatus[] = [...IML_WIPE_ASSET_STATUSES]
 ): Promise<WipeProductAssetsResult> {
   const product = await prisma.iml_products.findUnique({
     where: { id: productId },
@@ -131,7 +168,10 @@ export async function wipeProductPrintAndPreview(
     };
   }
 
-  if (!isWipeAllowedStatus(product.item_status)) {
+  if (
+    !isWipeAllowedStatus(product.item_status) ||
+    !statusesForRun.includes(product.item_status)
+  ) {
     return {
       productId,
       filesDeleted: 0,
@@ -212,13 +252,15 @@ export async function runImlWipeAssetsBatch(
     Math.max(opts?.limit ?? IML_WIPE_ASSETS_DEFAULT_BATCH, 1),
     100
   );
+  const selectedStatuses = normalizeWipeStatuses(opts?.statuses);
 
-  const candidateIds = await findWipeAssetCandidates(limit);
+  const candidateIds = await findWipeAssetCandidates(limit, selectedStatuses);
 
   if (dryRun) {
     return {
       dryRun: true,
       allowedStatuses: IML_WIPE_ASSET_STATUSES,
+      selectedStatuses,
       candidateIds,
       processed: [],
       totalBytesFreed: 0,
@@ -232,7 +274,7 @@ export async function runImlWipeAssetsBatch(
 
   for (const id of candidateIds) {
     try {
-      const result = await wipeProductPrintAndPreview(id);
+      const result = await wipeProductPrintAndPreview(id, selectedStatuses);
       processed.push(result);
       totalBytesFreed += result.bytesFreed;
       totalFilesDeleted += result.filesDeleted;
@@ -252,6 +294,7 @@ export async function runImlWipeAssetsBatch(
   return {
     dryRun: false,
     allowedStatuses: IML_WIPE_ASSET_STATUSES,
+    selectedStatuses,
     candidateIds,
     processed,
     totalBytesFreed,
