@@ -2,8 +2,14 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronsLeft, ChevronLeft, ChevronRight, ChevronsRight, Calendar } from "lucide-react";
-import { formatWeekRange, formatDateLocal, parseDateLocal } from "./lib/week-utils";
+import { formatWeekRange } from "./lib/week-utils";
 import { getPrevMonth, getNextMonth, getCurrentMonth, formatMonth } from "./lib/month-utils";
+import {
+  addDaysToYmdPrague,
+  getWeekStartYmdPrague,
+  pragueDayStart,
+  pragueTodayYmd,
+} from "@/lib/datetime-cz";
 
 type Props = {
   view: "week" | "month";
@@ -84,23 +90,16 @@ export function CalendarNav({ view, from, to, month }: Props) {
     );
   }
 
-  const fromDate = parseDateLocal(from);
-  const toDate = parseDateLocal(to);
-
-  const updateWeekUrl = (newFrom: Date, newTo: Date) => {
+  const updateWeekUrl = (newFromYmd: string, newToYmd: string) => {
     updateUrl({
       view: "week",
-      from: formatDateLocal(newFrom),
-      to: formatDateLocal(newTo),
+      from: newFromYmd,
+      to: newToYmd,
     });
   };
 
   const shiftByDays = (days: number) => {
-    const newFrom = new Date(fromDate);
-    newFrom.setDate(newFrom.getDate() + days);
-    const newTo = new Date(toDate);
-    newTo.setDate(newTo.getDate() + days);
-    updateWeekUrl(newFrom, newTo);
+    updateWeekUrl(addDaysToYmdPrague(from, days), addDaysToYmdPrague(to, days));
   };
 
   const goPrevWeek = () => shiftByDays(-7);
@@ -109,14 +108,12 @@ export function CalendarNav({ view, from, to, month }: Props) {
   const goNextDay = () => shiftByDays(1);
 
   const goCurrent = () => {
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const todayEnd = new Date(today);
-    todayEnd.setDate(todayEnd.getDate() + 6);
-    updateWeekUrl(today, todayEnd);
+    const todayYmd = pragueTodayYmd();
+    const weekStart = getWeekStartYmdPrague(todayYmd);
+    updateWeekUrl(weekStart, addDaysToYmdPrague(weekStart, 6));
   };
 
-  const weekLabel = formatWeekRange(fromDate, toDate);
+  const weekLabel = formatWeekRange(pragueDayStart(from), pragueDayStart(to));
 
   return (
     <div className="mb-4 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-gray-200 bg-white p-4">
