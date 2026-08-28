@@ -424,7 +424,7 @@ export async function buildProductPayload(
     color_count: colorCount,
     print_colors_text: get("print_colors_text") || null,
     label_type: labelType,
-    item_status: get("item_status") || null,
+    item_status: get("item_status") || "neaktivní",
     sku,
     last_edited_by: editorName,
     is_active: true,

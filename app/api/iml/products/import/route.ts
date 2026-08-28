@@ -178,7 +178,7 @@ export async function POST(req: NextRequest) {
           print_colors_text: get("print_colors_text") || null,
           label_type: get("label_type") || null,
           product_kind: parseProductKind(get("product_kind") || null),
-          item_status: get("item_status") || null,
+          item_status: get("item_status") || "neaktivní",
           sku,
           last_edited_by: editorName,
           is_active: true,
