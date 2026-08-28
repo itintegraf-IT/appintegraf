@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Eraser, Loader2 } from "lucide-react";
-import { wipeStatusLabel, IML_WIPE_STATUS_NONE } from "@/lib/iml-product-wipe-assets";
+import { wipeStatusLabel, IML_WIPE_STATUS_NONE } from "@/lib/iml-product-wipe-assets-shared";
 
 type StatusCounts = { products: number; withAssets: number };
 
