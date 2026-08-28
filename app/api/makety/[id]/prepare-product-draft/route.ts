@@ -8,6 +8,10 @@ import {
 } from "@/lib/makety-access";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { buildMaketyProductDraft } from "@/lib/makety-product-draft";
+import {
+  findImlProductByIgCode,
+  toMaketyImlProductConflict,
+} from "@/lib/makety-iml-product-lookup";
 
 export async function POST(
   _req: Request,
@@ -74,9 +78,18 @@ export async function POST(
     data: { product_draft: draft as unknown as Prisma.InputJsonValue },
   });
 
+  let conflict = null;
+  if (draft.mode === "create" && draft.ig_code?.trim()) {
+    const existing = await findImlProductByIgCode(draft.ig_code);
+    if (existing) {
+      conflict = toMaketyImlProductConflict(existing);
+    }
+  }
+
   return NextResponse.json({
     success: true,
     draft,
+    conflict,
     customerName: maketa.iml_customers?.name ?? null,
     dieCutLabel: maketa.iml_die_cuts
       ? [
