@@ -92,6 +92,7 @@ export async function POST(
         product_id: source.product_id,
         die_cut_id: source.die_cut_id,
         label_code: source.label_code,
+        product_name: source.product_name,
         job_number: source.job_number,
         prepress_user_id: workflow.prepress_user_id,
         final_approver_user_id: workflow.final_approver_user_id,

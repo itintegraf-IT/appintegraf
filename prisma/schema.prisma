@@ -430,6 +430,7 @@ model makety {
   product_id                   Int?
   die_cut_id                   Int?
   label_code                   String?              @db.VarChar(100)
+  product_name                 String?              @db.VarChar(255)
   job_number                   String?              @db.VarChar(50)
   product_draft                Json?
   iml_applied_at               DateTime?            @db.DateTime(0)

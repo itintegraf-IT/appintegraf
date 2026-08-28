@@ -200,12 +200,14 @@ export async function PUT(
       product_id: number | null;
       die_cut_id: number | null;
       label_code: string | null;
+      product_name: string | null;
       job_number: string | null;
     } = {
       customer_id: existing.customer_id,
       product_id: existing.product_id,
       die_cut_id: existing.die_cut_id,
       label_code: existing.label_code,
+      product_name: existing.product_name,
       job_number: existing.job_number,
     };
 
@@ -215,6 +217,7 @@ export async function PUT(
         "product_id" in body ||
         "die_cut_id" in body ||
         "label_code" in body ||
+        "product_name" in body ||
         "job_number" in body;
       if (hasImlKey) {
         const imlParsed = parseMaketyImlFieldsFromInput(body as Record<string, unknown>);

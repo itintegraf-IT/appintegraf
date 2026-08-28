@@ -26,6 +26,7 @@ export type EditMaketyInitial = {
   product_id?: number | null;
   die_cut_id?: number | null;
   label_code?: string | null;
+  product_name?: string | null;
   job_number?: string | null;
   prepress_user_id?: number | null;
   final_approver_user_id?: number | null;
@@ -63,6 +64,7 @@ export function EditMaketyWorkForm({
     product_id: initial.product_id ?? null,
     die_cut_id: initial.die_cut_id ?? null,
     label_code: initial.label_code ?? null,
+    product_name: initial.product_name ?? null,
     job_number: initial.job_number ?? null,
   };
 
@@ -89,6 +91,7 @@ export function EditMaketyWorkForm({
       payload.product_id = String(fd.get("product_id") ?? "").trim() || null;
       payload.die_cut_id = String(fd.get("die_cut_id") ?? "").trim() || null;
       payload.label_code = String(fd.get("label_code") ?? "").trim() || null;
+      payload.product_name = String(fd.get("product_name") ?? "").trim() || null;
       payload.job_number = String(fd.get("job_number") ?? "").trim() || null;
       payload.prepress_user_id = String(fd.get("prepress_user_id") ?? "").trim() || null;
       payload.final_approver_user_id =

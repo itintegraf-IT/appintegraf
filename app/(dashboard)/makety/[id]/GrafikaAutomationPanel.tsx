@@ -90,10 +90,30 @@ export function GrafikaAutomationPanel({
       }
       setDraftOpen(false);
       setDraft(null);
+      const fileInfo = data.files as
+        | {
+            softproofAttached?: boolean;
+            printDataAttached?: boolean;
+            warnings?: string[];
+          }
+        | undefined;
+      const transferred: string[] = [];
+      if (fileInfo?.softproofAttached) transferred.push("softproof");
+      if (fileInfo?.printDataAttached) transferred.push("tisková data");
+      const transferNote =
+        transferred.length > 0 ? ` Přeneseno: ${transferred.join(", ")}.` : "";
+      const warnNote =
+        fileInfo?.warnings?.length && transferred.length === 0
+          ? ` Varování: ${fileInfo.warnings.join("; ")}`
+          : fileInfo?.warnings?.length
+            ? ` ${fileInfo.warnings.join("; ")}`
+            : "";
       setMessage(
-        data.mode === "update"
+        (data.mode === "update"
           ? `Produkt #${data.productId} aktualizován. Zakázka je v archivu.`
-          : `Produkt #${data.productId} založen. Zakázka je v archivu.`
+          : `Produkt #${data.productId} založen. Zakázka je v archivu.`) +
+          transferNote +
+          warnNote
       );
       router.refresh();
     } catch {
@@ -197,6 +217,18 @@ export function GrafikaAutomationPanel({
                   value={draft.client_code ?? ""}
                   onChange={(e) =>
                     setDraft({ ...draft, client_code: e.target.value || null })
+                  }
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-medium uppercase text-gray-500">
+                  Název u klienta
+                </span>
+                <input
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-600 dark:bg-gray-800"
+                  value={draft.client_name ?? ""}
+                  onChange={(e) =>
+                    setDraft({ ...draft, client_name: e.target.value || null })
                   }
                 />
               </label>

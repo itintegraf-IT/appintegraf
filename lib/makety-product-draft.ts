@@ -21,6 +21,7 @@ export function buildMaketyProductDraft(input: {
   product_id: number | null;
   die_cut_id: number | null;
   label_code: string | null;
+  product_name?: string | null;
   body: string;
   customer_name?: string | null;
   product?: {
@@ -41,6 +42,7 @@ export function buildMaketyProductDraft(input: {
     (ig_code ? `Grafika ${ig_code}` : null);
   const production_notes = input.body.trim().slice(0, 5000) || null;
   const client_name =
+    input.product_name?.trim() ||
     input.product?.client_name?.trim() ||
     input.customer_name?.trim() ||
     null;
@@ -59,7 +61,7 @@ export function buildMaketyProductDraft(input: {
     ig_short_name,
     client_name,
     production_notes,
-    item_status: "Aktivní",
+    item_status: "aktivní",
     approval_status: "approved",
     missing_fields,
   };
