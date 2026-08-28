@@ -66,6 +66,9 @@ const productListSelect = {
   iml_foils: { select: { id: true, code: true, name: true } },
 } as const;
 
+/** Velikost bloku pro infinite scroll (per_page=all se na klientu mapuje sem). */
+const INFINITE_SCROLL_CHUNK = 50;
+
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -124,6 +127,8 @@ export async function GET(req: NextRequest) {
 
   const pageParam = searchParams.get("page");
   const perPageParam = searchParams.get("per_page");
+  const skipTotal =
+    searchParams.get("skip_total") === "1" || searchParams.get("skip_total") === "true";
   const paginated = pageParam !== null || perPageParam !== null;
 
   const listSelect = {
@@ -150,26 +155,30 @@ export async function GET(req: NextRequest) {
     page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
     const perPageRaw = perPageParam ?? "25";
     if (perPageRaw === "all") {
-      perPage = null;
+      perPage = INFINITE_SCROLL_CHUNK;
     } else {
       const parsed = parseInt(perPageRaw, 10);
       perPage = parsed === 50 || parsed === 100 ? parsed : 25;
     }
-    const skip = perPage ? (page - 1) * perPage : 0;
+    const skip = (page - 1) * perPage;
 
-    const [rows, count] = await Promise.all([
-      prisma.iml_products.findMany({
-        where,
-        orderBy: { id: "desc" },
-        skip: perPage ? skip : 0,
-        take: perPage ?? undefined,
-        select: listSelect,
-      }),
-      prisma.iml_products.count({ where }),
-    ]);
+    const rows = await prisma.iml_products.findMany({
+      where,
+      orderBy: { id: "desc" },
+      skip,
+      take: perPage,
+      select: listSelect,
+    });
     products = rows;
-    total = count;
-    totalPages = perPage ? Math.max(1, Math.ceil(count / perPage)) : 1;
+
+    if (skipTotal) {
+      total = undefined;
+      totalPages = undefined;
+    } else {
+      const count = await prisma.iml_products.count({ where });
+      total = count;
+      totalPages = Math.max(1, Math.ceil(count / perPage));
+    }
   }
 
   // Efektivní flagy bez stahování blobů: jen OCTET_LENGTH > 0.
@@ -219,8 +228,12 @@ export async function GET(req: NextRequest) {
     products: productsWithFlags,
     total: total ?? productsWithFlags.length,
     page: page ?? 1,
-    perPage: perPage ?? total ?? productsWithFlags.length,
+    perPage: perPage ?? INFINITE_SCROLL_CHUNK,
     totalPages: totalPages ?? 1,
+    hasMore:
+      perPage != null &&
+      productsWithFlags.length === perPage &&
+      (total != null ? (page ?? 1) * perPage < total : !skipTotal),
   });
 }
 
