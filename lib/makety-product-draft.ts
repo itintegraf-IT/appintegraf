@@ -17,7 +17,7 @@ export type MaketyProductDraft = {
   missing_fields: string[];
 };
 
-export type ApplyProductDraftBody = MaketyProductDraft & {
+export type ApplyProductDraftBody = Partial<MaketyProductDraft> & {
   confirmReplace?: boolean;
 };
 

@@ -30,7 +30,7 @@ function isDraft(val: unknown): val is MaketyProductDraft {
 }
 
 function parseApplyBody(body: unknown): ApplyProductDraftBody {
-  if (!body || typeof body !== "object") return {} as ApplyProductDraftBody;
+  if (!body || typeof body !== "object") return {};
   return body as ApplyProductDraftBody;
 }
 
