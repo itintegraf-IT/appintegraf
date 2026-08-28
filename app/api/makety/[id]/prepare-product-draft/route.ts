@@ -63,6 +63,7 @@ export async function POST(
     product_id: maketa.product_id,
     die_cut_id: maketa.die_cut_id,
     label_code: maketa.label_code,
+    product_name: maketa.product_name,
     body: maketa.body,
     customer_name: maketa.iml_customers?.name ?? null,
     product: maketa.iml_products,

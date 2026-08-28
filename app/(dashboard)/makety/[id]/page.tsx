@@ -294,6 +294,10 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
                     </dd>
                   </div>
                   <div>
+                    <dt className="text-xs font-medium uppercase text-gray-500">Název (IML)</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{maketa.product_name ?? "—"}</dd>
+                  </div>
+                  <div>
                     <dt className="text-xs font-medium uppercase text-gray-500">Číslo zakázky (ERP)</dt>
                     <dd className="mt-1 text-sm text-gray-900">{maketa.job_number ?? "—"}</dd>
                   </div>

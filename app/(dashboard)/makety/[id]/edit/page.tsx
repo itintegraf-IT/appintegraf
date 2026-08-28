@@ -99,6 +99,7 @@ export default async function MaketaEditPage({ params, searchParams }: PageProps
           product_id: maketa.product_id,
           die_cut_id: maketa.die_cut_id,
           label_code: maketa.label_code,
+          product_name: maketa.product_name,
           job_number: maketa.job_number,
           prepress_user_id: maketa.prepress_user_id,
           final_approver_user_id: maketa.final_approver_user_id,

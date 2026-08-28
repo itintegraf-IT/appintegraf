@@ -5,6 +5,7 @@ export type MaketyImlFields = {
   product_id: number | null;
   die_cut_id: number | null;
   label_code: string | null;
+  product_name: string | null;
   job_number: string | null;
 };
 
@@ -45,6 +46,7 @@ export function parseMaketyImlFieldsFromInput(input: {
     product_id: productRaw,
     die_cut_id: dieCutRaw,
     label_code: parseOptionalText(read("label_code"), 100),
+    product_name: parseOptionalText(read("product_name"), 255),
     job_number: parseOptionalText(read("job_number"), 50),
   };
 }
@@ -63,11 +65,12 @@ export async function resolveMaketyImlFields(
       product_id: null,
       die_cut_id: null,
       label_code: null,
+      product_name: null,
       job_number: null,
     };
   }
 
-  let { customer_id, product_id, die_cut_id, label_code, job_number } = fields;
+  let { customer_id, product_id, die_cut_id, label_code, product_name, job_number } = fields;
 
   if (customer_id != null) {
     const customer = await prisma.iml_customers.findFirst({
@@ -127,5 +130,5 @@ export async function resolveMaketyImlFields(
     return { error: "Nejprve vyberte klienta" };
   }
 
-  return { customer_id, product_id, die_cut_id, label_code, job_number };
+  return { customer_id, product_id, die_cut_id, label_code, product_name, job_number };
 }

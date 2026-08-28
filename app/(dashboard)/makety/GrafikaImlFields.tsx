@@ -8,6 +8,7 @@ export type GrafikaImlInitial = {
   product_id: number | null;
   die_cut_id: number | null;
   label_code: string | null;
+  product_name: string | null;
   job_number: string | null;
 };
 
@@ -61,6 +62,10 @@ export function GrafikaImlFields({ initial }: Props) {
     initial?.die_cut_id != null ? String(initial.die_cut_id) : ""
   );
   const [labelCode, setLabelCode] = useState(initial?.label_code ?? "");
+  const [productName, setProductName] = useState(initial?.product_name ?? "");
+  const [productNameTouched, setProductNameTouched] = useState(
+    Boolean(initial?.product_name?.trim())
+  );
   const [jobNumber, setJobNumber] = useState(initial?.job_number ?? "");
   const [customerQuery, setCustomerQuery] = useState("");
   const [customerOpen, setCustomerOpen] = useState(false);
@@ -154,6 +159,8 @@ export function GrafikaImlFields({ initial }: Props) {
     setProductId("");
     setDieCutId("");
     setLabelCode("");
+    setProductName("");
+    setProductNameTouched(false);
     setCustomerOpen(false);
   };
 
@@ -165,6 +172,10 @@ export function GrafikaImlFields({ initial }: Props) {
     const code = p.ig_code || p.client_code || p.ean_code || "";
     if (code) setLabelCode(code);
     if (p.die_cut_id != null) setDieCutId(String(p.die_cut_id));
+    if (!productNameTouched) {
+      const name = p.client_name?.trim() || p.ig_short_name?.trim() || "";
+      if (name) setProductName(name);
+    }
   };
 
   const displayValue = customerOpen
@@ -271,6 +282,25 @@ export function GrafikaImlFields({ initial }: Props) {
             {customersLoading
               ? "Načítání klientů…"
               : "Rozevírací seznam — pište pro vyhledání, výchozí je bez klienta"}
+          </p>
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className="mb-1 block text-sm font-medium text-gray-700">Název</label>
+          <input
+            name="product_name"
+            type="text"
+            value={productName}
+            onChange={(e) => {
+              setProductNameTouched(true);
+              setProductName(e.target.value);
+            }}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            placeholder="Název etikety pro IML katalog (Název / Klient)"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Při zápisu do IML se přenese jako název u klienta. Výběr etikety z katalogu pole
+            předvyplní.
           </p>
         </div>
 

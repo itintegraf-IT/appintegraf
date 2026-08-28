@@ -13,6 +13,7 @@ import {
   draftToProductUpdateScalars,
   type MaketyProductDraft,
 } from "@/lib/makety-product-draft";
+import { transferMaketyFilesToImlProduct } from "@/lib/makety-transfer-product-files";
 
 function isDraft(val: unknown): val is MaketyProductDraft {
   if (!val || typeof val !== "object") return false;
@@ -80,6 +81,7 @@ export async function POST(
           product_id: maketa.product_id,
           die_cut_id: maketa.die_cut_id,
           label_code: maketa.label_code,
+          product_name: maketa.product_name,
           body: maketa.body,
           customer_name: maketa.iml_customers?.name ?? null,
           product: maketa.iml_products,
@@ -95,6 +97,9 @@ export async function POST(
   if (draft.customer_id == null) draft.missing_fields.push("customer_id");
   if (!draft.ig_code?.trim()) draft.missing_fields.push("ig_code");
 
+  if (!draft.client_name?.trim() && maketa.product_name?.trim()) {
+    draft.client_name = maketa.product_name.trim();
+  }
   if (!draft.client_name?.trim() && maketa.iml_customers?.name) {
     draft.client_name = maketa.iml_customers.name;
   }
@@ -113,7 +118,12 @@ export async function POST(
   const editor = `${maketa.users_creator.first_name} ${maketa.users_creator.last_name}`.trim();
 
   try {
+    let productId: number;
+    let mode: "create" | "update";
+
     if (draft.mode === "update" && draft.product_id != null) {
+      productId = draft.product_id;
+      mode = "update";
       await prisma.iml_products.update({
         where: { id: draft.product_id },
         data: {
@@ -138,43 +148,55 @@ export async function POST(
           body: `Aktualizován produkt IML #${draft.product_id} (${draft.ig_code})`,
         },
       });
+    } else {
+      const created = await prisma.iml_products.create({
+        data: {
+          ...draftToProductCreateScalars(draft),
+          last_edited_by: editor || undefined,
+        },
+      });
+      productId = created.id;
+      mode = "create";
 
-      return NextResponse.json({
-        success: true,
-        mode: "update",
-        productId: draft.product_id,
+      await prisma.makety.update({
+        where: { id: maketaId },
+        data: {
+          product_id: created.id,
+          label_code: draft.ig_code,
+          product_draft: Prisma.DbNull,
+          iml_applied_at: new Date(),
+        },
+      });
+
+      await prisma.makety_comments.create({
+        data: {
+          maketa_id: maketaId,
+          user_id: userId,
+          body: `Založen produkt IML #${created.id} (${draft.ig_code})`,
+        },
       });
     }
 
-    const created = await prisma.iml_products.create({
-      data: {
-        ...draftToProductCreateScalars(draft),
-        last_edited_by: editor || undefined,
-      },
-    });
+    const files = await transferMaketyFilesToImlProduct(maketaId, productId, userId);
 
-    await prisma.makety.update({
-      where: { id: maketaId },
-      data: {
-        product_id: created.id,
-        label_code: draft.ig_code,
-        product_draft: Prisma.DbNull,
-        iml_applied_at: new Date(),
-      },
-    });
-
-    await prisma.makety_comments.create({
-      data: {
-        maketa_id: maketaId,
-        user_id: userId,
-        body: `Založen produkt IML #${created.id} (${draft.ig_code})`,
-      },
-    });
+    const fileParts: string[] = [];
+    if (files.softproofAttached) fileParts.push("softproof");
+    if (files.printDataAttached) fileParts.push("tisková data");
+    if (fileParts.length > 0) {
+      await prisma.makety_comments.create({
+        data: {
+          maketa_id: maketaId,
+          user_id: userId,
+          body: `Do IML produktu #${productId} přeneseno: ${fileParts.join(", ")}`,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,
-      mode: "create",
-      productId: created.id,
+      mode,
+      productId,
+      files,
     });
   } catch (e) {
     console.error("apply-product-draft", e);
