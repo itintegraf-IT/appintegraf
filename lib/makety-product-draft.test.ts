@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { buildMaketyProductDraft } from "@/lib/makety-product-draft";
+import {
+  buildMaketyProductDraft,
+  requiresIgCodeReplaceConfirmation,
+  supplementProductFromDraft,
+} from "@/lib/makety-product-draft";
+import { matchProductByIgCode } from "@/lib/makety-iml-product-lookup";
 import { pickLatestMaketyFileByKind } from "@/lib/makety-transfer-product-files";
 
 describe("buildMaketyProductDraft client_name", () => {
@@ -55,6 +60,88 @@ describe("buildMaketyProductDraft client_name", () => {
       body: "",
     });
     expect(draft.item_status).toBe("aktivní");
+  });
+});
+
+describe("supplementProductFromDraft", () => {
+  const draft = buildMaketyProductDraft({
+    customer_id: 2,
+    product_id: null,
+    die_cut_id: 5,
+    label_code: "045-01-048",
+    product_name: "Nový název",
+    body: "Nová poznámka",
+  });
+
+  it("doplní prázdná pole, vyplněná nepřepíše", () => {
+    const update = supplementProductFromDraft(
+      {
+        client_code: "EXIST",
+        client_name: "Původní název",
+        ig_short_name: null,
+        production_notes: "",
+        die_cut_id: null,
+        customer_id: null,
+      },
+      draft
+    );
+    expect(update.client_code).toBeUndefined();
+    expect(update.client_name).toBeUndefined();
+    expect(update.ig_short_name).toBe(draft.ig_short_name);
+    expect(update.production_notes).toBe(draft.production_notes);
+    expect(update.iml_die_cuts).toEqual({ connect: { id: 5 } });
+    expect(update.iml_customers).toEqual({ connect: { id: 2 } });
+  });
+});
+
+describe("requiresIgCodeReplaceConfirmation", () => {
+  const conflict = {
+    product_id: 42,
+    ig_code: "045-01-048",
+    client_name: "Test",
+    ig_short_name: null,
+    customer_id: 1,
+  };
+
+  it("create + konflikt bez confirm vyžaduje potvrzení", () => {
+    expect(
+      requiresIgCodeReplaceConfirmation({
+        draftMode: "create",
+        draftProductId: null,
+        conflict,
+        confirmReplace: false,
+      })
+    ).toBe(true);
+  });
+
+  it("create + confirmReplace projde", () => {
+    expect(
+      requiresIgCodeReplaceConfirmation({
+        draftMode: "create",
+        draftProductId: null,
+        conflict,
+        confirmReplace: true,
+      })
+    ).toBe(false);
+  });
+
+  it("update stejného produktu nevyžaduje replace confirm", () => {
+    expect(
+      requiresIgCodeReplaceConfirmation({
+        draftMode: "update",
+        draftProductId: 42,
+        conflict,
+        confirmReplace: false,
+      })
+    ).toBe(false);
+  });
+});
+
+describe("matchProductByIgCode", () => {
+  it("porovná kódy case-insensitively", () => {
+    expect(matchProductByIgCode("045-01-048", "045-01-048")).toBe(true);
+    expect(matchProductByIgCode("045-01-048", " 045-01-048 ")).toBe(true);
+    expect(matchProductByIgCode("045-01-048", "045-01-047")).toBe(false);
   });
 });
 

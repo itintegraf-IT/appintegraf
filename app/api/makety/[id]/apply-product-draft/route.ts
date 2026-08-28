@@ -7,18 +7,31 @@ import {
   userCanViewMaketa,
 } from "@/lib/makety-access";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
+import { logImlAudit } from "@/lib/iml-audit";
 import {
   buildMaketyProductDraft,
   draftToProductCreateScalars,
   draftToProductUpdateScalars,
+  requiresIgCodeReplaceConfirmation,
+  supplementProductFromDraft,
+  type ApplyProductDraftBody,
   type MaketyProductDraft,
 } from "@/lib/makety-product-draft";
+import {
+  findImlProductByIgCode,
+  toMaketyImlProductConflict,
+} from "@/lib/makety-iml-product-lookup";
 import { transferMaketyFilesToImlProduct } from "@/lib/makety-transfer-product-files";
 
 function isDraft(val: unknown): val is MaketyProductDraft {
   if (!val || typeof val !== "object") return false;
   const d = val as MaketyProductDraft;
   return d.mode === "create" || d.mode === "update";
+}
+
+function parseApplyBody(body: unknown): ApplyProductDraftBody {
+  if (!body || typeof body !== "object") return {};
+  return body as ApplyProductDraftBody;
 }
 
 export async function POST(
@@ -49,15 +62,14 @@ export async function POST(
     );
   }
 
-  let overrides: Partial<MaketyProductDraft> = {};
+  let requestBody: ApplyProductDraftBody = {};
   try {
-    const body = await req.json().catch(() => ({}));
-    if (body && typeof body === "object") {
-      overrides = body as Partial<MaketyProductDraft>;
-    }
+    requestBody = parseApplyBody(await req.json().catch(() => ({})));
   } catch {
     /* empty */
   }
+  const confirmReplace = requestBody.confirmReplace === true;
+  const { confirmReplace: _confirmReplace, ...overrides } = requestBody;
 
   const maketa = await prisma.makety.findFirst({
     where: { id: maketaId, work_type: "grafika" },
@@ -117,11 +129,89 @@ export async function POST(
 
   const editor = `${maketa.users_creator.first_name} ${maketa.users_creator.last_name}`.trim();
 
+  const igConflictProduct = draft.ig_code?.trim()
+    ? await findImlProductByIgCode(draft.ig_code)
+    : null;
+  const conflict = igConflictProduct ? toMaketyImlProductConflict(igConflictProduct) : null;
+
+  const isConflictReplace =
+    confirmReplace &&
+    conflict != null &&
+    (draft.mode === "create" || draft.product_id !== conflict.product_id);
+
+  if (
+    requiresIgCodeReplaceConfirmation({
+      draftMode: draft.mode,
+      draftProductId: draft.product_id,
+      conflict,
+      confirmReplace,
+    })
+  ) {
+    return NextResponse.json(
+      {
+        error: `Produkt s kódem IG ${draft.ig_code} již existuje. Potvrďte nahrazení souborů.`,
+        conflict,
+        draft,
+      },
+      { status: 409 }
+    );
+  }
+
   try {
     let productId: number;
-    let mode: "create" | "update";
+    let mode: "create" | "update" | "replace";
+    let replacedExisting = false;
 
-    if (draft.mode === "update" && draft.product_id != null) {
+    if (isConflictReplace && igConflictProduct) {
+      productId = igConflictProduct.id;
+      mode = "replace";
+      replacedExisting = true;
+
+      const supplementData = supplementProductFromDraft(igConflictProduct, draft);
+      await prisma.iml_products.update({
+        where: { id: productId },
+        data: {
+          ...supplementData,
+          last_edited_by: editor || undefined,
+        },
+      });
+
+      await prisma.makety.update({
+        where: { id: maketaId },
+        data: {
+          product_id: productId,
+          product_draft: Prisma.DbNull,
+          iml_applied_at: new Date(),
+        },
+      });
+
+      await prisma.makety_comments.create({
+        data: {
+          maketa_id: maketaId,
+          user_id: userId,
+          body: `Nahrazeny soubory (softproof, tisková data) u existujícího produktu IML #${productId} (${draft.ig_code}) z grafické zakázky. Metadata doplněna jen do prázdných polí.`,
+        },
+      });
+
+      await logImlAudit({
+        userId,
+        action: "update",
+        tableName: "iml_products",
+        recordId: productId,
+        oldValues: {
+          ig_code: igConflictProduct.ig_code,
+          client_name: igConflictProduct.client_name,
+          source: "makety_grafika",
+        },
+        newValues: {
+          ig_code: draft.ig_code,
+          supplemented: true,
+          replaced_files: true,
+          maketa_id: maketaId,
+          source: "makety_grafika",
+        },
+      });
+    } else if (draft.mode === "update" && draft.product_id != null) {
       productId = draft.product_id;
       mode = "update";
       await prisma.iml_products.update({
@@ -146,6 +236,19 @@ export async function POST(
           maketa_id: maketaId,
           user_id: userId,
           body: `Aktualizován produkt IML #${draft.product_id} (${draft.ig_code})`,
+        },
+      });
+
+      await logImlAudit({
+        userId,
+        action: "update",
+        tableName: "iml_products",
+        recordId: productId,
+        newValues: {
+          ig_code: draft.ig_code,
+          client_name: draft.client_name,
+          maketa_id: maketaId,
+          source: "makety_grafika",
         },
       });
     } else {
@@ -175,6 +278,19 @@ export async function POST(
           body: `Založen produkt IML #${created.id} (${draft.ig_code})`,
         },
       });
+
+      await logImlAudit({
+        userId,
+        action: "create",
+        tableName: "iml_products",
+        recordId: productId,
+        newValues: {
+          ig_code: draft.ig_code,
+          client_name: draft.client_name,
+          maketa_id: maketaId,
+          source: "makety_grafika",
+        },
+      });
     }
 
     const files = await transferMaketyFilesToImlProduct(maketaId, productId, userId);
@@ -196,6 +312,7 @@ export async function POST(
       success: true,
       mode,
       productId,
+      replacedExisting,
       files,
     });
   } catch (e) {

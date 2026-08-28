@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import type { MaketyImlProductConflict } from "@/lib/makety-iml-product-lookup";
 
 /** Návrh dat pro založení / aktualizaci iml_products z grafické zakázky. */
 export type MaketyProductDraft = {
@@ -15,6 +16,65 @@ export type MaketyProductDraft = {
   approval_status: string;
   missing_fields: string[];
 };
+
+export type ApplyProductDraftBody = Partial<MaketyProductDraft> & {
+  confirmReplace?: boolean;
+};
+
+export type ExistingProductForSupplement = {
+  client_code: string | null;
+  client_name: string | null;
+  ig_short_name: string | null;
+  production_notes: string | null;
+  die_cut_id: number | null;
+  customer_id: number | null;
+};
+
+function isBlank(value: string | null | undefined): boolean {
+  return value == null || value.trim() === "";
+}
+
+/** Vrátí true, pokud create narazí na existující Kód IG a vyžaduje confirmReplace. */
+export function requiresIgCodeReplaceConfirmation(input: {
+  draftMode: "create" | "update";
+  draftProductId: number | null;
+  conflict: MaketyImlProductConflict | null;
+  confirmReplace: boolean;
+}): boolean {
+  if (!input.conflict) return false;
+  if (input.confirmReplace) return false;
+  if (input.draftMode === "create") return true;
+  return input.draftProductId !== input.conflict.product_id;
+}
+
+/** Doplní metadata z draftu jen do prázdných polí existujícího produktu. */
+export function supplementProductFromDraft(
+  existing: ExistingProductForSupplement,
+  draft: MaketyProductDraft
+): Prisma.iml_productsUpdateInput {
+  const data: Prisma.iml_productsUpdateInput = { is_active: true };
+
+  if (isBlank(existing.client_code) && draft.client_code?.trim()) {
+    data.client_code = draft.client_code.trim();
+  }
+  if (isBlank(existing.client_name) && draft.client_name?.trim()) {
+    data.client_name = draft.client_name.trim();
+  }
+  if (isBlank(existing.ig_short_name) && draft.ig_short_name?.trim()) {
+    data.ig_short_name = draft.ig_short_name.trim();
+  }
+  if (isBlank(existing.production_notes) && draft.production_notes?.trim()) {
+    data.production_notes = draft.production_notes.trim();
+  }
+  if (existing.die_cut_id == null && draft.die_cut_id != null) {
+    data.iml_die_cuts = { connect: { id: draft.die_cut_id } };
+  }
+  if (existing.customer_id == null && draft.customer_id != null) {
+    data.iml_customers = { connect: { id: draft.customer_id } };
+  }
+
+  return data;
+}
 
 export function buildMaketyProductDraft(input: {
   customer_id: number | null;

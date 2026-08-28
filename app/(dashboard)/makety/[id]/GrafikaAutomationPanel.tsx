@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MaketyProductDraft } from "@/lib/makety-product-draft";
+import type { MaketyImlProductConflict } from "@/lib/makety-iml-product-lookup";
 
 type Props = {
   maketaId: number;
@@ -33,7 +34,17 @@ export function GrafikaAutomationPanel({
     customerName: string | null;
     dieCutLabel: string | null;
   } | null>(null);
+  const [conflict, setConflict] = useState<MaketyImlProductConflict | null>(null);
   const autoOpened = useRef(false);
+
+  const normalizeIgCode = (code: string | null | undefined) =>
+    code?.trim().toUpperCase() ?? "";
+
+  const activeConflict = useMemo(() => {
+    if (!conflict || !draft?.ig_code?.trim()) return null;
+    if (normalizeIgCode(conflict.ig_code) !== normalizeIgCode(draft.ig_code)) return null;
+    return conflict;
+  }, [conflict, draft?.ig_code]);
 
   const pendingIml = canOperate && status === "approved" && !imlApplied;
 
@@ -52,6 +63,7 @@ export function GrafikaAutomationPanel({
         return;
       }
       setDraft(data.draft as MaketyProductDraft);
+      setConflict((data.conflict as MaketyImlProductConflict | null) ?? null);
       setDraftMeta({
         customerName: data.customerName ?? null,
         dieCutLabel: data.dieCutLabel ?? null,
@@ -76,20 +88,36 @@ export function GrafikaAutomationPanel({
     setBusy("apply");
     setError(null);
     try {
+      const payload = activeConflict
+        ? {
+            ...draft,
+            confirmReplace: true,
+            mode: "update" as const,
+            product_id: activeConflict.product_id,
+          }
+        : draft;
+
       const res = await fetch(`/api/makety/${maketaId}/apply-product-draft`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
+        body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(typeof data.error === "string" ? data.error : "Uložení selhalo");
+        const errMsg = typeof data.error === "string" ? data.error : "Uložení selhalo";
+        setError(
+          res.status === 409
+            ? `${errMsg} Zavřete dialog a znovu připravte návrh, pokud jste změnili Kód IG.`
+            : errMsg
+        );
         if (data.draft) setDraft(data.draft as MaketyProductDraft);
+        if (data.conflict) setConflict(data.conflict as MaketyImlProductConflict);
         setBusy(null);
         return;
       }
       setDraftOpen(false);
       setDraft(null);
+      setConflict(null);
       const fileInfo = data.files as
         | {
             softproofAttached?: boolean;
@@ -108,13 +136,13 @@ export function GrafikaAutomationPanel({
           : fileInfo?.warnings?.length
             ? ` ${fileInfo.warnings.join("; ")}`
             : "";
-      setMessage(
-        (data.mode === "update"
-          ? `Produkt #${data.productId} aktualizován. Zakázka je v archivu.`
-          : `Produkt #${data.productId} založen. Zakázka je v archivu.`) +
-          transferNote +
-          warnNote
-      );
+      const baseMsg =
+        data.mode === "replace" || data.replacedExisting
+          ? `Produkt #${data.productId} aktualizován (existující Kód IG). Soubory nahrazeny. Zakázka je v archivu.`
+          : data.mode === "update"
+            ? `Produkt #${data.productId} aktualizován. Zakázka je v archivu.`
+            : `Produkt #${data.productId} založen. Zakázka je v archivu.`;
+      setMessage(baseMsg + transferNote + warnNote);
       router.refresh();
     } catch {
       setError("Síťová chyba");
@@ -176,14 +204,29 @@ export function GrafikaAutomationPanel({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-xl dark:bg-gray-900">
             <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              {draft.mode === "update"
-                ? "Aktualizovat záznam v IML"
-                : "Založit záznam v IML"}
+              {activeConflict
+                ? "Nahradit soubory u existujícího produktu?"
+                : draft.mode === "update"
+                  ? "Aktualizovat záznam v IML"
+                  : "Založit záznam v IML"}
             </h4>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              Přijmout zapíše produkt do katalogu a přesune zakázku do archivu. Odmítnout zápis
-              přeskočí — zakázka zůstane aktivní a dialog lze zopakovat.
+              {activeConflict
+                ? "Nový záznam v IML nevznikne. Po potvrzení se nahradí softproof a tisková data; prázdná metadata se doplní z grafiky."
+                : "Přijmout zapíše produkt do katalogu a přesune zakázku do archivu. Odmítnout zápis přeskočí — zakázka zůstane aktivní a dialog lze zopakovat."}
             </p>
+
+            {activeConflict && (
+              <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+                Produkt s kódem{" "}
+                <strong>{activeConflict.ig_code ?? draft.ig_code}</strong> již existuje
+                (#{activeConflict.product_id}
+                {activeConflict.client_name || activeConflict.ig_short_name
+                  ? `, ${activeConflict.client_name ?? activeConflict.ig_short_name}`
+                  : ""}
+                ). Nový záznam nevznikne.
+              </div>
+            )}
 
             <dl className="mt-4 space-y-3 text-sm">
               <div>
@@ -277,7 +320,11 @@ export function GrafikaAutomationPanel({
                 onClick={() => void onApplyDraft()}
                 disabled={busy != null}
               >
-                {busy === "apply" ? "Ukládám…" : "Přijmout"}
+                {busy === "apply"
+                  ? "Ukládám…"
+                  : activeConflict
+                    ? "Nahradit softproof a tisková data"
+                    : "Přijmout"}
               </button>
             </div>
           </div>
