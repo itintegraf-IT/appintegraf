@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Eraser, Loader2 } from "lucide-react";
-import { imlItemStatusLabel } from "@/lib/iml-constants";
+import { wipeStatusLabel, IML_WIPE_STATUS_NONE } from "@/lib/iml-product-wipe-assets";
 
 type StatusCounts = { products: number; withAssets: number };
 
@@ -94,7 +94,7 @@ export function ImlWipePrintAssetsTab() {
     if (
       !dryRun &&
       !confirm(
-        `Opravdu smazat tisková PDF a softproof u dávky produktů ve stavu: ${selected.join(", ")}? Tuto akci nelze vrátit zpět (metadata produktů zůstanou).`
+        `Opravdu smazat tisková PDF a softproof u dávky produktů ve stavu: ${selected.map(wipeStatusLabel).join(", ")}? Tuto akci nelze vrátit zpět (metadata produktů zůstanou).`
       )
     ) {
       return;
@@ -168,18 +168,20 @@ export function ImlWipePrintAssetsTab() {
                       disabled={busy}
                     />
                     <span>
-                      <span className="font-medium">{imlItemStatusLabel(s)}</span>
+                      <span className="font-medium">{wipeStatusLabel(s)}</span>
                       <span className="ml-2 text-xs text-gray-500">
                         {counts.products} produktů · {counts.withAssets} se
                         soubory
                       </span>
-                      <Link
-                        href={`/iml/products?status=${encodeURIComponent(s)}`}
-                        className="ml-2 text-xs text-red-700 underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        seznam
-                      </Link>
+                      {s !== IML_WIPE_STATUS_NONE && (
+                        <Link
+                          href={`/iml/products?status=${encodeURIComponent(s)}`}
+                          className="ml-2 text-xs text-red-700 underline"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          seznam
+                        </Link>
+                      )}
                     </span>
                   </label>
                 );
@@ -242,7 +244,7 @@ export function ImlWipePrintAssetsTab() {
         <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
           <p className="font-medium text-gray-900">
             {lastResult.dryRun ? "Dry-run" : "Hotovo"} — stavy:{" "}
-            {(lastResult.selectedStatuses ?? []).join(", ")} — kandidátů:{" "}
+            {(lastResult.selectedStatuses ?? []).map(wipeStatusLabel).join(", ")} — kandidátů:{" "}
             {lastResult.candidateIds.length}
             {!lastResult.dryRun && (
               <>

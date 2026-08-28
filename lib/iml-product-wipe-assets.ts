@@ -1,17 +1,34 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { deleteArchiveFileIfExists } from "@/lib/iml-product-archive";
+import { imlItemStatusLabel } from "@/lib/iml-constants";
 
-/** Stavy, u kterých smí admin smazat tisková data a softproof. */
+/** Stavy položky, u kterých smí admin smazat tisková data a softproof. */
 export const IML_WIPE_ASSET_STATUSES = [
   "zablokovaná",
   "neaktivní",
   "chyba",
 ] as const;
 
+/** Sentinel pro položky bez vyplněného stavu (`item_status` null / prázdný). */
+export const IML_WIPE_STATUS_NONE = "__none__";
+
 export type ImlWipeAssetStatus = (typeof IML_WIPE_ASSET_STATUSES)[number];
 
+/** Všechny volby ve filtru mazání (stavy + bez stavu). */
+export const IML_WIPE_SELECTABLE_STATUSES = [
+  ...IML_WIPE_ASSET_STATUSES,
+  IML_WIPE_STATUS_NONE,
+] as const;
+
+export type ImlWipeSelectableStatus = (typeof IML_WIPE_SELECTABLE_STATUSES)[number];
+
 export const IML_WIPE_ASSETS_DEFAULT_BATCH = 20;
+
+export function wipeStatusLabel(status: string): string {
+  if (status === IML_WIPE_STATUS_NONE) return "bez stavu";
+  return imlItemStatusLabel(status);
+}
 
 export type WipeProductAssetsResult = {
   productId: number;
@@ -51,22 +68,37 @@ export type WipeAssetsStats = {
   productsWithAssets: number;
 };
 
-function isWipeAllowedStatus(status: string | null | undefined): status is ImlWipeAssetStatus {
-  return (
-    typeof status === "string" &&
-    (IML_WIPE_ASSET_STATUSES as readonly string[]).includes(status)
-  );
+function isWipeAssetStatus(value: string): value is ImlWipeAssetStatus {
+  return (IML_WIPE_ASSET_STATUSES as readonly string[]).includes(value);
+}
+
+function isWipeSelectableStatus(value: string): value is ImlWipeSelectableStatus {
+  return (IML_WIPE_SELECTABLE_STATUSES as readonly string[]).includes(value);
+}
+
+export function isProductStatusEmpty(status: string | null | undefined): boolean {
+  return !status?.trim();
+}
+
+function productMatchesWipeSelection(
+  itemStatus: string | null | undefined,
+  selected: ImlWipeSelectableStatus[]
+): boolean {
+  if (isProductStatusEmpty(itemStatus)) {
+    return selected.includes(IML_WIPE_STATUS_NONE);
+  }
+  return isWipeAssetStatus(itemStatus) && selected.includes(itemStatus);
 }
 
 /** Validuje a seřadí stavy podle whitelistu. Prázdný vstup = všechny povolené. */
-export function normalizeWipeStatuses(input: unknown): ImlWipeAssetStatus[] {
+export function normalizeWipeStatuses(input: unknown): ImlWipeSelectableStatus[] {
   if (!Array.isArray(input) || input.length === 0) {
-    return [...IML_WIPE_ASSET_STATUSES];
+    return [...IML_WIPE_SELECTABLE_STATUSES];
   }
   const picked = new Set(
-    input.filter((s): s is ImlWipeAssetStatus => isWipeAllowedStatus(s))
+    input.filter((s): s is ImlWipeSelectableStatus => typeof s === "string" && isWipeSelectableStatus(s))
   );
-  return IML_WIPE_ASSET_STATUSES.filter((s) => picked.has(s));
+  return IML_WIPE_SELECTABLE_STATUSES.filter((s) => picked.has(s));
 }
 
 function blobLen(data: Buffer | Uint8Array | null | undefined): number {
@@ -84,6 +116,24 @@ const HAS_ASSETS_SQL = Prisma.sql`
     )
   )
 `;
+
+const EMPTY_STATUS_SQL = Prisma.sql`(p.item_status IS NULL OR TRIM(p.item_status) = '')`;
+
+function buildStatusFilterSql(statuses: ImlWipeSelectableStatus[]): Prisma.Sql | null {
+  const regular = statuses.filter(isWipeAssetStatus);
+  const includeNone = statuses.includes(IML_WIPE_STATUS_NONE);
+  const parts: Prisma.Sql[] = [];
+
+  if (regular.length > 0) {
+    parts.push(Prisma.sql`p.item_status IN (${Prisma.join(regular)})`);
+  }
+  if (includeNone) {
+    parts.push(EMPTY_STATUS_SQL);
+  }
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return parts[0]!;
+  return Prisma.sql`(${Prisma.join(parts, " OR ")})`;
+}
 
 /** Statistiky pro admin UI (per povolený stav). */
 export async function getWipeAssetsStats(): Promise<WipeAssetsStats> {
@@ -105,6 +155,22 @@ export async function getWipeAssetsStats(): Promise<WipeAssetsStats> {
     };
   }
 
+  const [noneProducts, noneWithAssets] = await Promise.all([
+    prisma.$queryRaw<Array<{ cnt: bigint }>>`
+      SELECT COUNT(*) AS cnt FROM iml_products p WHERE ${EMPTY_STATUS_SQL}
+    `,
+    prisma.$queryRaw<Array<{ cnt: bigint }>>`
+      SELECT COUNT(*) AS cnt
+      FROM iml_products p
+      WHERE ${EMPTY_STATUS_SQL}
+        AND ${HAS_ASSETS_SQL}
+    `,
+  ]);
+  byStatus[IML_WIPE_STATUS_NONE] = {
+    products: Number(noneProducts[0]?.cnt ?? 0),
+    withAssets: Number(noneWithAssets[0]?.cnt ?? 0),
+  };
+
   const productsInStatus = Object.values(byStatus).reduce((a, c) => a + c.products, 0);
   const productsWithAssets = Object.values(byStatus).reduce(
     (a, c) => a + c.withAssets,
@@ -112,7 +178,7 @@ export async function getWipeAssetsStats(): Promise<WipeAssetsStats> {
   );
 
   return {
-    allowedStatuses: IML_WIPE_ASSET_STATUSES,
+    allowedStatuses: IML_WIPE_SELECTABLE_STATUSES,
     byStatus,
     productsInStatus,
     productsWithAssets,
@@ -121,15 +187,16 @@ export async function getWipeAssetsStats(): Promise<WipeAssetsStats> {
 
 export async function findWipeAssetCandidates(
   limit: number,
-  statuses: ImlWipeAssetStatus[]
+  statuses: ImlWipeSelectableStatus[]
 ): Promise<number[]> {
-  if (statuses.length === 0) return [];
+  const statusFilter = buildStatusFilterSql(statuses);
+  if (!statusFilter) return [];
   const safeLimit = Math.min(Math.max(limit, 1), 100);
 
   const rows = await prisma.$queryRaw<Array<{ id: number }>>`
     SELECT p.id
     FROM iml_products p
-    WHERE p.item_status IN (${Prisma.join(statuses)})
+    WHERE ${statusFilter}
       AND ${HAS_ASSETS_SQL}
     ORDER BY p.id ASC
     LIMIT ${safeLimit}
@@ -144,7 +211,7 @@ export async function findWipeAssetCandidates(
  */
 export async function wipeProductPrintAndPreview(
   productId: number,
-  statusesForRun: ImlWipeAssetStatus[] = [...IML_WIPE_ASSET_STATUSES]
+  statusesForRun: ImlWipeSelectableStatus[] = [...IML_WIPE_SELECTABLE_STATUSES]
 ): Promise<WipeProductAssetsResult> {
   const product = await prisma.iml_products.findUnique({
     where: { id: productId },
@@ -168,17 +235,14 @@ export async function wipeProductPrintAndPreview(
     };
   }
 
-  if (
-    !isWipeAllowedStatus(product.item_status) ||
-    !statusesForRun.includes(product.item_status)
-  ) {
+  if (!productMatchesWipeSelection(product.item_status, statusesForRun)) {
     return {
       productId,
       filesDeleted: 0,
       clearedImage: false,
       clearedLegacyPdf: false,
       bytesFreed: 0,
-      skippedReason: `Nepovolený stav: ${product.item_status ?? "(prázdný)"}`,
+      skippedReason: `Nepovolený stav: ${product.item_status?.trim() || "bez stavu"}`,
     };
   }
 
@@ -259,7 +323,7 @@ export async function runImlWipeAssetsBatch(
   if (dryRun) {
     return {
       dryRun: true,
-      allowedStatuses: IML_WIPE_ASSET_STATUSES,
+      allowedStatuses: IML_WIPE_SELECTABLE_STATUSES,
       selectedStatuses,
       candidateIds,
       processed: [],
@@ -293,7 +357,7 @@ export async function runImlWipeAssetsBatch(
 
   return {
     dryRun: false,
-    allowedStatuses: IML_WIPE_ASSET_STATUSES,
+    allowedStatuses: IML_WIPE_SELECTABLE_STATUSES,
     selectedStatuses,
     candidateIds,
     processed,

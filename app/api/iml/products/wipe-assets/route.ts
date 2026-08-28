@@ -10,7 +10,7 @@ import {
 
 /**
  * Admin: hromadné smazání tiskových PDF + softproof u produktů
- * ve stavech zablokovaná / neaktivní / chyba (výběr přes statuses[]).
+ * ve stavech zablokovaná / neaktivní / chyba / bez stavu (výběr přes statuses[]).
  * GET  – statistiky
  * POST – { dryRun?: boolean, limit?: number, statuses?: string[] }
  */
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Neplatný výběr stavů. Povoleno: zablokovaná, neaktivní, chyba.",
+            "Neplatný výběr stavů. Povoleno: zablokovaná, neaktivní, chyba, bez stavu.",
         },
         { status: 400 }
       );
