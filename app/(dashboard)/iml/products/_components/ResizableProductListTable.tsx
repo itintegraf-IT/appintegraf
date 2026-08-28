@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { startColumnResize } from "@/lib/iml/product-list-column-resize";
 import type { ProductListColumnId, ProductListColumnMeta, ProductListRow } from "@/lib/iml/product-list-columns";
 import {
@@ -12,11 +12,13 @@ type Props = {
   visibleColumns: ProductListColumnMeta[];
   columnWidths: Partial<Record<ProductListColumnId, number>>;
   loading: boolean;
+  loadingMore?: boolean;
   ready: boolean;
   products: ProductListRow[];
   cellContext: ProductListCellContext;
   onResizeColumn: (id: ProductListColumnId, width: number) => void;
   onResetColumnWidth: (id: ProductListColumnId) => void;
+  footer?: ReactNode;
 };
 
 function headerAlignClass(align?: "left" | "center" | "right"): string {
@@ -44,11 +46,13 @@ export function ResizableProductListTable({
   visibleColumns,
   columnWidths,
   loading,
+  loadingMore = false,
   ready,
   products,
   cellContext,
   onResizeColumn,
   onResetColumnWidth,
+  footer,
 }: Props) {
   const colCount = visibleColumns.length;
   const [dragWidths, setDragWidths] = useState<Partial<Record<ProductListColumnId, number>>>({});
@@ -115,7 +119,13 @@ export function ResizableProductListTable({
           </tr>
         </thead>
         <tbody>
-          {loading || !ready ? (
+          {loading && products.length === 0 ? (
+            <tr>
+              <td colSpan={colCount || 1} className="px-4 py-8 text-center text-gray-500">
+                Načítání…
+              </td>
+            </tr>
+          ) : !ready ? (
             <tr>
               <td colSpan={colCount || 1} className="px-4 py-8 text-center text-gray-500">
                 Načítání…
@@ -146,8 +156,16 @@ export function ResizableProductListTable({
               </tr>
             ))
           )}
+          {loadingMore && products.length > 0 && (
+            <tr>
+              <td colSpan={colCount || 1} className="px-4 py-3 text-center text-sm text-gray-500">
+                Načítám další produkty…
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
+      {footer}
     </div>
   );
 }
