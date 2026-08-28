@@ -1,34 +1,28 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { deleteArchiveFileIfExists } from "@/lib/iml-product-archive";
-import { imlItemStatusLabel } from "@/lib/iml-constants";
-
-/** Stavy položky, u kterých smí admin smazat tisková data a softproof. */
-export const IML_WIPE_ASSET_STATUSES = [
-  "zablokovaná",
-  "neaktivní",
-  "chyba",
-] as const;
-
-/** Sentinel pro položky bez vyplněného stavu (`item_status` null / prázdný). */
-export const IML_WIPE_STATUS_NONE = "__none__";
-
-export type ImlWipeAssetStatus = (typeof IML_WIPE_ASSET_STATUSES)[number];
-
-/** Všechny volby ve filtru mazání (stavy + bez stavu). */
-export const IML_WIPE_SELECTABLE_STATUSES = [
-  ...IML_WIPE_ASSET_STATUSES,
+import {
+  IML_WIPE_ASSET_STATUSES,
+  IML_WIPE_ASSETS_DEFAULT_BATCH,
+  IML_WIPE_SELECTABLE_STATUSES,
   IML_WIPE_STATUS_NONE,
-] as const;
+  isProductStatusEmpty,
+  isWipeAssetStatus,
+  isWipeSelectableStatus,
+  type ImlWipeAssetStatus,
+  type ImlWipeSelectableStatus,
+} from "@/lib/iml-product-wipe-assets-shared";
 
-export type ImlWipeSelectableStatus = (typeof IML_WIPE_SELECTABLE_STATUSES)[number];
-
-export const IML_WIPE_ASSETS_DEFAULT_BATCH = 20;
-
-export function wipeStatusLabel(status: string): string {
-  if (status === IML_WIPE_STATUS_NONE) return "bez stavu";
-  return imlItemStatusLabel(status);
-}
+export {
+  IML_WIPE_ASSET_STATUSES,
+  IML_WIPE_ASSETS_DEFAULT_BATCH,
+  IML_WIPE_SELECTABLE_STATUSES,
+  IML_WIPE_STATUS_NONE,
+  isProductStatusEmpty,
+  wipeStatusLabel,
+  type ImlWipeAssetStatus,
+  type ImlWipeSelectableStatus,
+} from "@/lib/iml-product-wipe-assets-shared";
 
 export type WipeProductAssetsResult = {
   productId: number;
@@ -68,18 +62,6 @@ export type WipeAssetsStats = {
   productsWithAssets: number;
 };
 
-function isWipeAssetStatus(value: string): value is ImlWipeAssetStatus {
-  return (IML_WIPE_ASSET_STATUSES as readonly string[]).includes(value);
-}
-
-function isWipeSelectableStatus(value: string): value is ImlWipeSelectableStatus {
-  return (IML_WIPE_SELECTABLE_STATUSES as readonly string[]).includes(value);
-}
-
-export function isProductStatusEmpty(status: string | null | undefined): boolean {
-  return !status?.trim();
-}
-
 function productMatchesWipeSelection(
   itemStatus: string | null | undefined,
   selected: ImlWipeSelectableStatus[]
@@ -87,7 +69,11 @@ function productMatchesWipeSelection(
   if (isProductStatusEmpty(itemStatus)) {
     return selected.includes(IML_WIPE_STATUS_NONE);
   }
-  return isWipeAssetStatus(itemStatus) && selected.includes(itemStatus);
+  return (
+    typeof itemStatus === "string" &&
+    isWipeAssetStatus(itemStatus) &&
+    selected.includes(itemStatus)
+  );
 }
 
 /** Validuje a seřadí stavy podle whitelistu. Prázdný vstup = všechny povolené. */
