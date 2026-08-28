@@ -110,7 +110,7 @@ export default function ImlProductEditPage() {
             production_notes: s("production_notes"),
             approval_status: s("approval_status"),
             approval_date: sd("approval_date"),
-            item_status: s("item_status") || "aktivní",
+            item_status: s("item_status"),
             format_width_mm: formatWidth,
             format_height_mm: formatHeight,
             color_count: si("color_count"),

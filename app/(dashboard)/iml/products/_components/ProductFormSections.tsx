@@ -514,6 +514,7 @@ export default function ProductFormSections({
                 onChange={(e) => setField("item_status", e.target.value)}
                 className={inputCls}
               >
+                <option value="">— bez stavu —</option>
                 {IML_ITEM_STATUSES.map((s) => (
                   <option key={s} value={s}>{imlItemStatusLabel(s)}</option>
                 ))}

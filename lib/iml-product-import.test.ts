@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   autoMapHeaders,
+  buildProductPayload,
   imlExportNoteHeuristics,
   mergeImlExportProductionNotes,
   normalizeCustomerNameKey,
@@ -139,5 +140,35 @@ describe("imlExportNoteHeuristics", () => {
     expect(imlExportNoteHeuristics("vzorky hotové").hasPrintSample).toBe(true);
     expect(imlExportNoteHeuristics("2023-11-13 nátisk").hasPrintProof).toBe(true);
     expect(imlExportNoteHeuristics("").hasPrintProof).toBe(false);
+  });
+});
+
+describe("buildProductPayload item_status", () => {
+  it("bez sloupce stavu nastaví neaktivní", async () => {
+    const mapping = autoMapHeaders(["code", "name"]);
+    const built = await buildProductPayload(
+      ["473110", "Test produkt"],
+      0,
+      mapping,
+      new Map(),
+      "Tester"
+    );
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.payload.data.item_status).toBe("neaktivní");
+  });
+
+  it("explicitní hodnota stavu v CSV se zachová", async () => {
+    const mapping = { ig_code: 0, client_name: 1, item_status: 2 };
+    const built = await buildProductPayload(
+      ["473110", "Test produkt", "chyba"],
+      0,
+      mapping,
+      new Map(),
+      "Tester"
+    );
+    expect(built.ok).toBe(true);
+    if (!built.ok) return;
+    expect(built.payload.data.item_status).toBe("chyba");
   });
 });

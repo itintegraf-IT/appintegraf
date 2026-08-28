@@ -301,7 +301,10 @@ export default async function ImlProductDetailPage({
           <div className="grid gap-4 sm:grid-cols-2">
             <InfoField label="Stav schválení" value={fmt(product.approval_status)} />
             <InfoField label="Datum schválení" value={fmtDate(product.approval_date)} />
-            <InfoField label="Stav položky" value={fmt(product.item_status)} />
+            <InfoField
+              label="Stav položky"
+              value={product.item_status?.trim() ? fmt(product.item_status) : "bez stavu"}
+            />
             <InfoField label="Verze tiskových dat" value={fmt(product.print_data_version)} />
             <InfoField label="Skladem" value={fmtNum(product.stock_quantity)} />
             <InfoField label="Formát" value={formatDisplay} />
