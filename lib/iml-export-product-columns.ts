@@ -304,6 +304,68 @@ export function buildProductExportCsv(
   return [header, ...lines].join("\n");
 }
 
+export function buildProductExportCsvWithAssetPaths(
+  rows: ProductExportSourceRow[],
+  columns: Array<{ key: ProductExportColumnKey; header?: string }>,
+  assetPaths: Map<number, { soubor_tisk?: string; soubor_softproof?: string }>,
+  assetOpts: { includePrint: boolean; includeSoftproof: boolean }
+): string {
+  const extraHeaders: string[] = [];
+  if (assetOpts.includePrint) extraHeaders.push("soubor_tisk");
+  if (assetOpts.includeSoftproof) extraHeaders.push("soubor_softproof");
+
+  const header = [
+    ...columns.map((c) => escapeCsv(columnHeader(c))),
+    ...extraHeaders.map((h) => escapeCsv(h)),
+  ].join(";");
+
+  const lines = rows.map((row) => {
+    const base = columns
+      .map((c) => escapeCsv(serializeProductExportValue(row, c.key)))
+      .join(";");
+    const extras: string[] = [];
+    if (assetOpts.includePrint) {
+      extras.push(escapeCsv(assetPaths.get(row.id)?.soubor_tisk ?? ""));
+    }
+    if (assetOpts.includeSoftproof) {
+      extras.push(escapeCsv(assetPaths.get(row.id)?.soubor_softproof ?? ""));
+    }
+    return extras.length ? `${base};${extras.join(";")}` : base;
+  });
+
+  return [header, ...lines].join("\n");
+}
+
+export function buildProductExportXmlWithAssetPaths(
+  rows: ProductExportSourceRow[],
+  columns: Array<{ key: ProductExportColumnKey; header?: string }>,
+  assetPaths: Map<number, { soubor_tisk?: string; soubor_softproof?: string }>,
+  assetOpts: { includePrint: boolean; includeSoftproof: boolean }
+): string {
+  const lines: string[] = ['<?xml version="1.0" encoding="UTF-8"?>', "<Products>"];
+  for (const row of rows) {
+    lines.push("  <Product>");
+    for (const col of columns) {
+      const tag = col.key;
+      const val = serializeProductExportValue(row, col.key);
+      lines.push(`    <${tag}>${escapeXml(val)}</${tag}>`);
+    }
+    if (assetOpts.includePrint) {
+      lines.push(
+        `    <soubor_tisk>${escapeXml(assetPaths.get(row.id)?.soubor_tisk ?? "")}</soubor_tisk>`
+      );
+    }
+    if (assetOpts.includeSoftproof) {
+      lines.push(
+        `    <soubor_softproof>${escapeXml(assetPaths.get(row.id)?.soubor_softproof ?? "")}</soubor_softproof>`
+      );
+    }
+    lines.push("  </Product>");
+  }
+  lines.push("</Products>");
+  return lines.join("\n");
+}
+
 export function buildProductExportXml(
   rows: ProductExportSourceRow[],
   columns: Array<{ key: ProductExportColumnKey; header?: string }>

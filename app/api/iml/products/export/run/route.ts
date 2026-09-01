@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
-import { loadProductsForExport, renderProductExport } from "@/lib/iml-export-products-run";
+import {
+  hasProductExportAssets,
+  parseProductExportAssetOptions,
+  PRODUCT_EXPORT_ASSETS_MAX_ROWS,
+} from "@/lib/iml-export-products-assets";
+import {
+  loadProductsForExport,
+  renderProductExportWithOptionalZip,
+} from "@/lib/iml-export-products-run";
 
 /**
  * Spustí export produktů podle šablony nebo ad-hoc sloupců/filtrů.
- * Body: { templateId } | { format, columns, filters }
+ * Body: { templateId } | { format, columns, filters, include_print?, include_softproof? }
  */
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -43,15 +51,55 @@ export async function POST(req: NextRequest) {
     filtersInput = template.filters;
   }
 
-  const { rows, columns } = await loadProductsForExport(filtersInput, columnsInput);
-  const rendered = renderProductExport(format, rows, columns);
+  const filtersObj =
+    filtersInput && typeof filtersInput === "object"
+      ? (filtersInput as Record<string, unknown>)
+      : {};
+  const assetOpts = parseProductExportAssetOptions({ ...filtersObj, ...body });
+  const withAssets = hasProductExportAssets(assetOpts);
 
-  const bom = format === "csv" ? "\uFEFF" : "";
-  return new NextResponse(bom + rendered.body, {
-    headers: {
-      "Content-Type": rendered.contentType,
-      "Content-Disposition": `attachment; filename="${rendered.filename}"`,
-      "X-Export-Row-Count": String(rows.length),
-    },
-  });
+  const { rows: loadedRows, columns } = await loadProductsForExport(
+    filtersInput,
+    columnsInput,
+    { withAssets }
+  );
+
+  if (withAssets && loadedRows.length > PRODUCT_EXPORT_ASSETS_MAX_ROWS) {
+    return NextResponse.json(
+      {
+        error: `Export s tiskovými daty / softproofem je omezen na ${PRODUCT_EXPORT_ASSETS_MAX_ROWS} produktů. Zúžte filtr.`,
+      },
+      { status: 400 }
+    );
+  }
+
+  const rows = withAssets
+    ? loadedRows.slice(0, PRODUCT_EXPORT_ASSETS_MAX_ROWS)
+    : loadedRows;
+
+  try {
+    const result = await renderProductExportWithOptionalZip(format, rows, columns, assetOpts);
+
+    if (result.kind === "zip") {
+      return new NextResponse(new Uint8Array(result.buffer), {
+        headers: {
+          "Content-Type": "application/zip",
+          "Content-Disposition": `attachment; filename="${result.filename}"`,
+          "X-Export-Row-Count": String(rows.length),
+        },
+      });
+    }
+
+    const bom = format === "csv" ? "\uFEFF" : "";
+    return new NextResponse(bom + result.body, {
+      headers: {
+        "Content-Type": result.contentType,
+        "Content-Disposition": `attachment; filename="${result.filename}"`,
+        "X-Export-Row-Count": String(rows.length),
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Export selhal";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }
