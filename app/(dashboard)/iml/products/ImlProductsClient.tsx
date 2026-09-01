@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { Loader2, Search } from "lucide-react";
+import { Loader2, Search, Download } from "lucide-react";
 import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
 import { useListFilters } from "@/lib/navigation/use-list-filters";
 import { type ProductListRow } from "@/lib/iml/product-list-columns";
@@ -88,6 +88,9 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const [hasMore, setHasMore] = useState(false);
   const [reachedCap, setReachedCap] = useState(false);
   const [perPageBootstrapped, setPerPageBootstrapped] = useState(false);
+  const [exportBusy, setExportBusy] = useState(false);
+  const [includePrint, setIncludePrint] = useState(false);
+  const [includeSoftproof, setIncludeSoftproof] = useState(false);
 
   const infinitePageRef = useRef(1);
   const prefetchRef = useRef<{ page: number; products: ProductListRow[]; hasMore: boolean } | null>(
@@ -298,7 +301,39 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     if (filterStatus) params.set("status", filterStatus);
     if (filterProductKind) params.set("product_kind", filterProductKind);
     if (filterArchive && filterArchive !== "active") params.set("archive", filterArchive);
+    if (includePrint) params.set("include_print", "1");
+    if (includeSoftproof) params.set("include_softproof", "1");
     return `/api/iml/products/export?${params}`;
+  };
+
+  const downloadExport = async (format: "csv" | "xlsx") => {
+    setExportBusy(true);
+    try {
+      const res = await fetch(buildExportUrl(format));
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Export selhal");
+        return;
+      }
+      const blob = await res.blob();
+      const cd = res.headers.get("Content-Disposition") ?? "";
+      const match = /filename="([^"]+)"/.exec(cd);
+      const fallback =
+        includePrint || includeSoftproof
+          ? `iml-produkty.zip`
+          : format === "xlsx"
+            ? "iml-produkty.xlsx"
+            : "iml-produkty.csv";
+      const filename = match?.[1] ?? fallback;
+      const urlObj = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = urlObj;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(urlObj);
+    } finally {
+      setExportBusy(false);
+    }
   };
 
   const refreshList = useCallback(() => {
@@ -345,20 +380,64 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
       {canRead && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
-            <a
-              href={buildExportUrl("csv")}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              download="iml-produkty.csv"
-            >
-              Export CSV
-            </a>
-            <a
-              href={buildExportUrl("xlsx")}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-              download="iml-produkty.xlsx"
-            >
-              Export Excel
-            </a>
+            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={includePrint}
+                onChange={(e) => setIncludePrint(e.target.checked)}
+              />
+              Tisková data (PDF)
+            </label>
+            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={includeSoftproof}
+                onChange={(e) => setIncludeSoftproof(e.target.checked)}
+              />
+              Softproof (obrázek)
+            </label>
+            {(includePrint || includeSoftproof) && (
+              <span className="text-xs text-gray-500">Soubory budou v ZIP ve složce soubory/</span>
+            )}
+            {includePrint || includeSoftproof ? (
+              <>
+                <button
+                  type="button"
+                  disabled={exportBusy}
+                  onClick={() => void downloadExport("csv")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  <Download className="h-4 w-4" />
+                  Export CSV
+                </button>
+                <button
+                  type="button"
+                  disabled={exportBusy}
+                  onClick={() => void downloadExport("xlsx")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                >
+                  <Download className="h-4 w-4" />
+                  Export Excel
+                </button>
+              </>
+            ) : (
+              <>
+                <a
+                  href={buildExportUrl("csv")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  download="iml-produkty.csv"
+                >
+                  Export CSV
+                </a>
+                <a
+                  href={buildExportUrl("xlsx")}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  download="iml-produkty.xlsx"
+                >
+                  Export Excel
+                </a>
+              </>
+            )}
             {tableReady && (
               <ProductListColumnPicker
                 visibleColumnIds={visibleColumnIds}

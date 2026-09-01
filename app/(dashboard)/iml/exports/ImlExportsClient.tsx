@@ -92,6 +92,8 @@ export function ImlExportsClient({ canWrite }: Props) {
   const [orderStatus, setOrderStatus] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [includePrint, setIncludePrint] = useState(false);
+  const [includeSoftproof, setIncludeSoftproof] = useState(false);
 
   const loadTemplates = useCallback(async () => {
     setLoading(true);
@@ -130,6 +132,8 @@ export function ImlExportsClient({ canWrite }: Props) {
     setOrderStatus("");
     setDateFrom("");
     setDateTo("");
+    setIncludePrint(false);
+    setIncludeSoftproof(false);
     setError(null);
   };
 
@@ -168,6 +172,12 @@ export function ImlExportsClient({ canWrite }: Props) {
           ? f.archive
           : "active"
       );
+      setIncludePrint(f.include_print === true || f.include_print === 1 || f.include_print === "1");
+      setIncludeSoftproof(
+        f.include_softproof === true ||
+          f.include_softproof === 1 ||
+          f.include_softproof === "1"
+      );
     }
   };
 
@@ -195,6 +205,8 @@ export function ImlExportsClient({ canWrite }: Props) {
           item_status: itemStatus || undefined,
           product_kind: productKind || undefined,
           archive: archive || "active",
+          include_print: includePrint || undefined,
+          include_softproof: includeSoftproof || undefined,
         };
 
   const selectedCount = entity === "orders" ? orderSelected.size : productSelected.size;
@@ -249,11 +261,17 @@ export function ImlExportsClient({ canWrite }: Props) {
     setError(null);
     try {
       const body = opts?.templateId
-        ? { templateId: opts.templateId }
+        ? {
+            templateId: opts.templateId,
+            ...(includePrint ? { include_print: true } : {}),
+            ...(includeSoftproof ? { include_softproof: true } : {}),
+          }
         : {
             format,
             columns: columnsPayload(),
             filters: filtersPayload(),
+            ...(includePrint ? { include_print: true } : {}),
+            ...(includeSoftproof ? { include_softproof: true } : {}),
           };
       if (!opts?.templateId && selectedCount === 0) {
         setError("Vyberte alespoň jeden sloupec");
@@ -277,7 +295,9 @@ export function ImlExportsClient({ canWrite }: Props) {
       const fallback =
         entity === "orders"
           ? `iml-objednavky.${format === "xml" ? "xml" : "csv"}`
-          : `iml-produkty.${format === "xml" ? "xml" : "csv"}`;
+          : includePrint || includeSoftproof
+            ? "iml-produkty.zip"
+            : `iml-produkty.${format === "xml" ? "xml" : "csv"}`;
       const filename = match?.[1] ?? fallback;
       const urlObj = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -528,6 +548,33 @@ export function ImlExportsClient({ canWrite }: Props) {
               </>
             )}
           </div>
+
+          {entity === "products" && (
+            <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3">
+              <p className="text-sm font-medium text-gray-800">Soubory v exportu</p>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={includePrint}
+                  onChange={(e) => setIncludePrint(e.target.checked)}
+                />
+                Tisková data (PDF)
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={includeSoftproof}
+                  onChange={(e) => setIncludeSoftproof(e.target.checked)}
+                />
+                Softproof (obrázek)
+              </label>
+              {(includePrint || includeSoftproof) && (
+                <p className="text-xs text-gray-500">
+                  Export bude ZIP s tabulkou a soubory ve složce soubory/
+                </p>
+              )}
+            </div>
+          )}
 
           <div>
             <p className="mb-2 text-sm font-medium text-gray-800">Sloupce</p>

@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/db";
 import {
   buildProductExportCsv,
+  buildProductExportCsvWithAssetPaths,
   buildProductExportXml,
+  buildProductExportXmlWithAssetPaths,
   sanitizeProductExportColumns,
   sanitizeProductExportFilters,
   type ProductExportColumnKey,
@@ -9,10 +11,24 @@ import {
   type ProductExportSourceRow,
 } from "@/lib/iml-export-product-columns";
 import { resolveCatalogCustomerId } from "@/lib/iml-customer-catalog";
+import {
+  collectProductExportAssets,
+  hasProductExportAssets,
+  PRODUCT_EXPORT_ASSETS_MAX_ROWS,
+  type ProductExportAssetOptions,
+  type ProductAssetPathMap,
+} from "@/lib/iml-export-products-assets";
+import { buildProductExportZip } from "@/lib/iml-export-products-zip";
+
+export type LoadProductsForExportOptions = {
+  withAssets?: boolean;
+  maxRows?: number;
+};
 
 export async function loadProductsForExport(
   filtersInput: unknown,
-  columnsInput: unknown
+  columnsInput: unknown,
+  loadOpts?: LoadProductsForExportOptions
 ): Promise<{
   rows: ProductExportSourceRow[];
   columns: Array<{ key: ProductExportColumnKey; header?: string }>;
@@ -20,6 +36,11 @@ export async function loadProductsForExport(
 }> {
   const columns = sanitizeProductExportColumns(columnsInput);
   const filters = sanitizeProductExportFilters(filtersInput);
+  const withAssets = loadOpts?.withAssets === true;
+  const assetMax = PRODUCT_EXPORT_ASSETS_MAX_ROWS;
+  const maxRows = withAssets
+    ? Math.min(loadOpts?.maxRows ?? assetMax, assetMax) + 1
+    : loadOpts?.maxRows ?? 5000;
 
   const where: Record<string, unknown> = {};
   if (filters.search) {
@@ -43,22 +64,73 @@ export async function loadProductsForExport(
 
   const needPantone = columns.some((c) => c.key === "pantone_codes");
 
-  const products = await prisma.iml_products.findMany({
-    where,
-    orderBy: { id: "desc" },
-    take: 5000,
-    include: {
-      iml_customers: { select: { name: true } },
-      ...(needPantone
-        ? {
-            iml_product_colors: {
-              include: { iml_pantone_colors: { select: { code: true } } },
-              orderBy: [{ sort_order: "asc" as const }, { id: "asc" as const }],
-            },
-          }
-        : {}),
-    },
-  });
+  const products = withAssets
+    ? await prisma.iml_products.findMany({
+        where,
+        orderBy: { id: "desc" },
+        take: maxRows,
+        select: {
+          id: true,
+          ig_code: true,
+          ig_short_name: true,
+          client_code: true,
+          client_name: true,
+          sku: true,
+          product_kind: true,
+          requester: true,
+          label_shape_code: true,
+          product_format: true,
+          format_width_mm: true,
+          format_height_mm: true,
+          die_cut_tool_code: true,
+          assembly_code: true,
+          positions_on_sheet: true,
+          labels_per_sheet: true,
+          pieces_per_box: true,
+          pieces_per_pallet: true,
+          foil_type: true,
+          color_coverage: true,
+          ean_code: true,
+          item_status: true,
+          approval_status: true,
+          approval_date: true,
+          color_count: true,
+          print_colors_text: true,
+          label_type: true,
+          has_print_sample: true,
+          has_print_proof: true,
+          is_active: true,
+          archived_at: true,
+          created_at: true,
+          updated_at: true,
+          image_data: true,
+          iml_customers: { select: { name: true } },
+          ...(needPantone
+            ? {
+                iml_product_colors: {
+                  include: { iml_pantone_colors: { select: { code: true } } },
+                  orderBy: [{ sort_order: "asc" as const }, { id: "asc" as const }],
+                },
+              }
+            : {}),
+        },
+      })
+    : await prisma.iml_products.findMany({
+        where,
+        orderBy: { id: "desc" },
+        take: maxRows,
+        include: {
+          iml_customers: { select: { name: true } },
+          ...(needPantone
+            ? {
+                iml_product_colors: {
+                  include: { iml_pantone_colors: { select: { code: true } } },
+                  orderBy: [{ sort_order: "asc" as const }, { id: "asc" as const }],
+                },
+              }
+            : {}),
+        },
+      });
 
   return {
     rows: products as unknown as ProductExportSourceRow[],
@@ -70,19 +142,81 @@ export async function loadProductsForExport(
 export function renderProductExport(
   format: "csv" | "xml",
   rows: ProductExportSourceRow[],
-  columns: Array<{ key: ProductExportColumnKey; header?: string }>
+  columns: Array<{ key: ProductExportColumnKey; header?: string }>,
+  assetOpts?: ProductExportAssetOptions,
+  assetPaths?: ProductAssetPathMap
 ): { body: string; contentType: string; filename: string } {
   const stamp = new Date().toISOString().slice(0, 10);
+  const useAssets =
+    assetOpts &&
+    assetPaths &&
+    hasProductExportAssets(assetOpts);
+
   if (format === "xml") {
     return {
-      body: buildProductExportXml(rows, columns),
+      body: useAssets
+        ? buildProductExportXmlWithAssetPaths(rows, columns, assetPaths, assetOpts)
+        : buildProductExportXml(rows, columns),
       contentType: "application/xml; charset=utf-8",
       filename: `iml-produkty-${stamp}.xml`,
     };
   }
   return {
-    body: buildProductExportCsv(rows, columns),
+    body: useAssets
+      ? buildProductExportCsvWithAssetPaths(rows, columns, assetPaths, assetOpts)
+      : buildProductExportCsv(rows, columns),
     contentType: "text/csv; charset=utf-8",
     filename: `iml-produkty-${stamp}.csv`,
   };
+}
+
+export async function renderProductExportWithOptionalZip(
+  format: "csv" | "xml",
+  rows: ProductExportSourceRow[],
+  columns: Array<{ key: ProductExportColumnKey; header?: string }>,
+  assetOpts: ProductExportAssetOptions
+): Promise<
+  | { kind: "file"; body: string; contentType: string; filename: string }
+  | { kind: "zip"; buffer: Buffer; filename: string }
+> {
+  if (!hasProductExportAssets(assetOpts)) {
+    const rendered = renderProductExport(format, rows, columns);
+    return { kind: "file", ...rendered };
+  }
+
+  if (rows.length > PRODUCT_EXPORT_ASSETS_MAX_ROWS) {
+    throw new Error(
+      `Export s tiskovými daty / softproofem je omezen na ${PRODUCT_EXPORT_ASSETS_MAX_ROWS} produktů (nalezeno ${rows.length}). Zúžte filtr.`
+    );
+  }
+
+  const { files, paths } = await collectProductExportAssets(
+    rows.map((r) => ({
+      id: r.id,
+      ig_code: r.ig_code,
+      image_data: (r as ProductExportSourceRow & { image_data?: Buffer | null }).image_data,
+    })),
+    assetOpts
+  );
+
+  const rendered = renderProductExport(format, rows, columns, assetOpts, paths);
+  const tableBuffer = Buffer.from(
+    format === "csv" ? "\uFEFF" + rendered.body : rendered.body,
+    "utf-8"
+  );
+
+  const zip = await buildProductExportZip({
+    tableBuffer,
+    tableFilename: rendered.filename,
+    assets: files,
+    manifest: {
+      exportedAt: new Date().toISOString(),
+      rowCount: rows.length,
+      assetCount: files.length,
+      includePrint: assetOpts.includePrint,
+      includeSoftproof: assetOpts.includeSoftproof,
+    },
+  });
+
+  return { kind: "zip", buffer: zip.buffer, filename: zip.filename };
 }
