@@ -39,6 +39,66 @@ Cena IML, \tnákld \t1 130 000 ks - 0,44 \tkč \t/ set. IML etikety, \tprosím p
     expect(r.items[1].quantity).toBe(27000);
     expect(r.notes).toContain("PS Plasty");
   });
+
+  it("parsuje layout B s Kódem IG v popisu a Číslem zákazníka", () => {
+    const text = `OBJEDNÁVKA VO-2026-002100
+Číslo dokladu.: VO-2026-002100
+Datum: 1.9.2026
+PS PLASTY CZ s.r.o.
+Popis Číslo Množství Cena za jedn. Cena bez DPH DPH Cena celkem:
+IML HASOFT STAVLEP - kbelík kulatý 1 180 ml, PP, s ručkou - červený 02-03-323 (08/26) AK2
+10828
+1 500,00 ks
+0,81 1 215,00 21,00 0,00 1 215,00
+IML HASOFT STĚNUSPRAV - kbelík kulatý 1 180 ml, PP, s ručkou - červený 02-03-324 (08/26) AK2
+19600
+30 000,00 ks
+0,81 24 300,00 21,00 0,00 24 300,00
+IML STACHEMA ADHÉZNÍ MŮSTEK - kbelík kulatý 1 180 ml, PP, s ručkou - bílý 02-03-494 (08/26) AK2
+10725
+5 000,00 ks
+0,81 4 050,00 21,00 0,00 4 050,00
+Cena celkem bez DPH
+39 285,00
+CZK
+Celkem DPH
+8 249,85
+Celkem s DPH
+47 534,85
+Prosím poslat do PS EUROPLAST. Cena za kus IML 0,810Kč.`;
+
+    const r = parsePsPlastyOrderText(text);
+    expect(r.orderNumber).toBe("VO-2026-002100");
+    expect(r.orderDate).toBe("2026-09-01");
+    expect(r.items.length).toBe(3);
+    expect(r.items[0].yourMaterialNo).toBe("02-03-323");
+    expect(r.items[0].customerMaterialNo).toBe("10828");
+    expect(r.items[0].quantity).toBe(1500);
+    expect(r.items[0].price).toBe(0.81);
+    expect(r.items[0].netAmount).toBe(1215);
+    expect(r.items[1].yourMaterialNo).toBe("02-03-324");
+    expect(r.items[1].customerMaterialNo).toBe("19600");
+    expect(r.items[1].quantity).toBe(30000);
+    expect(r.items[2].yourMaterialNo).toBe("02-03-494");
+    expect(r.items[2].customerMaterialNo).toBe("10725");
+    expect(r.notes).toContain("PS EUROPLAST");
+  });
+
+  it("parsuje layout B na jednom řádku", () => {
+    const text = `OBJEDNÁVKA VO-2026-002100
+Datum: 1.9.2026
+Popis Číslo Množství Cena za jedn. Cena bez DPH DPH Cena celkem:
+IML HASOFT STAVLEP - kbelík 02-03-323 (08/26) AK2 10828 1 500,00 ks 0,81 1 215,00 21,00 0,00 1 215,00
+Cena celkem bez DPH
+1 215,00`;
+
+    const r = parsePsPlastyOrderText(text);
+    expect(r.items.length).toBe(1);
+    expect(r.items[0].yourMaterialNo).toBe("02-03-323");
+    expect(r.items[0].customerMaterialNo).toBe("10828");
+    expect(r.items[0].quantity).toBe(1500);
+    expect(r.items[0].price).toBe(0.81);
+  });
 });
 
 describe("parseSfaOrderText", () => {
@@ -134,6 +194,7 @@ describe("detectOrderPdfTemplate", () => {
   it("rozpozná šablony", () => {
     expect(detectOrderPdfTemplate("Purchase Order 4500210202\nOrkla Foods")?.key).toBe("orkla");
     expect(detectOrderPdfTemplate("OBJEDNÁVKA VO-2025-001969\nPS PLASTY")?.key).toBe("psplasty");
+    expect(detectOrderPdfTemplate("Prosím poslat do PS EUROPLAST")?.key).toBe("psplasty");
     expect(detectOrderPdfTemplate("SFA Packaging B.V.\nPURCHASE ORDER\nIK251631")?.key).toBe("sfa");
     expect(detectOrderPdfTemplate("OBJEDNÁVKA č.: 25096\nJEPA Plastics")?.key).toBe("jepa");
     expect(detectOrderPdfTemplate("Request Nr. AN121853\nJokey Praha")?.key).toBe("jokey");
