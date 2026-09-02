@@ -1,4 +1,8 @@
 import path from "path";
+import {
+  MAX_PRODUCT_PDF_BYTES,
+  MAX_PRODUCT_PDF_MB,
+} from "@/lib/iml-product-upload-limits";
 
 export const MAKETY_FILE_MODULE = "makety";
 
@@ -36,7 +40,9 @@ export function sanitizeMaketyMimeType(mime: string | null | undefined): string 
   return /^[\w.+-]+\/[\w.+-]+$/.test(raw) ? raw : "application/octet-stream";
 }
 
-export const MAKETY_MAX_BYTES = 50 * 1024 * 1024;
+/** Stejný strop jako IML tisková data (PDF). */
+export const MAKETY_MAX_BYTES = MAX_PRODUCT_PDF_BYTES;
+export const MAKETY_MAX_MB = MAX_PRODUCT_PDF_MB;
 
 export const MAKETY_MAX_FILES_PER_REQUEST = 20;
 

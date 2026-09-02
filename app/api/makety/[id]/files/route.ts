@@ -8,6 +8,7 @@ import {
   MAKETY_ALLOWED_FORMATS_LABEL,
   MAKETY_FILE_MODULE,
   MAKETY_MAX_BYTES,
+  MAKETY_MAX_MB,
   MAKETY_MAX_FILES_PER_REQUEST,
 } from "@/lib/makety-files";
 import { requireMaketyFileKind, type MaketyFileKind } from "@/lib/makety-file-kind";
@@ -34,7 +35,7 @@ async function saveMaketyFile(params: {
   if (file.size > MAKETY_MAX_BYTES) {
     return {
       ok: false,
-      error: `Soubor „${file.name}“ je větší než 50 MB`,
+      error: `Soubor „${file.name}“ je větší než ${MAKETY_MAX_MB} MB`,
     };
   }
 
