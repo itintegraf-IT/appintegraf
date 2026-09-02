@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { emptyProductExportSourceRow } from "@/lib/iml-export-product-field-catalog";
 import { renderOrderLineExport } from "@/lib/iml-export-orders-run";
 import {
   sanitizeOrderExportColumns,
@@ -27,23 +28,13 @@ const sampleRow = (overrides: Partial<OrderLineExportSourceRow> = {}): OrderLine
   unit_price: "1.5",
   subtotal: "750",
   product_id: 5,
-  ig_code: "02-03-323",
-  ig_short_name: "Etiketa",
-  client_code: null,
-  client_name: null,
-  sku: null,
-  product_kind: "iml",
-  label_shape_code: null,
-  product_format: null,
-  format_width_mm: null,
-  format_height_mm: null,
-  die_cut_tool_code: null,
-  foil_type: null,
-  ean_code: null,
-  item_status: "aktivní",
-  print_colors_text: null,
-  color_count: null,
-  pantone_codes: "",
+  product_data: {
+    ...emptyProductExportSourceRow(5),
+    ig_code: "02-03-323",
+    ig_short_name: "Etiketa",
+    product_kind: "iml",
+    item_status: "aktivní",
+  },
   ...overrides,
 });
 

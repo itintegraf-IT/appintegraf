@@ -1,52 +1,61 @@
 import { escapeXml } from "@/lib/iml-xml";
 import { escapeCsv } from "@/lib/iml-export";
+import {
+  PRODUCT_EXPORT_FIELD_DEFS,
+  productFieldFromOrderKey,
+  productFieldOrderKey,
+  serializeProductFieldValue,
+  type ProductExportSourceRow,
+} from "@/lib/iml-export-product-field-catalog";
 
 export type OrderExportColumnGroup = "order" | "line" | "product";
 
-/** Whitelist klíčů line-level exportu objednávek. */
-export const ORDER_LINE_EXPORT_COLUMN_KEYS = [
-  // order header
-  "order_id",
-  "order_number",
-  "job_number",
-  "customer_name",
-  "order_date",
-  "expected_ship_date",
-  "status",
-  "total",
-  "notes",
-  "shipping_label",
-  "shipping_recipient",
-  "shipping_street",
-  "shipping_city",
-  "shipping_postal_code",
-  "shipping_country",
-  "order_created_at",
-  // line
-  "line_id",
-  "quantity",
-  "unit_price",
-  "subtotal",
-  // product
-  "product_id",
-  "ig_code",
-  "ig_short_name",
-  "client_code",
-  "client_name",
-  "sku",
-  "product_kind",
-  "label_shape_code",
-  "product_format",
-  "format_width_mm",
-  "format_height_mm",
-  "die_cut_tool_code",
-  "foil_type",
-  "ean_code",
-  "item_status",
-  "pantone_codes",
-  "print_colors_text",
-  "color_count",
+const ORDER_HEADER_COLUMNS = [
+  { key: "order_id", label: "ID objednávky", defaultSelected: false },
+  { key: "order_number", label: "Číslo objednávky", defaultSelected: true },
+  { key: "job_number", label: "Číslo zakázky", defaultSelected: true },
+  { key: "customer_name", label: "Zákazník", defaultSelected: true },
+  { key: "order_date", label: "Datum přijetí", defaultSelected: true },
+  { key: "expected_ship_date", label: "Plánovaná expedice", defaultSelected: true },
+  { key: "status", label: "Stav objednávky", defaultSelected: true },
+  { key: "total", label: "Celkem (Kč)", defaultSelected: false },
+  { key: "notes", label: "Poznámky", defaultSelected: false },
+  { key: "shipping_label", label: "Doručení – označení", defaultSelected: false },
+  { key: "shipping_recipient", label: "Doručení – příjemce", defaultSelected: false },
+  { key: "shipping_street", label: "Doručení – ulice", defaultSelected: false },
+  { key: "shipping_city", label: "Doručení – město", defaultSelected: false },
+  { key: "shipping_postal_code", label: "Doručení – PSČ", defaultSelected: false },
+  { key: "shipping_country", label: "Doručení – země", defaultSelected: false },
+  { key: "order_created_at", label: "Objednávka vytvořena", defaultSelected: false },
 ] as const;
+
+const LINE_COLUMNS = [
+  { key: "line_id", label: "ID řádku", defaultSelected: false },
+  { key: "quantity", label: "Množství", defaultSelected: true },
+  { key: "unit_price", label: "Jedn. cena", defaultSelected: true },
+  { key: "subtotal", label: "Mezisoučet", defaultSelected: true },
+] as const;
+
+const PRODUCT_COLUMNS_FROM_CATALOG = PRODUCT_EXPORT_FIELD_DEFS.map((def) => ({
+  key: productFieldOrderKey(def.key),
+  label: def.key === "id" ? "ID produktu" : def.label,
+  defaultSelected: def.defaultSelected,
+}));
+
+export const ORDER_LINE_EXPORT_COLUMNS: Array<{
+  key: string;
+  label: string;
+  group: OrderExportColumnGroup;
+  defaultSelected?: boolean;
+}> = [
+  ...ORDER_HEADER_COLUMNS.map((c) => ({ ...c, group: "order" as const })),
+  ...LINE_COLUMNS.map((c) => ({ ...c, group: "line" as const })),
+  ...PRODUCT_COLUMNS_FROM_CATALOG.map((c) => ({ ...c, group: "product" as const })),
+];
+
+export const ORDER_LINE_EXPORT_COLUMN_KEYS = ORDER_LINE_EXPORT_COLUMNS.map(
+  (c) => c.key
+) as readonly string[];
 
 export type OrderLineExportColumnKey = (typeof ORDER_LINE_EXPORT_COLUMN_KEYS)[number];
 
@@ -57,57 +66,17 @@ export type OrderLineExportColumnDef = {
   defaultSelected?: boolean;
 };
 
-export const ORDER_LINE_EXPORT_COLUMNS: OrderLineExportColumnDef[] = [
-  { key: "order_id", label: "ID objednávky", group: "order" },
-  { key: "order_number", label: "Číslo objednávky", group: "order", defaultSelected: true },
-  { key: "job_number", label: "Číslo zakázky", group: "order", defaultSelected: true },
-  { key: "customer_name", label: "Zákazník", group: "order", defaultSelected: true },
-  { key: "order_date", label: "Datum přijetí", group: "order", defaultSelected: true },
-  { key: "expected_ship_date", label: "Plánovaná expedice", group: "order", defaultSelected: true },
-  { key: "status", label: "Stav objednávky", group: "order", defaultSelected: true },
-  { key: "total", label: "Celkem (Kč)", group: "order" },
-  { key: "notes", label: "Poznámky", group: "order" },
-  { key: "shipping_label", label: "Doručení – označení", group: "order" },
-  { key: "shipping_recipient", label: "Doručení – příjemce", group: "order" },
-  { key: "shipping_street", label: "Doručení – ulice", group: "order" },
-  { key: "shipping_city", label: "Doručení – město", group: "order" },
-  { key: "shipping_postal_code", label: "Doručení – PSČ", group: "order" },
-  { key: "shipping_country", label: "Doručení – země", group: "order" },
-  { key: "order_created_at", label: "Objednávka vytvořena", group: "order" },
-
-  { key: "line_id", label: "ID řádku", group: "line" },
-  { key: "quantity", label: "Množství", group: "line", defaultSelected: true },
-  { key: "unit_price", label: "Jedn. cena", group: "line", defaultSelected: true },
-  { key: "subtotal", label: "Mezisoučet", group: "line", defaultSelected: true },
-
-  { key: "product_id", label: "ID produktu", group: "product" },
-  { key: "ig_code", label: "Kód IG", group: "product", defaultSelected: true },
-  { key: "ig_short_name", label: "Zkrácený název", group: "product", defaultSelected: true },
-  { key: "client_code", label: "Kód klienta", group: "product", defaultSelected: true },
-  { key: "client_name", label: "Název klienta", group: "product", defaultSelected: true },
-  { key: "sku", label: "SKU", group: "product" },
-  { key: "product_kind", label: "Druh produktu", group: "product" },
-  { key: "label_shape_code", label: "Tvar etikety", group: "product" },
-  { key: "product_format", label: "Formát", group: "product" },
-  { key: "format_width_mm", label: "Šířka (mm)", group: "product" },
-  { key: "format_height_mm", label: "Výška (mm)", group: "product" },
-  { key: "die_cut_tool_code", label: "Výsek", group: "product" },
-  { key: "foil_type", label: "Fólie", group: "product" },
-  { key: "ean_code", label: "EAN", group: "product" },
-  { key: "item_status", label: "Stav položky", group: "product" },
-  { key: "pantone_codes", label: "Pantone kódy", group: "product", defaultSelected: true },
-  { key: "print_colors_text", label: "Barvy (souhrn)", group: "product" },
-  { key: "color_count", label: "Počet barev", group: "product" },
-];
-
-export const ORDER_EXPORT_COLUMN_GROUPS: Array<{ id: OrderExportColumnGroup; label: string }> = [
-  { id: "order", label: "Hlavička objednávky" },
-  { id: "line", label: "Řádek" },
-  { id: "product", label: "Produkt" },
-];
+export const ORDER_EXPORT_COLUMN_GROUPS: Array<{ id: OrderExportColumnGroup; label: string }> =
+  [
+    { id: "order", label: "Hlavička objednávky" },
+    { id: "line", label: "Řádek" },
+    { id: "product", label: "Produkt" },
+  ];
 
 export const DEFAULT_ORDER_LINE_EXPORT_COLUMNS: OrderLineExportColumnKey[] =
-  ORDER_LINE_EXPORT_COLUMNS.filter((c) => c.defaultSelected).map((c) => c.key);
+  ORDER_LINE_EXPORT_COLUMNS.filter((c) => c.defaultSelected).map(
+    (c) => c.key as OrderLineExportColumnKey
+  );
 
 const KEY_SET = new Set<string>(ORDER_LINE_EXPORT_COLUMN_KEYS);
 
@@ -229,23 +198,8 @@ export type OrderLineExportSourceRow = {
   unit_price: unknown;
   subtotal: unknown;
   product_id: number | null;
-  ig_code: string | null;
-  ig_short_name: string | null;
-  client_code: string | null;
-  client_name: string | null;
-  sku: string | null;
-  product_kind: string | null;
-  label_shape_code: string | null;
-  product_format: string | null;
-  format_width_mm: unknown;
-  format_height_mm: unknown;
-  die_cut_tool_code: string | null;
-  foil_type: string | null;
-  ean_code: string | null;
-  item_status: string | null;
-  print_colors_text: string | null;
-  color_count: number | null;
-  pantone_codes: string;
+  product_data: ProductExportSourceRow | null;
+  image_data?: Buffer | null;
 };
 
 export function serializeOrderLineExportValue(
@@ -295,42 +249,13 @@ export function serializeOrderLineExportValue(
       return fmtDecimal(row.subtotal);
     case "product_id":
       return row.product_id != null ? String(row.product_id) : "";
-    case "ig_code":
-      return row.ig_code ?? "";
-    case "ig_short_name":
-      return row.ig_short_name ?? "";
-    case "client_code":
-      return row.client_code ?? "";
-    case "client_name":
-      return row.client_name ?? "";
-    case "sku":
-      return row.sku ?? "";
-    case "product_kind":
-      return row.product_kind ?? "";
-    case "label_shape_code":
-      return row.label_shape_code ?? "";
-    case "product_format":
-      return row.product_format ?? "";
-    case "format_width_mm":
-      return row.format_width_mm != null ? String(row.format_width_mm) : "";
-    case "format_height_mm":
-      return row.format_height_mm != null ? String(row.format_height_mm) : "";
-    case "die_cut_tool_code":
-      return row.die_cut_tool_code ?? "";
-    case "foil_type":
-      return row.foil_type ?? "";
-    case "ean_code":
-      return row.ean_code ?? "";
-    case "item_status":
-      return row.item_status ?? "";
-    case "pantone_codes":
-      return row.pantone_codes ?? "";
-    case "print_colors_text":
-      return row.print_colors_text ?? "";
-    case "color_count":
-      return row.color_count != null ? String(row.color_count) : "";
-    default:
+    default: {
+      const productKey = productFieldFromOrderKey(key);
+      if (productKey) {
+        return serializeProductFieldValue(row.product_data, productKey);
+      }
       return "";
+    }
   }
 }
 
