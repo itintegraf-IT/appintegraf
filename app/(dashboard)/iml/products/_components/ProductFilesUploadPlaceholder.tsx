@@ -1,6 +1,10 @@
 "use client";
 
 import { Image, FileText } from "lucide-react";
+import {
+  MAX_PRODUCT_IMAGE_MB,
+  MAX_PRODUCT_PDF_MB,
+} from "@/lib/iml-product-upload-limits";
 
 export function ProductFilesUploadPlaceholder() {
   return (
@@ -11,7 +15,9 @@ export function ProductFilesUploadPlaceholder() {
       </p>
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
-          <p className="mb-2 text-sm text-gray-600">Náhled (JPG, PNG, WebP, GIF, max 5 MB)</p>
+          <p className="mb-2 text-sm text-gray-600">
+            Náhled (JPG, PNG, WebP, GIF nebo PDF 1. stránka, max {MAX_PRODUCT_IMAGE_MB} MB)
+          </p>
           <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 opacity-60">
             <Image className="mb-2 h-10 w-10 text-gray-400" />
             <span className="text-center text-sm text-gray-500">
@@ -21,7 +27,7 @@ export function ProductFilesUploadPlaceholder() {
           </div>
         </div>
         <div>
-          <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max 50 MB)</p>
+          <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max {MAX_PRODUCT_PDF_MB} MB)</p>
           <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 opacity-60">
             <FileText className="mb-2 h-10 w-10 text-gray-400" />
             <span className="text-center text-sm text-gray-500">

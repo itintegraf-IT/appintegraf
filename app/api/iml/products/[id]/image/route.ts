@@ -3,8 +3,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
-
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB
+import {
+  MAX_PRODUCT_IMAGE_BYTES,
+  MAX_PRODUCT_IMAGE_MB,
+} from "@/lib/iml-product-upload-limits";
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
 export async function GET(
@@ -78,8 +80,11 @@ export async function POST(
       return NextResponse.json({ error: "Nebyl nahrán žádný soubor" }, { status: 400 });
     }
 
-    if (file.size > MAX_IMAGE_SIZE) {
-      return NextResponse.json({ error: "Obrázek je příliš velký (max 5 MB)" }, { status: 400 });
+    if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
+      return NextResponse.json(
+        { error: `Obrázek je příliš velký (max ${MAX_PRODUCT_IMAGE_MB} MB)` },
+        { status: 400 }
+      );
     }
 
     const type = file.type?.toLowerCase();

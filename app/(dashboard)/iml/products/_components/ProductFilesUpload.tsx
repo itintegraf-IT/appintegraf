@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Image, FileText, Trash2, Upload } from "lucide-react";
 import { ProductPdfThumbnail } from "./ProductPdfThumbnail";
 import { pdfFileToJpegPreviewBlob } from "@/lib/iml-product-preview-from-pdf";
+import {
+  MAX_PREVIEW_SOURCE_PDF_BYTES,
+  MAX_PREVIEW_SOURCE_PDF_MB,
+  MAX_PRODUCT_IMAGE_MB,
+  MAX_PRODUCT_PDF_MB,
+} from "@/lib/iml-product-upload-limits";
 
 const PREVIEW_FILE_ACCEPT =
   "image/jpeg,image/png,image/webp,image/gif,application/pdf,.pdf";
@@ -62,6 +68,12 @@ export function ProductFilesUpload({
         file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
       let fileToUpload: File = file;
       if (isPdf) {
+        if (file.size > MAX_PREVIEW_SOURCE_PDF_BYTES) {
+          setImageError(
+            `PDF je příliš velké pro náhled v prohlížeči (max ${MAX_PREVIEW_SOURCE_PDF_MB} MB). Nahrajte ho vpravo jako Tisková data (PDF) — softproof se vytvoří automaticky.`
+          );
+          return;
+        }
         try {
           const blob = await pdfFileToJpegPreviewBlob(file);
           fileToUpload = new File([blob], "nahled-z-pdf.jpg", { type: "image/jpeg" });
@@ -133,7 +145,7 @@ export function ProductFilesUpload({
       if (!res.ok) {
         if (res.status === 413) {
           setPdfError(
-            "Požadavek byl odmítnut (413) – typicky malý `client_max_body_size` u nginx. Nastavte alespoň 60M u location pro aplikaci a znovu načtěte konfiguraci."
+            "Požadavek byl odmítnut (413) – typicky malý `client_max_body_size` u nginx. Nastavte alespoň 100M u location pro aplikaci a znovu načtěte konfiguraci."
           );
           return;
         }
@@ -183,7 +195,7 @@ export function ProductFilesUpload({
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
           <p className="mb-2 text-sm text-gray-600">
-            Náhled – obrázek (JPG, PNG, WebP, GIF) nebo PDF (1. stránka → uloží se jako JPEG, max. 5 MB)
+            Náhled – obrázek (JPG, PNG, WebP, GIF) nebo PDF (1. stránka → uloží se jako JPEG, max. {MAX_PRODUCT_IMAGE_MB} MB)
             {!localHasImage && localHasPdf && (
               <span className="mt-0.5 block text-xs font-normal text-gray-500">
                 Dokud nenahrajete vlastní náhled výše, zobrazí se první stránka tiskových dat (PDF vpravo).
@@ -281,7 +293,7 @@ export function ProductFilesUpload({
         </div>
 
         <div>
-          <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max 50 MB)</p>
+          <p className="mb-2 text-sm text-gray-600">Tisková data (PDF, max {MAX_PRODUCT_PDF_MB} MB)</p>
           {localHasPdf ? (
             <div className="flex items-center gap-2">
               <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-gray-100">
