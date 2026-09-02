@@ -1,6 +1,10 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
+  buildProductExportPrismaSelect,
+  mapDbProductToExportRow,
+} from "@/lib/iml-export-product-field-catalog";
+import {
   buildOrderLineExportCsv,
   buildOrderLineExportCsvWithAssetPaths,
   buildOrderLineExportXml,
@@ -24,12 +28,6 @@ const MAX_ORDERS = 2000;
 
 export type LoadOrderLinesForExportOptions = {
   withAssets?: boolean;
-};
-
-type ProductWithImage = {
-  id: number;
-  ig_code: string | null;
-  image_data?: Buffer | null;
 };
 
 export async function loadOrderLinesForExport(
@@ -68,38 +66,9 @@ export async function loadOrderLinesForExport(
     }
   }
 
-  const needPantone = columns.some((c) => c.key === "pantone_codes");
-
-  const productSelect = {
-    id: true,
-    ig_code: true,
-    ig_short_name: true,
-    client_code: true,
-    client_name: true,
-    sku: true,
-    product_kind: true,
-    label_shape_code: true,
-    product_format: true,
-    format_width_mm: true,
-    format_height_mm: true,
-    die_cut_tool_code: true,
-    foil_type: true,
-    ean_code: true,
-    item_status: true,
-    print_colors_text: true,
-    color_count: true,
-    ...(withAssets ? { image_data: true } : {}),
-    ...(needPantone
-      ? {
-          iml_product_colors: {
-            orderBy: [{ sort_order: "asc" as const }, { id: "asc" as const }],
-            select: {
-              iml_pantone_colors: { select: { code: true } },
-            },
-          },
-        }
-      : {}),
-  };
+  const productSelect = buildProductExportPrismaSelect(columns, {
+    withAssets,
+  }) as Prisma.iml_productsSelect;
 
   const orders = await prisma.iml_orders.findMany({
     where,
@@ -144,37 +113,14 @@ export async function loadOrderLinesForExport(
         unit_price: null,
         subtotal: null,
         product_id: null,
-        ig_code: null,
-        ig_short_name: null,
-        client_code: null,
-        client_name: null,
-        sku: null,
-        product_kind: null,
-        label_shape_code: null,
-        product_format: null,
-        format_width_mm: null,
-        format_height_mm: null,
-        die_cut_tool_code: null,
-        foil_type: null,
-        ean_code: null,
-        item_status: null,
-        print_colors_text: null,
-        color_count: null,
-        pantone_codes: "",
+        product_data: null,
       });
       continue;
     }
 
     for (const item of items) {
-      const p = item.iml_products as ProductWithImage & Record<string, unknown> | null;
-      const pantone =
-        needPantone && p && "iml_product_colors" in p && Array.isArray(p.iml_product_colors)
-          ? (p.iml_product_colors as Array<{ iml_pantone_colors?: { code: string | null } | null }>)
-              .map((c) => c.iml_pantone_colors?.code)
-              .filter(Boolean)
-              .join(", ")
-          : "";
-
+      const p = item.iml_products as Record<string, unknown> | null;
+      const productData = mapDbProductToExportRow(p);
       rows.push({
         order_id: order.id,
         order_number: order.order_number,
@@ -196,28 +142,12 @@ export async function loadOrderLinesForExport(
         quantity: item.quantity,
         unit_price: item.unit_price,
         subtotal: item.subtotal,
-        product_id: p?.id ?? null,
-        ig_code: (p?.ig_code as string | null) ?? null,
-        ig_short_name: (p?.ig_short_name as string | null) ?? null,
-        client_code: (p?.client_code as string | null) ?? null,
-        client_name: (p?.client_name as string | null) ?? null,
-        sku: (p?.sku as string | null) ?? null,
-        product_kind: (p?.product_kind as string | null) ?? null,
-        label_shape_code: (p?.label_shape_code as string | null) ?? null,
-        product_format: (p?.product_format as string | null) ?? null,
-        format_width_mm: p?.format_width_mm ?? null,
-        format_height_mm: p?.format_height_mm ?? null,
-        die_cut_tool_code: (p?.die_cut_tool_code as string | null) ?? null,
-        foil_type: (p?.foil_type as string | null) ?? null,
-        ean_code: (p?.ean_code as string | null) ?? null,
-        item_status: (p?.item_status as string | null) ?? null,
-        print_colors_text: (p?.print_colors_text as string | null) ?? null,
-        color_count: (p?.color_count as number | null) ?? null,
-        pantone_codes: pantone,
-        ...(withAssets && p
-          ? { image_data: p.image_data as Buffer | null | undefined }
+        product_id: productData?.id ?? null,
+        product_data: productData,
+        ...(withAssets && productData?.image_data
+          ? { image_data: productData.image_data }
           : {}),
-      } as OrderLineExportSourceRow & { image_data?: Buffer | null });
+      });
     }
   }
 
@@ -235,11 +165,10 @@ function uniqueProductsFromOrderRows(
   for (const row of rows) {
     if (row.product_id == null) continue;
     if (byId.has(row.product_id)) continue;
-    const ext = row as OrderLineExportSourceRow & { image_data?: Buffer | null };
     byId.set(row.product_id, {
       id: row.product_id,
-      ig_code: row.ig_code,
-      image_data: ext.image_data,
+      ig_code: row.product_data?.ig_code ?? null,
+      image_data: row.image_data ?? row.product_data?.image_data,
     });
   }
   return [...byId.values()];

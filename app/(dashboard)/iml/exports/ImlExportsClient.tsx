@@ -6,6 +6,7 @@ import { Download, Plus, Trash2, Save, Play } from "lucide-react";
 import {
   DEFAULT_PRODUCT_EXPORT_COLUMNS,
   PRODUCT_EXPORT_COLUMNS,
+  PRODUCT_EXPORT_FIELD_GROUPS,
   type ProductExportColumnKey,
 } from "@/lib/iml-export-product-columns";
 import {
@@ -619,24 +620,39 @@ export function ImlExportsClient({ canWrite }: Props) {
                 })}
               </div>
             ) : (
-              <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
-                {PRODUCT_EXPORT_COLUMNS.map((col) => (
-                  <label key={col.key} className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={productSelected.has(col.key)}
-                      onChange={() => {
-                        setProductSelected((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(col.key)) next.delete(col.key);
-                          else next.add(col.key);
-                          return next;
-                        });
-                      }}
-                    />
-                    {col.label}
-                  </label>
-                ))}
+              <div className="space-y-4">
+                {PRODUCT_EXPORT_FIELD_GROUPS.map((group) => {
+                  const cols = PRODUCT_EXPORT_COLUMNS.filter((c) => c.group === group.id);
+                  return (
+                    <div key={group.id}>
+                      <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-gray-500">
+                        {group.label}
+                      </p>
+                      <div className="grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
+                        {cols.map((col) => (
+                          <label
+                            key={col.key}
+                            className="flex items-center gap-2 text-sm text-gray-700"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={productSelected.has(col.key)}
+                              onChange={() => {
+                                setProductSelected((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(col.key)) next.delete(col.key);
+                                  else next.add(col.key);
+                                  return next;
+                                });
+                              }}
+                            />
+                            {col.label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

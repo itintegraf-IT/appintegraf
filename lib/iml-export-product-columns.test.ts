@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  emptyProductExportSourceRow,
+  serializeProductFieldValue,
+} from "@/lib/iml-export-product-field-catalog";
+import {
   sanitizeProductExportColumns,
   sanitizeProductExportFilters,
   buildProductExportXml,
@@ -75,5 +79,26 @@ describe("iml-export-product-columns", () => {
     ]);
     expect(xml).toContain("<ig_code>A&amp;B</ig_code>");
     expect(xml).toContain("<id>1</id>");
+  });
+
+  it("serializes print data and custom fields", () => {
+    const row = {
+      ...emptyProductExportSourceRow(1),
+      print_data_version: "v3",
+      stock_quantity: 42,
+      last_edited_by: "Admin",
+      custom_data: { foo: "bar" },
+      foil_material: { name: "PP fólie" },
+      iml_product_colors: [
+        { coverage_pct: 75, iml_pantone_colors: { code: "186 C" } },
+      ],
+    } as ProductExportSourceRow;
+
+    expect(serializeProductFieldValue(row, "print_data_version")).toBe("v3");
+    expect(serializeProductFieldValue(row, "stock_quantity")).toBe("42");
+    expect(serializeProductFieldValue(row, "last_edited_by")).toBe("Admin");
+    expect(serializeProductFieldValue(row, "custom_data")).toBe('{"foo":"bar"}');
+    expect(serializeProductFieldValue(row, "foil_material_name")).toBe("PP fólie");
+    expect(serializeProductFieldValue(row, "pantone_coverage")).toBe("186 C:75%");
   });
 });

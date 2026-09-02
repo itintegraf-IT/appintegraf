@@ -1,5 +1,12 @@
 import { prisma } from "@/lib/db";
 import {
+  buildProductExportPrismaInclude,
+  buildProductExportPrismaSelect,
+  productExportNeedsMaterials,
+  productExportNeedsPantone,
+  type ProductExportSourceRow,
+} from "@/lib/iml-export-product-field-catalog";
+import {
   buildProductExportCsv,
   buildProductExportCsvWithAssetPaths,
   buildProductExportXml,
@@ -8,7 +15,6 @@ import {
   sanitizeProductExportFilters,
   type ProductExportColumnKey,
   type ProductExportFilters,
-  type ProductExportSourceRow,
 } from "@/lib/iml-export-product-columns";
 import { resolveCatalogCustomerId } from "@/lib/iml-customer-catalog";
 import {
@@ -62,74 +68,26 @@ export async function loadProductsForExport(
   if (archive === "archived") where.archived_at = { not: null };
   else if (archive !== "all") where.archived_at = null;
 
-  const needPantone = columns.some((c) => c.key === "pantone_codes");
+  const needPantone = productExportNeedsPantone(columns);
+  const needMaterials = productExportNeedsMaterials(columns);
 
   const products = withAssets
     ? await prisma.iml_products.findMany({
         where,
         orderBy: { id: "desc" },
         take: maxRows,
-        select: {
-          id: true,
-          ig_code: true,
-          ig_short_name: true,
-          client_code: true,
-          client_name: true,
-          sku: true,
-          product_kind: true,
-          requester: true,
-          label_shape_code: true,
-          product_format: true,
-          format_width_mm: true,
-          format_height_mm: true,
-          die_cut_tool_code: true,
-          assembly_code: true,
-          positions_on_sheet: true,
-          labels_per_sheet: true,
-          pieces_per_box: true,
-          pieces_per_pallet: true,
-          foil_type: true,
-          color_coverage: true,
-          ean_code: true,
-          item_status: true,
-          approval_status: true,
-          approval_date: true,
-          color_count: true,
-          print_colors_text: true,
-          label_type: true,
-          has_print_sample: true,
-          has_print_proof: true,
-          is_active: true,
-          archived_at: true,
-          created_at: true,
-          updated_at: true,
-          image_data: true,
-          iml_customers: { select: { name: true } },
-          ...(needPantone
-            ? {
-                iml_product_colors: {
-                  include: { iml_pantone_colors: { select: { code: true } } },
-                  orderBy: [{ sort_order: "asc" as const }, { id: "asc" as const }],
-                },
-              }
-            : {}),
-        },
+        select: buildProductExportPrismaSelect(columns, {
+          withAssets: true,
+        }) as never,
       })
     : await prisma.iml_products.findMany({
         where,
         orderBy: { id: "desc" },
         take: maxRows,
-        include: {
-          iml_customers: { select: { name: true } },
-          ...(needPantone
-            ? {
-                iml_product_colors: {
-                  include: { iml_pantone_colors: { select: { code: true } } },
-                  orderBy: [{ sort_order: "asc" as const }, { id: "asc" as const }],
-                },
-              }
-            : {}),
-        },
+        include: buildProductExportPrismaInclude(columns, {
+          needPantone,
+          needMaterials,
+        }) as never,
       });
 
   return {
@@ -194,7 +152,7 @@ export async function renderProductExportWithOptionalZip(
     rows.map((r) => ({
       id: r.id,
       ig_code: r.ig_code,
-      image_data: (r as ProductExportSourceRow & { image_data?: Buffer | null }).image_data,
+      image_data: r.image_data,
     })),
     assetOpts
   );

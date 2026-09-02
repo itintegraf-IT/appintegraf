@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  emptyProductExportSourceRow,
+  formatPantoneCoverage,
+} from "@/lib/iml-export-product-field-catalog";
+import {
   buildOrderLineExportCsv,
   buildOrderLineExportCsvWithAssetPaths,
   buildOrderLineExportXml,
@@ -8,6 +12,26 @@ import {
   type OrderLineExportSourceRow,
 } from "@/lib/iml-export-order-columns";
 import { getExportedOrderIds } from "@/lib/iml-export-orders-run";
+
+function sampleProduct(overrides: Record<string, unknown> = {}) {
+  return {
+    ...emptyProductExportSourceRow(5),
+    ig_code: "IG001",
+    ig_short_name: "Etiketa",
+    client_code: "C1",
+    client_name: "Název",
+    product_kind: "iml",
+    item_status: "aktivní",
+    color_count: 2,
+    iml_product_colors: [
+      {
+        coverage_pct: 50,
+        iml_pantone_colors: { code: "Pantone 186 C" },
+      },
+    ],
+    ...overrides,
+  };
+}
 
 const sampleRow = (overrides: Partial<OrderLineExportSourceRow> = {}): OrderLineExportSourceRow => ({
   order_id: 1,
@@ -31,23 +55,7 @@ const sampleRow = (overrides: Partial<OrderLineExportSourceRow> = {}): OrderLine
   unit_price: "1.50",
   subtotal: "750.00",
   product_id: 5,
-  ig_code: "IG001",
-  ig_short_name: "Etiketa",
-  client_code: "C1",
-  client_name: "Název",
-  sku: null,
-  product_kind: "iml",
-  label_shape_code: null,
-  product_format: null,
-  format_width_mm: null,
-  format_height_mm: null,
-  die_cut_tool_code: null,
-  foil_type: null,
-  ean_code: null,
-  item_status: "aktivní",
-  print_colors_text: null,
-  color_count: 2,
-  pantone_codes: "Pantone 186 C",
+  product_data: sampleProduct(),
   ...overrides,
 });
 
@@ -100,7 +108,11 @@ describe("iml-export-order-columns", () => {
     const xml = buildOrderLineExportXml(
       [
         sampleRow({ line_id: 1, quantity: 10 }),
-        sampleRow({ line_id: 2, quantity: 20, ig_code: "IG002" }),
+        sampleRow({
+          line_id: 2,
+          quantity: 20,
+          product_data: sampleProduct({ ig_code: "IG002" }),
+        }),
       ],
       cols
     );
@@ -136,5 +148,37 @@ describe("iml-export-order-columns", () => {
         sampleRow({ order_id: 2, line_id: 20 }),
       ])
     ).toEqual([1, 2]);
+  });
+
+  it("exportuje nová tisková data pole produktu", () => {
+    const cols = sanitizeOrderExportColumns([
+      "print_data_version",
+      "stock_quantity",
+      "last_edited_by",
+    ]);
+    const csv = buildOrderLineExportCsv(
+      [
+        sampleRow({
+          product_data: sampleProduct({
+            print_data_version: "v2",
+            stock_quantity: 100,
+            last_edited_by: "Tester",
+          }),
+        }),
+      ],
+      cols
+    );
+    expect(csv).toContain("v2;100;Tester");
+  });
+});
+
+describe("formatPantoneCoverage", () => {
+  it("formátuje kód a pokrytí", () => {
+    expect(
+      formatPantoneCoverage([
+        { coverage_pct: 50, iml_pantone_colors: { code: "P186" } },
+        { coverage_pct: 30, iml_pantone_colors: { code: "P276" } },
+      ])
+    ).toBe("P186:50%, P276:30%");
   });
 });
