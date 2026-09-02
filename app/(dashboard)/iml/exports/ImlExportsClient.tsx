@@ -14,7 +14,12 @@ import {
   ORDER_LINE_EXPORT_COLUMNS,
   type OrderLineExportColumnKey,
 } from "@/lib/iml-export-order-columns";
-import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
+import {
+  IML_ITEM_STATUSES,
+  IML_ORDER_STATUSES,
+  imlItemStatusLabel,
+  imlOrderStatusLabel,
+} from "@/lib/iml-constants";
 
 type ExportEntity = "products" | "orders";
 
@@ -31,8 +36,6 @@ type Template = {
 type Customer = { id: number; name: string };
 
 type Props = { canWrite: boolean };
-
-const ORDER_STATUSES = ["nová", "potvrzená", "odeslaná", "dokončená", "zrušená"] as const;
 
 function parseProductColumnKeys(columns: unknown): ProductExportColumnKey[] {
   if (!Array.isArray(columns)) return [...DEFAULT_PRODUCT_EXPORT_COLUMNS];
@@ -172,13 +175,11 @@ export function ImlExportsClient({ canWrite }: Props) {
           ? f.archive
           : "active"
       );
-      setIncludePrint(f.include_print === true || f.include_print === 1 || f.include_print === "1");
-      setIncludeSoftproof(
-        f.include_softproof === true ||
-          f.include_softproof === 1 ||
-          f.include_softproof === "1"
-      );
     }
+    setIncludePrint(f.include_print === true || f.include_print === 1 || f.include_print === "1");
+    setIncludeSoftproof(
+      f.include_softproof === true || f.include_softproof === 1 || f.include_softproof === "1"
+    );
   };
 
   const columnsPayload = () =>
@@ -198,6 +199,8 @@ export function ImlExportsClient({ canWrite }: Props) {
           status: orderStatus || undefined,
           date_from: dateFrom || undefined,
           date_to: dateTo || undefined,
+          include_print: includePrint || undefined,
+          include_softproof: includeSoftproof || undefined,
         }
       : {
           search: search || undefined,
@@ -294,7 +297,9 @@ export function ImlExportsClient({ canWrite }: Props) {
       const match = /filename="([^"]+)"/.exec(cd);
       const fallback =
         entity === "orders"
-          ? `iml-objednavky.${format === "xml" ? "xml" : "csv"}`
+          ? includePrint || includeSoftproof
+            ? "iml-objednavky.zip"
+            : `iml-objednavky.${format === "xml" ? "xml" : "csv"}`
           : includePrint || includeSoftproof
             ? "iml-produkty.zip"
             : `iml-produkty.${format === "xml" ? "xml" : "csv"}`;
@@ -478,9 +483,9 @@ export function ImlExportsClient({ canWrite }: Props) {
                     className="w-full rounded-lg border border-gray-300 px-3 py-2"
                   >
                     <option value="">Vše</option>
-                    {ORDER_STATUSES.map((s) => (
+                    {IML_ORDER_STATUSES.map((s) => (
                       <option key={s} value={s}>
-                        {s}
+                        {imlOrderStatusLabel(s)}
                       </option>
                     ))}
                   </select>
@@ -549,7 +554,7 @@ export function ImlExportsClient({ canWrite }: Props) {
             )}
           </div>
 
-          {entity === "products" && (
+          {(entity === "products" || entity === "orders") && (
             <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3">
               <p className="text-sm font-medium text-gray-800">Soubory v exportu</p>
               <label className="flex items-center gap-2 text-sm text-gray-700">

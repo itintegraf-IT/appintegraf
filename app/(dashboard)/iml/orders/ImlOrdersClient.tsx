@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { Eye, Pencil, Trash2, Download, Printer } from "lucide-react";
 import { ImlVariableExportModal } from "./ImlVariableExportModal";
 import { ImlOrderTemplateExportButton } from "./ImlOrderTemplateExportButton";
 import { useListFilters } from "@/lib/navigation/use-list-filters";
 import { withReturnTo } from "@/lib/navigation/return-to";
+import {
+  IML_ORDER_STATUSES,
+  IML_ORDER_STATUS_EXPORTED,
+  imlOrderStatusLabel,
+} from "@/lib/iml-constants";
 
 const ORDER_LIST_FILTER_DEFAULTS = {
   customer_id: "",
@@ -46,6 +51,10 @@ function shortCustomerName(name: string | null | undefined): string {
   return `${n.slice(0, MAX_NAME - 1)}…`;
 }
 
+function isSelectableForExport(status: string): boolean {
+  return status !== IML_ORDER_STATUS_EXPORTED;
+}
+
 export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
   const { filters, setFilter, listHref } = useListFilters({
     defaults: ORDER_LIST_FILTER_DEFAULTS,
@@ -58,9 +67,13 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [bulkExportOpen, setBulkExportOpen] = useState(false);
-  const [singleExport, setSingleExport] = useState<{ id: number; order_number: string } | null>(null);
+  const [singleExport, setSingleExport] = useState<{ id: number; order_number: string } | null>(
+    null
+  );
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [statusSavingId, setStatusSavingId] = useState<number | null>(null);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
     if (filterCustomer) params.set("customer_id", filterCustomer);
@@ -71,7 +84,7 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
       setOrders(data.orders ?? []);
     }
     setLoading(false);
-  };
+  }, [filterCustomer, filterStatus]);
 
   useEffect(() => {
     fetch("/api/iml/customers")
@@ -81,22 +94,84 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
   }, []);
 
   useEffect(() => {
-    const t = setTimeout(() => fetchOrders(), 300);
+    const t = setTimeout(() => void fetchOrders(), 300);
     return () => clearTimeout(t);
-  }, [filterCustomer, filterStatus]);
+  }, [fetchOrders]);
+
+  const selectableOrders = useMemo(
+    () => orders.filter((o) => isSelectableForExport(o.status)),
+    [orders]
+  );
+
+  const allSelectableChecked =
+    selectableOrders.length > 0 && selectableOrders.every((o) => selectedIds.has(o.id));
+
+  const toggleSelectAll = () => {
+    if (allSelectableChecked) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(selectableOrders.map((o) => o.id)));
+    }
+  };
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleExported = () => {
+    setSelectedIds(new Set());
+    void fetchOrders();
+  };
+
+  const handleStatusChange = async (orderId: number, newStatus: string) => {
+    const prev = orders.find((o) => o.id === orderId)?.status;
+    if (!prev || prev === newStatus) return;
+
+    setOrders((list) =>
+      list.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o))
+    );
+    setStatusSavingId(orderId);
+    try {
+      const res = await fetch(`/api/iml/orders/${orderId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      if (!res.ok) {
+        setOrders((list) =>
+          list.map((o) => (o.id === orderId ? { ...o, status: prev } : o))
+        );
+        const data = await res.json().catch(() => ({}));
+        alert(data.error ?? "Změna stavu selhala");
+      }
+    } finally {
+      setStatusSavingId(null);
+    }
+  };
 
   const handleDelete = async (id: number, orderNumber: string) => {
     if (!confirm(`Opravdu smazat objednávku "${orderNumber}"?`)) return;
     const res = await fetch(`/api/iml/orders/${id}`, { method: "DELETE" });
     if (res.ok) {
-      fetchOrders();
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      void fetchOrders();
     } else {
       const data = await res.json().catch(() => ({}));
       alert(data.error ?? "Chyba při mazání");
     }
   };
 
-  const colCount = 12;
+  const selectedOrderIds = useMemo(() => Array.from(selectedIds), [selectedIds]);
+  const colCount = 13;
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white shadow-sm">
@@ -104,7 +179,7 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            fetchOrders();
+            void fetchOrders();
           }}
           className="flex flex-wrap gap-3"
         >
@@ -126,11 +201,11 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
             className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Všechny stavy</option>
-            <option value="nová">Nová</option>
-            <option value="potvrzená">Potvrzená</option>
-            <option value="odeslaná">Odeslaná</option>
-            <option value="dokončená">Dokončená</option>
-            <option value="zrušená">Zrušená</option>
+            {IML_ORDER_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {imlOrderStatusLabel(s)}
+              </option>
+            ))}
           </select>
           <button
             type="submit"
@@ -148,7 +223,15 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
                 <Download className="h-4 w-4" />
                 Export
               </button>
-              <ImlOrderTemplateExportButton />
+              <ImlOrderTemplateExportButton
+                orderIds={selectedOrderIds.length ? selectedOrderIds : undefined}
+                label={
+                  selectedOrderIds.length
+                    ? `Export vybraných (${selectedOrderIds.length})`
+                    : "Export šablonou"
+                }
+                onExported={handleExported}
+              />
             </>
           )}
         </form>
@@ -173,9 +256,21 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
         </>
       )}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[960px]">
+        <table className="w-full min-w-[1000px]">
           <thead className="border-b border-gray-200 bg-gray-50">
             <tr>
+              <th className="w-10 px-2 py-3 text-center">
+                {canRead && (
+                  <input
+                    type="checkbox"
+                    checked={allSelectableChecked}
+                    onChange={toggleSelectAll}
+                    disabled={selectableOrders.length === 0}
+                    title="Vybrat vše k exportu"
+                    aria-label="Vybrat vše k exportu"
+                  />
+                )}
+              </th>
               <th className="w-14 px-2 py-3 text-left text-xs font-semibold text-gray-700">Náhled</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700">Číslo</th>
               <th className="px-3 py-3 text-left text-xs font-semibold text-gray-700">Zakázka</th>
@@ -210,8 +305,25 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
                 const meta = o.list_meta;
                 const cust = o.iml_customers?.name ?? "";
                 const pid = meta?.primary_product_id;
+                const selectable = isSelectableForExport(o.status);
                 return (
                   <tr key={o.id} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="px-2 py-2 text-center align-middle">
+                      {canRead && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(o.id)}
+                          disabled={!selectable}
+                          onChange={() => toggleSelect(o.id)}
+                          title={
+                            selectable
+                              ? "Vybrat k exportu"
+                              : "Objednávka je již exportovaná"
+                          }
+                          aria-label={`Vybrat objednávku ${o.order_number}`}
+                        />
+                      )}
+                    </td>
                     <td className="px-2 py-2 align-middle">
                       {pid && meta?.has_image ? (
                         <img
@@ -247,7 +359,24 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
                         : "—"}
                     </td>
                     <td className="px-3 py-2 align-middle">
-                      <span className="rounded bg-gray-100 px-2 py-0.5 text-xs">{o.status}</span>
+                      {canWrite ? (
+                        <select
+                          value={o.status}
+                          disabled={statusSavingId === o.id}
+                          onChange={(e) => void handleStatusChange(o.id, e.target.value)}
+                          className="max-w-[140px] rounded border border-gray-300 bg-white px-2 py-1 text-xs"
+                        >
+                          {IML_ORDER_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {imlOrderStatusLabel(s)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="rounded bg-gray-100 px-2 py-0.5 text-xs">
+                          {imlOrderStatusLabel(o.status)}
+                        </span>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-2 text-right align-middle text-sm tabular-nums">
                       {meta?.total_qty ?? "—"}
@@ -301,6 +430,7 @@ export function ImlOrdersClient({ canWrite, canRead = true }: Props) {
                               orderIds={[o.id]}
                               variant="menu"
                               label="Export šablonou"
+                              onExported={handleExported}
                             />
                           </>
                         )}
