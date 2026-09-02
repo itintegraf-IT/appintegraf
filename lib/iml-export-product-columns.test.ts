@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   sanitizeProductExportColumns,
+  sanitizeProductExportFilters,
   buildProductExportXml,
   type ProductExportSourceRow,
 } from "@/lib/iml-export-product-columns";
@@ -13,6 +14,22 @@ describe("iml-export-product-columns", () => {
       "sku",
     ]);
     expect(cols.map((c) => c.key)).toEqual(["ig_code", "sku"]);
+  });
+
+  it("sanitizes asset flags in filters", () => {
+    expect(
+      sanitizeProductExportFilters({
+        include_print: "true",
+        include_softproof: 1,
+      })
+    ).toEqual({ include_print: true, include_softproof: true });
+
+    expect(
+      sanitizeProductExportFilters({
+        include_print: false,
+        include_softproof: null,
+      })
+    ).toEqual({});
   });
 
   it("builds simple XML", () => {

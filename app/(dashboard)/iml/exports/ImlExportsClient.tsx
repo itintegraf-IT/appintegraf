@@ -244,7 +244,7 @@ export function ImlExportsClient({ canWrite }: Props) {
         return;
       }
       await loadTemplates();
-      if (!editingId && data.template?.id) setEditingId(data.template.id);
+      if (data.template) loadTemplate(data.template);
     } finally {
       setBusy(false);
     }

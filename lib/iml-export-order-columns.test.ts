@@ -66,6 +66,23 @@ describe("iml-export-order-columns", () => {
     expect(f.date_from).toBe("2026-01-01");
   });
 
+  it("sanitizes asset flags in filters", () => {
+    expect(
+      sanitizeOrderExportFilters({
+        include_print: true,
+        include_softproof: "1",
+      })
+    ).toEqual({ include_print: true, include_softproof: true });
+
+    expect(
+      sanitizeOrderExportFilters({
+        include_print: false,
+        include_softproof: "0",
+        includePrint: true,
+      })
+    ).toEqual({});
+  });
+
   it("builds CSV with one row per line", () => {
     const cols = sanitizeOrderExportColumns(["order_number", "quantity", "ig_code"]);
     const csv = buildOrderLineExportCsv([sampleRow()], cols);
