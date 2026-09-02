@@ -9,6 +9,7 @@ import {
   maketyFileKindLabel,
   type MaketyFileKind,
 } from "@/lib/makety-file-kind";
+import { MAKETY_MAX_MB } from "@/lib/makety-files";
 
 const ACCEPT =
   ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.eml,.msg,.mht,.mhtml,application/pdf,image/*,message/rfc822";
@@ -245,7 +246,7 @@ export function MaketaFilesPanel({
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 className="mb-1 text-sm font-semibold text-gray-800">Dokumentace ({files.length})</h3>
       <p className="mb-3 text-xs text-gray-500">
-        PDF, Word, Excel, obrázky, e-mail (.eml, .msg) · max. 20 MB na soubor · více souborů najednou
+        PDF, Word, Excel, obrázky, e-mail (.eml, .msg) · max. {MAKETY_MAX_MB} MB na soubor · více souborů najednou
       </p>
       {showUploadHint && (
         <p className="mb-2 text-sm text-violet-700">{uploadHintText}</p>
