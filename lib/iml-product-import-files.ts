@@ -8,9 +8,14 @@ import {
   ensureProductThumbnailFromPdf,
   saveProductPreviewImage,
 } from "@/lib/iml-product-thumbnail";
+import {
+  MAX_IMAGE_SIZE,
+  MAX_PDF_SIZE,
+  MAX_PRODUCT_IMAGE_BYTES,
+  validateProductPdfSize,
+} from "@/lib/iml-product-upload-limits";
 
-export const MAX_PDF_SIZE = 50 * 1024 * 1024;
-export const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+export { MAX_IMAGE_SIZE, MAX_PDF_SIZE, MAX_PRODUCT_IMAGE_BYTES };
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 
@@ -44,9 +49,7 @@ export async function attachProductPdf(
   filename: string,
   userId: number
 ): Promise<void> {
-  if (buffer.length > MAX_PDF_SIZE) {
-    throw new Error(`PDF je příliš velké (max ${MAX_PDF_SIZE / 1024 / 1024} MB)`);
-  }
+  validateProductPdfSize(buffer.length);
   if (!isPdfBuffer(buffer)) {
     throw new Error("Soubor není platné PDF");
   }

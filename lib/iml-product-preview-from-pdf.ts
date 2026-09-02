@@ -2,10 +2,14 @@
  * Převod první stránky PDF souboru na JPEG blob pro uložení jako `iml_products.image_data`
  * (náhled v katalogu přes stávající `/api/.../image`). Pouze z klientského kódu.
  */
-const PDF_MAGIC = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // %PDF
+import {
+  MAX_PREVIEW_PDF_BYTES,
+  MAX_PREVIEW_SOURCE_PDF_MB,
+} from "@/lib/iml-product-upload-limits";
 
-/** Maximální velikost vstupního PDF pro převod náhledu (ochrana prohlížeče). */
-export const MAX_PREVIEW_PDF_BYTES = 15 * 1024 * 1024;
+export { MAX_PREVIEW_PDF_BYTES };
+
+const PDF_MAGIC = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // %PDF
 
 export async function pdfFileToJpegPreviewBlob(
   file: File,
@@ -16,7 +20,7 @@ export async function pdfFileToJpegPreviewBlob(
 
   if (file.size > MAX_PREVIEW_PDF_BYTES) {
     throw new Error(
-      `PDF pro náhled je příliš velký (max ${Math.round(MAX_PREVIEW_PDF_BYTES / (1024 * 1024))} MB). Zmenšete soubor nebo použijte obrázek.`
+      `PDF pro náhled je příliš velký (max ${Math.round(MAX_PREVIEW_SOURCE_PDF_MB)} MB). Zmenšete soubor nebo použijte obrázek.`
     );
   }
 

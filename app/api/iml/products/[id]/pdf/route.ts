@@ -8,6 +8,10 @@ import {
   deleteArchiveFileIfExists,
   resolveProductPdfBuffer,
 } from "@/lib/iml-product-archive";
+import {
+  MAX_PRODUCT_PDF_BYTES,
+  MAX_PRODUCT_PDF_MB,
+} from "@/lib/iml-product-upload-limits";
 
 /**
  * Verzovaný PDF endpoint pro iml_product_files.
@@ -23,7 +27,6 @@ import {
  * Fallback: pokud produkt nemá žádnou verzi v iml_product_files,
  * čte se legacy `iml_products.pdf_data` / `pdf_archive_path`.
  */
-const MAX_PDF_SIZE = 50 * 1024 * 1024; // 50 MB (spec 3.4)
 
 export async function GET(
   req: NextRequest,
@@ -96,9 +99,9 @@ export async function POST(
       return NextResponse.json({ error: "Nebyl nahrán žádný soubor" }, { status: 400 });
     }
 
-    if (file.size > MAX_PDF_SIZE) {
+    if (file.size > MAX_PRODUCT_PDF_BYTES) {
       return NextResponse.json(
-        { error: `PDF je příliš velké (max ${Math.round(MAX_PDF_SIZE / 1024 / 1024)} MB)` },
+        { error: `PDF je příliš velké (max ${Math.round(MAX_PRODUCT_PDF_MB)} MB)` },
         { status: 400 }
       );
     }
