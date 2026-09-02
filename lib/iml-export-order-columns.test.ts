@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   buildOrderLineExportCsv,
+  buildOrderLineExportCsvWithAssetPaths,
   buildOrderLineExportXml,
   sanitizeOrderExportColumns,
   sanitizeOrderExportFilters,
   type OrderLineExportSourceRow,
 } from "@/lib/iml-export-order-columns";
+import { getExportedOrderIds } from "@/lib/iml-export-orders-run";
 
 const sampleRow = (overrides: Partial<OrderLineExportSourceRow> = {}): OrderLineExportSourceRow => ({
   order_id: 1,
@@ -91,5 +93,31 @@ describe("iml-export-order-columns", () => {
     expect(xml.match(/<Item>/g)?.length).toBe(2);
     expect(xml).toContain("<order_number>O-1</order_number>");
     expect(xml).toContain("<ig_code>IG002</ig_code>");
+  });
+
+  it("buildOrderLineExportCsvWithAssetPaths doplní cesty podle product_id", () => {
+    const cols = sanitizeOrderExportColumns(["order_number", "ig_code"]);
+    const paths = new Map([
+      [5, { soubor_tisk: "soubory/IG001-tisk.pdf", soubor_softproof: "soubory/IG001-softproof.jpg" }],
+    ]);
+    const csv = buildOrderLineExportCsvWithAssetPaths(
+      [sampleRow()],
+      cols,
+      paths,
+      { includePrint: true, includeSoftproof: true }
+    );
+    expect(csv.split("\n")[0]).toContain("soubor_tisk");
+    expect(csv.split("\n")[1]).toContain("soubory/IG001-tisk.pdf");
+    expect(csv.split("\n")[1]).toContain("soubory/IG001-softproof.jpg");
+  });
+
+  it("getExportedOrderIds vrátí unikátní order_id", () => {
+    expect(
+      getExportedOrderIds([
+        sampleRow({ order_id: 1, line_id: 10 }),
+        sampleRow({ order_id: 1, line_id: 11 }),
+        sampleRow({ order_id: 2, line_id: 20 }),
+      ])
+    ).toEqual([1, 2]);
   });
 });

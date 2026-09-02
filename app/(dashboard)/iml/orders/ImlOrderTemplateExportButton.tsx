@@ -16,6 +16,7 @@ type Props = {
   variant?: "button" | "menu";
   className?: string;
   label?: string;
+  onExported?: () => void;
 };
 
 async function downloadOrderTemplateExport(templateId: number, orderIds?: number[]) {
@@ -49,6 +50,7 @@ export function ImlOrderTemplateExportButton({
   variant = "button",
   className = "",
   label = "Export šablonou",
+  onExported,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -86,6 +88,7 @@ export function ImlOrderTemplateExportButton({
     try {
       await downloadOrderTemplateExport(templateId, orderIds);
       setOpen(false);
+      onExported?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Export selhal");
     } finally {

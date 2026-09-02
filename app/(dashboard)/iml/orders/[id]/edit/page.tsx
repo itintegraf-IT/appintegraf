@@ -7,6 +7,7 @@ import { Search } from "lucide-react";
 import { BackLink } from "@/components/navigation/BackLink";
 import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
 import { filterProductsByQuery } from "@/lib/iml-product-search";
+import { IML_ORDER_STATUSES, imlOrderStatusLabel } from "@/lib/iml-constants";
 
 const EMPTY_PICKER = { product_id: "", quantity: "0", unit_price: "" };
 
@@ -422,11 +423,11 @@ export default function ImlOrderEditPage() {
               onChange={(e) => setForm({ ...form, status: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             >
-              <option value="nová">Nová</option>
-              <option value="potvrzená">Potvrzená</option>
-              <option value="odeslaná">Odeslaná</option>
-              <option value="dokončená">Dokončená</option>
-              <option value="zrušená">Zrušená</option>
+              {IML_ORDER_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {imlOrderStatusLabel(s)}
+                </option>
+              ))}
             </select>
           </div>
           <div className="sm:col-span-2">

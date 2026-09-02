@@ -326,17 +326,6 @@ export function serializeOrderLineExportValue(
   }
 }
 
-export function buildOrderLineExportCsv(
-  rows: OrderLineExportSourceRow[],
-  columns: Array<{ key: OrderLineExportColumnKey; header?: string }>
-): string {
-  const header = columns.map((c) => escapeCsv(orderColumnHeader(c))).join(";");
-  const lines = rows.map((row) =>
-    columns.map((c) => escapeCsv(serializeOrderLineExportValue(row, c.key))).join(";")
-  );
-  return [header, ...lines].join("\n");
-}
-
 export function buildOrderLineExportXml(
   rows: OrderLineExportSourceRow[],
   columns: Array<{ key: OrderLineExportColumnKey; header?: string }>
@@ -366,6 +355,103 @@ export function buildOrderLineExportXml(
         for (const col of itemCols) {
           const val = serializeOrderLineExportValue(row, col.key);
           lines.push(`        <${col.key}>${escapeXml(val)}</${col.key}>`);
+        }
+        lines.push("      </Item>");
+      }
+      lines.push("    </Items>");
+    }
+    lines.push("  </Order>");
+  }
+  lines.push("</Orders>");
+  return lines.join("\n");
+}
+
+export function buildOrderLineExportCsv(
+  rows: OrderLineExportSourceRow[],
+  columns: Array<{ key: OrderLineExportColumnKey; header?: string }>
+): string {
+  const header = columns.map((c) => escapeCsv(orderColumnHeader(c))).join(";");
+  const lines = rows.map((row) =>
+    columns.map((c) => escapeCsv(serializeOrderLineExportValue(row, c.key))).join(";")
+  );
+  return [header, ...lines].join("\n");
+}
+
+export function buildOrderLineExportCsvWithAssetPaths(
+  rows: OrderLineExportSourceRow[],
+  columns: Array<{ key: OrderLineExportColumnKey; header?: string }>,
+  assetPaths: Map<number, { soubor_tisk?: string; soubor_softproof?: string }>,
+  assetOpts: { includePrint: boolean; includeSoftproof: boolean }
+): string {
+  const extraHeaders: string[] = [];
+  if (assetOpts.includePrint) extraHeaders.push("soubor_tisk");
+  if (assetOpts.includeSoftproof) extraHeaders.push("soubor_softproof");
+
+  const header = [
+    ...columns.map((c) => escapeCsv(orderColumnHeader(c))),
+    ...extraHeaders.map((h) => escapeCsv(h)),
+  ].join(";");
+
+  const lines = rows.map((row) => {
+    const base = columns
+      .map((c) => escapeCsv(serializeOrderLineExportValue(row, c.key)))
+      .join(";");
+    const extras: string[] = [];
+    const pid = row.product_id;
+    if (assetOpts.includePrint) {
+      extras.push(escapeCsv(pid != null ? (assetPaths.get(pid)?.soubor_tisk ?? "") : ""));
+    }
+    if (assetOpts.includeSoftproof) {
+      extras.push(escapeCsv(pid != null ? (assetPaths.get(pid)?.soubor_softproof ?? "") : ""));
+    }
+    return extras.length ? `${base};${extras.join(";")}` : base;
+  });
+
+  return [header, ...lines].join("\n");
+}
+
+export function buildOrderLineExportXmlWithAssetPaths(
+  rows: OrderLineExportSourceRow[],
+  columns: Array<{ key: OrderLineExportColumnKey; header?: string }>,
+  assetPaths: Map<number, { soubor_tisk?: string; soubor_softproof?: string }>,
+  assetOpts: { includePrint: boolean; includeSoftproof: boolean }
+): string {
+  const orderCols = columns.filter((c) => orderLineExportColumnGroup(c.key) === "order");
+  const itemCols = columns.filter((c) => orderLineExportColumnGroup(c.key) !== "order");
+
+  const byOrder = new Map<number, OrderLineExportSourceRow[]>();
+  for (const row of rows) {
+    const list = byOrder.get(row.order_id) ?? [];
+    list.push(row);
+    byOrder.set(row.order_id, list);
+  }
+
+  const lines: string[] = ['<?xml version="1.0" encoding="UTF-8"?>', "<Orders>"];
+  for (const orderRows of byOrder.values()) {
+    const first = orderRows[0]!;
+    lines.push("  <Order>");
+    for (const col of orderCols) {
+      const val = serializeOrderLineExportValue(first, col.key);
+      lines.push(`    <${col.key}>${escapeXml(val)}</${col.key}>`);
+    }
+    if (itemCols.length > 0 || assetOpts.includePrint || assetOpts.includeSoftproof) {
+      lines.push("    <Items>");
+      for (const row of orderRows) {
+        lines.push("      <Item>");
+        for (const col of itemCols) {
+          const val = serializeOrderLineExportValue(row, col.key);
+          lines.push(`        <${col.key}>${escapeXml(val)}</${col.key}>`);
+        }
+        const pid = row.product_id;
+        if (assetOpts.includePrint) {
+          lines.push(
+            `        <soubor_tisk>${escapeXml(pid != null ? (assetPaths.get(pid)?.soubor_tisk ?? "") : "")}</soubor_tisk>`
+          );
+        }
+        if (assetOpts.includeSoftproof) {
+          lines.push(
+            `        <soubor_softproof>${escapeXml(pid != null ? (assetPaths.get(pid)?.soubor_softproof ?? "") : "")}</soubor_softproof>`
+          );
         }
         lines.push("      </Item>");
       }

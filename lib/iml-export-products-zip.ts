@@ -27,6 +27,7 @@ export async function buildProductExportZip(input: {
     includePrint?: boolean;
     includeSoftproof?: boolean;
   };
+  zipFilename?: string;
 }): Promise<{ buffer: Buffer; filename: string }> {
   const stamp = new Date().toISOString().slice(0, 10);
   const pass = new PassThrough();
@@ -57,6 +58,6 @@ export async function buildProductExportZip(input: {
 
   return {
     buffer: Buffer.concat(chunks),
-    filename: `iml-produkty-${stamp}.zip`,
+    filename: input.zipFilename ?? `iml-produkty-${stamp}.zip`,
   };
 }

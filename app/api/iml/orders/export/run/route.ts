@@ -2,11 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
-import { loadOrderLinesForExport, renderOrderLineExport } from "@/lib/iml-export-orders-run";
+import { IML_ORDER_STATUS_EXPORTED } from "@/lib/iml-constants";
+import {
+  hasProductExportAssets,
+  parseProductExportAssetOptions,
+} from "@/lib/iml-export-products-assets";
+import {
+  loadOrderLinesForExport,
+  renderOrderExportWithOptionalZip,
+} from "@/lib/iml-export-orders-run";
 
 /**
  * Spustí line-level export objednávek podle šablony nebo ad-hoc sloupců/filtrů.
- * Body: { templateId } | { format, columns, filters }
+ * Body: { templateId } | { format, columns, filters, include_print?, include_softproof? }
  * filters.order_ids — export konkrétních objednávek
  */
 export async function POST(req: NextRequest) {
@@ -41,7 +49,6 @@ export async function POST(req: NextRequest) {
     }
     format = template.format === "xml" ? "xml" : "csv";
     columnsInput = template.columns;
-    // Šablona + volitelné přepsání order_ids z requestu (detail / výběr)
     const templateFilters =
       template.filters && typeof template.filters === "object" ? template.filters : {};
     const override =
@@ -54,15 +61,50 @@ export async function POST(req: NextRequest) {
     };
   }
 
-  const { rows, columns } = await loadOrderLinesForExport(filtersInput, columnsInput);
-  const rendered = renderOrderLineExport(format, rows, columns);
+  const filtersObj =
+    filtersInput && typeof filtersInput === "object"
+      ? (filtersInput as Record<string, unknown>)
+      : {};
+  const assetOpts = parseProductExportAssetOptions({ ...filtersObj, ...body });
+  const withAssets = hasProductExportAssets(assetOpts);
 
-  const bom = format === "csv" ? "\uFEFF" : "";
-  return new NextResponse(bom + rendered.body, {
-    headers: {
-      "Content-Type": rendered.contentType,
-      "Content-Disposition": `attachment; filename="${rendered.filename}"`,
-      "X-Export-Row-Count": String(rows.length),
-    },
+  const { rows, columns } = await loadOrderLinesForExport(filtersInput, columnsInput, {
+    withAssets,
   });
+
+  try {
+    const result = await renderOrderExportWithOptionalZip(format, rows, columns, assetOpts);
+
+    if (
+      result.exportedOrderIds.length > 0 &&
+      (await hasModuleAccess(userId, "iml", "write"))
+    ) {
+      await prisma.iml_orders.updateMany({
+        where: { id: { in: result.exportedOrderIds } },
+        data: { status: IML_ORDER_STATUS_EXPORTED },
+      });
+    }
+
+    if (result.kind === "zip") {
+      return new NextResponse(new Uint8Array(result.buffer), {
+        headers: {
+          "Content-Type": "application/zip",
+          "Content-Disposition": `attachment; filename="${result.filename}"`,
+          "X-Export-Row-Count": String(rows.length),
+        },
+      });
+    }
+
+    const bom = format === "csv" ? "\uFEFF" : "";
+    return new NextResponse(bom + result.body, {
+      headers: {
+        "Content-Type": result.contentType,
+        "Content-Disposition": `attachment; filename="${result.filename}"`,
+        "X-Export-Row-Count": String(rows.length),
+      },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Export selhal";
+    return NextResponse.json({ error: message }, { status: 400 });
+  }
 }

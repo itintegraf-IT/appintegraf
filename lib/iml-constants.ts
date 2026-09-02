@@ -29,6 +29,29 @@ export function imlItemStatusLabel(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
+/** Povolené stavy objednávky (`iml_orders.status`). */
+export const IML_ORDER_STATUSES = [
+  "nová",
+  "potvrzená",
+  "odeslaná",
+  "dokončená",
+  "zrušená",
+  "exportovaná",
+] as const;
+
+export type ImlOrderStatus = (typeof IML_ORDER_STATUSES)[number];
+
+export const IML_ORDER_STATUS_EXPORTED: ImlOrderStatus = "exportovaná";
+
+export function imlOrderStatusLabel(status: string): string {
+  if (!status) return "";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
+
+export function isImlOrderStatus(value: string): value is ImlOrderStatus {
+  return (IML_ORDER_STATUSES as readonly string[]).includes(value);
+}
+
 /** Typ etikety na záložce Tisková data (`iml_products.label_type`). */
 export const IML_LABEL_TYPES = [
   { value: "rezana", label: "Řezaná" },
