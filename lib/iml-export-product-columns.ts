@@ -128,7 +128,13 @@ export type ProductExportFilters = {
   product_kind?: string | null;
   /** active | archived | all */
   archive?: string | null;
+  include_print?: boolean;
+  include_softproof?: boolean;
 };
+
+function truthyExportAssetFlag(v: unknown): boolean {
+  return v === true || v === 1 || v === "1" || v === "true";
+}
 
 export function sanitizeProductExportFilters(input: unknown): ProductExportFilters {
   if (!input || typeof input !== "object") return {};
@@ -150,6 +156,8 @@ export function sanitizeProductExportFilters(input: unknown): ProductExportFilte
   if (o.archive === "archived" || o.archive === "all" || o.archive === "active") {
     filters.archive = o.archive;
   }
+  if (truthyExportAssetFlag(o.include_print)) filters.include_print = true;
+  if (truthyExportAssetFlag(o.include_softproof)) filters.include_softproof = true;
   return filters;
 }
 

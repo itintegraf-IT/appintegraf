@@ -152,7 +152,13 @@ export type OrderExportFilters = {
   date_from?: string | null;
   date_to?: string | null;
   order_ids?: number[];
+  include_print?: boolean;
+  include_softproof?: boolean;
 };
+
+function truthyExportAssetFlag(v: unknown): boolean {
+  return v === true || v === 1 || v === "1" || v === "true";
+}
 
 export function sanitizeOrderExportFilters(input: unknown): OrderExportFilters {
   if (!input || typeof input !== "object") return {};
@@ -177,6 +183,8 @@ export function sanitizeOrderExportFilters(input: unknown): OrderExportFilters {
       .slice(0, 500);
     if (ids.length) filters.order_ids = [...new Set(ids)];
   }
+  if (truthyExportAssetFlag(o.include_print)) filters.include_print = true;
+  if (truthyExportAssetFlag(o.include_softproof)) filters.include_softproof = true;
   return filters;
 }
 
