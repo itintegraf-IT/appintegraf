@@ -10,6 +10,7 @@ import {
   hasMaketyGrafikaFlag,
   hasMaketySchvalovatelFinalFlag,
   hasMaketySchvalovatelPrepressFlag,
+  hasMaketySpravaVzorkuFlag,
   hasMaketyVyrobaFlag,
   hasMaketyZadavatelGrafikaFlag,
   hasMaketyZadavatelMaketaFlag,
@@ -21,6 +22,7 @@ import {
   MAKETY_GRAFIKA_ROLE_LABEL,
   MAKETY_SCHVALOVATEL_FINAL_LABEL,
   MAKETY_SCHVALOVATEL_PREPRESS_LABEL,
+  MAKETY_SPRAVA_VZORKU_LABEL,
   MAKETY_VYROBA_ROLE_LABEL,
   MAKETY_ZADAVATEL_GRAFIKA_LABEL,
   MAKETY_ZADAVATEL_MAKETA_LABEL,
@@ -231,6 +233,7 @@ export function AdminUserForm({ user }: { user?: User }) {
           delete next.makety_zadavatel_grafika;
           delete next.makety_schvalovatel_prepress;
           delete next.makety_schvalovatel_final;
+          delete next.makety_sprava_vzorku;
         }
         if (moduleKey === "stitky") {
           delete next.stitky_tiskar;
@@ -256,7 +259,8 @@ export function AdminUserForm({ user }: { user?: User }) {
         hasMaketyZadavatelMaketaFlag(next) ||
         hasMaketyZadavatelGrafikaFlag(next) ||
         hasMaketySchvalovatelPrepressFlag(next) ||
-        hasMaketySchvalovatelFinalFlag(next))
+        hasMaketySchvalovatelFinalFlag(next) ||
+        hasMaketySpravaVzorkuFlag(next))
     ) {
       next.makety = "read";
     }
@@ -317,6 +321,16 @@ export function AdminUserForm({ user }: { user?: User }) {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (checked) next.makety_schvalovatel_final = "1";
       else delete next.makety_schvalovatel_final;
+      ensureMaketyBaseIfNeeded(next);
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setMaketySpravaVzorkuFlag = (checked: boolean) => {
+    setForm((prev) => {
+      const next: ModuleAccessMap = { ...prev.module_access };
+      if (checked) next.makety_sprava_vzorku = "1";
+      else delete next.makety_sprava_vzorku;
       ensureMaketyBaseIfNeeded(next);
       return { ...prev, module_access: next };
     });
@@ -464,6 +478,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         delete moduleAccess.makety_zadavatel_grafika;
         delete moduleAccess.makety_schvalovatel_prepress;
         delete moduleAccess.makety_schvalovatel_final;
+        delete moduleAccess.makety_sprava_vzorku;
       }
       if (isStitkyModuleEnabled(moduleAccess)) {
         moduleAccess = normalizeStitkyModuleAccessForSave(moduleAccess);
@@ -1053,6 +1068,16 @@ export function AdminUserForm({ user }: { user?: User }) {
                             className="rounded"
                           />
                           <span>{MAKETY_SCHVALOVATEL_FINAL_LABEL}</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hasMaketySpravaVzorkuFlag(form.module_access)}
+                            onChange={(e) => setMaketySpravaVzorkuFlag(e.target.checked)}
+                            disabled={isAdminRoleSelected}
+                            className="rounded"
+                          />
+                          <span>{MAKETY_SPRAVA_VZORKU_LABEL}</span>
                         </label>
                       </div>
                     )}

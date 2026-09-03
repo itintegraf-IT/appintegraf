@@ -18,3 +18,6 @@ export const MAKETY_SCHVALOVATEL_PREPRESS_LABEL = "Schvalovatel prepress";
 
 /** Finální schvalovatel (obchod / technolog) u zakázek grafiky. */
 export const MAKETY_SCHVALOVATEL_FINAL_LABEL = "Finální schvalovatel grafiky";
+
+/** Správa vzorků – notifikace při úpravě dat (likvidace nátisku / zásob). */
+export const MAKETY_SPRAVA_VZORKU_LABEL = "Správa vzorků";

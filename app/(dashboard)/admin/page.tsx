@@ -118,6 +118,13 @@ export default async function AdminPage() {
           Šablony softproofu
         </Link>
         <Link
+          href="/admin/settings/sprava-vzorku"
+          className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
+        >
+          <Mail className="h-4 w-4" />
+          Notifikace správy vzorků
+        </Link>
+        <Link
           href="/admin/contract-types"
           className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-gray-700 hover:bg-gray-50"
         >
