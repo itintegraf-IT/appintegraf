@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { hasMaketyGrafikaAccess, hasMaketyVyrobaAccess } from "@/lib/auth-utils";
+import { hasMaketyGrafikaAccess, hasMaketySpravaVzorkuAccess, hasMaketyVyrobaAccess } from "@/lib/auth-utils";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { Printer } from "lucide-react";
 import { MAKETY_MODULE_LABEL } from "@/lib/makety-module-label";
@@ -27,7 +27,8 @@ export default async function MaketyLayout({ children }: { children: React.React
   const canWriteAny = await canZadatAnyMaketyWork(userId);
   const canModuleAdmin = await canViewAllMaketyTypes(userId);
   const canVyroba = await hasMaketyVyrobaAccess(userId);
-  const canGrafika = await hasMaketyGrafikaAccess(userId);
+  const canGrafika =
+    (await hasMaketyGrafikaAccess(userId)) || (await hasMaketySpravaVzorkuAccess(userId));
   const canManageQueue = await canManageMaketyQueue(userId);
 
   return (

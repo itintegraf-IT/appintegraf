@@ -57,6 +57,10 @@ export function hasMaketySchvalovatelFinalFlag(moduleAccess: Record<string, stri
   return isModuleAccessFlag(moduleAccess.makety_schvalovatel_final);
 }
 
+export function hasMaketySpravaVzorkuFlag(moduleAccess: Record<string, string>): boolean {
+  return isModuleAccessFlag(moduleAccess.makety_sprava_vzorku);
+}
+
 function anyMaketyRoleFlag(moduleAccess: Record<string, string>): boolean {
   return (
     hasMaketyVyrobaFlag(moduleAccess) ||
@@ -64,7 +68,8 @@ function anyMaketyRoleFlag(moduleAccess: Record<string, string>): boolean {
     hasMaketyZadavatelMaketaFlag(moduleAccess) ||
     hasMaketyZadavatelGrafikaFlag(moduleAccess) ||
     hasMaketySchvalovatelPrepressFlag(moduleAccess) ||
-    hasMaketySchvalovatelFinalFlag(moduleAccess)
+    hasMaketySchvalovatelFinalFlag(moduleAccess) ||
+    hasMaketySpravaVzorkuFlag(moduleAccess)
   );
 }
 
@@ -98,6 +103,7 @@ export function normalizeMaketyModuleAccessForSave(
 
   const schvalovatelPrepress = hasMaketySchvalovatelPrepressFlag(next);
   const schvalovatelFinal = hasMaketySchvalovatelFinalFlag(next);
+  const spravaVzorku = hasMaketySpravaVzorkuFlag(next);
 
   let base = maketyBaseLevelFromAccess(next);
   if (legacyMakety === "admin") base = "admin";
@@ -109,6 +115,7 @@ export function normalizeMaketyModuleAccessForSave(
     zadavatelGrafika ||
     schvalovatelPrepress ||
     schvalovatelFinal ||
+    spravaVzorku ||
     legacyMakety === "vyroba" ||
     legacyMakety === "grafika" ||
     legacyMakety === "write";
@@ -123,6 +130,7 @@ export function normalizeMaketyModuleAccessForSave(
     delete next.makety_zadavatel_grafika;
     delete next.makety_schvalovatel_prepress;
     delete next.makety_schvalovatel_final;
+    delete next.makety_sprava_vzorku;
     return next;
   }
 
@@ -139,6 +147,8 @@ export function normalizeMaketyModuleAccessForSave(
   else delete next.makety_schvalovatel_prepress;
   if (schvalovatelFinal) next.makety_schvalovatel_final = "1";
   else delete next.makety_schvalovatel_final;
+  if (spravaVzorku) next.makety_sprava_vzorku = "1";
+  else delete next.makety_sprava_vzorku;
 
   return next;
 }
@@ -179,6 +189,12 @@ export function roleHasMaketySchvalovatelFinalFromDecoded(
   return isModuleAccessFlag(decoded.makety_schvalovatel_final);
 }
 
+export function roleHasMaketySpravaVzorkuFromDecoded(
+  decoded: Record<string, unknown>
+): boolean {
+  return isModuleAccessFlag(decoded.makety_sprava_vzorku);
+}
+
 function maketyBaseFromDecoded(decoded: Record<string, unknown>): string {
   const perm = decoded.makety;
   if (typeof perm !== "string") return "";
@@ -201,7 +217,8 @@ export function roleMaketyGrantsModuleAccess(
       roleHasMaketyZadavatelMaketaFromDecoded(decoded) ||
       roleHasMaketyZadavatelGrafikaFromDecoded(decoded) ||
       roleHasMaketySchvalovatelPrepressFromDecoded(decoded) ||
-      roleHasMaketySchvalovatelFinalFromDecoded(decoded)
+      roleHasMaketySchvalovatelFinalFromDecoded(decoded) ||
+      roleHasMaketySpravaVzorkuFromDecoded(decoded)
     );
   }
   if (access === "write") {

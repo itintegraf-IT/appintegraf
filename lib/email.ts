@@ -574,6 +574,16 @@ export type SendMaketaEmailParams = {
   orderNumber: string | null;
   maketaId: number;
   workType?: "maketa" | "grafika";
+  /** Volitelný blok údajů o produktu (HTML řádky už escapované nebo plain text). */
+  productDetails?: {
+    labelCode?: string | null;
+    productName?: string | null;
+    jobNumber?: string | null;
+  };
+  /** Přepsání textu CTA tlačítka. */
+  ctaLabel?: string;
+  /** Pokud false, sekce „Zadání“ se nevykreslí. */
+  includeBodyPreview?: boolean;
 };
 
 /**
@@ -595,10 +605,28 @@ export async function sendMaketaEmail(
   }
 
   const link = `${getBaseUrl()}/makety/${params.maketaId}`;
-  const openCta = params.workType === "grafika" ? "Otevřít grafiku" : "Otevřít maketu";
+  const openCta =
+    params.ctaLabel?.trim() ||
+    (params.workType === "grafika" ? "Otevřít grafiku" : "Otevřít maketu");
   const zak = params.orderNumber
     ? `<p><strong>Zakázka:</strong> ${params.orderNumber}</p>`
     : "";
+  const pd = params.productDetails;
+  const productBlock = [
+    pd?.labelCode?.trim()
+      ? `<p><strong>Kód etikety:</strong> ${pd.labelCode.trim()}</p>`
+      : "",
+    pd?.productName?.trim()
+      ? `<p><strong>Produkt:</strong> ${pd.productName.trim()}</p>`
+      : "",
+    pd?.jobNumber?.trim() ? `<p><strong>Job:</strong> ${pd.jobNumber.trim()}</p>` : "",
+  ]
+    .filter(Boolean)
+    .join("\n  ");
+  const bodySection =
+    params.includeBodyPreview === false
+      ? ""
+      : `<p><strong>Zadání:</strong> ${params.bodyPreview.slice(0, 500)}</p>`;
   const html = `
 <!DOCTYPE html>
 <html>
@@ -607,7 +635,8 @@ export async function sendMaketaEmail(
   <p>Dobrý den, ${params.toName},</p>
   <p>${params.intro}</p>
   ${zak}
-  <p><strong>Zadání:</strong> ${params.bodyPreview.slice(0, 500)}</p>
+  ${productBlock}
+  ${bodySection}
   <p><a href="${link}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">${openCta}</a></p>
   <p style="color: #666; font-size: 12px;">Pokud tlačítko nefunguje, zkopírujte odkaz: ${link}</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
@@ -615,6 +644,16 @@ export async function sendMaketaEmail(
 </body>
 </html>
   `.trim();
+
+  const textParts = [
+    params.intro,
+    params.orderNumber ? `Zakázka: ${params.orderNumber}` : "",
+    pd?.labelCode?.trim() ? `Kód etikety: ${pd.labelCode.trim()}` : "",
+    pd?.productName?.trim() ? `Produkt: ${pd.productName.trim()}` : "",
+    pd?.jobNumber?.trim() ? `Job: ${pd.jobNumber.trim()}` : "",
+    params.includeBodyPreview === false ? "" : params.bodyPreview.slice(0, 500),
+    `Odkaz: ${link}`,
+  ].filter(Boolean);
 
   try {
     const transporter = nodemailer.createTransport({
@@ -637,7 +676,7 @@ export async function sendMaketaEmail(
         : settings.from,
       to: params.toEmail,
       subject: params.subject,
-      text: `${params.intro}\n\n${params.bodyPreview.slice(0, 500)}\n\nOdkaz: ${link}`,
+      text: textParts.join("\n\n"),
       html,
     });
 

@@ -7,6 +7,7 @@ import {
   hasMaketyGrafikaAccess,
   hasMaketySchvalovatelFinalAccess,
   hasMaketySchvalovatelPrepressAccess,
+  hasMaketySpravaVzorkuAccess,
   hasMaketyVyrobaAccess,
   isAdmin,
 } from "@/lib/auth-utils";
@@ -64,6 +65,7 @@ export async function canViewMaketyGrafikaCalendar(userId: number): Promise<bool
   if (await hasMaketyGrafikaAccess(userId)) return true;
   if (await hasMaketySchvalovatelPrepressAccess(userId)) return true;
   if (await hasMaketySchvalovatelFinalAccess(userId)) return true;
+  if (await hasMaketySpravaVzorkuAccess(userId)) return true;
   return canZadatMaketyWork(userId, "grafika");
 }
 
@@ -78,7 +80,8 @@ export async function getOrgWideWorkTypes(userId: number): Promise<MaketyWorkTyp
   if (
     (await hasMaketyGrafikaAccess(userId)) ||
     (await hasMaketySchvalovatelPrepressAccess(userId)) ||
-    (await hasMaketySchvalovatelFinalAccess(userId))
+    (await hasMaketySchvalovatelFinalAccess(userId)) ||
+    (await hasMaketySpravaVzorkuAccess(userId))
   ) {
     types.push("grafika");
   }
@@ -128,6 +131,7 @@ async function userHasOrgAccessToWorkType(
     if (await hasMaketyGrafikaAccess(userId)) return true;
     if (await hasMaketySchvalovatelPrepressAccess(userId)) return true;
     if (await hasMaketySchvalovatelFinalAccess(userId)) return true;
+    if (await hasMaketySpravaVzorkuAccess(userId)) return true;
   }
   return false;
 }

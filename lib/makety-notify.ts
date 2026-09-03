@@ -10,6 +10,9 @@ import {
   filterUserIdsAllowingEmail,
   userAllowsEmailNotification,
 } from "@/lib/user-email-notifications-db";
+import { loadSpravaVzorkuNotifyTemplate } from "@/lib/makety-sprava-vzorku-template-db";
+import { renderSpravaVzorkuNotifyTemplate } from "@/lib/makety-sprava-vzorku-template";
+import { getUsersWithMaketySpravaVzorkuAccess } from "@/lib/makety-sprava-vzorku-users";
 
 export type MaketaNotifyKind =
   | "assigned"
@@ -303,6 +306,84 @@ export async function notifyGrafikaWorkflowCreated(params: {
       workType: "grafika",
       excludeUserId: params.excludeUserId,
     });
+  }
+}
+
+/**
+ * Při zadání grafiky s typem „úprava dat“: notifikace uživatelům s rolí Správa vzorků
+ * (konfigurovatelná šablona – likvidace nátisku / zásob).
+ */
+export async function notifySpravaVzorkuUpravaDat(params: {
+  maketaId: number;
+  orderNumber: string | null;
+  labelCode?: string | null;
+  productName?: string | null;
+  jobNumber?: string | null;
+  excludeUserId?: number;
+}): Promise<void> {
+  const recipients = await getUsersWithMaketySpravaVzorkuAccess();
+  const userIds = recipients
+    .map((u) => u.id)
+    .filter((id) => id !== params.excludeUserId);
+  if (userIds.length === 0) return;
+
+  const template = await loadSpravaVzorkuNotifyTemplate();
+  const linkPath = `/makety/${params.maketaId}`;
+  const productDetails = {
+    labelCode: params.labelCode ?? null,
+    productName: params.productName ?? null,
+    jobNumber: params.jobNumber ?? null,
+  };
+
+  const emailIds = await filterUserIdsAllowingEmail(userIds, "makety");
+  const emailUsers =
+    emailIds.length > 0
+      ? await prisma.users.findMany({
+          where: { id: { in: emailIds } },
+          select: { id: true, email: true, first_name: true, last_name: true },
+        })
+      : [];
+  const emailById = new Map(emailUsers.map((u) => [u.id, u]));
+
+  for (const uid of userIds) {
+    const emailUser = emailById.get(uid);
+    const toName = emailUser
+      ? `${emailUser.first_name} ${emailUser.last_name}`.trim() || "Uživateli"
+      : "Uživateli";
+    const rendered = renderSpravaVzorkuNotifyTemplate(template, {
+      toName,
+      orderNumber: params.orderNumber,
+      labelCode: params.labelCode,
+      productName: params.productName,
+      jobNumber: params.jobNumber,
+      maketaId: params.maketaId,
+    });
+
+    await prisma.notifications.create({
+      data: {
+        user_id: uid,
+        title: rendered.title,
+        message: rendered.intro.slice(0, 500),
+        type: "makety_sample_disposal",
+        link: linkPath,
+      },
+    });
+
+    if (emailUser?.email) {
+      await sendMaketaEmail({
+        toEmail: emailUser.email,
+        toName,
+        subject: `${rendered.subject} – INTEGRAF`,
+        intro: rendered.intro,
+        bodyPreview: "",
+        orderNumber: params.orderNumber,
+        maketaId: params.maketaId,
+        workType: "grafika",
+        productDetails,
+        ctaLabel: rendered.ctaLabel,
+        includeBodyPreview: false,
+      });
+    }
   }
 }
 

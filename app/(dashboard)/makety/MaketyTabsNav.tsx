@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Archive, Calendar, Languages, LayoutList, List, Plus, Users } from "lucide-react";
+import { Archive, Calendar, Languages, LayoutList, List, Package, Plus, Users } from "lucide-react";
 
 export function MaketyTabsNav({
   canWriteMaketa,
@@ -31,6 +31,7 @@ export function MaketyTabsNav({
   const isKalendarGrafika = pathname === "/makety/kalendar-grafika";
   const isFronta = pathname === "/makety/fronta";
   const isSoftproofTemplates = pathname.startsWith("/makety/nastaveni/softproof");
+  const isSpravaVzorkuTemplates = pathname.startsWith("/makety/nastaveni/sprava-vzorku");
 
   const showZadani = canWriteAny || canModuleAdmin;
   const showKalendarMaket = canModuleAdmin || canVyroba || canWriteMaketa;
@@ -93,6 +94,12 @@ export function MaketyTabsNav({
         <Link href="/makety/nastaveni/softproof" className={tabClass(isSoftproofTemplates)}>
           <Languages className="h-4 w-4" />
           Šablony softproofu
+        </Link>
+      )}
+      {canModuleAdmin && (
+        <Link href="/makety/nastaveni/sprava-vzorku" className={tabClass(isSpravaVzorkuTemplates)}>
+          <Package className="h-4 w-4" />
+          Správa vzorků
         </Link>
       )}
     </nav>

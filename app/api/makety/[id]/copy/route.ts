@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { userCanCopyMaketa } from "@/lib/makety-access";
-import { notifyGrafikaWorkflowCreated, notifyMaketaRecipients } from "@/lib/makety-notify";
+import { notifyGrafikaWorkflowCreated, notifyMaketaRecipients, notifySpravaVzorkuUpravaDat } from "@/lib/makety-notify";
 import { nextQueuePositionForAssignee } from "@/lib/makety-queue";
 import { resolveGrafikaWorkflowAssignees } from "@/lib/makety-workflow-assignees";
 import type { MaketyWorkType } from "@/lib/makety-work-type";
@@ -110,6 +110,16 @@ export async function POST(
         finalApproverUserId: workflow.final_approver_user_id,
         excludeUserId: userId,
       });
+      if (source.data_kind === "uprava_dat") {
+        await notifySpravaVzorkuUpravaDat({
+          maketaId: created.id,
+          orderNumber: source.order_number,
+          labelCode: source.label_code,
+          productName: source.product_name,
+          jobNumber: source.job_number,
+          excludeUserId: userId,
+        });
+      }
     } else {
       await notifyMaketaRecipients({
         maketaId: created.id,
