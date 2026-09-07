@@ -364,12 +364,22 @@ export async function userCanOperateGrafikaAutomation(
 
 const GRAFIKA_FILE_DELETE_STATUSES = new Set(["open", "in_progress", "data_problem"]);
 
-/** Zadavatel u aktivní zakázky, nebo přiřazený grafik do odeslání dál (hotovo). */
+/**
+ * Mazání přílohy: zadavatel u aktivní zakázky, admin (globální / modul),
+ * nebo přiřazený grafik do odeslání dál (open / in_progress / data_problem).
+ */
 export async function userCanDeleteMaketyFile(
   userId: number,
   maketaId: number
 ): Promise<boolean> {
   if (await userCanEditMaketa(userId, maketaId)) return true;
+  if (await canViewAllMaketyTypes(userId)) {
+    const exists = await prisma.makety.findFirst({
+      where: { id: maketaId },
+      select: { id: true },
+    });
+    return exists != null;
+  }
   const row = await prisma.makety.findFirst({
     where: { id: maketaId },
     select: {

@@ -188,7 +188,10 @@ export async function DELETE(
   const canDelete = await userCanDeleteMaketyFile(userId, maketaId);
   if (!canDelete) {
     return NextResponse.json(
-      { error: "Soubor teď nemůžete smazat (po odeslání dál jen zadavatel, grafik jen do Hotovo)" },
+      {
+        error:
+          "Soubor teď nemůžete smazat (po odeslání dál jen zadavatel nebo admin; grafik jen do Hotovo)",
+      },
       { status: 403 }
     );
   }
