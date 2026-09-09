@@ -10,8 +10,9 @@ import type { MaketyWorkType } from "@/lib/makety-work-type";
 
 /**
  * POST /api/makety/[id]/copy
- * Vytvoří novou zakázku se stejnými údaji (včetně IML vazeb).
- * Nekopíruje: soubory, komentáře, status log, nabídku/kalkulaci, product_draft.
+ * Vytvoří novou zakázku se stejnými texty a metadaty (včetně IML vazeb, priority, workflow).
+ * Nekopíruje: termín (due_at → teď+24h), order_number, job_number, soubory, komentáře,
+ * status log, nabídku/kalkulaci, product_draft.
  * Stav = výchozí (open / awaiting_quote). Přesměrování na edit nové zakázky řeší UI.
  */
 export async function POST(
@@ -72,18 +73,21 @@ export async function POST(
     ? source.body
     : `Kopie: ${source.body}`;
 
+  // Stejný default jako NewMaketyWorkForm — termín a čísla se vyplní znovu na editu.
+  const due_at = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
   try {
     const created = await prisma.makety.create({
       data: {
         body: bodyCopy,
-        order_number: source.order_number,
+        order_number: null,
         material: source.material,
         dimensions: source.dimensions,
         quantity: source.quantity,
         priority: source.priority,
         data_kind: source.data_kind,
         queue_position,
-        due_at: source.due_at,
+        due_at,
         assignee_user_id: workflow.assignee_user_id,
         created_by: userId,
         work_type: workType,
@@ -93,7 +97,7 @@ export async function POST(
         die_cut_id: source.die_cut_id,
         label_code: source.label_code,
         product_name: source.product_name,
-        job_number: source.job_number,
+        job_number: null,
         prepress_user_id: workflow.prepress_user_id,
         final_approver_user_id: workflow.final_approver_user_id,
         // quote / product_draft / rejection záměrně nekopírujeme
@@ -104,7 +108,7 @@ export async function POST(
       await notifyGrafikaWorkflowCreated({
         maketaId: created.id,
         bodyPreview: bodyCopy,
-        orderNumber: source.order_number,
+        orderNumber: null,
         assigneeUserId: workflow.assignee_user_id,
         prepressUserId: workflow.prepress_user_id,
         finalApproverUserId: workflow.final_approver_user_id,
@@ -113,10 +117,10 @@ export async function POST(
       if (source.data_kind === "uprava_dat") {
         await notifySpravaVzorkuUpravaDat({
           maketaId: created.id,
-          orderNumber: source.order_number,
+          orderNumber: null,
           labelCode: source.label_code,
           productName: source.product_name,
-          jobNumber: source.job_number,
+          jobNumber: null,
           excludeUserId: userId,
         });
       }
@@ -124,7 +128,7 @@ export async function POST(
       await notifyMaketaRecipients({
         maketaId: created.id,
         bodyPreview: bodyCopy,
-        orderNumber: source.order_number,
+        orderNumber: null,
         kind: "assigned",
         assigneeUserId: workflow.assignee_user_id,
         workType,
