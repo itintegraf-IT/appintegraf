@@ -19,7 +19,6 @@ import {
   userCanCopyMaketa,
   canManageMaketyQueue,
   userCanDeleteMaketyFile,
-  userCanDownloadMaketyFile,
   isMaketyProhlizecKlientaOnly,
 } from "@/lib/makety-access";
 import { MaketaQuoteForm } from "./MaketaQuoteForm";
@@ -127,8 +126,8 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
       ? isGrafikaImlArchived(maketa.status, maketa.iml_applied_at)
       : isMaketaTerminalStatus(maketa.status, workType);
   const canDeleteFile = await userCanDeleteMaketyFile(userId, id);
-  const canDownloadFile = await userCanDownloadMaketyFile(userId, id);
   const prohlizecOnly = await isMaketyProhlizecKlientaOnly(userId);
+  const fileAccess = prohlizecOnly ? "softproof-only" : "all";
   const canUploadFile = !prohlizecOnly && !isArchived;
   const canComment = !prohlizecOnly;
   const canManagePriority =
@@ -495,7 +494,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
         <MaketaFilesPanel
           maketaId={id}
           canDelete={canDeleteFile && !prohlizecOnly}
-          canDownload={canDownloadFile}
+          fileAccess={fileAccess}
           canUpload={canUploadFile}
           canChangeType={!prohlizecOnly && !isArchived}
           showUploadHint={showUploadHint && !prohlizecOnly}
