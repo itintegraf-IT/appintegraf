@@ -32,12 +32,16 @@ function fileApiUrl(maketaId: number, fileId: number, download = false): string 
 export function MaketaFilesPanel({
   maketaId,
   canDelete,
+  canDownload = true,
+  canUpload = true,
   showUploadHint,
   uploadHintText = "Nahrajte podklady — můžete vybrat více souborů najednou.",
   canChangeType = true,
 }: {
   maketaId: number;
   canDelete: boolean;
+  canDownload?: boolean;
+  canUpload?: boolean;
   showUploadHint?: boolean;
   uploadHintText?: string;
   canChangeType?: boolean;
@@ -240,18 +244,23 @@ export function MaketaFilesPanel({
     }
   };
 
-  const uploadDisabled = uploading || !documentType;
+  const uploadDisabled = uploading || !documentType || !canUpload;
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 className="mb-1 text-sm font-semibold text-gray-800">Dokumentace ({files.length})</h3>
       <p className="mb-3 text-xs text-gray-500">
-        PDF, Word, Excel, obrázky, e-mail (.eml, .msg) · max. {MAKETY_MAX_MB} MB na soubor · více souborů najednou
+        {canUpload
+          ? `PDF, Word, Excel, obrázky, e-mail (.eml, .msg) · max. ${MAKETY_MAX_MB} MB na soubor · více souborů najednou`
+          : canDownload
+            ? "Seznam příloh — můžete soubory prohlížet a stahovat."
+            : "Seznam příloh (pouze náhled názvů — stahování není povoleno)."}
       </p>
-      {showUploadHint && (
+      {canUpload && showUploadHint && (
         <p className="mb-2 text-sm text-violet-700">{uploadHintText}</p>
       )}
 
+      {canUpload && (
       <div className="mb-3">
         <label className="mb-1 block text-xs font-medium text-gray-700">
           Typ souboru <span className="text-red-600">*</span>
@@ -270,7 +279,9 @@ export function MaketaFilesPanel({
           ))}
         </select>
       </div>
+      )}
 
+      {canUpload && (
       <div
         onDragEnter={onDragEnterZone}
         onDragOver={(e) => e.preventDefault()}
@@ -313,10 +324,11 @@ export function MaketaFilesPanel({
           className="hidden"
         />
       </div>
+      )}
 
-      {uploadProgress && <p className="mb-2 text-sm text-violet-700">{uploadProgress}</p>}
+      {canUpload && uploadProgress && <p className="mb-2 text-sm text-violet-700">{uploadProgress}</p>}
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
-      {dragHint && <p className="mb-2 text-sm text-amber-800">{dragHint}</p>}
+      {canDownload && dragHint && <p className="mb-2 text-sm text-amber-800">{dragHint}</p>}
       {warnings.length > 0 && (
         <ul className="mb-2 list-inside list-disc text-sm text-amber-800">
           {warnings.map((w, i) => (
@@ -331,16 +343,21 @@ export function MaketaFilesPanel({
       ) : (
         <ul className="space-y-2">
           {files.map((f) => {
-            const ready = dragReadyIds.has(f.id);
-            const waiting = prefetchingIds.has(f.id);
+            const ready = canDownload && dragReadyIds.has(f.id);
+            const waiting = canDownload && prefetchingIds.has(f.id);
             return (
             <li
               key={f.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-2 py-2 text-sm"
-              onMouseEnter={() => prefetchForDrag(f)}
-              onPointerEnter={() => prefetchForDrag(f)}
+              onMouseEnter={() => {
+                if (canDownload) prefetchForDrag(f);
+              }}
+              onPointerEnter={() => {
+                if (canDownload) prefetchForDrag(f);
+              }}
             >
               <div className="flex min-w-0 flex-1 items-start gap-2">
+                {canDownload ? (
                 <span
                   draggable={ready}
                   role="button"
@@ -362,7 +379,9 @@ export function MaketaFilesPanel({
                 >
                   <GripVertical className="h-4 w-4" />
                 </span>
+                ) : null}
                 <div className="min-w-0 flex-1 space-y-1">
+                  {canDownload ? (
                   <a
                     href={fileApiUrl(maketaId, f.id)}
                     target="_blank"
@@ -371,6 +390,9 @@ export function MaketaFilesPanel({
                   >
                     {f.original_filename}
                   </a>
+                  ) : (
+                    <span className="break-all font-medium text-gray-800">{f.original_filename}</span>
+                  )}
                   <div className="flex flex-wrap items-center gap-2">
                     {canChangeType ? (
                       <select
@@ -406,6 +428,7 @@ export function MaketaFilesPanel({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
+                {canDownload && (
                 <button
                   type="button"
                   onClick={() => void onDownloadFile(f)}
@@ -416,6 +439,7 @@ export function MaketaFilesPanel({
                   <Download className="h-3.5 w-3.5" />
                   {downloadingId === f.id ? "…" : "Stáhnout"}
                 </button>
+                )}
                 {canDelete && (
                   <button
                     type="button"

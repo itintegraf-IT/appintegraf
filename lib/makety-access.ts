@@ -2,6 +2,11 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import {
   hasModuleAccess,
+  hasExplicitMaketyGrafikaRole,
+  hasExplicitMaketyProhlizecKlientaRole,
+  hasExplicitMaketySchvalovatelFinalRole,
+  hasExplicitMaketySchvalovatelPrepressRole,
+  hasExplicitMaketySpravaVzorkuRole,
   hasExplicitMaketyZadavatelGrafikaRole,
   hasExplicitMaketyZadavatelMaketaRole,
   hasMaketyGrafikaAccess,
@@ -18,6 +23,7 @@ import {
   type GrafikaStatus,
 } from "@/lib/makety-grafika-status";
 import { isMaketaTerminalStatus } from "@/lib/makety-status";
+import { getMaketyUserCustomerIds } from "@/lib/makety-user-customers";
 
 /** Správa fronty výroby (řazení, priorita) – admin modulu nebo globální admin. */
 export async function canManageMaketyQueue(userId: number): Promise<boolean> {
@@ -96,7 +102,7 @@ export function applyWorkTypeToWhere(
   where.work_type = types.length === 1 ? types[0] : { in: types };
 }
 
-/** Sestaví where pro seznam/archiv: org-wide fronta nebo vlastní zakázky. */
+/** Sestaví where pro seznam/archiv: org-wide fronta, prohlížeč klienta, nebo vlastní zakázky. */
 export async function buildMaketyListWhere(
   userId: number,
   extra?: Prisma.maketyWhereInput
@@ -110,6 +116,16 @@ export async function buildMaketyListWhere(
   if (await canViewAllMaketyTypes(userId)) {
     return where;
   }
+  if (await isMaketyProhlizecKlientaOnly(userId)) {
+    const ids = await getMaketyProhlizecCustomerIds(userId);
+    where.work_type = "grafika";
+    if (ids.length === 0) {
+      where.id = -1;
+    } else {
+      where.customer_id = { in: ids };
+    }
+    return where;
+  }
   where.OR = [{ created_by: userId }, { assignee_user_id: userId }];
   return where;
 }
@@ -119,6 +135,34 @@ export async function canViewAllMakety(userId: number): Promise<boolean> {
   if (await canViewAllMaketyTypes(userId)) return true;
   const types = await getOrgWideWorkTypes(userId);
   return types != null && types.length > 0;
+}
+
+export async function getMaketyProhlizecCustomerIds(userId: number): Promise<number[]> {
+  return getMaketyUserCustomerIds(userId);
+}
+
+/**
+ * Má roli prohlížeče klienta a nemá silnější org práva na grafiku/makety
+ * (admin, grafika, schvalovatelé, správa vzorků, zadavatel grafiky).
+ */
+export async function isMaketyProhlizecKlientaOnly(userId: number): Promise<boolean> {
+  if (!(await hasExplicitMaketyProhlizecKlientaRole(userId))) return false;
+  if (await canViewAllMaketyTypes(userId)) return false;
+  if (await hasExplicitMaketyGrafikaRole(userId)) return false;
+  if (await hasExplicitMaketySchvalovatelPrepressRole(userId)) return false;
+  if (await hasExplicitMaketySchvalovatelFinalRole(userId)) return false;
+  if (await hasExplicitMaketySpravaVzorkuRole(userId)) return false;
+  if (await hasExplicitMaketyZadavatelGrafikaRole(userId)) return false;
+  return true;
+}
+
+/** Prohlížeč klienta nesmí stahovat ani otevírat soubory. */
+export async function userCanDownloadMaketyFile(
+  userId: number,
+  maketaId: number
+): Promise<boolean> {
+  if (await isMaketyProhlizecKlientaOnly(userId)) return false;
+  return userCanViewMaketa(userId, maketaId);
 }
 
 async function userHasOrgAccessToWorkType(
@@ -146,6 +190,7 @@ export async function userCanViewMaketa(userId: number, maketaId: number): Promi
       assignee_user_id: true,
       prepress_user_id: true,
       final_approver_user_id: true,
+      customer_id: true,
     },
   });
   if (!row) return false;
@@ -153,12 +198,22 @@ export async function userCanViewMaketa(userId: number, maketaId: number): Promi
   const workType = (row.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
   if (await userHasOrgAccessToWorkType(userId, workType)) return true;
 
-  return (
+  if (
     row.created_by === userId ||
     row.assignee_user_id === userId ||
     row.prepress_user_id === userId ||
     row.final_approver_user_id === userId
-  );
+  ) {
+    return true;
+  }
+
+  if (await isMaketyProhlizecKlientaOnly(userId)) {
+    if (workType !== "grafika" || row.customer_id == null) return false;
+    const ids = await getMaketyProhlizecCustomerIds(userId);
+    return ids.includes(row.customer_id);
+  }
+
+  return false;
 }
 
 export async function userCanEditMaketa(userId: number, maketaId: number): Promise<boolean> {

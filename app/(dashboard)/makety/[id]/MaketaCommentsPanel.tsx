@@ -18,12 +18,14 @@ export function MaketaCommentsPanel({
   maketaId,
   participants,
   redirectToListAfterSubmit = false,
+  canComment = true,
 }: {
   maketaId: number;
   /** Účastníci, které lze upozornit (bez aktuálního uživatele). */
   participants: MaketyCommentParticipant[];
   /** Po odeslání přejít na přehled (např. po doplnění nové zakázky). */
   redirectToListAfterSubmit?: boolean;
+  canComment?: boolean;
 }) {
   const router = useRouter();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -135,6 +137,7 @@ export function MaketaCommentsPanel({
           })}
         </ul>
       )}
+      {canComment && (
       <form onSubmit={onSubmit} className="space-y-2">
         <textarea
           value={text}
@@ -181,6 +184,7 @@ export function MaketaCommentsPanel({
           {sending ? "Odesílám…" : "Odeslat"}
         </button>
       </form>
+      )}
     </div>
   );
 }

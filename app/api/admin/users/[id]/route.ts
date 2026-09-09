@@ -278,6 +278,13 @@ export async function PUT(
       await prisma.stitky_user_roles.deleteMany({ where: { user_id: id } });
     }
 
+    const { syncMaketyUserCustomers } = await import("@/lib/makety-user-customers");
+    await syncMaketyUserCustomers(
+      id,
+      isAdminRole ? {} : module_access,
+      isAdminRole ? [] : bodyData.makety_customer_ids
+    );
+
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("Admin user PUT error:", e);

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import {
   userCanOperateGrafikaAutomation,
   userCanViewMaketa,
+  isMaketyProhlizecKlientaOnly,
 } from "@/lib/makety-access";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { exportMaketyCiceroXml } from "@/lib/makety-cicero-export";
@@ -29,6 +30,9 @@ export async function POST(
 
   if (!(await userCanViewMaketa(userId, maketaId))) {
     return NextResponse.json({ error: "Zakázka nenalezena" }, { status: 404 });
+  }
+  if (await isMaketyProhlizecKlientaOnly(userId)) {
+    return NextResponse.json({ error: "Nemáte oprávnění exportovat" }, { status: 403 });
   }
   if (!(await userCanOperateGrafikaAutomation(userId, maketaId)).allowed) {
     return NextResponse.json(
@@ -76,6 +80,9 @@ export async function GET(
 
   if (!(await userCanViewMaketa(userId, maketaId))) {
     return NextResponse.json({ error: "Zakázka nenalezena" }, { status: 404 });
+  }
+  if (await isMaketyProhlizecKlientaOnly(userId)) {
+    return NextResponse.json({ error: "Nemáte oprávnění exportovat" }, { status: 403 });
   }
 
   try {

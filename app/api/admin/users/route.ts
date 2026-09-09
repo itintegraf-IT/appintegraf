@@ -232,6 +232,13 @@ export async function POST(req: NextRequest) {
       await syncStitkyUserRolesFromModuleAccess(user.id, module_access as Record<string, string>);
     }
 
+    const { syncMaketyUserCustomers } = await import("@/lib/makety-user-customers");
+    await syncMaketyUserCustomers(
+      user.id,
+      isAdminRole ? {} : (module_access as Record<string, string>),
+      isAdminRole ? [] : body.makety_customer_ids
+    );
+
     let activationEmailed: boolean | null = null;
     if (useActivation) {
       try {

@@ -7,6 +7,7 @@ import {
   roleHasMaketySchvalovatelPrepressFromDecoded,
   roleHasMaketySchvalovatelFinalFromDecoded,
   roleHasMaketySpravaVzorkuFromDecoded,
+  roleHasMaketyProhlizecKlientaFromDecoded,
   roleMaketyGrantsModuleAccess,
 } from "@/lib/makety-module-access-flags";
 import { roleStitkyGrantsModuleAccess } from "@/lib/stitky-module-access-flags";
@@ -305,6 +306,29 @@ export async function hasExplicitMaketySpravaVzorkuRole(userId: number): Promise
 export async function hasMaketySpravaVzorkuAccess(userId: number): Promise<boolean> {
   if (await isAdmin(userId)) return true;
   return hasExplicitMaketySpravaVzorkuRole(userId);
+}
+
+/** Explicitní prohlížeč klienta (bez globálního admina). */
+export async function hasExplicitMaketyProhlizecKlientaRole(userId: number): Promise<boolean> {
+  const roles = await getUserRoles(userId);
+  for (const role of roles) {
+    const rawAccess = role.module_access;
+    if (rawAccess === null || rawAccess === undefined) continue;
+    let decoded: unknown = rawAccess;
+    if (typeof rawAccess === "string") {
+      decoded = parseModuleAccessJson(rawAccess);
+      if (decoded === null) continue;
+    }
+    if (decoded && typeof decoded === "object" && !Array.isArray(decoded)) {
+      if (roleHasMaketyProhlizecKlientaFromDecoded(decoded as Record<string, unknown>)) return true;
+    }
+  }
+  return false;
+}
+
+export async function hasMaketyProhlizecKlientaAccess(userId: number): Promise<boolean> {
+  if (await isAdmin(userId)) return true;
+  return hasExplicitMaketyProhlizecKlientaRole(userId);
 }
 
 /**

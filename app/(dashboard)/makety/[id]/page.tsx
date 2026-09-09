@@ -19,6 +19,8 @@ import {
   userCanCopyMaketa,
   canManageMaketyQueue,
   userCanDeleteMaketyFile,
+  userCanDownloadMaketyFile,
+  isMaketyProhlizecKlientaOnly,
 } from "@/lib/makety-access";
 import { MaketaQuoteForm } from "./MaketaQuoteForm";
 import { MaketaApprovalPanel } from "./MaketaApprovalPanel";
@@ -125,6 +127,10 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
       ? isGrafikaImlArchived(maketa.status, maketa.iml_applied_at)
       : isMaketaTerminalStatus(maketa.status, workType);
   const canDeleteFile = await userCanDeleteMaketyFile(userId, id);
+  const canDownloadFile = await userCanDownloadMaketyFile(userId, id);
+  const prohlizecOnly = await isMaketyProhlizecKlientaOnly(userId);
+  const canUploadFile = !prohlizecOnly && !isArchived;
+  const canComment = !prohlizecOnly;
   const canManagePriority =
     (await canManageMaketyQueue(userId)) && !isArchived;
   const canEditDataKind =
@@ -485,11 +491,14 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
           />
         )}
 
-      {!isArchived && (
+      {(!isArchived || prohlizecOnly) && (
         <MaketaFilesPanel
           maketaId={id}
-          canDelete={canDeleteFile}
-          showUploadHint={showUploadHint}
+          canDelete={canDeleteFile && !prohlizecOnly}
+          canDownload={canDownloadFile}
+          canUpload={canUploadFile}
+          canChangeType={!prohlizecOnly && !isArchived}
+          showUploadHint={showUploadHint && !prohlizecOnly}
           uploadHintText={
             workType === "grafika"
               ? "Nejdřív vyberte typ souboru (softproof / tisková data / jiné), pak nahrajte přílohy."
@@ -498,7 +507,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
         />
       )}
 
-      {workType === "grafika" && <MaketyFileEventsPanel maketaId={id} />}
+      {workType === "grafika" && !prohlizecOnly && <MaketyFileEventsPanel maketaId={id} />}
 
       {workType === "grafika" && canGrafikaAutomation && (
         <GrafikaAutomationPanel
@@ -515,6 +524,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
         maketaId={id}
         participants={commentParticipants}
         redirectToListAfterSubmit={showUploadHint}
+        canComment={canComment}
       />
     </div>
   );

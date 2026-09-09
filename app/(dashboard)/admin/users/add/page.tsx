@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { redirectAdminDenied } from "@/lib/navigation-errors";
 import { isAdmin } from "@/lib/auth-utils";
+import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { AdminUserForm } from "../AdminUserForm";
@@ -14,6 +15,11 @@ export default async function AdminUserAddPage() {
   if (!(await isAdmin(userId))) {
     redirectAdminDenied();
   }
+
+  const imlCustomers = await prisma.iml_customers.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
 
   return (
     <>
@@ -31,7 +37,7 @@ export default async function AdminUserAddPage() {
         </Link>
       </div>
 
-      <AdminUserForm />
+      <AdminUserForm imlCustomers={imlCustomers} />
     </>
   );
 }

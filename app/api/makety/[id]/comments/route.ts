@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
-import { userCanViewMaketa } from "@/lib/makety-access";
+import { userCanViewMaketa, isMaketyProhlizecKlientaOnly } from "@/lib/makety-access";
 import { notifyMaketaUsers } from "@/lib/makety-notify";
 import {
   buildMaketyCommentParticipants,
@@ -122,6 +122,12 @@ export async function POST(
 
   if (!(await userCanViewMaketa(userId, maketaId))) {
     return NextResponse.json({ error: "Maketa nenalezena" }, { status: 404 });
+  }
+  if (await isMaketyProhlizecKlientaOnly(userId)) {
+    return NextResponse.json(
+      { error: "Prohlížeč klienta nemůže přidávat komentáře" },
+      { status: 403 }
+    );
   }
 
   const maketa = await prisma.makety.findUnique({
