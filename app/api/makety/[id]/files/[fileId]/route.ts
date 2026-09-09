@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { userCanViewMaketa, userCanEditMaketa, userCanDeleteMaketyFile } from "@/lib/makety-access";
+import { userCanViewMaketa, userCanEditMaketa, userCanDeleteMaketyFile, userCanDownloadMaketyFile, isMaketyProhlizecKlientaOnly } from "@/lib/makety-access";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import {
   MAKETY_FILE_MODULE,
@@ -37,6 +37,9 @@ export async function GET(
 
     if (!(await userCanViewMaketa(userId, maketaId))) {
       return new NextResponse("Maketa nenalezena", { status: 404 });
+    }
+    if (!(await userCanDownloadMaketyFile(userId, maketaId))) {
+      return new NextResponse("Nemáte oprávnění stahovat soubory", { status: 403 });
     }
 
     const fileRow = await prisma.file_uploads.findFirst({
@@ -114,6 +117,9 @@ export async function PATCH(
 
   if (!(await userCanViewMaketa(userId, maketaId))) {
     return NextResponse.json({ error: "Maketa nenalezena" }, { status: 404 });
+  }
+  if (await isMaketyProhlizecKlientaOnly(userId)) {
+    return NextResponse.json({ error: "Nemáte oprávnění měnit typ souboru" }, { status: 403 });
   }
 
   const canEdit =

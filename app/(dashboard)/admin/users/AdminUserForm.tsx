@@ -8,6 +8,7 @@ import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
 import { TotpAdminPanel } from "@/components/admin/TotpAdminPanel";
 import {
   hasMaketyGrafikaFlag,
+  hasMaketyProhlizecKlientaFlag,
   hasMaketySchvalovatelFinalFlag,
   hasMaketySchvalovatelPrepressFlag,
   hasMaketySpravaVzorkuFlag,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/makety-module-access-flags";
 import {
   MAKETY_GRAFIKA_ROLE_LABEL,
+  MAKETY_PROHLIZEC_KLIENTA_LABEL,
   MAKETY_SCHVALOVATEL_FINAL_LABEL,
   MAKETY_SCHVALOVATEL_PREPRESS_LABEL,
   MAKETY_SPRAVA_VZORKU_LABEL,
@@ -113,9 +115,18 @@ type User = {
   module_access?: ModuleAccessMap;
   vehicle_manager?: boolean;
   email_notifications?: EmailNotificationsMap | null;
+  makety_customer_ids?: number[];
 };
 
-export function AdminUserForm({ user }: { user?: User }) {
+type ImlCustomerOpt = { id: number; name: string };
+
+export function AdminUserForm({
+  user,
+  imlCustomers = [],
+}: {
+  user?: User;
+  imlCustomers?: ImlCustomerOpt[];
+}) {
   const router = useRouter();
   const isEdit = !!user?.id;
   const [roles, setRoles] = useState<Role[]>([]);
@@ -133,6 +144,9 @@ export function AdminUserForm({ user }: { user?: User }) {
     msg: string;
   }>({ kind: null, ok: null, msg: "" });
   const [sendingReset, setSendingReset] = useState(false);
+  const [maketyCustomerIds, setMaketyCustomerIds] = useState<number[]>(
+    user?.makety_customer_ids ?? []
+  );
   const [form, setForm] = useState({
     username: user?.username ?? "",
     email: user?.email ?? "",
@@ -209,10 +223,12 @@ export function AdminUserForm({ user }: { user?: User }) {
         email_notifications: normalizeEmailNotifications(user.email_notifications),
         password_custom: "",
       });
+      setMaketyCustomerIds(user.makety_customer_ids ?? []);
     }
   }, [user]);
 
   const setModuleVisible = (moduleKey: string, visible: boolean) => {
+    if (!visible && moduleKey === "makety") setMaketyCustomerIds([]);
     setForm((prev) => {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (visible) {
@@ -234,6 +250,7 @@ export function AdminUserForm({ user }: { user?: User }) {
           delete next.makety_schvalovatel_prepress;
           delete next.makety_schvalovatel_final;
           delete next.makety_sprava_vzorku;
+          delete next.makety_prohlizec_klienta;
         }
         if (moduleKey === "stitky") {
           delete next.stitky_tiskar;
@@ -260,7 +277,8 @@ export function AdminUserForm({ user }: { user?: User }) {
         hasMaketyZadavatelGrafikaFlag(next) ||
         hasMaketySchvalovatelPrepressFlag(next) ||
         hasMaketySchvalovatelFinalFlag(next) ||
-        hasMaketySpravaVzorkuFlag(next))
+        hasMaketySpravaVzorkuFlag(next) ||
+        hasMaketyProhlizecKlientaFlag(next))
     ) {
       next.makety = "read";
     }
@@ -331,6 +349,19 @@ export function AdminUserForm({ user }: { user?: User }) {
       const next: ModuleAccessMap = { ...prev.module_access };
       if (checked) next.makety_sprava_vzorku = "1";
       else delete next.makety_sprava_vzorku;
+      ensureMaketyBaseIfNeeded(next);
+      return { ...prev, module_access: next };
+    });
+  };
+
+  const setMaketyProhlizecKlientaFlag = (checked: boolean) => {
+    setForm((prev) => {
+      const next: ModuleAccessMap = { ...prev.module_access };
+      if (checked) next.makety_prohlizec_klienta = "1";
+      else {
+        delete next.makety_prohlizec_klienta;
+        setMaketyCustomerIds([]);
+      }
       ensureMaketyBaseIfNeeded(next);
       return { ...prev, module_access: next };
     });
@@ -479,6 +510,7 @@ export function AdminUserForm({ user }: { user?: User }) {
         delete moduleAccess.makety_schvalovatel_prepress;
         delete moduleAccess.makety_schvalovatel_final;
         delete moduleAccess.makety_sprava_vzorku;
+        delete moduleAccess.makety_prohlizec_klienta;
       }
       if (isStitkyModuleEnabled(moduleAccess)) {
         moduleAccess = normalizeStitkyModuleAccessForSave(moduleAccess);
@@ -492,6 +524,9 @@ export function AdminUserForm({ user }: { user?: User }) {
         ...form,
         module_access: moduleAccess,
         shared_mail_ids: form.shared_mail_ids,
+        makety_customer_ids: hasMaketyProhlizecKlientaFlag(moduleAccess)
+          ? maketyCustomerIds
+          : [],
         vehicle_manager: form.vehicle_manager,
         email_notifications: normalizeEmailNotifications(form.email_notifications),
         password_custom: form.password_custom || undefined,
@@ -1079,8 +1114,54 @@ export function AdminUserForm({ user }: { user?: User }) {
                           />
                           <span>{MAKETY_SPRAVA_VZORKU_LABEL}</span>
                         </label>
+                        <label className="flex cursor-pointer items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={hasMaketyProhlizecKlientaFlag(form.module_access)}
+                            onChange={(e) => setMaketyProhlizecKlientaFlag(e.target.checked)}
+                            disabled={isAdminRoleSelected}
+                            className="rounded"
+                          />
+                          <span>{MAKETY_PROHLIZEC_KLIENTA_LABEL}</span>
+                        </label>
                       </div>
                     )}
+                    {isVisible &&
+                      hasMaketyProhlizecKlientaFlag(form.module_access) &&
+                      !isAdminRoleSelected && (
+                        <div className="mt-2 w-full max-w-md">
+                          <label className="mb-1 block text-xs font-medium text-gray-600">
+                            Klienti IML (pouze grafika, bez stahování)
+                          </label>
+                          <select
+                            multiple
+                            size={Math.min(8, Math.max(4, imlCustomers.length || 4))}
+                            value={maketyCustomerIds.map(String)}
+                            onChange={(e) => {
+                              const selected = Array.from(e.target.selectedOptions).map((o) =>
+                                parseInt(o.value, 10)
+                              );
+                              setMaketyCustomerIds(selected.filter((n) => !Number.isNaN(n)));
+                            }}
+                            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                          >
+                            {imlCustomers.length === 0 ? (
+                              <option disabled value="">
+                                Žádní klienti v katalogu
+                              </option>
+                            ) : (
+                              imlCustomers.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                          <p className="mt-1 text-xs text-gray-500">
+                            Ctrl/Cmd + klik pro výběr více klientů.
+                          </p>
+                        </div>
+                      )}
                   </>
                 ) : isStitky ? (
                   <>

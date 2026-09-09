@@ -21,3 +21,6 @@ export const MAKETY_SCHVALOVATEL_FINAL_LABEL = "Finální schvalovatel grafiky";
 
 /** Správa vzorků – notifikace při úpravě dat (likvidace nátisku / zásob). */
 export const MAKETY_SPRAVA_VZORKU_LABEL = "Správa vzorků";
+
+/** Read-only prohlížení grafiky přiřazených IML klientů (bez stahování). */
+export const MAKETY_PROHLIZEC_KLIENTA_LABEL = "Prohlížeč klienta";

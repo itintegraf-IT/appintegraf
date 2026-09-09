@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
-import { userCanViewMaketa, userCanEditMaketa } from "@/lib/makety-access";
+import { userCanViewMaketa, userCanEditMaketa, isMaketyProhlizecKlientaOnly } from "@/lib/makety-access";
 import {
   isMaketyUploadAllowed,
   MAKETY_ALLOWED_FORMATS_LABEL,
@@ -141,6 +141,10 @@ export async function POST(
   });
   if (!exists) {
     return NextResponse.json({ error: "Maketa nenalezena" }, { status: 404 });
+  }
+
+  if (await isMaketyProhlizecKlientaOnly(userId)) {
+    return NextResponse.json({ error: "Nemáte oprávnění nahrávat přílohy" }, { status: 403 });
   }
 
   const canUpload =

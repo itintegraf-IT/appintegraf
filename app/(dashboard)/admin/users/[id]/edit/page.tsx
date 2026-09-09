@@ -83,12 +83,24 @@ export default async function AdminUserEditPage({
 
   const shared_mail_ids = (row.user_shared_mails ?? []).map((m) => m.shared_mail_id);
 
+  const maketyCustomerRows = await prisma.makety_user_customers.findMany({
+    where: { user_id: id },
+    select: { customer_id: true },
+  });
+  const makety_customer_ids = maketyCustomerRows.map((r) => r.customer_id);
+
+  const imlCustomers = await prisma.iml_customers.findMany({
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
+
   const { user_roles: _ur, user_secondary_departments: _usd, user_shared_mails: _usm, email_notifications: emailNotifRaw, ...rest } = row;
   const user = {
     ...rest,
     department_id,
     secondary_department_ids,
     shared_mail_ids,
+    makety_customer_ids,
     role_id: ur?.role_id ?? row.role_id,
     module_access,
     vehicle_manager,
@@ -113,7 +125,10 @@ export default async function AdminUserEditPage({
         </Link>
       </div>
 
-      <AdminUserForm user={user as Parameters<typeof AdminUserForm>[0]["user"]} />
+      <AdminUserForm
+        user={user as Parameters<typeof AdminUserForm>[0]["user"]}
+        imlCustomers={imlCustomers}
+      />
     </>
   );
 }
