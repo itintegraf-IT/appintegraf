@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  isSoftproofDocumentType,
   maketyFileKindLabel,
   parseMaketyFileKind,
   requireMaketyFileKind,
@@ -21,5 +22,14 @@ describe("makety-file-kind", () => {
   it("labely", () => {
     expect(maketyFileKindLabel("softproof")).toContain("Softproof");
     expect(maketyFileKindLabel("print_data")).toBe("Tisková data");
+  });
+
+  it("isSoftproofDocumentType jen softproof", () => {
+    expect(isSoftproofDocumentType("softproof")).toBe(true);
+    expect(isSoftproofDocumentType("SOFTPROOF")).toBe(true);
+    expect(isSoftproofDocumentType("print_data")).toBe(false);
+    expect(isSoftproofDocumentType("other")).toBe(false);
+    expect(isSoftproofDocumentType(null)).toBe(false);
+    expect(isSoftproofDocumentType("")).toBe(false);
   });
 });

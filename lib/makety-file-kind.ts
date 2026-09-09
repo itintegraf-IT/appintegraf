@@ -15,6 +15,13 @@ export function parseMaketyFileKind(
   return isMaketyFileKind(v) ? v : null;
 }
 
+/** Prohlížeč klienta smí otevřít/stáhnout jen softproof. */
+export function isSoftproofDocumentType(
+  raw: string | null | undefined
+): boolean {
+  return parseMaketyFileKind(raw) === "softproof";
+}
+
 /** Vyžaduje platný typ; při neplatném vrátí chybu. */
 export function requireMaketyFileKind(
   raw: string | null | undefined

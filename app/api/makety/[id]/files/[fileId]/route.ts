@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { userCanViewMaketa, userCanEditMaketa, userCanDeleteMaketyFile, userCanDownloadMaketyFile, isMaketyProhlizecKlientaOnly } from "@/lib/makety-access";
+import { userCanViewMaketa, userCanEditMaketa, userCanDeleteMaketyFile, userCanAccessMaketyFile, isMaketyProhlizecKlientaOnly } from "@/lib/makety-access";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import {
   MAKETY_FILE_MODULE,
@@ -38,15 +38,15 @@ export async function GET(
     if (!(await userCanViewMaketa(userId, maketaId))) {
       return new NextResponse("Maketa nenalezena", { status: 404 });
     }
-    if (!(await userCanDownloadMaketyFile(userId, maketaId))) {
-      return new NextResponse("Nemáte oprávnění stahovat soubory", { status: 403 });
-    }
 
     const fileRow = await prisma.file_uploads.findFirst({
       where: { id: fileId, module: MAKETY_FILE_MODULE, record_id: maketaId },
     });
     if (!fileRow) {
       return new NextResponse("Soubor nenalezen", { status: 404 });
+    }
+    if (!(await userCanAccessMaketyFile(userId, maketaId, fileRow.document_type))) {
+      return new NextResponse("Nemáte oprávnění otevřít tento soubor", { status: 403 });
     }
 
     const diskPath = resolveMaketyFileDiskPath(fileRow.file_path);

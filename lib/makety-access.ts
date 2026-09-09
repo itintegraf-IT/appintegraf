@@ -24,6 +24,7 @@ import {
 } from "@/lib/makety-grafika-status";
 import { isMaketaTerminalStatus } from "@/lib/makety-status";
 import { getMaketyUserCustomerIds } from "@/lib/makety-user-customers";
+import { isSoftproofDocumentType } from "@/lib/makety-file-kind";
 
 /** Správa fronty výroby (řazení, priorita) – admin modulu nebo globální admin. */
 export async function canManageMaketyQueue(userId: number): Promise<boolean> {
@@ -156,11 +157,29 @@ export async function isMaketyProhlizecKlientaOnly(userId: number): Promise<bool
   return true;
 }
 
-/** Prohlížeč klienta nesmí stahovat ani otevírat soubory. */
+/**
+ * Přístup k obsahu přílohy. Prohlížeč klienta jen softproof;
+ * ostatní role se stejným oprávněním jako view makety.
+ */
+export async function userCanAccessMaketyFile(
+  userId: number,
+  maketaId: number,
+  documentType: string | null | undefined
+): Promise<boolean> {
+  if (!(await userCanViewMaketa(userId, maketaId))) return false;
+  if (!(await isMaketyProhlizecKlientaOnly(userId))) return true;
+  return isSoftproofDocumentType(documentType);
+}
+
+/** @deprecated Preferujte userCanAccessMaketyFile s document_type. */
 export async function userCanDownloadMaketyFile(
   userId: number,
-  maketaId: number
+  maketaId: number,
+  documentType?: string | null
 ): Promise<boolean> {
+  if (documentType !== undefined) {
+    return userCanAccessMaketyFile(userId, maketaId, documentType);
+  }
   if (await isMaketyProhlizecKlientaOnly(userId)) return false;
   return userCanViewMaketa(userId, maketaId);
 }

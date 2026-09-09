@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download, GripVertical, Upload } from "lucide-react";
 import {
   MAKETY_FILE_KINDS,
+  isSoftproofDocumentType,
   maketyFileKindBadgeClass,
   maketyFileKindLabel,
   type MaketyFileKind,
@@ -13,6 +14,8 @@ import { MAKETY_MAX_MB } from "@/lib/makety-files";
 
 const ACCEPT =
   ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.eml,.msg,.mht,.mhtml,application/pdf,image/*,message/rfc822";
+
+export type MaketyFileAccessMode = "all" | "softproof-only" | "none";
 
 type FileRow = {
   id: number;
@@ -29,10 +32,16 @@ function fileApiUrl(maketaId: number, fileId: number, download = false): string 
   return download ? `${base}?download=1` : base;
 }
 
+function canOpenFile(fileAccess: MaketyFileAccessMode, documentType: string | null): boolean {
+  if (fileAccess === "all") return true;
+  if (fileAccess === "none") return false;
+  return isSoftproofDocumentType(documentType);
+}
+
 export function MaketaFilesPanel({
   maketaId,
   canDelete,
-  canDownload = true,
+  fileAccess = "all",
   canUpload = true,
   showUploadHint,
   uploadHintText = "Nahrajte podklady — můžete vybrat více souborů najednou.",
@@ -40,7 +49,8 @@ export function MaketaFilesPanel({
 }: {
   maketaId: number;
   canDelete: boolean;
-  canDownload?: boolean;
+  /** all = otevřít/stáhnout vše; softproof-only = jen softproof; none = jen názvy */
+  fileAccess?: MaketyFileAccessMode;
   canUpload?: boolean;
   showUploadHint?: boolean;
   uploadHintText?: string;
@@ -252,9 +262,11 @@ export function MaketaFilesPanel({
       <p className="mb-3 text-xs text-gray-500">
         {canUpload
           ? `PDF, Word, Excel, obrázky, e-mail (.eml, .msg) · max. ${MAKETY_MAX_MB} MB na soubor · více souborů najednou`
-          : canDownload
+          : fileAccess === "all"
             ? "Seznam příloh — můžete soubory prohlížet a stahovat."
-            : "Seznam příloh (pouze náhled názvů — stahování není povoleno)."}
+            : fileAccess === "softproof-only"
+              ? "Seznam příloh — softproof můžete prohlížet; tisková data a ostatní jen jako názvy."
+              : "Seznam příloh (pouze náhled názvů — stahování není povoleno)."}
       </p>
       {canUpload && showUploadHint && (
         <p className="mb-2 text-sm text-violet-700">{uploadHintText}</p>
@@ -328,7 +340,7 @@ export function MaketaFilesPanel({
 
       {canUpload && uploadProgress && <p className="mb-2 text-sm text-violet-700">{uploadProgress}</p>}
       {error && <p className="mb-2 text-sm text-red-600">{error}</p>}
-      {canDownload && dragHint && <p className="mb-2 text-sm text-amber-800">{dragHint}</p>}
+      {fileAccess !== "none" && dragHint && <p className="mb-2 text-sm text-amber-800">{dragHint}</p>}
       {warnings.length > 0 && (
         <ul className="mb-2 list-inside list-disc text-sm text-amber-800">
           {warnings.map((w, i) => (
@@ -343,21 +355,22 @@ export function MaketaFilesPanel({
       ) : (
         <ul className="space-y-2">
           {files.map((f) => {
-            const ready = canDownload && dragReadyIds.has(f.id);
-            const waiting = canDownload && prefetchingIds.has(f.id);
+            const openable = canOpenFile(fileAccess, f.document_type);
+            const ready = openable && dragReadyIds.has(f.id);
+            const waiting = openable && prefetchingIds.has(f.id);
             return (
             <li
               key={f.id}
               className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-2 py-2 text-sm"
               onMouseEnter={() => {
-                if (canDownload) prefetchForDrag(f);
+                if (openable) prefetchForDrag(f);
               }}
               onPointerEnter={() => {
-                if (canDownload) prefetchForDrag(f);
+                if (openable) prefetchForDrag(f);
               }}
             >
               <div className="flex min-w-0 flex-1 items-start gap-2">
-                {canDownload ? (
+                {openable ? (
                 <span
                   draggable={ready}
                   role="button"
@@ -381,7 +394,7 @@ export function MaketaFilesPanel({
                 </span>
                 ) : null}
                 <div className="min-w-0 flex-1 space-y-1">
-                  {canDownload ? (
+                  {openable ? (
                   <a
                     href={fileApiUrl(maketaId, f.id)}
                     target="_blank"
@@ -428,7 +441,7 @@ export function MaketaFilesPanel({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {canDownload && (
+                {openable && (
                 <button
                   type="button"
                   onClick={() => void onDownloadFile(f)}
