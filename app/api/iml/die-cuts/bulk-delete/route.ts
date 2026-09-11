@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import { deleteAllDieCutUploads } from "@/lib/iml-die-cut-upload";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -45,6 +46,9 @@ export async function POST(req: NextRequest) {
     }
 
     await prisma.$transaction(async (tx) => {
+      for (const dieCutId of existingIds) {
+        await deleteAllDieCutUploads(dieCutId, tx);
+      }
       await tx.iml_products.updateMany({
         where: { die_cut_id: { in: existingIds } },
         data: { die_cut_id: null },

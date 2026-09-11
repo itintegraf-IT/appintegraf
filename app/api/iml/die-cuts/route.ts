@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { parseDieCutBody } from "@/lib/iml/die-cuts";
+import { IML_DIE_CUT_UPLOAD_MODULE } from "@/lib/iml-die-cut-upload";
 import type { Prisma } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
@@ -52,10 +53,29 @@ export async function GET(req: NextRequest) {
     },
   });
 
+  const ids = rows.map((r) => r.id);
+  const fileCounts =
+    ids.length === 0
+      ? []
+      : await prisma.file_uploads.groupBy({
+          by: ["record_id"],
+          where: {
+            module: IML_DIE_CUT_UPLOAD_MODULE,
+            record_id: { in: ids },
+          },
+          _count: { id: true },
+        });
+  const attachmentsById = new Map(
+    fileCounts
+      .filter((c) => c.record_id != null)
+      .map((c) => [c.record_id as number, c._count.id])
+  );
+
   return NextResponse.json({
     die_cuts: rows.map(({ _count, iml_customers, iml_box_types, ...row }) => ({
       ...row,
       products_count: _count.iml_products,
+      attachments_count: attachmentsById.get(row.id) ?? 0,
       customer: iml_customers,
       box_type: iml_box_types,
     })),
