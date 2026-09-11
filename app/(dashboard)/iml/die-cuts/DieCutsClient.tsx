@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, FileIcon, Pencil, Plus, Search, Trash2, Upload } from "lucide-react";
 import { DIE_CUT_MATERIALS } from "@/lib/iml/die-cut-constants";
+import { DieCutAttachments } from "./DieCutAttachments";
 
 type CustomerOpt = { id: number; name: string };
 type BoxTypeOpt = { id: number; code: string; name: string };
@@ -34,6 +35,7 @@ type DieCutRow = {
   mat_elr_70: boolean;
   mat_elr_70_weight: string | null;
   products_count?: number;
+  attachments_count?: number;
   customer?: CustomerOpt | null;
   box_type?: BoxTypeOpt | null;
 };
@@ -388,6 +390,7 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
               <th className="px-3 py-2 text-left font-semibold text-gray-700">Krabice</th>
               <th className="px-3 py-2 text-left font-semibold text-gray-700">Materiály</th>
               <th className="px-3 py-2 text-right font-semibold text-gray-700">Produkty</th>
+              <th className="px-3 py-2 text-right font-semibold text-gray-700">Přílohy</th>
               <th className="px-3 py-2 text-left font-semibold text-gray-700">Stav</th>
               {canWrite && <th className="px-3 py-2 text-right font-semibold text-gray-700">Akce</th>}
             </tr>
@@ -395,13 +398,13 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={12} className="px-3 py-8 text-center text-gray-500">
                   Načítání…
                 </td>
               </tr>
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={11} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={12} className="px-3 py-8 text-center text-gray-500">
                   Žádné výseky. {canWrite ? "Přidejte první přes „Nový výsek“." : ""}
                 </td>
               </tr>
@@ -438,6 +441,19 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
                     {materialsSummary(row)}
                   </td>
                   <td className="px-3 py-2 text-right">{row.products_count ?? 0}</td>
+                  <td className="px-3 py-2 text-right">
+                    {(row.attachments_count ?? 0) > 0 ? (
+                      <span
+                        className="inline-flex items-center gap-1 text-gray-700"
+                        title={`${row.attachments_count} příloh`}
+                      >
+                        <FileIcon className="h-3.5 w-3.5 text-gray-400" />
+                        {row.attachments_count}
+                      </span>
+                    ) : (
+                      "—"
+                    )}
+                  </td>
                   <td className="px-3 py-2">
                     {row.is_active ? (
                       <span className="text-green-700">aktivní</span>
@@ -656,6 +672,25 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
                   className="w-full rounded-lg border border-gray-300 px-3 py-2"
                 />
               </label>
+
+              {editingId != null ? (
+                <DieCutAttachments
+                  dieCutId={editingId}
+                  canUpload={canWrite}
+                  onCountChange={(count) => {
+                    setRows((prev) =>
+                      prev.map((r) =>
+                        r.id === editingId ? { ...r, attachments_count: count } : r
+                      )
+                    );
+                  }}
+                />
+              ) : (
+                <p className="text-sm text-gray-500 sm:col-span-2">
+                  Přílohy (PDF / DXF / DWG) lze nahrát po uložení výseku.
+                </p>
+              )}
+
               {editingId != null && (
                 <label className="flex items-center gap-2 text-sm sm:col-span-2">
                   <input

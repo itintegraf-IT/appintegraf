@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { dieCutToProductFields, parseDieCutBody } from "@/lib/iml/die-cuts";
+import { deleteAllDieCutUploads } from "@/lib/iml-die-cut-upload";
 
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
@@ -151,6 +152,7 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     }
 
     await prisma.$transaction(async (tx) => {
+      await deleteAllDieCutUploads(id, tx);
       await tx.iml_products.updateMany({
         where: { die_cut_id: id },
         data: { die_cut_id: null },
