@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canWriteEquipment } from "@/lib/equipment/access";
 import { transferEquipmentToRoom } from "@/lib/equipment/room-transfer";
+import { parseNotifyFlag } from "@/lib/equipment/parse-notify-flag";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
   const toRoomId = parseInt(String(body.to_room_id ?? body.room_id ?? ""), 10);
   const notes = body.notes ? String(body.notes) : null;
   const source = body.source === "manual" || body.source === "bulk" ? body.source : "scan";
+  const notify = parseNotifyFlag(body.notify);
 
   if (!Number.isFinite(equipmentId) || !Number.isFinite(toRoomId)) {
     return NextResponse.json({ error: "Chybí equipment_id nebo room_id" }, { status: 400 });
@@ -37,6 +39,7 @@ export async function POST(req: NextRequest) {
       userId,
       source,
       notes,
+      notify,
     });
     return NextResponse.json({
       ok: true,

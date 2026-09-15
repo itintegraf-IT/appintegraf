@@ -20,6 +20,7 @@ import {
   pointInPolygon,
   type PlanPoint,
 } from "@/lib/equipment/floor-plan";
+import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
 
 type PlanSummary = {
   id: number;
@@ -594,6 +595,7 @@ export default function FloorPlanClient({
   const transferToRoom = async (equipmentId: number, toRoomId: number) => {
     if (!canWrite) return;
     setError("");
+    const notify = askSendEquipmentMovementNotify();
     const res = await fetch("/api/equipment/placement", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -602,6 +604,7 @@ export default function FloorPlanClient({
         to_room_id: toRoomId,
         source: "manual",
         notes: "Přesun z půdorysu",
+        notify,
       }),
     });
     const data = await res.json().catch(() => ({}));

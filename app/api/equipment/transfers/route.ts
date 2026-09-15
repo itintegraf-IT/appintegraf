@@ -6,6 +6,7 @@ import {
   transferEquipmentToRoom,
   transferManyEquipmentToRoom,
 } from "@/lib/equipment/room-transfer";
+import { parseNotifyFlag } from "@/lib/equipment/parse-notify-flag";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const toRoomId = parseInt(String(body.to_room_id ?? ""), 10);
   const notes = body.notes ? String(body.notes) : null;
+  const notify = parseNotifyFlag(body.notify);
 
   if (!Number.isFinite(toRoomId)) {
     return NextResponse.json({ error: "Chybí to_room_id" }, { status: 400 });
@@ -52,6 +54,7 @@ export async function POST(req: NextRequest) {
         userId,
         source: "manual",
         notes,
+        notify,
       });
       return NextResponse.json({
         ok: true,
@@ -64,6 +67,7 @@ export async function POST(req: NextRequest) {
       toRoomId,
       userId,
       notes,
+      notify,
     });
     return NextResponse.json({ ok: true, results });
   } catch (e) {
