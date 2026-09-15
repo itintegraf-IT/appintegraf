@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
-import { Laptop, Plus, ClipboardList, UserCheck, DoorOpen, QrCode, ArrowRightLeft, ClipboardCheck, BarChart3, Map, Upload } from "lucide-react";
+import { Laptop, Plus, ClipboardList, UserCheck, DoorOpen, QrCode, ArrowRightLeft, ClipboardCheck, BarChart3, Map, Upload, Package } from "lucide-react";
 import { equipmentAgeFromRecord } from "@/lib/equipment-age";
 import {
   parseEquipmentListDir,
@@ -14,8 +14,12 @@ import { EquipmentRequestsTab } from "./EquipmentRequestsTab";
 import { EquipmentTableActions } from "./EquipmentTableActions";
 import { EquipmentListClient } from "./EquipmentListClient";
 import { formatEquipmentPrice } from "@/lib/equipment/format-price";
-import { isEquipmentAssignedStatus } from "@/lib/equipment-status";
+import {
+  EQUIPMENT_ITEM_STATUS,
+  isEquipmentAssignedStatus,
+} from "@/lib/equipment-status";
 import { canAdministerEquipment } from "@/lib/equipment/access";
+import type { Prisma } from "@prisma/client";
 
 const EQUIPMENT_LIST_TAKE = 2000;
 
@@ -26,7 +30,10 @@ function equipmentListPath(opts: {
   sort?: string;
   dir?: string;
   view?: string;
+  /** Bez místnosti (`room_id` null). */
   unassigned?: boolean;
+  /** Bez aktivního držitele (skladem). */
+  noHolder?: boolean;
 }) {
   const q = new URLSearchParams();
   if (opts.tab === "requests") q.set("tab", "requests");
@@ -35,6 +42,7 @@ function equipmentListPath(opts: {
   if (opts.dir) q.set("dir", opts.dir);
   if (opts.view) q.set("view", opts.view);
   if (opts.unassigned) q.set("unassigned", "1");
+  if (opts.noHolder) q.set("no_holder", "1");
   const s = q.toString();
   return s ? `/equipment?${s}` : "/equipment";
 }
@@ -49,6 +57,7 @@ export default async function EquipmentPage({
     dir?: string;
     view?: string;
     unassigned?: string;
+    no_holder?: string;
   }>;
 }) {
   const session = await auth();
@@ -64,6 +73,7 @@ export default async function EquipmentPage({
   const dir = parseEquipmentListDir(params.dir, sort);
   const view = parseEquipmentListView(params.view);
   const unassigned = params.unassigned === "1";
+  const noHolder = params.no_holder === "1";
 
   type EquipmentRow = {
     id: number;
@@ -89,9 +99,15 @@ export default async function EquipmentPage({
   let equipment: EquipmentRow[] = [];
 
   if (admin && scope === "all") {
+    const listWhere: Prisma.equipment_itemsWhereInput = {};
+    if (unassigned) listWhere.room_id = null;
+    if (noHolder) {
+      listWhere.status = EQUIPMENT_ITEM_STATUS.SKLADEM;
+      listWhere.equipment_assignments = { none: { returned_at: null } };
+    }
     const rows = await prisma.equipment_items.findMany({
       take: EQUIPMENT_LIST_TAKE,
-      where: unassigned ? { room_id: null } : undefined,
+      where: Object.keys(listWhere).length ? listWhere : undefined,
       orderBy: { id: "desc" },
       include: {
         equipment_categories: {
@@ -219,6 +235,7 @@ export default async function EquipmentPage({
                   dir: params.dir,
                   view: params.view,
                   unassigned,
+                  noHolder,
                 })}
                 className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                   tab === "requests"
@@ -236,6 +253,7 @@ export default async function EquipmentPage({
                   dir: params.dir,
                   view: params.view,
                   unassigned,
+                  noHolder,
                 })}
                 className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
                   tab === "equipment"
@@ -255,6 +273,7 @@ export default async function EquipmentPage({
                   tab: onRequestsTab ? "requests" : undefined,
                   scope: scope === "all" ? undefined : "all",
                   unassigned: scope === "all" ? unassigned : false,
+                  noHolder: scope === "all" ? noHolder : false,
                 })}
                 className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
@@ -291,8 +310,23 @@ export default async function EquipmentPage({
               { href: "/equipment/presun", icon: ArrowRightLeft, label: "Přesun", hint: "Mezi místnostmi" },
               { href: "/equipment/inventura", icon: ClipboardCheck, label: "Inventura", hint: "Kontrola stavu" },
               { href: "/equipment/prirazeni", icon: UserCheck, label: "Přiřazení", hint: "Uživatelům" },
+              ...(admin
+                ? [
+                    {
+                      href: "/equipment?scope=all&no_holder=1",
+                      icon: Package,
+                      label: "Skladem",
+                      hint: "Nepřiřazené kusy",
+                    },
+                  ]
+                : []),
               { href: "/equipment/reporty", icon: BarChart3, label: "Reporty", hint: "Přehledy" },
-            ] as const
+            ] as {
+              href: string;
+              icon: typeof DoorOpen;
+              label: string;
+              hint: string;
+            }[]
           ).map(({ href, icon: Icon, label, hint }) => (
             <Link
               key={href}
@@ -324,12 +358,28 @@ export default async function EquipmentPage({
                 view: params.view,
               })}
               className={`rounded-full border px-3 py-1 text-sm ${
-                !unassigned
+                !unassigned && !noHolder
                   ? "border-red-200 bg-red-50 text-red-700"
                   : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
               }`}
             >
               Vše
+            </Link>
+            <Link
+              href={equipmentListPath({
+                scope: "all",
+                sort: params.sort,
+                dir: params.dir,
+                view: params.view,
+                noHolder: true,
+              })}
+              className={`rounded-full border px-3 py-1 text-sm ${
+                noHolder
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Nepřiřazené
             </Link>
             <Link
               href={equipmentListPath({
@@ -345,7 +395,7 @@ export default async function EquipmentPage({
                   : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
               }`}
             >
-              Nezařazené
+              Bez místnosti
             </Link>
             {unassigned ? (
               <Link
@@ -357,6 +407,12 @@ export default async function EquipmentPage({
               </Link>
             ) : null}
           </div>
+          {noHolder ? (
+            <p className="mb-3 text-sm text-gray-600">
+              Položky skladem bez držitele. Vyberte je v tabulce a přiřaďte uživateli (hromadně nebo
+              jednotlivě).
+            </p>
+          ) : null}
           {unassigned ? (
             <p className="mb-3 text-sm text-gray-600">
               Položky bez místnosti. Vyberte je v tabulce a umístěte, přiřaďte držiteli, nebo
@@ -369,6 +425,7 @@ export default async function EquipmentPage({
             dir={dir}
             view={view}
             unassigned={unassigned}
+            noHolder={noHolder}
             canEdit={admin}
             canAssign={admin || equipmentWrite}
             canDelete={admin}

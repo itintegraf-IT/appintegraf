@@ -57,6 +57,7 @@ type Props = {
   dir: EquipmentListSortDir;
   view: EquipmentListView;
   unassigned?: boolean;
+  noHolder?: boolean;
   canEdit: boolean;
   canAssign: boolean;
   canDelete: boolean;
@@ -66,14 +67,15 @@ function buildHref(
   sort: EquipmentListSortKey,
   dir: EquipmentListSortDir,
   view: EquipmentListView,
-  unassigned?: boolean
+  opts?: { unassigned?: boolean; noHolder?: boolean }
 ) {
   const q = new URLSearchParams();
   q.set("scope", "all");
   if (sort !== "zapis") q.set("sort", sort);
   if (dir !== (sort === "zapis" ? "desc" : "asc")) q.set("dir", dir);
   if (view !== "table") q.set("view", view);
-  if (unassigned) q.set("unassigned", "1");
+  if (opts?.unassigned) q.set("unassigned", "1");
+  if (opts?.noHolder) q.set("no_holder", "1");
   return `/equipment?${q.toString()}`;
 }
 
@@ -133,6 +135,7 @@ export function EquipmentListClient({
   dir,
   view,
   unassigned = false,
+  noHolder = false,
   canEdit,
   canAssign,
   canDelete,
@@ -207,7 +210,7 @@ export function EquipmentListClient({
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selected.includes(id));
 
   const navigate = (nextSort: EquipmentListSortKey, nextDir: EquipmentListSortDir, nextView: EquipmentListView) => {
-    router.push(buildHref(nextSort, nextDir, nextView, unassigned));
+    router.push(buildHref(nextSort, nextDir, nextView, { unassigned, noHolder }));
   };
 
   const toggle = (id: number) => {
@@ -449,7 +452,11 @@ export function EquipmentListClient({
                   type="button"
                   disabled={selected.length === 0 || !toUser || busy != null}
                   onClick={() => void assignHolder()}
-                  className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
+                  className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm disabled:opacity-50 ${
+                    noHolder
+                      ? "bg-red-600 font-medium text-white hover:bg-red-700"
+                      : "border border-gray-300 bg-white text-gray-800 hover:bg-gray-50"
+                  }`}
                 >
                   <UserPlus className="h-4 w-4" />
                   {busy === "user" ? "Přiřazuji…" : "Přiřadit držiteli"}
