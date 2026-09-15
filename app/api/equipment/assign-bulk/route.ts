@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { assignEquipmentToUser } from "@/lib/equipment/assign-to-user";
+import { parseNotifyFlag } from "@/lib/equipment/parse-notify-flag";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -19,6 +20,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const targetUser = parseInt(String(body.user_id ?? ""), 10);
   const notes = body.notes ? String(body.notes) : null;
+  const notify = parseNotifyFlag(body.notify);
   const ids: number[] = Array.isArray(body.equipment_ids)
     ? body.equipment_ids.map((x: unknown) => parseInt(String(x), 10)).filter((n: number) => Number.isFinite(n))
     : [];
@@ -47,6 +49,7 @@ export async function POST(req: NextRequest) {
         targetUserId: targetUser,
         assignedBy: userId,
         notes,
+        notify,
       });
       assigned.push(r.assignmentId);
     } catch (e) {

@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { assignEquipmentToUser } from "@/lib/equipment/assign-to-user";
+import { parseNotifyFlag } from "@/lib/equipment/parse-notify-flag";
 
 /** POST – přiřazení vybavení uživateli */
 export async function POST(
@@ -27,6 +28,7 @@ export async function POST(
 
   const body = await req.json().catch(() => ({}));
   const { user_id: targetUserId, notes } = body;
+  const notify = parseNotifyFlag(body.notify);
 
   const targetUser = targetUserId != null ? parseInt(String(targetUserId), 10) : null;
   if (!targetUser || isNaN(targetUser)) {
@@ -47,6 +49,7 @@ export async function POST(
       targetUserId: targetUser,
       assignedBy: userId,
       notes: notes ? String(notes) : null,
+      notify,
     });
     return NextResponse.json({ success: true, assignmentId });
   } catch (e) {

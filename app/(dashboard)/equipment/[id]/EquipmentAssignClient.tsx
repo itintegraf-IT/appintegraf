@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { UserPlus, RotateCcw, Printer } from "lucide-react";
 import { EQUIPMENT_ITEM_STATUS, isEquipmentAssignedStatus } from "@/lib/equipment-status";
+import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
 
 type User = { id: number; first_name: string; last_name: string };
 
@@ -51,13 +52,18 @@ export function EquipmentAssignClient({
   const handleAssign = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!assignUserId) return;
+    const notify = askSendEquipmentMovementNotify();
     setError("");
     setLoading(true);
     try {
       const res = await fetch(`/api/equipment/${equipmentId}/assign`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: parseInt(assignUserId, 10), notes: assignNotes || undefined }),
+        body: JSON.stringify({
+          user_id: parseInt(assignUserId, 10),
+          notes: assignNotes || undefined,
+          notify,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -85,11 +91,14 @@ export function EquipmentAssignClient({
 
   const handleReturn = async () => {
     if (!confirm("Opravdu chcete vrátit toto vybavení?")) return;
+    const notify = askSendEquipmentMovementNotify();
     setError("");
     setLoading(true);
     try {
       const res = await fetch(`/api/equipment/${equipmentId}/return`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notify }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {

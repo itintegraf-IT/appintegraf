@@ -6,6 +6,7 @@ import {
   EQUIPMENT_MANUAL_CODE_HINT,
   EQUIPMENT_MANUAL_CODE_PLACEHOLDER,
 } from "../_components/EquipmentCodeBadge";
+import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
 
 type RoomInfo = { id: number; name: string; code: string };
 type LookupResult = {
@@ -41,6 +42,7 @@ export default function EquipmentScanClient() {
   const push = (msg: string) => setLog((l) => [msg, ...l].slice(0, 30));
 
   const placeItem = async (item: PendingItem, target: RoomInfo) => {
+    const notify = askSendEquipmentMovementNotify();
     const placeRes = await fetch("/api/equipment/placement", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,6 +50,7 @@ export default function EquipmentScanClient() {
         equipment_id: item.id,
         to_room_id: target.id,
         source: "scan",
+        notify,
       }),
     });
     const placeData = await placeRes.json().catch(() => ({}));

@@ -6,6 +6,7 @@ import {
   EQUIPMENT_MANUAL_CODE_HINT,
   EQUIPMENT_MANUAL_CODE_PLACEHOLDER,
 } from "../_components/EquipmentCodeBadge";
+import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
 
 export default function PresunPage() {
   const [code, setCode] = useState("");
@@ -34,6 +35,7 @@ export default function PresunPage() {
 
   const transfer = async () => {
     if (!item) return;
+    const notify = askSendEquipmentMovementNotify();
     const res = await fetch("/api/equipment/transfers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -41,6 +43,7 @@ export default function PresunPage() {
         equipment_id: item.id,
         to_room_id: parseInt(toRoom, 10),
         notes,
+        notify,
       }),
     });
     const data = await res.json().catch(() => ({}));

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { EquipmentCodeBadge } from "../../_components/EquipmentCodeBadge";
+import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
 
 type Item = {
   id: number;
@@ -44,12 +45,14 @@ export default function RoomDetailClient() {
 
   const bulkMove = async () => {
     setMsg("");
+    const notify = askSendEquipmentMovementNotify();
     const res = await fetch("/api/equipment/transfers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         equipment_ids: selected,
         to_room_id: parseInt(toRoom, 10),
+        notify,
       }),
     });
     const data = await res.json().catch(() => ({}));

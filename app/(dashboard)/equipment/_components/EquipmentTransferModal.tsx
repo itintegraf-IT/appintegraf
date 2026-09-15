@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
 
 type Room = { id: number; name: string; code: string };
 
@@ -23,6 +24,7 @@ export function EquipmentTransferModal({
 
   const submit = async () => {
     setError("");
+    const notify = askSendEquipmentMovementNotify();
     const res = await fetch("/api/equipment/transfers", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -30,6 +32,7 @@ export function EquipmentTransferModal({
         equipment_id: equipmentId,
         to_room_id: parseInt(toRoom, 10),
         notes,
+        notify,
       }),
     });
     const data = await res.json().catch(() => ({}));

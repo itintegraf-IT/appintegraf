@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/db";
 import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
+import { notifyEquipmentAssigned } from "@/lib/equipment-movement-notify";
 
 export async function assignEquipmentToUser(params: {
   equipmentId: number;
   targetUserId: number;
   assignedBy: number;
   notes?: string | null;
+  /** Explicitní souhlas s odesláním notifikace; chybí/false = neposílat */
+  notify?: boolean;
 }): Promise<{ assignmentId: number }> {
   const item = await prisma.equipment_items.findUnique({
     where: { id: params.equipmentId },
@@ -43,6 +46,14 @@ export async function assignEquipmentToUser(params: {
     });
     return row.id;
   });
+
+  if (params.notify === true) {
+    void notifyEquipmentAssigned({
+      assignmentId,
+      equipmentId: params.equipmentId,
+      holderUserId: params.targetUserId,
+    });
+  }
 
   return { assignmentId };
 }

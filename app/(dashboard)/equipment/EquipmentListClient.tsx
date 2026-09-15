@@ -26,6 +26,7 @@ import {
   EquipmentFilterCombobox,
   normalizeEquipmentSearch,
 } from "./_components/EquipmentFilterCombobox";
+import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
 
 export type EquipmentListRow = {
   id: number;
@@ -219,6 +220,7 @@ export function EquipmentListClient({
 
   const placeToRoom = async () => {
     if (selected.length === 0 || !toRoom) return;
+    const notify = askSendEquipmentMovementNotify();
     setErr("");
     setMsg("");
     setBusy("room");
@@ -229,6 +231,7 @@ export function EquipmentListClient({
         body: JSON.stringify({
           equipment_ids: selected,
           to_room_id: parseInt(toRoom, 10),
+          notify,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -248,6 +251,7 @@ export function EquipmentListClient({
 
   const assignHolder = async () => {
     if (selected.length === 0 || !toUser) return;
+    const notify = askSendEquipmentMovementNotify();
     setErr("");
     setMsg("");
     setBusy("user");
@@ -258,6 +262,7 @@ export function EquipmentListClient({
         body: JSON.stringify({
           equipment_ids: selected,
           user_id: parseInt(toUser, 10),
+          notify,
         }),
       });
       const data = await res.json().catch(() => ({}));

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
+import { notifyEquipmentRoomTransfer } from "@/lib/equipment-movement-notify";
 
 export type TransferSource = "scan" | "manual" | "bulk";
 
@@ -21,6 +22,8 @@ export async function transferEquipmentToRoom(params: {
   userId: number;
   source: TransferSource;
   notes?: string | null;
+  /** Explicitní souhlas s odesláním notifikace; chybí/false = neposílat */
+  notify?: boolean;
 }): Promise<TransferResult> {
   const item = await prisma.equipment_items.findUnique({
     where: { id: params.equipmentId },
@@ -84,12 +87,24 @@ export async function transferEquipmentToRoom(params: {
     },
   });
 
-  return {
+  const result: TransferResult = {
     historyId: history.id,
     protocolNumber: history.protocol_number ?? protocolNumberFor(history.id),
     fromRoomId,
     toRoomId: params.toRoomId,
   };
+
+  if (params.notify === true) {
+    void notifyEquipmentRoomTransfer({
+      historyId: result.historyId,
+      equipmentId: params.equipmentId,
+      fromRoomId: result.fromRoomId,
+      toRoomId: result.toRoomId,
+      protocolNumber: result.protocolNumber,
+    });
+  }
+
+  return result;
 }
 
 export async function transferManyEquipmentToRoom(params: {
@@ -97,6 +112,7 @@ export async function transferManyEquipmentToRoom(params: {
   toRoomId: number;
   userId: number;
   notes?: string | null;
+  notify?: boolean;
 }): Promise<TransferResult[]> {
   const results: TransferResult[] = [];
   for (const equipmentId of params.equipmentIds) {
@@ -107,6 +123,7 @@ export async function transferManyEquipmentToRoom(params: {
         userId: params.userId,
         source: "bulk",
         notes: params.notes,
+        notify: params.notify,
       })
     );
   }
