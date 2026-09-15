@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { sendEquipmentMovementEmail } from "@/lib/email";
 import { getDepartmentMembers } from "@/lib/equipment-departments";
+import { getExtraMovementNotifyUserIds } from "@/lib/equipment/movement-extra-recipients";
 import {
   filterUserIdsAllowingEmail,
 } from "@/lib/user-email-notifications-db";
@@ -52,6 +53,16 @@ async function collectRecipients(holderUserId: number | null): Promise<Recipient
     }
   } catch (e) {
     console.error("equipment-movement-notify: účtárna recipients failed:", e);
+  }
+
+  try {
+    const extraIds = await getExtraMovementNotifyUserIds();
+    const missing = extraIds.filter((id) => !byId.has(id));
+    for (const u of await loadUsersByIds(missing)) {
+      byId.set(u.id, u);
+    }
+  } catch (e) {
+    console.error("equipment-movement-notify: extra recipients failed:", e);
   }
 
   return [...byId.values()];

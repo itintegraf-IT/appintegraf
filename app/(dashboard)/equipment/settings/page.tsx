@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canAdministerEquipment } from "@/lib/equipment/access";
-import { FolderTree, QrCode, Shield, Upload } from "lucide-react";
+import { FolderTree, QrCode, Shield, Upload, Bell } from "lucide-react";
 
 const cards = [
   {
@@ -29,6 +29,12 @@ const cards = [
     title: "Fond QR",
     hint: "Generování, tisk a přiřazení inventárních QR kódů",
   },
+  {
+    href: "/equipment/settings/notifications",
+    icon: Bell,
+    title: "Notifikace pohybů",
+    hint: "Další příjemci vedle držitele a účtárny",
+  },
 ] as const;
 
 export default async function EquipmentSettingsHubPage() {
@@ -40,7 +46,7 @@ export default async function EquipmentSettingsHubPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Nastavení majetku</h1>
-        <p className="mt-1 text-gray-600">Import, skupiny, přístupy a fond QR kódů</p>
+        <p className="mt-1 text-gray-600">Import, skupiny, přístupy, fond QR a notifikace</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
