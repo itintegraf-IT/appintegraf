@@ -128,6 +128,7 @@ export async function POST(req: NextRequest) {
       warranty_until = null,
       last_service_at = null,
       pool_qr_code = null,
+      serial_numbers: serialNumbersRaw,
     } = body;
 
     if (!name || !category_id) {
@@ -145,6 +146,134 @@ export async function POST(req: NextRequest) {
       roomId = parseInt(String(room_id), 10);
       const room = await prisma.equipment_rooms.findUnique({ where: { id: roomId } });
       if (room) locationText = `${room.code} – ${room.name}`;
+    }
+
+    const itemStatus = isEquipmentItemStatus(String(status))
+      ? status
+      : EQUIPMENT_ITEM_STATUS.SKLADEM;
+
+    const shared = {
+      name: String(name).trim(),
+      brand: brand ? String(brand).trim() : null,
+      model: model ? String(model).trim() : null,
+      description: description ? String(description).trim() : null,
+      category_id: catId,
+      purchase_date: purchase_date ? new Date(purchase_date) : null,
+      purchase_price:
+        purchase_price != null && purchase_price !== ""
+          ? parseFloat(String(purchase_price))
+          : null,
+      supplier: supplier ? String(supplier).trim() : null,
+      invoice_number: invoice_number ? String(invoice_number).trim() : null,
+      status: itemStatus,
+      location: locationText,
+      room_id: roomId,
+      warranty_until: warranty_until ? new Date(warranty_until) : null,
+      last_service_at: last_service_at ? new Date(last_service_at) : null,
+      notes: notes ? String(notes).trim() : null,
+    };
+
+    /** Hromadné založení: pole serial_numbers (každý kus = jedno SN). */
+    const bulkSerials: string[] | null = Array.isArray(serialNumbersRaw)
+      ? serialNumbersRaw.map((s: unknown) => String(s ?? "").trim()).filter(Boolean)
+      : null;
+
+    if (bulkSerials && bulkSerials.length > 1) {
+      if (bulkSerials.length > 50) {
+        return NextResponse.json(
+          { error: "Najednou lze založit maximálně 50 kusů" },
+          { status: 400 }
+        );
+      }
+
+      const uniqueCheck = new Set(bulkSerials.map((s) => s.toLowerCase()));
+      if (uniqueCheck.size !== bulkSerials.length) {
+        return NextResponse.json(
+          { error: "Sériová čísla musí být unikátní (duplicita ve formuláři)" },
+          { status: 400 }
+        );
+      }
+
+      const existingSn = await prisma.equipment_items.findMany({
+        where: { serial_number: { in: bulkSerials } },
+        select: { serial_number: true },
+      });
+      if (existingSn.length > 0) {
+        const taken = existingSn.map((e) => e.serial_number).filter(Boolean).join(", ");
+        return NextResponse.json(
+          { error: `Sériové číslo už existuje: ${taken}` },
+          { status: 400 }
+        );
+      }
+
+      const rows: Array<{
+        serial_number: string;
+        asset_tag: string;
+        qr_code: string;
+      }> = [];
+      for (const sn of bulkSerials) {
+        rows.push({
+          serial_number: sn,
+          asset_tag: await generateUniqueAssetTag(),
+          qr_code: await generateUniqueEqQrCode(),
+        });
+      }
+
+      await prisma.equipment_items.createMany({
+        data: rows.map((r) => ({
+          ...shared,
+          serial_number: r.serial_number,
+          asset_tag: r.asset_tag,
+          qr_code: r.qr_code,
+        })),
+      });
+
+      const created = await prisma.equipment_items.findMany({
+        where: { serial_number: { in: bulkSerials } },
+        select: { id: true, serial_number: true },
+        orderBy: { id: "asc" },
+      });
+      const bySn = new Map(created.map((c) => [c.serial_number, c.id]));
+      const createdIds = bulkSerials
+        .map((sn) => bySn.get(sn))
+        .filter((id): id is number => typeof id === "number");
+
+      for (const id of createdIds) {
+        await logEquipmentAuditSafe({
+          userId,
+          action: "item_create",
+          tableName: "equipment_items",
+          recordId: id,
+          detail: { bulk: true, count: createdIds.length },
+        });
+      }
+
+      return NextResponse.json({
+        success: true,
+        id: createdIds[0],
+        ids: createdIds,
+        count: createdIds.length,
+      });
+    }
+
+    const singleSn =
+      bulkSerials && bulkSerials.length === 1
+        ? bulkSerials[0]
+        : serial_number
+          ? String(serial_number).trim()
+          : null;
+
+    if (singleSn) {
+      const clash = await prisma.equipment_items.findFirst({
+        where: { serial_number: singleSn },
+        select: { id: true },
+      });
+      if (clash) {
+        return NextResponse.json(
+          { error: `Sériové číslo už existuje: ${singleSn}` },
+          { status: 400 }
+        );
+      }
     }
 
     let asset_tag = await generateUniqueAssetTag();
@@ -170,26 +299,10 @@ export async function POST(req: NextRequest) {
 
     const item = await prisma.equipment_items.create({
       data: {
-        name: String(name).trim(),
-        brand: brand ? String(brand).trim() : null,
-        model: model ? String(model).trim() : null,
-        serial_number: serial_number ? String(serial_number).trim() : null,
+        ...shared,
+        serial_number: singleSn,
         asset_tag,
         qr_code,
-        description: description ? String(description).trim() : null,
-        category_id: catId,
-        purchase_date: purchase_date ? new Date(purchase_date) : null,
-        purchase_price: purchase_price != null ? parseFloat(purchase_price) : null,
-        supplier: supplier ? String(supplier).trim() : null,
-        invoice_number: invoice_number ? String(invoice_number).trim() : null,
-        status: isEquipmentItemStatus(String(status))
-          ? status
-          : EQUIPMENT_ITEM_STATUS.SKLADEM,
-        location: locationText,
-        room_id: roomId,
-        warranty_until: warranty_until ? new Date(warranty_until) : null,
-        last_service_at: last_service_at ? new Date(last_service_at) : null,
-        notes: notes ? String(notes).trim() : null,
       },
     });
 
@@ -218,9 +331,16 @@ export async function POST(req: NextRequest) {
       recordId: item.id,
     });
 
-    return NextResponse.json({ success: true, id: item.id });
+    return NextResponse.json({ success: true, id: item.id, ids: [item.id], count: 1 });
   } catch (e) {
     console.error("Equipment POST error:", e);
+    const msg = e instanceof Error ? e.message : "";
+    if (msg.includes("Unique constraint") || msg.includes("serial_number")) {
+      return NextResponse.json(
+        { error: "Sériové číslo nebo inventární kód už existuje" },
+        { status: 400 }
+      );
+    }
     return NextResponse.json({ error: "Chyba při vytváření vybavení" }, { status: 500 });
   }
 }

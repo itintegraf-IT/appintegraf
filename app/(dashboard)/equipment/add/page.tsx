@@ -40,12 +40,16 @@ type EquipmentFormState = {
   pool_qr_code: string;
 };
 
+const MAX_UNITS = 50;
+
 export default function AddEquipmentPage() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [unitCount, setUnitCount] = useState(1);
+  const [unitSerials, setUnitSerials] = useState<string[]>([""]);
   const [form, setForm] = useState<EquipmentFormState>({
     name: "",
     brand: "",
@@ -77,24 +81,57 @@ export default function AddEquipmentPage() {
       .catch(() => {});
   }, []);
 
+  const setCount = (n: number) => {
+    const count = Math.min(MAX_UNITS, Math.max(1, n));
+    setUnitCount(count);
+    setUnitSerials((prev) => {
+      const next = prev.slice(0, count);
+      while (next.length < count) next.push("");
+      return next;
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (unitCount > 1) {
+      const serials = unitSerials.map((s) => s.trim());
+      if (serials.some((s) => !s)) {
+        setError("U každého kusu vyplňte sériové číslo.");
+        return;
+      }
+      const uniq = new Set(serials.map((s) => s.toLowerCase()));
+      if (uniq.size !== serials.length) {
+        setError("Sériová čísla musí být unikátní.");
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
+      const payload: Record<string, unknown> = {
+        ...form,
+        purchase_date: form.purchase_date || null,
+        purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : null,
+        room_id: form.room_id || null,
+        warranty_until: form.warranty_until || null,
+        last_service_at: form.last_service_at || null,
+        pool_qr_code: unitCount === 1 ? form.pool_qr_code || null : null,
+      };
+
+      if (unitCount > 1) {
+        payload.serial_numbers = unitSerials.map((s) => s.trim());
+        delete payload.serial_number;
+      } else {
+        payload.serial_number = form.serial_number || "";
+      }
+
       const res = await fetch("/api/equipment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          purchase_date: form.purchase_date || null,
-          purchase_price: form.purchase_price ? parseFloat(form.purchase_price) : null,
-          room_id: form.room_id || null,
-          warranty_until: form.warranty_until || null,
-          last_service_at: form.last_service_at || null,
-          pool_qr_code: form.pool_qr_code || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -105,7 +142,12 @@ export default function AddEquipmentPage() {
         return;
       }
 
-      router.push(`/equipment/${data.id}`);
+      const count = typeof data.count === "number" ? data.count : 1;
+      if (count > 1) {
+        router.push("/equipment");
+      } else {
+        router.push(`/equipment/${data.id}`);
+      }
       router.refresh();
     } catch {
       setError("Chyba při ukládání");
@@ -118,7 +160,9 @@ export default function AddEquipmentPage() {
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Přidat vybavení</h1>
-          <p className="mt-1 text-gray-600">Nový záznam v evidenci majetku</p>
+          <p className="mt-1 text-gray-600">
+            Nový záznam v evidenci majetku — stejná metadata, více kusů jen s jiným S/N
+          </p>
         </div>
         <Link
           href="/equipment"
@@ -197,6 +241,20 @@ export default function AddEquipmentPage() {
             </select>
           </div>
           <div>
+            <label className="mb-1 block text-sm font-medium text-gray-700">Počet kusů</label>
+            <input
+              type="number"
+              min={1}
+              max={MAX_UNITS}
+              value={unitCount}
+              onChange={(e) => setCount(parseInt(e.target.value, 10) || 1)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2"
+            />
+            <p className="mt-1 text-xs text-gray-500">
+              Více kusů = jedna karta metadat, každému vlastní sériové číslo (max {MAX_UNITS}).
+            </p>
+          </div>
+          <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Značka</label>
             <input
               type="text"
@@ -214,15 +272,42 @@ export default function AddEquipmentPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">Sériové číslo</label>
-            <input
-              type="text"
-              value={form.serial_number}
-              onChange={(e) => setForm({ ...form, serial_number: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            />
-          </div>
+          {unitCount === 1 ? (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-gray-700">Sériové číslo</label>
+              <input
+                type="text"
+                value={form.serial_number}
+                onChange={(e) => setForm({ ...form, serial_number: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2"
+              />
+            </div>
+          ) : (
+            <div className="sm:col-span-2 rounded-lg border border-dashed border-gray-200 bg-gray-50/80 p-4">
+              <label className="mb-2 block text-sm font-medium text-gray-800">
+                Sériová čísla kusů *
+              </label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {unitSerials.map((sn, i) => (
+                  <div key={i}>
+                    <label className="mb-0.5 block text-xs text-gray-500">Kus {i + 1}</label>
+                    <input
+                      type="text"
+                      required
+                      value={sn}
+                      onChange={(e) => {
+                        const next = [...unitSerials];
+                        next[i] = e.target.value;
+                        setUnitSerials(next);
+                      }}
+                      className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 font-mono text-sm"
+                      placeholder={`S/N ${i + 1}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Datum nákupu</label>
             <input
@@ -244,6 +329,9 @@ export default function AddEquipmentPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
               placeholder="např. 25000"
             />
+            {unitCount > 1 ? (
+              <p className="mt-1 text-xs text-gray-500">Cena se uloží na každý kus stejně.</p>
+            ) : null}
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-gray-700">Dodavatel</label>
@@ -305,21 +393,24 @@ export default function AddEquipmentPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
             />
           </div>
-          <div className="sm:col-span-2">
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Inventární č. z fondu (ručně)
-            </label>
-            <input
-              type="text"
-              value={form.pool_qr_code}
-              onChange={(e) => setForm({ ...form, pool_qr_code: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono"
-              placeholder="EQ-00001234"
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Zadejte inventární číslo ze štítku nebo fondu QR (bez skeneru).
-            </p>
-          </div>
+          {unitCount === 1 ? (
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-sm font-medium text-gray-700">
+                Inventární č. z fondu (ručně)
+              </label>
+              <input
+                type="text"
+                value={form.pool_qr_code}
+                onChange={(e) => setForm({ ...form, pool_qr_code: e.target.value })}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono"
+                placeholder="EQ-00001234"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Zadejte inventární číslo ze štítku nebo fondu QR (bez skeneru). U více kusů se
+                inventární čísla vygenerují automaticky.
+              </p>
+            </div>
+          ) : null}
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm font-medium text-gray-700">Popis</label>
             <textarea
@@ -346,7 +437,11 @@ export default function AddEquipmentPage() {
             disabled={loading}
             className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
           >
-            {loading ? "Ukládám…" : "Uložit"}
+            {loading
+              ? "Ukládám…"
+              : unitCount > 1
+                ? `Založit ${unitCount} kusů`
+                : "Uložit"}
           </button>
           <Link
             href="/equipment"
