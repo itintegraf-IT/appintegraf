@@ -6,10 +6,10 @@ import { unlink, access } from "fs/promises";
 import path from "path";
 import { Readable } from "stream";
 import { canReadVykresy, canWriteVykresy } from "@/lib/vykresy/access";
-import { VYKRESY_MODULE } from "@/lib/vykresy/constants";
+import { mimeTypeForVykresyFilename, VYKRESY_MODULE } from "@/lib/vykresy/constants";
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string; fileId: string }> }
 ) {
   const session = await auth();
@@ -54,11 +54,18 @@ export async function GET(
     data: { last_accessed_at: new Date() },
   });
 
+  const inline = req.nextUrl.searchParams.get("inline") === "1";
   const asciiName = fileRow.original_filename.replace(/[^\x20-\x7E]/g, "_");
+  const contentType = mimeTypeForVykresyFilename(
+    fileRow.original_filename,
+    fileRow.mime_type
+  );
+  const disposition = inline ? "inline" : "attachment";
+
   return new NextResponse(webStream, {
     headers: {
-      "Content-Type": fileRow.mime_type || "application/octet-stream",
-      "Content-Disposition": `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileRow.original_filename)}`,
+      "Content-Type": contentType,
+      "Content-Disposition": `${disposition}; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileRow.original_filename)}`,
       "Content-Length": String(fileRow.file_size),
     },
   });

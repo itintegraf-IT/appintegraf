@@ -26,6 +26,45 @@ export const VYKRESY_ALLOWED_EXTENSIONS = new Set([
   ".pdf",
 ]);
 
+export type VykresyPreviewKind = "pdf" | "model3d" | "none";
+
+export function getFileExtension(filename: string): string {
+  const i = filename.lastIndexOf(".");
+  if (i < 0) return "";
+  return filename.slice(i).toLowerCase();
+}
+
+export function getPreviewKind(filename: string): VykresyPreviewKind {
+  const ext = getFileExtension(filename);
+  if (ext === ".pdf") return "pdf";
+  if (ext === ".3mf" || ext === ".stl") return "model3d";
+  return "none";
+}
+
+/** MIME podle přípony – upload často ukládá application/octet-stream. */
+export function mimeTypeForVykresyFilename(
+  filename: string,
+  storedMime?: string | null
+): string {
+  const ext = getFileExtension(filename);
+  const map: Record<string, string> = {
+    ".pdf": "application/pdf",
+    ".stl": "model/stl",
+    ".3mf": "model/3mf",
+    ".obj": "model/obj",
+    ".step": "model/step",
+    ".stp": "model/step",
+    ".iges": "model/iges",
+    ".igs": "model/iges",
+    ".dwg": "image/vnd.dwg",
+    ".dxf": "image/vnd.dxf",
+  };
+  if (map[ext]) return map[ext];
+  const stored = (storedMime ?? "").trim();
+  if (stored && stored !== "application/octet-stream") return stored;
+  return "application/octet-stream";
+}
+
 export function isVykresyDocumentKind(value: string): value is VykresyDocumentKind {
   return (VYKRESY_DOCUMENT_KINDS as readonly string[]).includes(value);
 }

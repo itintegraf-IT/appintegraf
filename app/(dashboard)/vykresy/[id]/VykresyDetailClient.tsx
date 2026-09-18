@@ -6,14 +6,20 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Download,
+  Eye,
   Pencil,
   Trash2,
   Upload,
 } from "lucide-react";
 import {
+  getPreviewKind,
   VYKRESY_DOCUMENT_KIND_LABELS,
   type VykresyDocumentKind,
 } from "@/lib/vykresy/constants";
+import {
+  VykresyFilePreviewModal,
+  type VykresyPreviewFile,
+} from "../_components/VykresyFilePreviewModal";
 
 type FileRow = {
   id: number;
@@ -67,6 +73,7 @@ export function VykresyDetailClient({
   const [deleting, setDeleting] = useState(false);
   const [fileDeletingId, setFileDeletingId] = useState<number | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [previewFile, setPreviewFile] = useState<VykresyPreviewFile | null>(null);
 
   const load = useCallback(async () => {
     setLoadError("");
@@ -308,48 +315,79 @@ export function VykresyDetailClient({
           <p className="text-sm text-gray-500">Zatím žádné soubory.</p>
         ) : (
           <ul className="divide-y divide-gray-100">
-            {files.map((f) => (
-              <li
-                key={f.id}
-                className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
-              >
-                <div>
-                  <div className="font-medium text-gray-900">{f.original_filename}</div>
-                  <div className="text-xs text-gray-500">
-                    {formatBytes(f.file_size)}
-                    {f.document_type ? ` · ${f.document_type.toUpperCase()}` : ""}
-                    {f.users
-                      ? ` · ${f.users.first_name} ${f.users.last_name}`
-                      : ""}
-                    {" · "}
-                    {new Date(f.created_at).toLocaleString("cs-CZ")}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <a
-                    href={`/api/vykresy/${id}/files/${f.id}`}
-                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
-                  >
-                    <Download className="h-4 w-4" />
-                    Stáhnout
-                  </a>
-                  {canWrite && (
+            {files.map((f) => {
+              const previewKind = getPreviewKind(f.original_filename);
+              const openPreview = () =>
+                setPreviewFile({
+                  id: f.id,
+                  original_filename: f.original_filename,
+                  vykresId: id,
+                });
+              return (
+                <li
+                  key={f.id}
+                  className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
+                >
+                  <div>
                     <button
                       type="button"
-                      onClick={() => void onDeleteFile(f.id)}
-                      disabled={fileDeletingId === f.id}
-                      className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      onClick={openPreview}
+                      className="text-left font-medium text-red-700 hover:underline"
+                      title="Otevřít náhled"
                     >
-                      <Trash2 className="h-4 w-4" />
-                      {fileDeletingId === f.id ? "…" : "Smazat"}
+                      {f.original_filename}
                     </button>
-                  )}
-                </div>
-              </li>
-            ))}
+                    <div className="text-xs text-gray-500">
+                      {formatBytes(f.file_size)}
+                      {f.document_type ? ` · ${f.document_type.toUpperCase()}` : ""}
+                      {f.users
+                        ? ` · ${f.users.first_name} ${f.users.last_name}`
+                        : ""}
+                      {" · "}
+                      {new Date(f.created_at).toLocaleString("cs-CZ")}
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    {(previewKind === "pdf" || previewKind === "model3d") && (
+                      <button
+                        type="button"
+                        onClick={openPreview}
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Náhled
+                      </button>
+                    )}
+                    <a
+                      href={`/api/vykresy/${id}/files/${f.id}`}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50"
+                    >
+                      <Download className="h-4 w-4" />
+                      Stáhnout
+                    </a>
+                    {canWrite && (
+                      <button
+                        type="button"
+                        onClick={() => void onDeleteFile(f.id)}
+                        disabled={fileDeletingId === f.id}
+                        className="inline-flex items-center gap-1 rounded-lg border border-red-200 px-3 py-1.5 text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        {fileDeletingId === f.id ? "…" : "Smazat"}
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </div>
+
+      <VykresyFilePreviewModal
+        file={previewFile}
+        onClose={() => setPreviewFile(null)}
+      />
     </div>
   );
 }

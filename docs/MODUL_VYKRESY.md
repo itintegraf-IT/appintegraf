@@ -8,7 +8,7 @@ Modul klíč: `vykresy` (Admin → uživatelé).
 
 | Úroveň | Možnosti |
 |--------|----------|
-| `read` | Seznam, detail, stažení souborů |
+| `read` | Seznam, detail, stažení a náhled souborů |
 | `write` / `admin` | CRUD záznamů, upload/mazání souborů, správa číselníku strojů |
 
 ## Datový model
@@ -25,9 +25,21 @@ Soubory na disku: `public/uploads/vykresy/` (ne BLOB v DB). Limit 50 MB.
 |-------|--------|
 | `/vykresy` | Seznam + filtry (název, typ, oddělení, stroj) |
 | `/vykresy/new` | Nový záznam |
-| `/vykresy/[id]` | Detail + přílohy (upload/download) |
+| `/vykresy/[id]` | Detail + přílohy (upload/download/náhled) |
 | `/vykresy/[id]/edit` | Úprava metadat |
 | `/vykresy/stroje` | Číselník strojů |
+
+### Náhled souborů
+
+V detailu klepnutím na název nebo **Náhled** se otevře modal:
+
+| Formát | Náhled |
+|--------|--------|
+| PDF | iframe v prohlížeči |
+| 3MF, STL | interaktivní 3D (rotace, zoom, pan) přes three.js |
+| STEP/IGES/DWG/DXF/OBJ | bez náhledu – stažení |
+
+API: `GET /api/vykresy/[id]/files/[fileId]?inline=1` pro náhled (`Content-Disposition: inline`).
 
 ## Migrace
 
@@ -38,8 +50,8 @@ npx prisma generate
 
 SQL: `prisma/migrations/20260918120000_vykresy_module/migration.sql`
 
-## Mimo scope (v1)
+## Mimo scope
 
-- 3D náhled v prohlížeči
+- Náhled OBJ / STEP / DWG / DXF
 - Verzování souborů
 - Vazba na IML / plánování XL_*
