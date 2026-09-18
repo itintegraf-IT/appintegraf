@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { Download, X } from "lucide-react";
 import { getPreviewKind, type VykresyPreviewKind } from "@/lib/vykresy/constants";
 import { VykresyPdfPreview } from "./VykresyPdfPreview";
+import { VykresyImagePreview } from "./VykresyImagePreview";
 
 export type VykresyPreviewFile = {
   id: number;
@@ -42,6 +43,13 @@ export function VykresyFilePreviewModal({ file, onClose }: Props) {
   const downloadUrl = `/api/vykresy/${file.vykresId}/files/${file.id}`;
   const inlineUrl = `${downloadUrl}?inline=1`;
 
+  const subtitle =
+    kind === "pdf"
+      ? "Náhled PDF"
+      : kind === "image"
+        ? "Náhled obrázku"
+        : "Náhled není k dispozici";
+
   return createPortal(
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 sm:p-6"
@@ -62,11 +70,7 @@ export function VykresyFilePreviewModal({ file, onClose }: Props) {
             >
               {file.original_filename}
             </h2>
-            {kind === "pdf" ? (
-              <p className="mt-0.5 text-xs text-gray-500">Náhled PDF</p>
-            ) : (
-              <p className="mt-0.5 text-xs text-gray-500">Náhled není k dispozici</p>
-            )}
+            <p className="mt-0.5 text-xs text-gray-500">{subtitle}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <a
@@ -89,10 +93,12 @@ export function VykresyFilePreviewModal({ file, onClose }: Props) {
         <div className="min-h-0 flex-1 overflow-auto bg-gray-100 p-3 sm:p-4">
           {kind === "pdf" ? (
             <VykresyPdfPreview src={inlineUrl} title={file.original_filename} />
+          ) : kind === "image" ? (
+            <VykresyImagePreview src={inlineUrl} title={file.original_filename} />
           ) : (
             <div className="flex h-[min(40vh,320px)] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-gray-300 bg-white px-4 text-center text-sm text-gray-600">
               <p>
-                Pro tento formát (3D/CAD) není prohlížečový náhled k dispozici.
+                Pro tento formát (3D/CAD/TIFF) není prohlížečový náhled k dispozici.
                 Soubor si stáhněte a otevřete v příslušné aplikaci.
               </p>
               <a

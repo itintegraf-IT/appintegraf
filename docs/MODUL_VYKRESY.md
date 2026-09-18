@@ -1,6 +1,6 @@
 # Modul Technické výkresy
 
-Evidence CAD výkresů, PDF a 3D modelů (STL, 3MF, OBJ, STEP, IGES, DWG, DXF).
+Evidence CAD výkresů, PDF, obrázků a 3D modelů (STL, 3MF, OBJ, STEP, IGES, DWG, DXF, JPG/PNG…).
 
 ## Oprávnění
 
@@ -8,12 +8,12 @@ Modul klíč: `vykresy` (Admin → uživatelé).
 
 | Úroveň | Možnosti |
 |--------|----------|
-| `read` | Seznam, detail, stažení a náhled PDF |
+| `read` | Seznam, detail, stažení, náhled PDF/obrázků |
 | `write` / `admin` | CRUD záznamů, upload/mazání souborů, správa číselníku strojů |
 
 ## Datový model
 
-- **`vykresy`** – metadata: název, `document_kind` (`model_3d` \| `cad` \| `pdf` \| `other`), oddělení (`departments`), stroj (`vykresy_machines`), popis
+- **`vykresy`** – metadata: název, `document_kind` (`model_3d` \| `cad` \| `pdf` \| `image` \| `other`), oddělení (`departments`), stroj (`vykresy_machines`), popis
 - **`vykresy_machines`** – číselník strojů (název, aktivní, pořadí)
 - **`file_uploads`** – přílohy (`module = vykresy`, `record_id` = id záznamu)
 
@@ -25,20 +25,22 @@ Soubory na disku: `public/uploads/vykresy/` (ne BLOB v DB). Limit 50 MB.
 |-------|--------|
 | `/vykresy` | Seznam + filtry (název, typ, oddělení, stroj) |
 | `/vykresy/new` | Nový záznam |
-| `/vykresy/[id]` | Detail + přílohy (upload/download/náhled PDF) |
+| `/vykresy/[id]` | Detail + přílohy (upload/download/náhled) |
 | `/vykresy/[id]/edit` | Úprava metadat |
 | `/vykresy/stroje` | Číselník strojů |
 
 ### Náhled souborů
 
-V detailu klepnutím na název nebo **Náhled** (u PDF) se otevře modal:
+V detailu: mřížka miniatur obrázků; klepnutím nebo **Náhled** se otevře modal:
 
 | Formát | Náhled |
 |--------|--------|
-| PDF | iframe v prohlížeči |
-| 3MF, STL, STEP, DWG, DXF, OBJ… | bez náhledu – stažení |
+| PDF | iframe |
+| JPG, JPEG, PNG, WebP, GIF | obrázek + zoom (+/− / Ctrl+kolečko) |
+| TIFF | upload ano, náhled v prohlížeči obvykle ne |
+| 3MF, STL, STEP, DWG… | bez náhledu – stažení |
 
-API: `GET /api/vykresy/[id]/files/[fileId]?inline=1` pro náhled PDF (`Content-Disposition: inline`).
+API: `GET /api/vykresy/[id]/files/[fileId]?inline=1` (`Content-Disposition: inline`).
 
 ## Migrace
 
@@ -51,6 +53,7 @@ SQL: `prisma/migrations/20260918120000_vykresy_module/migration.sql`
 
 ## Mimo scope
 
-- Interaktivní 3D náhled v prohlížeči (three.js) – záměrně nevyužito kvůli paměti při buildu
+- Interaktivní 3D náhled (three.js)
+- Serverová konverze TIFF→JPEG
 - Verzování souborů
 - Vazba na IML / plánování XL_*

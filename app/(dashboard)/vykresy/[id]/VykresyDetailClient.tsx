@@ -294,13 +294,13 @@ export function VykresyDetailClient({
               </button>
             </p>
             <p className="mt-1 text-xs text-gray-500">
-              STL, 3MF, OBJ, STEP/STP, IGES/IGS, DWG, DXF, PDF · max 50 MB
+              STL, 3MF, OBJ, STEP, DWG, DXF, PDF, JPG/PNG/WebP/GIF/TIFF · max 50 MB
             </p>
             <input
               ref={inputRef}
               type="file"
               className="hidden"
-              accept=".stl,.3mf,.obj,.step,.stp,.iges,.igs,.dwg,.dxf,.pdf"
+              accept=".stl,.3mf,.obj,.step,.stp,.iges,.igs,.dwg,.dxf,.pdf,.jpg,.jpeg,.png,.webp,.gif,.tif,.tiff,image/*"
               onChange={(e) => {
                 const f = e.target.files?.[0];
                 if (f) void uploadFile(f);
@@ -311,12 +311,54 @@ export function VykresyDetailClient({
           </div>
         )}
 
+        {(() => {
+          const imageFiles = files.filter(
+            (f) => getPreviewKind(f.original_filename) === "image"
+          );
+          if (imageFiles.length === 0) return null;
+          return (
+            <div className="mb-4">
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Náhledy obrázků
+              </h3>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+                {imageFiles.map((f) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() =>
+                      setPreviewFile({
+                        id: f.id,
+                        original_filename: f.original_filename,
+                        vykresId: id,
+                      })
+                    }
+                    className="group overflow-hidden rounded-lg border border-gray-200 bg-gray-50 text-left shadow-sm transition hover:border-red-300 hover:shadow"
+                    title={`Zvětšit: ${f.original_filename}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={`/api/vykresy/${id}/files/${f.id}?inline=1`}
+                      alt={f.original_filename}
+                      className="aspect-square w-full object-cover"
+                    />
+                    <div className="truncate px-2 py-1.5 text-xs text-gray-700 group-hover:text-red-700">
+                      {f.original_filename}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {files.length === 0 ? (
           <p className="text-sm text-gray-500">Zatím žádné soubory.</p>
         ) : (
           <ul className="divide-y divide-gray-100">
             {files.map((f) => {
               const previewKind = getPreviewKind(f.original_filename);
+              const canPreview = previewKind === "pdf" || previewKind === "image";
               const openPreview = () =>
                 setPreviewFile({
                   id: f.id,
@@ -348,7 +390,7 @@ export function VykresyDetailClient({
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    {previewKind === "pdf" && (
+                    {canPreview && (
                       <button
                         type="button"
                         onClick={openPreview}

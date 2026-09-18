@@ -85,7 +85,7 @@ export async function POST(
       return NextResponse.json(
         {
           error:
-            "Nepovolená přípona. Povoleno: STL, 3MF, OBJ, STEP/STP, IGES/IGS, DWG, DXF, PDF.",
+            "Nepovolená přípona. Povoleno: STL, 3MF, OBJ, STEP/STP, IGES/IGS, DWG, DXF, PDF, JPG/PNG/WebP/GIF/TIFF.",
         },
         { status: 400 }
       );

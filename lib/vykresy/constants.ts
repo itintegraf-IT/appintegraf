@@ -2,13 +2,20 @@ export const VYKRESY_MODULE = "vykresy" as const;
 
 export const VYKRESY_MAX_BYTES = 50 * 1024 * 1024;
 
-export const VYKRESY_DOCUMENT_KINDS = ["model_3d", "cad", "pdf", "other"] as const;
+export const VYKRESY_DOCUMENT_KINDS = [
+  "model_3d",
+  "cad",
+  "pdf",
+  "image",
+  "other",
+] as const;
 export type VykresyDocumentKind = (typeof VYKRESY_DOCUMENT_KINDS)[number];
 
 export const VYKRESY_DOCUMENT_KIND_LABELS: Record<VykresyDocumentKind, string> = {
   model_3d: "3D model",
   cad: "CAD výkres",
   pdf: "PDF",
+  image: "Obrázek",
   other: "Jiné",
 };
 
@@ -24,9 +31,18 @@ export const VYKRESY_ALLOWED_EXTENSIONS = new Set([
   ".dwg",
   ".dxf",
   ".pdf",
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".webp",
+  ".gif",
+  ".tif",
+  ".tiff",
 ]);
 
-export type VykresyPreviewKind = "pdf" | "none";
+export type VykresyPreviewKind = "pdf" | "image" | "none";
+
+const BROWSER_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 
 export function getFileExtension(filename: string): string {
   const i = filename.lastIndexOf(".");
@@ -37,6 +53,7 @@ export function getFileExtension(filename: string): string {
 export function getPreviewKind(filename: string): VykresyPreviewKind {
   const ext = getFileExtension(filename);
   if (ext === ".pdf") return "pdf";
+  if (BROWSER_IMAGE_EXTS.has(ext)) return "image";
   return "none";
 }
 
@@ -57,6 +74,13 @@ export function mimeTypeForVykresyFilename(
     ".igs": "model/iges",
     ".dwg": "image/vnd.dwg",
     ".dxf": "image/vnd.dxf",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+    ".gif": "image/gif",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
   };
   if (map[ext]) return map[ext];
   const stored = (storedMime ?? "").trim();
@@ -73,5 +97,8 @@ export function suggestDocumentKindFromExt(ext: string): VykresyDocumentKind {
   if ([".stl", ".3mf", ".obj"].includes(e)) return "model_3d";
   if ([".step", ".stp", ".iges", ".igs", ".dwg", ".dxf"].includes(e)) return "cad";
   if (e === ".pdf") return "pdf";
+  if ([".jpg", ".jpeg", ".png", ".webp", ".gif", ".tif", ".tiff"].includes(e)) {
+    return "image";
+  }
   return "other";
 }
