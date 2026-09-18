@@ -1,24 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import { createPortal } from "react-dom";
 import { Download, X } from "lucide-react";
 import { getPreviewKind, type VykresyPreviewKind } from "@/lib/vykresy/constants";
 import { VykresyPdfPreview } from "./VykresyPdfPreview";
-
-const VykresyModelViewer = dynamic(
-  () =>
-    import("./VykresyModelViewer").then((m) => m.VykresyModelViewer),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-[min(78vh,720px)] items-center justify-center rounded-lg border border-gray-200 bg-gray-100 text-sm text-gray-600">
-        Připravuji 3D prohlížeč…
-      </div>
-    ),
-  }
-);
 
 export type VykresyPreviewFile = {
   id: number;
@@ -76,9 +62,7 @@ export function VykresyFilePreviewModal({ file, onClose }: Props) {
             >
               {file.original_filename}
             </h2>
-            {kind === "model3d" ? (
-              <p className="mt-0.5 text-xs text-gray-500">Interaktivní 3D náhled</p>
-            ) : kind === "pdf" ? (
+            {kind === "pdf" ? (
               <p className="mt-0.5 text-xs text-gray-500">Náhled PDF</p>
             ) : (
               <p className="mt-0.5 text-xs text-gray-500">Náhled není k dispozici</p>
@@ -105,12 +89,10 @@ export function VykresyFilePreviewModal({ file, onClose }: Props) {
         <div className="min-h-0 flex-1 overflow-auto bg-gray-100 p-3 sm:p-4">
           {kind === "pdf" ? (
             <VykresyPdfPreview src={inlineUrl} title={file.original_filename} />
-          ) : kind === "model3d" ? (
-            <VykresyModelViewer url={inlineUrl} filename={file.original_filename} />
           ) : (
             <div className="flex h-[min(40vh,320px)] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-gray-300 bg-white px-4 text-center text-sm text-gray-600">
               <p>
-                Pro tento formát (CAD apod.) není prohlížečový náhled k dispozici.
+                Pro tento formát (3D/CAD) není prohlížečový náhled k dispozici.
                 Soubor si stáhněte a otevřete v příslušné aplikaci.
               </p>
               <a

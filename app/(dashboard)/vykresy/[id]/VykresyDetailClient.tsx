@@ -348,7 +348,7 @@ export function VykresyDetailClient({
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    {(previewKind === "pdf" || previewKind === "model3d") && (
+                    {previewKind === "pdf" && (
                       <button
                         type="button"
                         onClick={openPreview}

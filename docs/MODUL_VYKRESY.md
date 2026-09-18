@@ -8,7 +8,7 @@ Modul klíč: `vykresy` (Admin → uživatelé).
 
 | Úroveň | Možnosti |
 |--------|----------|
-| `read` | Seznam, detail, stažení a náhled souborů |
+| `read` | Seznam, detail, stažení a náhled PDF |
 | `write` / `admin` | CRUD záznamů, upload/mazání souborů, správa číselníku strojů |
 
 ## Datový model
@@ -25,21 +25,20 @@ Soubory na disku: `public/uploads/vykresy/` (ne BLOB v DB). Limit 50 MB.
 |-------|--------|
 | `/vykresy` | Seznam + filtry (název, typ, oddělení, stroj) |
 | `/vykresy/new` | Nový záznam |
-| `/vykresy/[id]` | Detail + přílohy (upload/download/náhled) |
+| `/vykresy/[id]` | Detail + přílohy (upload/download/náhled PDF) |
 | `/vykresy/[id]/edit` | Úprava metadat |
 | `/vykresy/stroje` | Číselník strojů |
 
 ### Náhled souborů
 
-V detailu klepnutím na název nebo **Náhled** se otevře modal:
+V detailu klepnutím na název nebo **Náhled** (u PDF) se otevře modal:
 
 | Formát | Náhled |
 |--------|--------|
 | PDF | iframe v prohlížeči |
-| 3MF, STL | interaktivní 3D (rotace, zoom, pan) přes three.js |
-| STEP/IGES/DWG/DXF/OBJ | bez náhledu – stažení |
+| 3MF, STL, STEP, DWG, DXF, OBJ… | bez náhledu – stažení |
 
-API: `GET /api/vykresy/[id]/files/[fileId]?inline=1` pro náhled (`Content-Disposition: inline`).
+API: `GET /api/vykresy/[id]/files/[fileId]?inline=1` pro náhled PDF (`Content-Disposition: inline`).
 
 ## Migrace
 
@@ -52,6 +51,6 @@ SQL: `prisma/migrations/20260918120000_vykresy_module/migration.sql`
 
 ## Mimo scope
 
-- Náhled OBJ / STEP / DWG / DXF
+- Interaktivní 3D náhled v prohlížeči (three.js) – záměrně nevyužito kvůli paměti při buildu
 - Verzování souborů
 - Vazba na IML / plánování XL_*

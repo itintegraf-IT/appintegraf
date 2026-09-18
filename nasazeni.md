@@ -73,7 +73,7 @@ Při nesouladu skript skončí chybou a build ani restart se nespustí.
 3. `npx prisma generate` (běží i v `postinstall`)
 4. volitelně `npx prisma migrate deploy`
 5. při potřebě SQL pro plánování: `npm run db:planovani-upgrade`
-6. `npm run build` (heap 6 GB přes `node --max-old-space-size=6144`; deploy skript nastaví i `NODE_OPTIONS`)
+6. `npm run build`
 7. `pm2 restart appintegraf` (nebo váš název procesu)
 
 ### Ruční SQL (moduly mimo Prisma migrate)

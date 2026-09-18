@@ -26,7 +26,7 @@ export const VYKRESY_ALLOWED_EXTENSIONS = new Set([
   ".pdf",
 ]);
 
-export type VykresyPreviewKind = "pdf" | "model3d" | "none";
+export type VykresyPreviewKind = "pdf" | "none";
 
 export function getFileExtension(filename: string): string {
   const i = filename.lastIndexOf(".");
@@ -37,7 +37,6 @@ export function getFileExtension(filename: string): string {
 export function getPreviewKind(filename: string): VykresyPreviewKind {
   const ext = getFileExtension(filename);
   if (ext === ".pdf") return "pdf";
-  if (ext === ".3mf" || ext === ".stl") return "model3d";
   return "none";
 }
 
