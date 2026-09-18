@@ -232,6 +232,9 @@ fi
 
 if [[ "$SKIP_BUILD" -eq 0 ]]; then
   echo "==> Next.js: build"
+  # Typecheck + webpack u velkého projektu (three.js apod.) snadno přesáhne výchozí ~2 GB heap
+  export NODE_OPTIONS="${NODE_OPTIONS:+${NODE_OPTIONS} }--max-old-space-size=6144"
+  echo "    NODE_OPTIONS=$NODE_OPTIONS"
   npm run build
 else
   echo "==> Next.js: build přeskočen (--skip-build)"
