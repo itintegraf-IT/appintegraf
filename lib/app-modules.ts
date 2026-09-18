@@ -16,6 +16,7 @@ export const APP_MODULE_KEYS = [
   "makety",
   "personalistika",
   "projekty",
+  "vykresy",
 ] as const;
 
 export type AppModuleKey = (typeof APP_MODULE_KEYS)[number];

@@ -37,6 +37,7 @@ export default async function DashboardLayout({
     materialy,
     stitky,
     projekty,
+    vykresy,
   } =
     await getLayoutAccess(userId);
 
@@ -56,6 +57,7 @@ export default async function DashboardLayout({
     materialy,
     stitky,
     projekty,
+    vykresy,
   };
 
   return (

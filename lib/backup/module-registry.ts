@@ -116,6 +116,13 @@ export const BACKUP_MODULES: Record<BackupModuleId, BackupModuleDef> = {
     tables: [prisma("contracts"), prisma("contract_approvals"), prisma("file_uploads")],
     fileUploadModules: [{ module: "contracts", uploadSubdir: "contracts" }],
   },
+  vykresy: {
+    id: "vykresy",
+    label: "Technické výkresy",
+    dependsOn: ["system"],
+    tables: [prisma("vykresy"), prisma("vykresy_machines"), prisma("file_uploads")],
+    fileUploadModules: [{ module: "vykresy", uploadSubdir: "vykresy" }],
+  },
   planovani: {
     id: "planovani",
     label: "Plánování výroby",

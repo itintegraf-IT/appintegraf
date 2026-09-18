@@ -29,6 +29,7 @@
     "db:makety-quote": "node scripts/run-makety-quote-migration.mjs",
     "db:makety-iml-applied": "node scripts/run-makety-iml-applied-migration.mjs",
     "db:equipment-quantity": "node scripts/run-equipment-quantity-migration.mjs",
+    "db:vykresy-migrate": "node scripts/run-vykresy-migration.mjs",
     "db:stitky-migrate": "node scripts/run-stitky-migration.mjs",
     "db:training-multi-answer": "node scripts/run-training-multi-answer-migration.mjs",
     "db:training-assignment-users": "node scripts/run-training-assignment-users-migration.mjs",

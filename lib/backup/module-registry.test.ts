@@ -18,12 +18,14 @@ describe("module-registry", () => {
         "equipment",
         "iml",
         "kiosk",
+        "makety",
         "materialy",
         "personalistika",
         "planovani",
         "system",
         "training",
         "ukoly",
+        "vykresy",
         "vyroba",
       ].sort()
     );

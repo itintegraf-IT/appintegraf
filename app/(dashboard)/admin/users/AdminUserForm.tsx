@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, Printer, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound, Layers, Tags, Car } from "lucide-react";
+import { ArrowLeft, Users, Laptop, Calendar, Tv, GraduationCap, CalendarDays, Package, Factory, ClipboardList, Printer, FileText, BriefcaseBusiness, ShieldAlert, Mail, KeyRound, Layers, Tags, Car, Cuboid } from "lucide-react";
 import { PASSWORD_RULES_TEXT, validatePassword } from "@/lib/password-policy";
 import { TotpAdminPanel } from "@/components/admin/TotpAdminPanel";
 import {
@@ -58,6 +58,7 @@ const AVAILABLE_MODULES = [
   { key: "stitky", label: "Štítky výroba", icon: Tags },
   { key: "makety", label: "Makety a grafika", icon: Printer },
   { key: "personalistika", label: "Personalistika", icon: BriefcaseBusiness },
+  { key: "vykresy", label: "Technické výkresy", icon: Cuboid },
 ] as const;
 
 /** Mapování UI úrovní na hodnoty v DB (auth-utils: read/write/admin); u plánování navíc tiskař */

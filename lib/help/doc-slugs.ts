@@ -62,6 +62,10 @@ export const HELP_DOC_SLUGS: Record<
     file: "MODUL_MATERIALY.md",
     title: "Katalog materiálů – dokumentace",
   },
+  "modul-vykresy": {
+    file: "MODUL_VYKRESY.md",
+    title: "Technické výkresy – dokumentace",
+  },
   "auth-sprava-hesel": {
     file: "AUTH_SPRAVA_HESEL.md",
     title: "Správa hesel a 2FA",

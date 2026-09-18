@@ -47,6 +47,7 @@ import {
   BriefcaseBusiness,
   Layers,
   Tags,
+  Cuboid,
 } from "lucide-react";
 import {
   Tooltip,
@@ -475,6 +476,13 @@ const navItems: NavItem[] = [
     label: "Katalog materiálů",
     module: "materialy",
     isActive: (p) => p.startsWith("/materialy"),
+  },
+  {
+    href: "/vykresy",
+    icon: Cuboid,
+    label: "Výkresy",
+    module: "vykresy",
+    isActive: (p) => p.startsWith("/vykresy"),
   },
   { href: "/kiosk", icon: Tv, label: "Kiosk Monitory", module: "kiosk" },
   { href: "/phone-list", icon: Phone, label: "Telefonní seznam", module: null },

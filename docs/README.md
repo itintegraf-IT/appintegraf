@@ -20,6 +20,7 @@ Přehled dokumentace modulů a specifikací projektu.
 | [MODUL_MAJETEK_QR.md](MODUL_MAJETEK_QR.md) | Majetek – plán evidence drobného majetku s QR, místnostmi a inventurou |
 | [MODUL_EVIDENCE_SMLOUV.md](MODUL_EVIDENCE_SMLOUV.md) | Evidence smluv – workflow, přílohy, export, upozornění na platnost |
 | [MODUL_MATERIALY.md](MODUL_MATERIALY.md) | Katalog materiálů – SDS/TDS/certifikáty, kategorie, vazba na IML |
+| [MODUL_VYKRESY.md](MODUL_VYKRESY.md) | Technické výkresy a 3D modely – evidence, upload, číselník strojů |
 | [KALENDAR_SCHVALOVANI_FAZE2.md](KALENDAR_SCHVALOVANI_FAZE2.md) | Specifikace dvoufázového schvalování kalendáře |
 | [AUTH_SPRAVA_HESEL.md](AUTH_SPRAVA_HESEL.md) | Obnova hesla, aktivace, politika, **2FA (TOTP)** |
 | [ADMIN_ZALOHA.md](ADMIN_ZALOHA.md) | Záloha a obnova dat modulů (administrátor) |
@@ -29,6 +30,7 @@ Přehled dokumentace modulů a specifikací projektu.
 | Dokument | Popis |
 |----------|-------|
 | [MODUL_IML.md](MODUL_IML.md) | Kompletní dokumentace – zákazníci, produkty, poptávky, objednávky, reporty |
+| [IML_XML_EXPORT_OBJEDNAVKY.md](IML_XML_EXPORT_OBJEDNAVKY.md) | XML export objednávek – manuál pro vývojáře jiných systémů |
 | [iml_newsec.md](iml_newsec.md) | Technická specifikace rozšíření IML |
 | [IML_NEWSEC_IMPLEMENTATION.md](IML_NEWSEC_IMPLEMENTATION.md) | Implementační plán a checklist fází 1–7 |
 

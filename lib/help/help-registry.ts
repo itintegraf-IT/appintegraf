@@ -18,6 +18,7 @@ import {
   User,
   Settings,
   HelpCircle,
+  Cuboid,
   type LucideIcon,
 } from "lucide-react";
 
@@ -408,6 +409,33 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       "Před smazáním materiálu zkontrolujte vazby na produkty IML.",
     ],
     docs: [{ label: "Kompletní dokumentace modulu", href: "/help/modul-materialy" }],
+  },
+
+  vykresy: {
+    key: "vykresy",
+    module: "vykresy",
+    icon: Cuboid,
+    title: "Technické výkresy",
+    path: "/vykresy",
+    intro:
+      "Evidence CAD výkresů, PDF a 3D modelů s metadaty (oddělení, stroj) a soubory na disku.",
+    features: [
+      "Záznamy s typem: 3D model, CAD, PDF, jiné.",
+      "Vyhledávání podle názvu, typu, oddělení a stroje.",
+      "Upload a stažení souborů (STL, 3MF, STEP, DWG, DXF, PDF, …).",
+      "Číselník strojů pro přiřazení dílu.",
+    ],
+    quickSteps: [
+      "V Administraci přiřaďte uživateli modul Výkresy.",
+      "V Číselníku strojů doplňte názvy strojů.",
+      "Vytvořte záznam a nahrajte soubory v detailu.",
+      "Filtrujte seznam podle metadat.",
+    ],
+    tips: [
+      "Soubory se neukládají do databáze, ale do public/uploads/vykresy/.",
+      "Použitý stroj nelze smazat – pouze deaktivovat.",
+    ],
+    docs: [{ label: "Dokumentace modulu", href: "/help/modul-vykresy" }],
   },
 
   kiosk: {
