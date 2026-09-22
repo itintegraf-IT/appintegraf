@@ -198,7 +198,9 @@ UI: sekce **Dokumenty** na detailu položky (`EquipmentDocumentsPanel`). API: `G
 | Skupiny majetku | `/equipment/settings/categories` | Správce |
 | Přístupy nahlížení | `/equipment/settings/access` | Správce |
 | Místnosti | `/equipment/rooms` | Správce |
-| Tisk štítků místností | `GET …/rooms/[id]/label` | Správce |
+| Tisk štítku místnosti (1×) | `GET …/rooms/[id]/label` | Čtení majetku |
+| Hromadný tisk místností (A4) | `POST …/rooms/labels` `{ ids, layoutKey? }` | Správce |
+| Mřížka A4 (šablony) | `/equipment/settings/labels` · `GET/PUT …/settings/label-grid` | Správce |
 
 Výchozí seed skupin: *Výpočetní a komunikační technika*, *Bílá technika*, *Nářadí*.
 
@@ -220,7 +222,7 @@ Sdílená komponenta: `EquipmentItemForm`.
 
 ### 3. QR kódy a štítky
 
-**Formát štítku:** jedna vizitka **90 × 50 mm** (majetek i místnost). Ne celý A4 jako jeden štítek.
+**Formát štítku:** jedna vizitka (výchozí **90 × 50 mm**) — majetek i místnost. Ne celý A4 jako jeden štítek.
 
 | Typ | Obsah na štítku |
 |-----|-----------------|
@@ -231,8 +233,15 @@ Sdílená komponenta: `EquipmentItemForm`.
 - Formát QR payloadu: `INTEGRAF:EQ:{qr_code}` / `INTEGRAF:RM:{qr_code}`
 - API obrázku: `GET /api/equipment/qr?code=…`
 - **Jednotlivý tisk:** PDF = 1 stránka = 1 vizitka
-- **Hromadný tisk:** více vizitek na A4 (mřížka, např. 2×5 na stránku)
+- **Hromadný tisk:** více štítků na A4 podle mřížky
+  - Výchozí šablona: `visitka_2x5` (2×5 / 90×50 mm)
+  - Alternativa: `compact_3x7` (3×7 / 60×35 mm)
+  - Vlastní mm parametry: `/equipment/settings/labels` (uloženo v `system_settings` klíč `equipment_label_grid`)
+  - Místnosti: checkboxy v `/equipment/rooms` → **Tisk QR (A4)** → `POST /api/equipment/rooms/labels`
+  - Majetek: `POST /api/equipment/labels`; fond QR: `print_batch` — stejná aktivní mřížka
 - Kartička majetku PDF (A4) — samostatný dokument se všemi údaji, **není** náhradou za vizitkový štítek
+
+Implementace: `lib/equipment/label-layout.ts`, `label-grid-settings.ts`, `label-pdf.ts` (`buildRoomLabelsBulkPdf`, …).
 
 #### Předgenerované QR (tisk naprázdno → přiřazení)
 
@@ -430,7 +439,7 @@ Jednotná funkce `transferEquipmentToRoom()` v `lib/equipment/room-transfer.ts`:
 | Schéma | `prisma/schema.prisma` |
 | Přístupová práva | `lib/equipment/access.ts` |
 | Přesuny | `lib/equipment/room-transfer.ts` |
-| QR / štítky | `lib/equipment/qr.ts`, `lib/equipment/label-layout.ts`, `lib/equipment/label-pdf.ts` |
+| QR / štítky | `lib/equipment/qr.ts`, `label-layout.ts`, `label-grid-settings.ts`, `label-pdf.ts` |
 | Fond QR | `lib/equipment/qr-pool.ts`, `app/api/equipment/qr-pool/**`, `equipment/settings/qr-pool/**` |
 | Upload | `lib/equipment/upload.ts` |
 | API | `app/api/equipment/**` |
