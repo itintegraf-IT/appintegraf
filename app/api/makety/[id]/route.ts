@@ -5,8 +5,8 @@ import { prisma } from "@/lib/db";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { userCanViewMaketa, userCanEditMaketa, userCanDeleteMaketa } from "@/lib/makety-access";
 import { revalidateMaketyViews } from "@/lib/makety-revalidate";
-import { notifyMaketaRecipients } from "@/lib/makety-notify";
-import { parseDateTimeLocalInput } from "@/lib/datetime-cz";
+import { notifyGrafikaWorkflowCreated, notifyMaketaRecipients, notifySpravaVzorkuUpravaDat, hasMaketyCreationNotify } from "@/lib/makety-notify";
+import { formatDateTimeLocalForInput, parseDateTimeLocalInput } from "@/lib/datetime-cz";
 import { parseMaketyDataKind } from "@/lib/makety-data-kind";
 import { parseMaketaPriority } from "@/lib/makety-status";
 import { maketyAssigneeRoleLabel, type MaketyWorkType } from "@/lib/makety-work-type";
@@ -176,7 +176,11 @@ export async function PUT(
       if (Number.isNaN(d.getTime())) {
         return NextResponse.json({ error: "Neplatný termín" }, { status: 400 });
       }
-      if (d.getTime() !== new Date(existing.due_at).getTime()) {
+      // Porovnání na minuty — stejná granularita jako datetime-local input.
+      if (
+        formatDateTimeLocalForInput(d) !==
+        formatDateTimeLocalForInput(new Date(existing.due_at))
+      ) {
         dueChanged = true;
       }
       nextDue = d;
@@ -290,7 +294,40 @@ export async function PUT(
       },
     });
 
-    if (dueChanged) {
+    // Kopie: creation notify až při prvním uložení (aktuální čísla). Nové zakázky už mají notify z POST.
+    const alreadyNotified = await hasMaketyCreationNotify(id);
+    if (!alreadyNotified) {
+      if (workType === "grafika") {
+        await notifyGrafikaWorkflowCreated({
+          maketaId: id,
+          bodyPreview: nextBody,
+          orderNumber: nextOrder,
+          assigneeUserId: nextAssignee,
+          prepressUserId: workflowUpdate.prepress_user_id,
+          finalApproverUserId: workflowUpdate.final_approver_user_id,
+          excludeUserId: userId,
+        });
+        if (nextDataKind === "uprava_dat") {
+          await notifySpravaVzorkuUpravaDat({
+            maketaId: id,
+            orderNumber: nextOrder,
+            labelCode: imlUpdate.label_code,
+            productName: imlUpdate.product_name,
+            jobNumber: imlUpdate.job_number,
+            excludeUserId: userId,
+          });
+        }
+      } else {
+        await notifyMaketaRecipients({
+          maketaId: id,
+          bodyPreview: nextBody,
+          orderNumber: nextOrder,
+          kind: "assigned",
+          assigneeUserId: nextAssignee,
+          workType,
+        });
+      }
+    } else if (dueChanged) {
       await notifyMaketaRecipients({
         maketaId: id,
         bodyPreview: nextBody,

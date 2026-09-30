@@ -33,6 +33,18 @@ export type MaketaNotifyKind =
   | "quote_approved"
   | "quote_rejected";
 
+/** True, pokud už existuje creation notifikace (assigned / workflow_assigned) pro danou maketu. */
+export async function hasMaketyCreationNotify(maketaId: number): Promise<boolean> {
+  const row = await prisma.notifications.findFirst({
+    where: {
+      link: `/makety/${maketaId}`,
+      type: { in: ["makety_assigned", "makety_workflow_assigned"] },
+    },
+    select: { id: true },
+  });
+  return row != null;
+}
+
 type UserEmailRow = {
   email: string | null;
   first_name: string;

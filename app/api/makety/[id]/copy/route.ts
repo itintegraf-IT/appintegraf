@@ -3,7 +3,6 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canAccessMaketyModule } from "@/lib/makety-module-access";
 import { userCanCopyMaketa } from "@/lib/makety-access";
-import { notifyGrafikaWorkflowCreated, notifyMaketaRecipients, notifySpravaVzorkuUpravaDat } from "@/lib/makety-notify";
 import { nextQueuePositionForAssignee } from "@/lib/makety-queue";
 import { resolveGrafikaWorkflowAssignees } from "@/lib/makety-workflow-assignees";
 import type { MaketyWorkType } from "@/lib/makety-work-type";
@@ -14,6 +13,7 @@ import type { MaketyWorkType } from "@/lib/makety-work-type";
  * Nekopíruje: termín (due_at → teď+24h), order_number, job_number, soubory, komentáře,
  * status log, nabídku/kalkulaci, product_draft.
  * Stav = výchozí (open / awaiting_quote). Přesměrování na edit nové zakázky řeší UI.
+ * Creation notifikace se neposílají zde — až při prvním uložení editu (aktuální čísla).
  */
 export async function POST(
   _req: NextRequest,
@@ -103,37 +103,6 @@ export async function POST(
         // quote / product_draft / rejection záměrně nekopírujeme
       },
     });
-
-    if (workType === "grafika") {
-      await notifyGrafikaWorkflowCreated({
-        maketaId: created.id,
-        bodyPreview: bodyCopy,
-        orderNumber: null,
-        assigneeUserId: workflow.assignee_user_id,
-        prepressUserId: workflow.prepress_user_id,
-        finalApproverUserId: workflow.final_approver_user_id,
-        excludeUserId: userId,
-      });
-      if (source.data_kind === "uprava_dat") {
-        await notifySpravaVzorkuUpravaDat({
-          maketaId: created.id,
-          orderNumber: null,
-          labelCode: source.label_code,
-          productName: source.product_name,
-          jobNumber: null,
-          excludeUserId: userId,
-        });
-      }
-    } else {
-      await notifyMaketaRecipients({
-        maketaId: created.id,
-        bodyPreview: bodyCopy,
-        orderNumber: null,
-        kind: "assigned",
-        assigneeUserId: workflow.assignee_user_id,
-        workType,
-      });
-    }
 
     return NextResponse.json({ success: true, id: created.id });
   } catch (e) {

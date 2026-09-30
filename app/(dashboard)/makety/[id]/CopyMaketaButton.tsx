@@ -15,9 +15,10 @@ export function CopyMaketaButton({ id, variant = "button" }: Props) {
   const [loading, setLoading] = useState(false);
 
   const onCopy = async () => {
+    if (loading) return;
     if (
       !confirm(
-        "Vytvořit kopii? Zkopírují se popis a metadata (kód etikety, typ dat, priorita, zákazník…). Termín a čísla zakázky vyplníte znovu. Soubory a komentáře se nezkopírují."
+        "Vytvořit kopii? Zkopírují se popis a metadata (kód etikety, typ dat, priorita, zákazník…). Termín a čísla zakázky vyplníte znovu. Soubory a komentáře se nezkopírují. Notifikace odejdou až po uložení editu."
       )
     ) {
       return;
