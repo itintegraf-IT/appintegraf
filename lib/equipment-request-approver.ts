@@ -4,28 +4,6 @@ import { getDepartmentMembers } from "@/lib/equipment-departments";
 
 const VEDENI_DEPARTMENT = "Vedení";
 
-/** Ověří, že uživatel je aktivní člen oddělení Vedení (primární nebo sekundární). */
-export async function isVedeniApprover(userId: number): Promise<boolean> {
-  const vedeni = await prisma.departments.findFirst({
-    where: { name: VEDENI_DEPARTMENT, is_active: true },
-    select: { id: true },
-  });
-  if (!vedeni) return false;
-
-  const approverOk = await prisma.users.findFirst({
-    where: {
-      id: userId,
-      is_active: true,
-      OR: [
-        { department_id: vedeni.id },
-        { user_secondary_departments: { some: { department_id: vedeni.id } } },
-      ],
-    },
-    select: { id: true },
-  });
-  return !!approverOk;
-}
-
 /** Vrátí chybovou hlášku, pokud schvalovatel není platný; jinak null. */
 export async function validateVedeniApprover(
   approvalTo: number

@@ -2,24 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { isInDepartment } from "@/lib/equipment-departments";
 import { sendEquipmentRequestResultEmail } from "@/lib/email";
 import { dismissNotificationsForLink } from "@/lib/notifications-dismiss";
 import { userAllowsEmailNotification } from "@/lib/user-email-notifications-db";
-
-async function isInDepartment(userId: number, departmentName: string): Promise<boolean> {
-  const dept = await prisma.departments.findFirst({
-    where: { name: departmentName, is_active: true },
-  });
-  if (!dept) return false;
-  const inMain = await prisma.users.findFirst({
-    where: { id: userId, department_id: dept.id },
-  });
-  if (inMain) return true;
-  const inSecondary = await prisma.user_secondary_departments.findFirst({
-    where: { user_id: userId, department_id: dept.id },
-  });
-  return !!inSecondary;
-}
 
 /** PATCH – Vedení schválí nebo zamítne požadavek */
 export async function PATCH(
