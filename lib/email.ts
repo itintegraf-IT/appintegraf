@@ -207,7 +207,8 @@ function escHtml(s: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /**
@@ -424,10 +425,10 @@ export async function sendEquipmentRequestResultEmail(
       : "#16a34a";
 
   const itBlock = params.itResponse
-    ? `<p><strong>Stanovisko IT:</strong><br>${String(params.itResponse).replace(/\n/g, "<br>")}</p>`
+    ? `<p><strong>Stanovisko IT:</strong><br>${escHtml(String(params.itResponse)).replace(/\n/g, "<br>")}</p>`
     : "";
   const adminBlock = params.adminResponse
-    ? `<p><strong>Stanovisko vedení:</strong><br>${String(params.adminResponse).replace(/\n/g, "<br>")}</p>`
+    ? `<p><strong>Stanovisko vedení:</strong><br>${escHtml(String(params.adminResponse)).replace(/\n/g, "<br>")}</p>`
     : "";
 
   const subject = `Požadavek na techniku #${params.requestId} – ${resultText}`;
@@ -436,8 +437,8 @@ export async function sendEquipmentRequestResultEmail(
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
-  <p>Dobrý den, ${params.toName},</p>
-  <p>Váš požadavek <strong>#${params.requestId}</strong> na <strong>${params.equipmentType}</strong> byl
+  <p>Dobrý den, ${escHtml(params.toName)},</p>
+  <p>Váš požadavek <strong>#${params.requestId}</strong> na <strong>${escHtml(params.equipmentType)}</strong> byl
     <strong style="color: ${color};">${resultText}</strong>.</p>
   ${itBlock}
   ${adminBlock}
@@ -517,10 +518,10 @@ export async function sendEquipmentMovementEmail(
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
-  <p>Dobrý den, ${params.toName},</p>
-  <p>${params.intro}</p>
-  <p><a href="${link}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">${label}</a></p>
-  <p style="color: #666; font-size: 12px;">Pokud tlačítko nefunguje, zkopírujte odkaz: ${link}</p>
+  <p>Dobrý den, ${escHtml(params.toName)},</p>
+  <p>${escHtml(params.intro)}</p>
+  <p><a href="${escHtml(link)}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">${escHtml(label)}</a></p>
+  <p style="color: #666; font-size: 12px;">Pokud tlačítko nefunguje, zkopírujte odkaz: ${escHtml(link)}</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
   <p style="color: #999; font-size: 11px;">Tento e-mail byl odeslán automaticky z aplikace INTEGRAF.</p>
 </body>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { PUBLIC_REQUEST_HONEYPOT_FIELD } from "@/lib/equipment/public-request-validation";
 
 export function PublicEquipmentRequestForm({ showInternalLink = false }: { showInternalLink?: boolean }) {
   const [loading, setLoading] = useState(false);
@@ -18,8 +19,9 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
     priority: "st_edn_",
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const trap = new FormData(e.currentTarget).get(PUBLIC_REQUEST_HONEYPOT_FIELD);
     setError("");
     setSuccess("");
     setLoading(true);
@@ -28,7 +30,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
       const res = await fetch("/api/public/equipment-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, [PUBLIC_REQUEST_HONEYPOT_FIELD]: typeof trap === "string" ? trap : "" }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -72,6 +74,16 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
         onSubmit={handleSubmit}
         className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
       >
+        {/* Past na roboty: člověk pole nevidí ani nevyplní. */}
+        <input
+          type="text"
+          name={PUBLIC_REQUEST_HONEYPOT_FIELD}
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          className="hidden"
+          defaultValue=""
+        />
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
