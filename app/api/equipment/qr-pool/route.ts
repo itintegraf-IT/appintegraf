@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canAdministerEquipment } from "@/lib/equipment/access";
-import { generateQrPoolBatch, voidQrPoolCode, assignQrFromPool } from "@/lib/equipment/qr-pool";
+import { voidQrPoolCode, assignQrFromPool } from "@/lib/equipment/qr-pool";
 import { buildPoolLabelsBulkPdf } from "@/lib/equipment/label-pdf";
 
 export async function GET(req: NextRequest) {
@@ -55,13 +55,12 @@ export async function POST(req: NextRequest) {
   const action = String(body.action ?? "generate");
 
   if (action === "generate") {
-    const count = parseInt(String(body.count ?? "10"), 10);
-    const result = await generateQrPoolBatch({
-      count,
-      userId,
-      notes: body.notes ? String(body.notes) : null,
-    });
-    return NextResponse.json(result, { status: 201 });
+    // Fond by předtiskl náhodná čísla EQ-…; nová čísla se přidělují z řady 100xxx.
+    // Generování se vrátí spolu s novými štítky (vlna 2).
+    return NextResponse.json(
+      { error: "Generování fondu QR je dočasně vypnuté — zavede se s novými štítky a číselnou řadou." },
+      { status: 409 }
+    );
   }
 
   if (action === "assign") {
