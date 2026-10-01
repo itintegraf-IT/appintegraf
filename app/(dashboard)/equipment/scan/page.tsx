@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
@@ -16,10 +17,12 @@ type LookupResult = {
   code?: string;
   status?: string;
   asset_tag?: string;
+  qr_code?: string;
 };
 type PendingItem = { id: number; name: string; assetTag: string | null };
 
 export default function EquipmentScanClient() {
+  const router = useRouter();
   const [mode, setMode] = useState<"place" | "assign">("place");
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [manual, setManual] = useState("");
@@ -153,30 +156,10 @@ export default function EquipmentScanClient() {
 
       if (currentMode === "assign") {
         if (data.type === "qr_pool" && data.status === "available") {
-          const name = window.prompt("Název nové položky majetku:");
-          if (!name) return;
-          const catRes = await fetch("/api/equipment/categories");
-          const cats = await catRes.json();
-          const catId = Array.isArray(cats) && cats[0] ? cats[0].id : null;
-          if (!catId) {
-            setError("Nejdřív vytvořte skupinu majetku");
-            return;
-          }
-          const createRes = await fetch("/api/equipment", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name,
-              category_id: catId,
-              pool_qr_code: data.asset_tag ?? code,
-            }),
-          });
-          const created = await createRes.json().catch(() => ({}));
-          if (!createRes.ok) {
-            setError(created.error ?? "Chyba vytvoření");
-            return;
-          }
-          push(`Vytvořeno #${created.id} s QR ${data.asset_tag}`);
+          // Zařazení s povinnými údaji nákupu (cena, datum, doklad) jen přes formulář.
+          const params = new URLSearchParams({ pool: String(data.qr_code ?? code) });
+          if (roomRef.current) params.set("room", String(roomRef.current.id));
+          router.push(`/equipment/add?${params.toString()}`);
           return;
         }
         setError("Naskenujte volný QR z fondu");
