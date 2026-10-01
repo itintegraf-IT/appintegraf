@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { canReadEquipment, canWriteEquipment } from "@/lib/equipment/access";
+import { canAdministerEquipment, canReadEquipment, canWriteEquipment } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
+import { summarizeInventoryLines } from "@/lib/equipment/inventory-rules";
 import { resolveScanCode } from "@/lib/equipment/scan-resolve";
 
 export async function GET(
@@ -19,6 +20,9 @@ export async function GET(
   }
 
   const id = parseInt((await params).id, 10);
+  if (Number.isNaN(id)) {
+    return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
+  }
   const inv = await prisma.equipment_inventories.findUnique({
     where: { id },
     include: {
@@ -57,8 +61,14 @@ export async function POST(
   }
   const userId = parseInt(session.user.id, 10);
   const id = parseInt((await params).id, 10);
+  if (Number.isNaN(id)) {
+    return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
+  }
   const body = await req.json().catch(() => ({}));
-  const action = String(body.action ?? "scan");
+  const action = body.action == null ? "scan" : String(body.action);
+  if (action !== "scan" && action !== "complete") {
+    return NextResponse.json({ error: "Neznámá akce" }, { status: 400 });
+  }
 
   const inv = await prisma.equipment_inventories.findUnique({ where: { id } });
   if (!inv) return NextResponse.json({ error: "Nenalezeno" }, { status: 404 });
@@ -67,20 +77,34 @@ export async function POST(
   }
 
   if (action === "complete") {
-    if (!(await canWriteEquipment(userId))) {
-      return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
+    if (inv.created_by !== userId && !(await canAdministerEquipment(userId))) {
+      return NextResponse.json(
+        { error: "Inventuru může uzavřít ten, kdo ji založil, nebo správce majetku." },
+        { status: 403 }
+      );
     }
-    await prisma.equipment_inventories.update({
-      where: { id },
+    const lines = await prisma.equipment_inventory_lines.findMany({
+      where: { inventory_id: id },
+      select: { line_status: true },
+    });
+    const summary = summarizeInventoryLines(lines);
+    // Podmíněná změna: dvě souběžná uzavření neprojdou obě.
+    const closed = await prisma.equipment_inventories.updateMany({
+      where: { id, status: "in_progress" },
       data: { status: "completed", completed_at: new Date(), updated_at: new Date() },
     });
+    if (closed.count !== 1) {
+      return NextResponse.json({ error: "Inventura je uzavřená" }, { status: 400 });
+    }
     await logEquipmentAuditSafe({
       userId,
       action: "inventory_complete",
       tableName: "equipment_inventories",
       recordId: id,
+      oldValues: { status: inv.status },
+      detail: { status: "completed", ...summary },
     });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, summary });
   }
 
   // scan
@@ -142,6 +166,15 @@ export async function POST(
     });
     lineStatus = "extra";
   }
+
+  await logEquipmentAuditSafe({
+    userId,
+    action: "inventory_scan",
+    tableName: "equipment_inventory_lines",
+    recordId: id,
+    oldValues: { equipmentId: item.id, line_status: line?.line_status ?? null },
+    detail: { equipmentId: item.id, line_status: lineStatus },
+  });
 
   return NextResponse.json({
     ok: true,
