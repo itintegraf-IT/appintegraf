@@ -7,8 +7,10 @@ describe("testMailMode", () => {
     [{ APP_ENV: "production" }, "off"],
     [{ APP_ENV: "test" }, "block"],
     [{ APP_ENV: "test", EMAIL_REDIRECT_TO: "   " }, "block"],
-    [{ APP_ENV: "test", EMAIL_REDIRECT_TO: "test@integraf.cz" }, "redirect"],
-    [{ EMAIL_REDIRECT_TO: "vyvoj@integraf.cz" }, "redirect"],
+    [{ APP_ENV: "test", EMAIL_REDIRECT_TO: "test@example.com" }, "redirect"],
+    [{ EMAIL_REDIRECT_TO: "vyvoj@example.com" }, "redirect"],
+    [{ APP_ENV: " Test " }, "block"],
+    [{ APP_ENV: "TEST", EMAIL_REDIRECT_TO: "test@example.com" }, "redirect"],
   ] as const)("%j → %s", (env, mode) => {
     expect(testMailMode(env)).toBe(mode);
   });
@@ -17,14 +19,14 @@ describe("testMailMode", () => {
 describe("applyTestRedirect", () => {
   it("pošle e-mail jen na testovací schránku a odstraní kopie", () => {
     const data: Record<string, unknown> = {
-      to: "jan.novak@integraf.cz",
-      cc: ["ucetni@integraf.cz"],
-      bcc: { name: "Archiv", address: "archiv@integraf.cz" },
+      to: "jan.novak@example.com",
+      cc: ["ucetni@example.com"],
+      bcc: { name: "Archiv", address: "archiv@example.com" },
       subject: "Byl vám přidělen majetek",
       text: "Dobrý den",
     };
-    applyTestRedirect(data, "test@integraf.cz");
-    expect(data.to).toBe("test@integraf.cz");
+    applyTestRedirect(data, "test@example.com");
+    expect(data.to).toBe("test@example.com");
     expect(data.cc).toBeUndefined();
     expect(data.bcc).toBeUndefined();
     expect(data.subject).toBe("[TEST] Byl vám přidělen majetek");
@@ -32,32 +34,32 @@ describe("applyTestRedirect", () => {
 
   it("do textu zapíše původní příjemce včetně kopií", () => {
     const data: Record<string, unknown> = {
-      to: ["a@integraf.cz", { name: "Bára", address: "b@integraf.cz" }],
-      cc: "c@integraf.cz",
+      to: ["a@example.com", { name: "Bára", address: "b@example.com" }],
+      cc: "c@example.com",
       subject: "X",
       text: "Obsah",
     };
-    applyTestRedirect(data, "test@integraf.cz");
+    applyTestRedirect(data, "test@example.com");
     const text = String(data.text);
-    expect(text).toContain("a@integraf.cz");
-    expect(text).toContain("b@integraf.cz");
-    expect(text).toContain("c@integraf.cz");
+    expect(text).toContain("a@example.com");
+    expect(text).toContain("b@example.com");
+    expect(text).toContain("c@example.com");
     expect(text.endsWith("Obsah")).toBe(true);
   });
 
   it("předmět neoznačí [TEST] dvakrát", () => {
-    const data: Record<string, unknown> = { to: "a@integraf.cz", subject: "[TEST] Už označeno" };
-    applyTestRedirect(data, "test@integraf.cz");
+    const data: Record<string, unknown> = { to: "a@example.com", subject: "[TEST] Už označeno" };
+    applyTestRedirect(data, "test@example.com");
     expect(data.subject).toBe("[TEST] Už označeno");
   });
 
   it("v HTML vloží upozornění hned za <body> a adresy escapuje", () => {
     const data: Record<string, unknown> = {
-      to: '"Jan <script>" <jan@integraf.cz>',
+      to: '"Jan <script>" <jan@example.com>',
       subject: "X",
       html: '<html><body style="x"><p>Obsah</p></body></html>',
     };
-    applyTestRedirect(data, "test@integraf.cz");
+    applyTestRedirect(data, "test@example.com");
     const html = String(data.html);
     expect(html.indexOf("[TEST]")).toBeGreaterThan(html.indexOf("<body"));
     expect(html.indexOf("[TEST]")).toBeLessThan(html.indexOf("<p>Obsah</p>"));
@@ -66,9 +68,36 @@ describe("applyTestRedirect", () => {
   });
 
   it("HTML bez <body> dostane upozornění na začátek", () => {
-    const data: Record<string, unknown> = { to: "a@integraf.cz", subject: "X", html: "<p>Obsah</p>" };
-    applyTestRedirect(data, "test@integraf.cz");
+    const data: Record<string, unknown> = { to: "a@example.com", subject: "X", html: "<p>Obsah</p>" };
+    applyTestRedirect(data, "test@example.com");
     expect(String(data.html).startsWith("<p")).toBe(true);
     expect(String(data.html).indexOf("[TEST]")).toBeLessThan(String(data.html).indexOf("Obsah"));
+  });
+});
+
+describe("applyTestRedirect — žádná cesta ke skutečným příjemcům", () => {
+  it("odstraní explicitní envelope a hlavičky To/Cc/Bcc (v libovolné velikosti písmen)", () => {
+    const data: Record<string, unknown> = {
+      to: "a@example.com",
+      envelope: { from: "s@example.com", to: ["real@example.com"] },
+      headers: { Cc: "real2@example.com", BCC: "real3@example.com", to: "real4@example.com", "X-Priority": "1" },
+      subject: "S",
+    };
+    applyTestRedirect(data, "test@example.com");
+    expect(data.envelope).toBeUndefined();
+    expect(data.headers).toEqual({ "X-Priority": "1" });
+  });
+
+  it("hlavičky zadané jako pole vyčistí stejně", () => {
+    const data: Record<string, unknown> = {
+      to: "a@example.com",
+      headers: [{ key: "cc", value: "real@example.com" }, { key: "X-A", value: "1" }],
+    };
+    applyTestRedirect(data, "test@example.com");
+    expect(data.headers).toEqual([{ key: "X-A", value: "1" }]);
+  });
+
+  it("hotovou (raw) zprávu odmítne — nejde bezpečně přesměrovat", () => {
+    expect(() => applyTestRedirect({ raw: "To: real@example.com\r\n\r\nAhoj" } as never, "test@example.com")).toThrow();
   });
 });

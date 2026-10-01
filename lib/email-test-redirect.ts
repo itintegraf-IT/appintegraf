@@ -11,7 +11,7 @@ export type TestMailMode = "off" | "redirect" | "block";
 
 export function testMailMode(env: MailPolicyEnv): TestMailMode {
   if (env.EMAIL_REDIRECT_TO?.trim()) return "redirect";
-  return env.APP_ENV === "test" ? "block" : "off";
+  return env.APP_ENV?.trim().toLowerCase() === "test" ? "block" : "off";
 }
 
 type MailData = {
@@ -21,7 +21,25 @@ type MailData = {
   subject?: string;
   text?: unknown;
   html?: unknown;
+  envelope?: unknown;
+  headers?: unknown;
+  raw?: unknown;
 };
+
+/** Hlavičky, přes které by zpráva mohla odejít skutečným příjemcům. */
+const RECIPIENT_HEADERS = new Set(["to", "cc", "bcc"]);
+
+function stripRecipientHeaders(headers: unknown): unknown {
+  if (Array.isArray(headers)) {
+    return headers.filter(
+      (h) => !(h && typeof h === "object" && RECIPIENT_HEADERS.has(String((h as { key?: unknown }).key).toLowerCase()))
+    );
+  }
+  if (headers && typeof headers === "object") {
+    return Object.fromEntries(Object.entries(headers).filter(([key]) => !RECIPIENT_HEADERS.has(key.toLowerCase())));
+  }
+  return headers;
+}
 
 function addresses(value: unknown): string[] {
   if (value == null) return [];
@@ -45,6 +63,13 @@ function escapeHtml(text: string): string {
 
 /** Přepíše zprávu (na místě) tak, aby došla jen na `redirectTo`. */
 export function applyTestRedirect(data: MailData, redirectTo: string): void {
+  if (data.raw != null) {
+    // Hotová zpráva má příjemce uvnitř, nejde ji bezpečně přepsat.
+    throw new Error("E-mail neodeslán: hotovou (raw) zprávu nelze v testu přesměrovat.");
+  }
+  delete data.envelope;
+  if (data.headers != null) data.headers = stripRecipientHeaders(data.headers);
+
   const original = [
     ...addresses(data.to),
     ...addresses(data.cc).map((a) => `${a} (kopie)`),
