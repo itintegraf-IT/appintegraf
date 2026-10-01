@@ -181,7 +181,7 @@ export function AddEquipmentForm({ canSetManualTag, initialPoolCode, initialRoom
                 categoryName={selectedCategory.name}
                 currentUserId={selectedCategory.responsible_user_id ?? null}
                 currentPerson={selectedCategory.users_responsible ?? null}
-                canEdit
+                canEdit={false}
               />
             </div>
           ) : null}

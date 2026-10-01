@@ -313,7 +313,7 @@ export default async function EquipmentViewPage({
               categoryName={item.equipment_categories.name}
               currentUserId={item.equipment_categories.responsible_user_id}
               currentPerson={item.equipment_categories.users_responsible}
-              canEdit={canWrite}
+              canEdit={canAdmin}
             />
           </div>
         </div>
