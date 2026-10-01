@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
 import {
-  EQUIPMENT_ITEM_STATUS,
-  isEquipmentItemStatus,
-} from "@/lib/equipment-status";
-import {
+  canManageRegister,
   canReadEquipment,
   canWriteEquipment,
   getAccessibleCategoryIds,
 } from "@/lib/equipment/access";
 import {
-  generateUniqueAssetTag,
-  generateUniqueEqQrCode,
-} from "@/lib/equipment/qr";
+  allocateAssetTags,
+  AssetNumberingNotConfiguredError,
+  isRetryableAllocationError,
+  uniqueConstraintIndex,
+} from "@/lib/equipment/asset-number";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
+import { validateNewItemInput } from "@/lib/equipment/new-item-validation";
+import { generateUniqueEqQrCode } from "@/lib/equipment/qr";
+import { claimPoolCodeForNewItem, PoolCodeError } from "@/lib/equipment/qr-pool";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -100,247 +103,176 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ equipment: items });
 }
 
+/** Inventární číslo zadané ručně už existuje (v evidenci nebo ve fondu QR). */
+class ManualTagTakenError extends Error {}
+
+/** Zařazení nové položky (nákup drobného majetku). Viz lib/equipment/new-item-validation.ts. */
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
-
   const userId = parseInt(session.user.id, 10);
 
+  const body: unknown = await req.json().catch(() => null);
+  const validated = validateNewItemInput(body, {
+    canSetManualTag: await canManageRegister(userId),
+    today: new Date(),
+  });
+  if (!validated.ok) {
+    return NextResponse.json({ error: validated.error }, { status: 400 });
+  }
+  const d = validated.data;
+
+  if (!(await canWriteEquipment(userId, d.categoryId))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
+  }
+
   try {
-    const body = await req.json();
-    const {
-      name,
-      brand = "",
-      model = "",
-      serial_number = "",
-      description = "",
-      category_id,
-      purchase_date = null,
-      purchase_price = null,
-      supplier = "",
-      invoice_number = "",
-      status = "skladem",
-      location = "",
-      notes = "",
-      room_id = null,
-      warranty_until = null,
-      last_service_at = null,
-      pool_qr_code = null,
-      serial_numbers: serialNumbersRaw,
-    } = body;
-
-    if (!name || !category_id) {
-      return NextResponse.json({ error: "Vyplňte název a kategorii" }, { status: 400 });
+    const category = await prisma.equipment_categories.findUnique({
+      where: { id: d.categoryId },
+      select: { is_active: true },
+    });
+    if (!category || category.is_active === false) {
+      return NextResponse.json({ error: "Vybraná skupina neexistuje nebo není aktivní." }, { status: 400 });
     }
-
-    const catId = parseInt(String(category_id), 10);
-    if (!(await canWriteEquipment(userId, catId))) {
-      return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
-    }
-
-    let roomId: number | null = null;
-    let locationText = location ? String(location).trim() : null;
-    if (room_id != null && room_id !== "") {
-      roomId = parseInt(String(room_id), 10);
-      const room = await prisma.equipment_rooms.findUnique({ where: { id: roomId } });
-      if (room) locationText = `${room.code} – ${room.name}`;
-    }
-
-    const itemStatus = isEquipmentItemStatus(String(status))
-      ? status
-      : EQUIPMENT_ITEM_STATUS.SKLADEM;
-
-    const shared = {
-      name: String(name).trim(),
-      brand: brand ? String(brand).trim() : null,
-      model: model ? String(model).trim() : null,
-      description: description ? String(description).trim() : null,
-      category_id: catId,
-      purchase_date: purchase_date ? new Date(purchase_date) : null,
-      purchase_price:
-        purchase_price != null && purchase_price !== ""
-          ? parseFloat(String(purchase_price))
-          : null,
-      supplier: supplier ? String(supplier).trim() : null,
-      invoice_number: invoice_number ? String(invoice_number).trim() : null,
-      status: itemStatus,
-      location: locationText,
-      room_id: roomId,
-      warranty_until: warranty_until ? new Date(warranty_until) : null,
-      last_service_at: last_service_at ? new Date(last_service_at) : null,
-      notes: notes ? String(notes).trim() : null,
-    };
-
-    /** Hromadné založení: pole serial_numbers (každý kus = jedno SN). */
-    const bulkSerials: string[] | null = Array.isArray(serialNumbersRaw)
-      ? serialNumbersRaw.map((s: unknown) => String(s ?? "").trim()).filter(Boolean)
-      : null;
-
-    if (bulkSerials && bulkSerials.length > 1) {
-      if (bulkSerials.length > 50) {
-        return NextResponse.json(
-          { error: "Najednou lze založit maximálně 50 kusů" },
-          { status: 400 }
-        );
+    if (d.roomId != null) {
+      const room = await prisma.equipment_rooms.findUnique({
+        where: { id: d.roomId },
+        select: { is_active: true },
+      });
+      if (!room || !room.is_active) {
+        return NextResponse.json({ error: "Vybraná místnost neexistuje nebo není aktivní." }, { status: 400 });
       }
-
-      const uniqueCheck = new Set(bulkSerials.map((s) => s.toLowerCase()));
-      if (uniqueCheck.size !== bulkSerials.length) {
-        return NextResponse.json(
-          { error: "Sériová čísla musí být unikátní (duplicita ve formuláři)" },
-          { status: 400 }
-        );
-      }
-
-      const existingSn = await prisma.equipment_items.findMany({
-        where: { serial_number: { in: bulkSerials } },
+    }
+    const serials = d.serialNumbers.filter((sn): sn is string => sn !== null);
+    if (serials.length > 0) {
+      const taken = await prisma.equipment_items.findMany({
+        where: { serial_number: { in: serials } },
         select: { serial_number: true },
       });
-      if (existingSn.length > 0) {
-        const taken = existingSn.map((e) => e.serial_number).filter(Boolean).join(", ");
+      if (taken.length > 0) {
         return NextResponse.json(
-          { error: `Sériové číslo už existuje: ${taken}` },
-          { status: 400 }
-        );
-      }
-
-      const rows: Array<{
-        serial_number: string;
-        asset_tag: string;
-        qr_code: string;
-      }> = [];
-      for (const sn of bulkSerials) {
-        rows.push({
-          serial_number: sn,
-          asset_tag: await generateUniqueAssetTag(),
-          qr_code: await generateUniqueEqQrCode(),
-        });
-      }
-
-      await prisma.equipment_items.createMany({
-        data: rows.map((r) => ({
-          ...shared,
-          serial_number: r.serial_number,
-          asset_tag: r.asset_tag,
-          qr_code: r.qr_code,
-        })),
-      });
-
-      const created = await prisma.equipment_items.findMany({
-        where: { serial_number: { in: bulkSerials } },
-        select: { id: true, serial_number: true },
-        orderBy: { id: "asc" },
-      });
-      const bySn = new Map(created.map((c) => [c.serial_number, c.id]));
-      const createdIds = bulkSerials
-        .map((sn) => bySn.get(sn))
-        .filter((id): id is number => typeof id === "number");
-
-      for (const id of createdIds) {
-        await logEquipmentAuditSafe({
-          userId,
-          action: "item_create",
-          tableName: "equipment_items",
-          recordId: id,
-          detail: { bulk: true, count: createdIds.length },
-        });
-      }
-
-      return NextResponse.json({
-        success: true,
-        id: createdIds[0],
-        ids: createdIds,
-        count: createdIds.length,
-      });
-    }
-
-    const singleSn =
-      bulkSerials && bulkSerials.length === 1
-        ? bulkSerials[0]
-        : serial_number
-          ? String(serial_number).trim()
-          : null;
-
-    if (singleSn) {
-      const clash = await prisma.equipment_items.findFirst({
-        where: { serial_number: singleSn },
-        select: { id: true },
-      });
-      if (clash) {
-        return NextResponse.json(
-          { error: `Sériové číslo už existuje: ${singleSn}` },
+          { error: `Sériové číslo už existuje: ${taken.map((t) => t.serial_number).join(", ")}` },
           { status: 400 }
         );
       }
     }
 
-    let asset_tag = await generateUniqueAssetTag();
-    let qr_code = await generateUniqueEqQrCode();
-    let usePool = false;
+    // QR kódy předem, mimo transakci (unikátnost hlídá index v DB).
+    const qrCodes: string[] = [];
+    if (!d.poolCode) {
+      for (let i = 0; i < d.unitCount; i++) qrCodes.push(await generateUniqueEqQrCode());
+    }
 
-    if (pool_qr_code) {
-      const pool = await prisma.equipment_qr_pool.findFirst({
-        where: {
-          OR: [
-            { qr_code: String(pool_qr_code).trim() },
-            { asset_tag: String(pool_qr_code).trim() },
-          ],
-          status: "available",
-        },
-      });
-      if (pool) {
-        asset_tag = pool.asset_tag;
-        qr_code = pool.qr_code;
-        usePool = true;
+    const shared = {
+      name: d.name,
+      brand: d.brand,
+      model: d.model,
+      description: d.description,
+      category_id: d.categoryId,
+      purchase_date: d.purchaseDate,
+      purchase_price: d.purchasePrice,
+      supplier: d.supplier,
+      invoice_number: d.invoiceNumber,
+      // Stav mění jen akce (přiřazení, servis, vyřazení); nová položka je vždy skladem.
+      status: EQUIPMENT_ITEM_STATUS.SKLADEM,
+      room_id: d.roomId,
+      warranty_until: d.warrantyUntil,
+      notes: d.notes,
+    };
+
+    let created: { id: number; asset_tag: string | null; qr_code: string | null; serial_number: string | null }[] = [];
+    for (let attempt = 1; ; attempt++) {
+      try {
+        created = await prisma.$transaction(
+          async (tx) => {
+            let tags: string[];
+            let codes = qrCodes;
+            let poolId: number | null = null;
+            if (d.poolCode) {
+              const claim = await claimPoolCodeForNewItem(tx, d.poolCode, userId);
+              tags = [claim.asset_tag];
+              codes = [claim.qr_code];
+              poolId = claim.poolId;
+            } else if (d.manualAssetTag) {
+              const clash =
+                (await tx.equipment_items.count({ where: { asset_tag: d.manualAssetTag } })) +
+                (await tx.equipment_qr_pool.count({ where: { asset_tag: d.manualAssetTag } }));
+              if (clash > 0) throw new ManualTagTakenError(`Inventární číslo ${d.manualAssetTag} už existuje.`);
+              tags = [d.manualAssetTag];
+            } else {
+              // Musí být prvním příkazem transakce (zámek řady).
+              tags = await allocateAssetTags(tx, d.unitCount);
+            }
+
+            const rows = [];
+            for (let i = 0; i < d.unitCount; i++) {
+              rows.push(
+                await tx.equipment_items.create({
+                  data: { ...shared, serial_number: d.serialNumbers[i], asset_tag: tags[i], qr_code: codes[i] },
+                  select: { id: true, asset_tag: true, qr_code: true, serial_number: true },
+                })
+              );
+            }
+            if (poolId != null) {
+              await tx.equipment_qr_pool.update({ where: { id: poolId }, data: { equipment_id: rows[0].id } });
+            }
+            return rows;
+          },
+          { maxWait: 5000, timeout: 20000 }
+        );
+        break;
+      } catch (e) {
+        if (attempt < 5 && isRetryableAllocationError(e)) continue;
+        throw e;
       }
     }
 
-    const item = await prisma.equipment_items.create({
-      data: {
-        ...shared,
-        serial_number: singleSn,
-        asset_tag,
-        qr_code,
-      },
-    });
-
-    if (usePool && pool_qr_code) {
-      await prisma.equipment_qr_pool.updateMany({
-        where: {
-          OR: [
-            { qr_code: String(pool_qr_code).trim() },
-            { asset_tag: String(pool_qr_code).trim() },
-          ],
-          status: "available",
-        },
-        data: {
-          status: "assigned",
-          equipment_id: item.id,
-          assigned_at: new Date(),
-          assigned_by: userId,
+    for (const row of created) {
+      await logEquipmentAuditSafe({
+        userId,
+        action: "item_create",
+        tableName: "equipment_items",
+        recordId: row.id,
+        detail: {
+          name: d.name,
+          category_id: d.categoryId,
+          purchase_date: d.purchaseDate.toISOString().slice(0, 10),
+          purchase_price: d.purchasePrice,
+          invoice_number: d.invoiceNumber,
+          supplier: d.supplier,
+          room_id: d.roomId,
+          asset_tag: row.asset_tag,
+          qr_code: row.qr_code,
+          serial_number: row.serial_number,
+          numbering: d.poolCode ? "pool" : d.manualAssetTag ? "manual" : "series",
         },
       });
     }
 
-    await logEquipmentAuditSafe({
-      userId,
-      action: "item_create",
-      tableName: "equipment_items",
-      recordId: item.id,
+    return NextResponse.json({
+      success: true,
+      id: created[0].id,
+      ids: created.map((r) => r.id),
+      count: created.length,
+      asset_tags: created.map((r) => r.asset_tag),
+      warnings: validated.warnings,
     });
-
-    return NextResponse.json({ success: true, id: item.id, ids: [item.id], count: 1 });
   } catch (e) {
-    console.error("Equipment POST error:", e);
-    const msg = e instanceof Error ? e.message : "";
-    if (msg.includes("Unique constraint") || msg.includes("serial_number")) {
+    if (e instanceof AssetNumberingNotConfiguredError) {
       return NextResponse.json(
-        { error: "Sériové číslo nebo inventární kód už existuje" },
-        { status: 400 }
+        { error: "Číselná řada inventárních čísel není nastavená. Nastavte ji v Nastavení → Inventární čísla." },
+        { status: 409 }
       );
     }
+    if (e instanceof PoolCodeError || e instanceof ManualTagTakenError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    if (uniqueConstraintIndex(e) === "serial_number") {
+      return NextResponse.json({ error: "Sériové číslo už existuje." }, { status: 400 });
+    }
+    console.error("Equipment POST error:", e);
     return NextResponse.json({ error: "Chyba při vytváření vybavení" }, { status: 500 });
   }
 }

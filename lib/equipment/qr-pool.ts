@@ -1,7 +1,38 @@
 import { randomUUID } from "crypto";
-import { prisma } from "@/lib/db";
+import { prisma, type PrismaTransactionClient } from "@/lib/db";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
-import { generateUniqueAssetTag, generateUniqueEqQrCode } from "@/lib/equipment/qr";
+import { generateUniqueAssetTag, generateUniqueEqQrCode, parseEquipmentScanCode } from "@/lib/equipment/qr";
+
+/** Kód z fondu nejde použít (neexistuje, už je přiřazený nebo znehodnocený) — hláška pro uživatele. */
+export class PoolCodeError extends Error {}
+
+/**
+ * Převezme volný kód z fondu pro nově zakládanou položku (uvnitř transakce).
+ * Podmíněný update zajistí, že kód nepřevezmou dva požadavky najednou.
+ * `equipment_id` doplní volající po vytvoření položky.
+ */
+export async function claimPoolCodeForNewItem(
+  tx: PrismaTransactionClient,
+  raw: string,
+  userId: number
+): Promise<{ qr_code: string; asset_tag: string; poolId: number }> {
+  const code = parseEquipmentScanCode(raw).code || raw.trim();
+  const pool = await tx.equipment_qr_pool.findFirst({
+    where: { OR: [{ qr_code: code }, { asset_tag: code }] },
+    select: { id: true, qr_code: true, asset_tag: true, status: true },
+  });
+  if (!pool || pool.status !== "available") {
+    throw new PoolCodeError("Kód z fondu QR nebyl nalezen nebo už je použitý.");
+  }
+  const claimed = await tx.equipment_qr_pool.updateMany({
+    where: { id: pool.id, status: "available" },
+    data: { status: "assigned", assigned_at: new Date(), assigned_by: userId },
+  });
+  if (claimed.count !== 1) {
+    throw new PoolCodeError("Kód z fondu QR nebyl nalezen nebo už je použitý.");
+  }
+  return { qr_code: pool.qr_code, asset_tag: pool.asset_tag, poolId: pool.id };
+}
 
 export async function generateQrPoolBatch(params: {
   count: number;

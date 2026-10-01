@@ -5,6 +5,7 @@ import {
   canAdministerEquipment,
   canReadEquipment,
   getAccessibleCategoryIds,
+  getWritableCategoryIds,
 } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
 
@@ -33,10 +34,16 @@ export async function GET(req: NextRequest) {
   });
 
   const accessible = await getAccessibleCategoryIds(userId);
-  const filtered =
+  let filtered =
     accessible === null
       ? categories
       : categories.filter((c) => accessible.includes(c.id));
+
+  // ?for=write: jen skupiny, do kterých smí uživatel zakládat a upravovat položky.
+  if (req.nextUrl.searchParams.get("for") === "write") {
+    const writable = await getWritableCategoryIds(userId);
+    if (writable !== null) filtered = filtered.filter((c) => writable.includes(c.id));
+  }
 
   return NextResponse.json(filtered);
 }
