@@ -3,7 +3,7 @@ import { readFile } from "fs/promises";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canReadEquipment } from "@/lib/equipment/access";
-import { equipmentFileDiskPath, equipmentServeHeaders } from "@/lib/equipment/files";
+import { equipmentDownloadName, equipmentFileDiskPath, equipmentServeHeaders } from "@/lib/equipment/files";
 import { EQUIPMENT_UPLOAD_MODULE } from "@/lib/equipment/upload";
 
 /** Fotka nebo příloha položky — s kontrolou práva číst skupinu položky. */
@@ -55,7 +55,11 @@ export async function GET(
     const download = req.nextUrl.searchParams.get("download") === "1";
     return new NextResponse(new Uint8Array(buf), {
       headers: {
-        ...equipmentServeHeaders(fileRow.mime_type, fileRow.original_filename, download),
+        ...equipmentServeHeaders(
+          fileRow.mime_type,
+          equipmentDownloadName(fileRow.original_filename, fileRow.file_path),
+          download
+        ),
         "Content-Length": String(buf.length),
       },
     });

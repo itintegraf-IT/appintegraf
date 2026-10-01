@@ -21,7 +21,22 @@ export function equipmentFileDiskPath(itemId: number, filePath: string): string 
   return path.join(process.cwd(), "public", "uploads", "equipment", String(itemId), name);
 }
 
-/** Content-Disposition: v `filename=` jen ASCII, celý název v UTF-8 ve `filename*=`. */
+/** Přípony, které server při nahrání sám určil podle obsahu (lib/equipment/upload-verify.ts). */
+const SERVED_EXTENSIONS = new Set([".jpg", ".png", ".webp", ".gif", ".pdf", ".docx", ".doc"]);
+
+/**
+ * Název pro stažení: původní název bez přípony + přípona ověřená serverem.
+ * Soubor tak nikdy nepřijde s příponou, kterou zvolil ten, kdo ho nahrál (např. .hta, .exe).
+ */
+export function equipmentDownloadName(originalName: string, filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  const name = (originalName || "").trim();
+  const dot = name.lastIndexOf(".");
+  const base = (dot > 0 ? name.slice(0, dot) : name).trim() || "soubor";
+  return base + (SERVED_EXTENSIONS.has(ext) ? ext : ".bin");
+}
+
+/** Content-Disposition: v `filename=` jen ASCII, celý název v UTF-8 ve `filename*=` (RFC 5987). */
 export function equipmentFileContentDisposition(name: string, mode: "inline" | "attachment"): string {
   const clean = (name || "").replace(/[\r\n"]/g, "_").trim() || "soubor";
   const ascii =
@@ -30,7 +45,8 @@ export function equipmentFileContentDisposition(name: string, mode: "inline" | "
       .replace(/[̀-ͯ]/g, "")
       .replace(/[^a-zA-Z0-9._ -]/g, "_")
       .slice(0, 150) || "soubor";
-  return `${mode}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(clean)}`;
+  const encoded = encodeURIComponent(clean).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  return `${mode}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }
 
 export function equipmentServeHeaders(

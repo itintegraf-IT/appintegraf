@@ -1,7 +1,12 @@
 import path from "path";
 import { describe, expect, it } from "vitest";
 import { equipmentFileUrl } from "./file-url";
-import { equipmentFileContentDisposition, equipmentFileDiskPath, equipmentServeHeaders } from "./files";
+import {
+  equipmentDownloadName,
+  equipmentFileContentDisposition,
+  equipmentFileDiskPath,
+  equipmentServeHeaders,
+} from "./files";
 
 describe("equipmentFileDiskPath", () => {
   it("vrátí cestu na disku pro soubor ve složce dané položky", () => {
@@ -67,7 +72,7 @@ describe("equipmentServeHeaders", () => {
     expect(h["Content-Disposition"].startsWith("attachment;")).toBe(true);
   });
 
-  it("starý záznam s HTML typem nikdy nepošle jako HTML", () => {
+  it("nepovolený typ pošle jako binární soubor ke stažení", () => {
     const h = equipmentServeHeaders("text/html", "x.html", false);
     expect(h["Content-Type"]).toBe("application/octet-stream");
     expect(h["Content-Disposition"].startsWith("attachment;")).toBe(true);
@@ -91,5 +96,26 @@ describe("equipmentFileUrl", () => {
   it("vede přes API s kontrolou oprávnění", () => {
     expect(equipmentFileUrl(11, 178)).toBe("/api/equipment/11/files/178");
     expect(equipmentFileUrl(11, 178, { download: true })).toBe("/api/equipment/11/files/178?download=1");
+  });
+});
+
+describe("equipmentDownloadName", () => {
+  it.each([
+    ["Faktura_2026.hta", "/uploads/equipment/11/1790_a.docx", "Faktura_2026.docx"],
+    ["setup.msi", "/uploads/equipment/11/1790_a.doc", "setup.doc"],
+    ["fotka-z-telefonu", "/uploads/equipment/11/1790_a.jpg", "fotka-z-telefonu.jpg"],
+    ["smlouva.docx", "/uploads/equipment/11/1790_a.docx", "smlouva.docx"],
+    ["", "/uploads/equipment/11/1790_a.pdf", "soubor.pdf"],
+    ["starý.exe", "/uploads/equipment/11/1790_a.exe", "starý.bin"],
+  ])("%s uložený jako %s se stáhne jako %s", (original, filePath, expected) => {
+    expect(equipmentDownloadName(original, filePath)).toBe(expected);
+  });
+});
+
+describe("equipmentFileContentDisposition — přísné kódování", () => {
+  it("apostrof, závorky a hvězdičku zakóduje i ve filename*", () => {
+    expect(equipmentFileContentDisposition("a'b(c)*.pdf", "inline")).toBe(
+      "inline; filename=\"a_b_c__.pdf\"; filename*=UTF-8''a%27b%28c%29%2A.pdf"
+    );
   });
 });

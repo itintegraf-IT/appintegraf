@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { EQUIPMENT_ITEM_STATUS, isEquipmentItemStatus } from "@/lib/equipment-status";
 import { canReadEquipment, canWriteEquipment, canAdministerEquipment } from "@/lib/equipment/access";
-import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
+import { logEquipmentAudit, logEquipmentAuditSafe } from "@/lib/equipment/audit";
 import { getItemHistoryCounts, itemDeleteBlockReason } from "@/lib/equipment/item-history";
 
 export async function GET(
@@ -193,7 +193,13 @@ export async function DELETE(
         if (reason) return { status: "blocked" as const, reason };
         const item = await tx.equipment_items.findUniqueOrThrow({ where: { id } });
         await tx.equipment_items.delete({ where: { id } });
-        return { status: "deleted" as const, item };
+        // Nevratná operace: audit ve stejné transakci — bez záznamu se položka nesmaže.
+        // Decimal a Date se v JSON převedou na text; celý řádek zůstane dohledatelný.
+        await logEquipmentAudit(
+          { userId, action: "item_delete", tableName: "equipment_items", recordId: id, oldValues: { ...item } },
+          tx
+        );
+        return { status: "deleted" as const };
       },
       { maxWait: 5000, timeout: 20000 }
     );
@@ -205,14 +211,6 @@ export async function DELETE(
       return NextResponse.json({ error: result.reason }, { status: 409 });
     }
 
-    await logEquipmentAuditSafe({
-      userId,
-      action: "item_delete",
-      tableName: "equipment_items",
-      recordId: id,
-      // Decimal a Date se v JSON převedou na text; celý řádek zůstane dohledatelný.
-      oldValues: { ...result.item },
-    });
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error("Equipment DELETE error:", e);

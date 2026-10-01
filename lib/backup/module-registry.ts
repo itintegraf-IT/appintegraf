@@ -67,9 +67,6 @@ export const BACKUP_MODULES: Record<BackupModuleId, BackupModuleDef> = {
       prisma("helpdesk_comments"),
       prisma("file_uploads"),
     ],
-    // Řádky file_uploads s fotkami a přílohami položek (soubory v uploads/equipment/<id>/).
-    fileUploadModules: [{ module: "equipment", uploadSubdir: "equipment" }],
-    // Půdorysy nejsou v file_uploads (cesta je v equipment_floor_plans.image_path).
     extraUploadDirs: ["equipment"],
   },
   calendar: {

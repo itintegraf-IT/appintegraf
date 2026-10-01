@@ -12,6 +12,18 @@ export type ItemHistoryCounts = {
   poolLinks: number;
 };
 
+/**
+ * Tabulky s cizím klíčem na equipment_items, které getItemHistoryCounts počítá.
+ * Test porovnává seznam se schema.prisma — nová vazba bez započtení test shodí.
+ */
+export const ITEM_HISTORY_RELATION_MODELS = [
+  "equipment_assignments",
+  "equipment_location_history",
+  "equipment_inventory_lines",
+  "equipment_transfers",
+  "equipment_qr_pool",
+] as const;
+
 const LABELS: Record<keyof ItemHistoryCounts, string> = {
   assignments: "přiřazení",
   locationHistory: "přesuny",
