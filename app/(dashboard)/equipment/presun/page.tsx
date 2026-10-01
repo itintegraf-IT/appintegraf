@@ -8,6 +8,8 @@ import {
 } from "../_components/EquipmentCodeBadge";
 import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
 
+const NETWORK_ERROR = "Spojení se serverem selhalo. Nic se neuložilo — zkuste to znovu.";
+
 export default function PresunPage() {
   const [code, setCode] = useState("");
   const [item, setItem] = useState<{ id: number; name: string; room?: { id: number } | null } | null>(
@@ -21,31 +23,42 @@ export default function PresunPage() {
 
   const lookup = async () => {
     setMsg("");
-    const res = await fetch(`/api/equipment/lookup?code=${encodeURIComponent(code)}&target=item`);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.type !== "item") {
-      setMsg(data.error ?? "Položka nenalezena");
-      setItem(null);
-      return;
+    try {
+      const res = await fetch(`/api/equipment/lookup?code=${encodeURIComponent(code)}&target=item`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.type !== "item") {
+        setMsg(data.error ?? "Položka nenalezena");
+        setItem(null);
+        return;
+      }
+      setItem(data);
+      const r = await fetch("/api/equipment/rooms");
+      const roomList = await r.json().catch(() => []);
+      setRooms(Array.isArray(roomList) ? roomList : []);
+    } catch {
+      setMsg(NETWORK_ERROR);
     }
-    setItem(data);
-    const r = await fetch("/api/equipment/rooms");
-    setRooms(await r.json());
   };
 
   const transfer = async () => {
     if (!item) return;
     const notify = askSendEquipmentMovementNotify();
-    const res = await fetch("/api/equipment/transfers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        equipment_id: item.id,
-        to_room_id: parseInt(toRoom, 10),
-        notes,
-        notify,
-      }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/equipment/transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          equipment_id: item.id,
+          to_room_id: parseInt(toRoom, 10),
+          notes,
+          notify,
+        }),
+      });
+    } catch {
+      setMsg(NETWORK_ERROR);
+      return;
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       setMsg(data.error ?? "Chyba");
@@ -119,7 +132,11 @@ export default function PresunPage() {
           </button>
         </div>
       ) : null}
-      {msg ? <p className="text-sm">{msg}</p> : null}
+      {msg ? (
+        <p role="status" className="rounded-lg border border-border p-3 text-sm">
+          {msg}
+        </p>
+      ) : null}
       {protocolUrl ? (
         <a href={protocolUrl} className="text-sm text-red-700 underline">
           Tisk protokolu
