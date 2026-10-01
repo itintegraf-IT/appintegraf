@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canAdministerEquipment } from "@/lib/equipment/access";
-import { FolderTree, QrCode, Shield, Upload, Bell, LayoutGrid } from "lucide-react";
+import { FolderTree, QrCode, Shield, Upload, Bell, LayoutGrid, Hash } from "lucide-react";
 
 const cards = [
   {
@@ -22,6 +22,12 @@ const cards = [
     icon: Shield,
     title: "Přístupy",
     hint: "Přiřazení skupin majetku uživatelům (čtení)",
+  },
+  {
+    href: "/equipment/settings/numbering",
+    icon: Hash,
+    title: "Inventární čísla",
+    hint: "Číselná řada drobného majetku (navazuje na ABRA Gen)",
   },
   {
     href: "/equipment/settings/qr-pool",
@@ -52,7 +58,7 @@ export default async function EquipmentSettingsHubPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Nastavení majetku</h1>
-        <p className="mt-1 text-gray-600">Import, skupiny, přístupy, fond QR, štítky a notifikace</p>
+        <p className="mt-1 text-gray-600">Import, skupiny, přístupy, inventární čísla, fond QR, štítky a notifikace</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
