@@ -11,6 +11,7 @@ import {
   EQUIPMENT_ATTACHMENT_MAX_BYTES,
 } from "@/lib/equipment/upload";
 import { verifyEquipmentUpload } from "@/lib/equipment/upload-verify";
+import { equipmentFileDiskPath } from "@/lib/equipment/files";
 
 /** Rezerva na hlavičky multipart požadavku nad velikostí samotného souboru. */
 const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
@@ -209,9 +210,9 @@ export async function DELETE(
     return NextResponse.json({ error: "Soubor se nepodařilo smazat" }, { status: 500 });
   }
 
-  // Soubor z disku až po potvrzeném smazání záznamu.
-  const disk = path.join(process.cwd(), "public", fileRow.file_path.replace(/^\//, ""));
-  await unlink(disk).catch(() => undefined);
+  // Soubor z disku až po potvrzeném smazání záznamu (jen ze složky této položky).
+  const disk = equipmentFileDiskPath(id, fileRow.file_path);
+  if (disk) await unlink(disk).catch(() => undefined);
 
   const isPhoto = fileRow.document_type === "photo" || fileRow.document_type === "photo_cover";
   await logEquipmentAuditSafe({
