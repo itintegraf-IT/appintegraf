@@ -46,6 +46,25 @@ function asBuffer(buf: Uint8Array): Buffer {
   return Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
+/** PDF: hlavička na začátku, před ní smí být jen BOM nebo prázdné znaky. */
+function startsWithPdfHeader(buf: Uint8Array): boolean {
+  let i = hasBytes(buf, [0xef, 0xbb, 0xbf]) ? 3 : 0;
+  while (i < buf.length && i < 1024 && [0x09, 0x0a, 0x0c, 0x0d, 0x20].includes(buf[i])) i++;
+  return hasAscii(buf, "%PDF-", i);
+}
+
+/** ZIP obsahuje položku s přesně tímto názvem (podle lokálních hlaviček souborů). */
+function zipHasEntry(buf: Uint8Array, entryName: string): boolean {
+  const b = asBuffer(buf);
+  const signature = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
+  const name = Buffer.from(entryName, "latin1");
+  for (let i = b.indexOf(signature); i !== -1 && i + 30 <= b.length; i = b.indexOf(signature, i + 4)) {
+    const nameLength = b.readUInt16LE(i + 26);
+    if (nameLength === name.length && b.subarray(i + 30, i + 30 + nameLength).equals(name)) return true;
+  }
+  return false;
+}
+
 export function sniffEquipmentFileType(buf: Uint8Array): SniffedFileType | null {
   if (hasBytes(buf, [0xff, 0xd8, 0xff])) return { mime: "image/jpeg", ext: ".jpg" };
   if (hasBytes(buf, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) {
@@ -53,9 +72,8 @@ export function sniffEquipmentFileType(buf: Uint8Array): SniffedFileType | null 
   }
   if (hasAscii(buf, "GIF87a") || hasAscii(buf, "GIF89a")) return { mime: "image/gif", ext: ".gif" };
   if (hasAscii(buf, "RIFF") && hasAscii(buf, "WEBP", 8)) return { mime: "image/webp", ext: ".webp" };
-  // Specifikace PDF dovoluje hlavičku kdekoli v prvním 1 KB.
-  if (asBuffer(buf).subarray(0, 1024).includes("%PDF-")) return { mime: "application/pdf", ext: ".pdf" };
-  if (hasBytes(buf, [0x50, 0x4b, 0x03, 0x04]) && asBuffer(buf).includes("word/document.xml")) {
+  if (startsWithPdfHeader(buf)) return { mime: "application/pdf", ext: ".pdf" };
+  if (hasBytes(buf, [0x50, 0x4b, 0x03, 0x04]) && zipHasEntry(buf, "word/document.xml")) {
     return { mime: DOCX_MIME, ext: ".docx" };
   }
   if (hasBytes(buf, [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1])) {

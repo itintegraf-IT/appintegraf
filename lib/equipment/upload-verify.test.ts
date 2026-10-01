@@ -16,8 +16,19 @@ const JPEG_HEAD = bytes(0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x
 const GIF = ascii("GIF89a\x01\x00\x01\x00\x00\x00\x00;");
 const WEBP = concat(ascii("RIFF"), bytes(0x24, 0, 0, 0), ascii("WEBPVP8 "), bytes(0, 0, 0, 0));
 const PDF = ascii("%PDF-1.4\n%âãÏÓ\n1 0 obj\n<<>>\nendobj\n");
-const DOCX = concat(bytes(0x50, 0x4b, 0x03, 0x04, 0x14, 0, 0, 0), ascii("[Content_Types].xml....word/document.xml...."));
-const PLAIN_ZIP = concat(bytes(0x50, 0x4b, 0x03, 0x04, 0x14, 0, 0, 0), ascii("data/report.csv...."));
+/** Minimální lokální hlavička ZIP (30 B) s názvem položky. */
+const zipEntry = (name: string) => {
+  const header = new Uint8Array(30);
+  header.set([0x50, 0x4b, 0x03, 0x04, 0x14, 0]);
+  header[26] = name.length & 0xff;
+  header[27] = name.length >> 8;
+  return concat(header, ascii(name));
+};
+const DOCX = concat(zipEntry("[Content_Types].xml"), zipEntry("word/document.xml"));
+const PLAIN_ZIP = zipEntry("data/report.csv");
+/** ZIP, který jen obsahuje text „word/document.xml“, ale žádný dokument Wordu. */
+const FAKE_DOCX = concat(zipEntry("payload.hta"), ascii("<!-- word/document.xml --><script>"));
+const HTML_WITH_PDF_MARKER = ascii("<html><!-- %PDF-1.4 --><script>alert(1)</script></html>");
 const CFB = bytes(0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0, 0, 0);
 const HTML = ascii("<!doctype html><html><script>alert(document.cookie)</script></html>");
 const SVG = ascii('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>');
@@ -35,8 +46,9 @@ describe("sniffEquipmentFileType", () => {
     expect(sniffEquipmentFileType(buf)).toEqual({ mime, ext });
   });
 
-  it("PDF s hlavičkou až za úvodními bajty (do 1 KB) pozná", () => {
+  it("PDF s BOM nebo prázdnými řádky před hlavičkou pozná", () => {
     expect(sniffEquipmentFileType(concat(ascii("\r\n"), PDF))?.mime).toBe("application/pdf");
+    expect(sniffEquipmentFileType(concat(bytes(0xef, 0xbb, 0xbf), PDF))?.mime).toBe("application/pdf");
   });
 
   it.each([
@@ -44,6 +56,8 @@ describe("sniffEquipmentFileType", () => {
     ["SVG", SVG],
     ["XML se SVG", XML_SVG],
     ["ZIP bez Wordu", PLAIN_ZIP],
+    ["ZIP s textem word/document.xml jen uvnitř obsahu", FAKE_DOCX],
+    ["HTML se značkou %PDF- v komentáři", HTML_WITH_PDF_MARKER],
     ["prázdný soubor", new Uint8Array()],
   ])("%s nerozpozná jako povolený typ", (_name, buf) => {
     expect(sniffEquipmentFileType(buf)).toBeNull();
