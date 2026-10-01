@@ -194,29 +194,37 @@ export async function DELETE(
   if (!fileRow) return NextResponse.json({ error: "Soubor nenalezen" }, { status: 404 });
 
   try {
-    const disk = path.join(process.cwd(), "public", fileRow.file_path.replace(/^\//, ""));
-    await unlink(disk).catch(() => undefined);
-  } catch {
-    /* ignore */
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.file_uploads.delete({ where: { id: fileRow.id } });
+        await tx.equipment_items.updateMany({
+          where: { id, cover_file_id: fileRow.id },
+          data: { cover_file_id: null, updated_at: new Date() },
+        });
+      },
+      { maxWait: 5000, timeout: 20000 }
+    );
+  } catch (e) {
+    console.error("equipment photos DELETE:", e);
+    return NextResponse.json({ error: "Soubor se nepodařilo smazat" }, { status: 500 });
   }
 
-  await prisma.file_uploads.delete({ where: { id: fileId } });
-  const item = await prisma.equipment_items.findUnique({
-    where: { id },
-    select: { cover_file_id: true },
-  });
-  if (item?.cover_file_id === fileId) {
-    await prisma.equipment_items.update({
-      where: { id },
-      data: { cover_file_id: null, updated_at: new Date() },
-    });
-  }
+  // Soubor z disku až po potvrzeném smazání záznamu.
+  const disk = path.join(process.cwd(), "public", fileRow.file_path.replace(/^\//, ""));
+  await unlink(disk).catch(() => undefined);
 
+  const isPhoto = fileRow.document_type === "photo" || fileRow.document_type === "photo_cover";
   await logEquipmentAuditSafe({
     userId,
-    action: "photo_delete",
+    action: isPhoto ? "photo_delete" : "attachment_delete",
     tableName: "file_uploads",
-    recordId: fileId,
+    recordId: fileRow.id,
+    oldValues: {
+      equipmentId: id,
+      original_filename: fileRow.original_filename,
+      document_type: fileRow.document_type,
+      file_path: fileRow.file_path,
+    },
   });
 
   return NextResponse.json({ ok: true });
@@ -241,18 +249,56 @@ export async function PATCH(
   const check = await getItemOr403(id, userId, true);
   if ("error" in check && check.error) return check.error;
 
-  await prisma.file_uploads.updateMany({
-    where: { module: EQUIPMENT_UPLOAD_MODULE, record_id: id, document_type: "photo_cover" },
-    data: { document_type: "photo" },
-  });
-  await prisma.file_uploads.update({
-    where: { id: fileId },
-    data: { document_type: "photo_cover" },
-  });
-  await prisma.equipment_items.update({
-    where: { id },
-    data: { cover_file_id: fileId, updated_at: new Date() },
-  });
+  try {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // Titulní fotkou může být jen fotka této položky.
+        const photo = await tx.file_uploads.findFirst({
+          where: {
+            id: fileId,
+            module: EQUIPMENT_UPLOAD_MODULE,
+            record_id: id,
+            document_type: { in: ["photo", "photo_cover"] },
+          },
+          select: { id: true },
+        });
+        if (!photo) return null;
+        const item = await tx.equipment_items.findUnique({
+          where: { id },
+          select: { cover_file_id: true },
+        });
+        await tx.file_uploads.updateMany({
+          where: { module: EQUIPMENT_UPLOAD_MODULE, record_id: id, document_type: "photo_cover" },
+          data: { document_type: "photo" },
+        });
+        await tx.file_uploads.update({
+          where: { id: photo.id },
+          data: { document_type: "photo_cover" },
+        });
+        await tx.equipment_items.update({
+          where: { id },
+          data: { cover_file_id: photo.id, updated_at: new Date() },
+        });
+        return { previousCoverId: item?.cover_file_id ?? null };
+      },
+      { maxWait: 5000, timeout: 20000 }
+    );
+    if (!result) {
+      return NextResponse.json({ error: "Fotka nenalezena" }, { status: 404 });
+    }
 
-  return NextResponse.json({ ok: true });
+    await logEquipmentAuditSafe({
+      userId,
+      action: "photo_cover_set",
+      tableName: "equipment_items",
+      recordId: id,
+      oldValues: { cover_file_id: result.previousCoverId },
+      detail: { cover_file_id: fileId },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("equipment photos PATCH:", e);
+    return NextResponse.json({ error: "Titulní fotku se nepodařilo nastavit" }, { status: 500 });
+  }
 }
