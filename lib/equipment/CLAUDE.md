@@ -20,16 +20,16 @@ Modul od 10/2026 rozvíjí Vojta s Claude Code. Michal spravuje server, nasazen�
 - **Mutace:** REST routes v `app/api/equipment/**` + `fetch()` z klienta a následný `router.refresh()`. Modul **nepoužívá Server Actions**, nezaváděj je.
 - Každá route začíná stejnou trojicí: `const session = await auth()` → 401 `{ error: "Neautorizováno" }` → kontrola oprávnění → 403 `{ error: "Nemáte oprávnění" }`. Chybové texty jsou česky a **nikdy nevracej klientovi `e.message`** ani interní cesty — detail jen do `console.error`.
 - Oprávnění **výhradně** přes `lib/equipment/access.ts` (`canReadEquipment`, `canWriteEquipment`, `canAdministerEquipment`, `getAccessibleCategories`, `isCategoryResponsible`). Nevolej v modulu přímo `isAdmin`/`hasModuleAccess` — přístup je omezený po skupinách majetku a ta logika má být jen na jednom místě. U operací nad konkrétní položkou vždy kontroluj **skupinu té položky**.
-- Audit zapisuj přes `logEquipmentAuditSafe` z `lib/equipment/audit.ts`, a to **u každé mutace** (včetně přiřazení, vrácení, skenů a změn nastavení) a **se starými i novými hodnotami** změněných polí.
+- Audit zapisuj přes `logEquipmentAuditSafe` z `lib/equipment/audit.ts`, a to **u každé mutace** (včetně přiřazení, vrácení, skenů a změn nastavení) a **se starými i novými hodnotami** změněných polí. U nevratných operací (smazání) zapisuj audit **v téže transakci**: `logEquipmentAudit(params, tx)` — bez auditu se změna neprovede.
 - Vícekrokové zápisy (přesun, přiřazení, inventura, hromadné akce) **v `prisma.$transaction`**; hromadná akce buď projde celá, nebo nic.
 - Vstupy validuj (ID přes kontrolu `NaN`, délky podle limitů DB, data, ceny). Neplatný vstup = 400 s českou hláškou, nikdy neošetřená 500.
 
 ## Integrita majetku (účetní dohledatelnost)
 
-- **Žádné tvrdé mazání položek**, které mají historii (přiřazení, přesuny, inventury). Místo mazání archivace nebo vyřazení. Historie a řádky uzavřených inventur se nesmí měnit zpětně.
+- **Žádné tvrdé mazání položek**, které mají historii (přiřazení, přesuny, inventury, fotky, kódy z fondu). Kontrolu dělá `getItemHistoryCounts` + `itemDeleteBlockReason` (`lib/equipment/item-history.ts`) po zamčení řádku; jinak 409 a vyřazení. Nová tabulka s vazbou na `equipment_items` se musí přidat do `ITEM_HISTORY_RELATION_MODELS` (hlídá test). Historie a řádky uzavřených inventur se nesmí měnit zpětně.
 - **Stav položky mění jen akce** (přiřazení, vrácení, servis, vyřazení), ne volná editace formuláře. **Místnost mění jen přesun** přes `transferEquipmentToRoom` (`lib/equipment/room-transfer.ts`), aby vznikla historie a protokol.
 - Zdrojem pravdy o umístění je `room_id`. Textové pole `location` je legacy — nové funkce ho nečtou ani nezapisují.
-- Inventární číslo (`asset_tag`) je vazba na účetní evidenci (SQL Ekonom, od 1. 11. 2026 ABRA Gen) — neměnit ho automaticky.
+- Inventární číslo (`asset_tag`) je vazba na účetní evidenci (ABRA Gen ostře od 1. 10. 2026; Gen eviduje jen odepisovaný majetek nad 80 000 Kč, drobný majetek eviduje tato aplikace) — neměnit ho automaticky.
 
 ## Migrace databáze
 
@@ -44,7 +44,7 @@ Modul od 10/2026 rozvíjí Vojta s Claude Code. Michal spravuje server, nasazen�
 - **Nový kód používá tokeny z `app/globals.css`** (`bg-card`, `text-muted-foreground`, `border-border`, `bg-primary`, …), ne natvrdo `gray-*`/`red-*`. Stavové barvy inventury jsou v jedné konstantě — vizuální paleta modulu se vybírá (10/2026), do té doby žádné nové natvrdo zadané barvy.
 - **Terénní obrazovky** (sken, inventura, přesun) jsou **mobile-first**: dotykové cíle ≥ 44 px, primární akce dosažitelné palcem, stav nikdy jen barvou (vždy i ikona a text), čitelné na slunci. Každý síťový požadavek má viditelný chybový stav.
 - Texty v UI jsou české; interní kódy (`missing`, `found`, `manual`) se uživateli nikdy nezobrazují syrově.
-- Soubory (fotky, přílohy) se **servírují přes API route s kontrolou oprávnění**, ne přímou cestou do `public/` (Next.js v produkci neobslouží soubory přidané po startu). Upload ověřuje typ podle obsahu souboru a příponu určuje server.
+- Soubory (fotky, přílohy) se **servírují přes `/api/equipment/[id]/files/[fileId]`** (`equipmentFileUrl` z `lib/equipment/file-url.ts`, hlavičky z `lib/equipment/files.ts`), nikdy přímou cestou do `public/` (Next.js v produkci neobslouží soubory přidané po startu). API nevrací `file_path`. Upload ověřuje typ podle obsahu (`verifyEquipmentUpload` z `lib/equipment/upload-verify.ts`, jen server) a příponu i MIME určuje server; název ke stažení nese příponu ověřenou serverem.
 
 ## Testy a ověřování
 
@@ -59,3 +59,4 @@ Modul od 10/2026 rozvíjí Vojta s Claude Code. Michal spravuje server, nasazen�
 - Dev server Vojty typicky běží na portu 3000. **Nikdy neukončuj procesy podle jména** (`pkill`, `killall`) — zužuj na konkrétní PID a nejdřív se zeptej.
 - Lokální databáze: `appintegraf_test` v AMPPS (kopie testovací DB ze serveru, reálná firemní data — nikam je nenahrávej). E-maily jsou v ní vypnuté (`system_settings.email_enabled=false`); po každém novém importu dumpu je znovu vypni.
 - E-maily v šablonách vždy escapuj (uživatelský vstup nesmí jít do HTML syrově). Hromadné akce posílají jednu souhrnnou notifikaci, ne jednu za položku.
+- **Každé SMTP spojení** v aplikaci vytvářej jako `withTestMailPolicy(nodemailer.createTransport(...))` (`lib/mail-transport.ts`, hlídá test): s `EMAIL_REDIRECT_TO` jde pošta jen na tuto adresu s `[TEST]`, při `APP_ENV=test` bez přesměrování se neodešle nic.
