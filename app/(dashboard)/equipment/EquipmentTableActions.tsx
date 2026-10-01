@@ -1,8 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Eye, Pencil, UserPlus, Trash2, Printer, FileText, QrCode } from "lucide-react";
+import { Eye, Pencil, UserPlus, Printer, FileText, QrCode } from "lucide-react";
 
 type Props = {
   equipmentId: number;
@@ -10,7 +9,6 @@ type Props = {
   assignmentId?: number | null;
   canEdit: boolean;
   canAssign: boolean;
-  canDelete: boolean;
 };
 
 export function EquipmentTableActions({
@@ -18,25 +16,7 @@ export function EquipmentTableActions({
   assignmentId = null,
   canEdit,
   canAssign,
-  canDelete,
 }: Props) {
-  const router = useRouter();
-
-  const handleDelete = async () => {
-    if (!confirm("Opravdu chcete smazat toto vybavení? Tato akce je nevratná.")) return;
-    try {
-      const res = await fetch(`/api/equipment/${equipmentId}`, { method: "DELETE" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        alert(data.error ?? "Chyba při mazání");
-        return;
-      }
-      router.refresh();
-    } catch {
-      alert("Chyba při mazání");
-    }
-  };
-
   return (
     <div className="flex items-center justify-end gap-1">
       <Link
@@ -92,16 +72,6 @@ export function EquipmentTableActions({
             <FileText className="h-4 w-4" />
           </Link>
         </>
-      )}
-      {canDelete && (
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="rounded p-2 text-red-600 hover:bg-red-50"
-          title="Smazat"
-        >
-          <Trash2 className="h-4 w-4" />
-        </button>
       )}
     </div>
   );

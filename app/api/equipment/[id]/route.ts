@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { EQUIPMENT_ITEM_STATUS, isEquipmentItemStatus } from "@/lib/equipment-status";
 import { canReadEquipment, canWriteEquipment, canAdministerEquipment } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
+import { getItemHistoryCounts, itemDeleteBlockReason } from "@/lib/equipment/item-history";
 
 export async function GET(
   _req: NextRequest,
@@ -183,12 +184,34 @@ export async function DELETE(
   }
 
   try {
-    await prisma.equipment_items.delete({ where: { id } });
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // Zámek řádku: během kontroly nesmí vzniknout nová historie (přesun, přiřazení…).
+        const locked = await tx.$queryRaw<{ id: number }[]>`SELECT id FROM equipment_items WHERE id = ${id} FOR UPDATE`;
+        if (locked.length === 0) return { status: "not_found" as const };
+        const reason = itemDeleteBlockReason(await getItemHistoryCounts(tx, id));
+        if (reason) return { status: "blocked" as const, reason };
+        const item = await tx.equipment_items.findUniqueOrThrow({ where: { id } });
+        await tx.equipment_items.delete({ where: { id } });
+        return { status: "deleted" as const, item };
+      },
+      { maxWait: 5000, timeout: 20000 }
+    );
+
+    if (result.status === "not_found") {
+      return NextResponse.json({ error: "Nenalezeno" }, { status: 404 });
+    }
+    if (result.status === "blocked") {
+      return NextResponse.json({ error: result.reason }, { status: 409 });
+    }
+
     await logEquipmentAuditSafe({
       userId,
       action: "item_delete",
       tableName: "equipment_items",
       recordId: id,
+      // Decimal a Date se v JSON převedou na text; celý řádek zůstane dohledatelný.
+      oldValues: { ...result.item },
     });
     return NextResponse.json({ success: true });
   } catch (e) {

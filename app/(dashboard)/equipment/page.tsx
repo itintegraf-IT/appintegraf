@@ -428,7 +428,6 @@ export default async function EquipmentPage({
             noHolder={noHolder}
             canEdit={admin}
             canAssign={admin || equipmentWrite}
-            canDelete={admin}
           />
         </>
       ) : (
@@ -502,7 +501,6 @@ export default async function EquipmentPage({
                             assignmentId={e.assignment_id ?? null}
                             canEdit={admin}
                             canAssign={(admin || equipmentWrite) && scope === "all"}
-                            canDelete={admin}
                           />
                         </td>
                       </tr>
