@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { withTestMailPolicy } from "@/lib/mail-transport";
 import { getEmailSettings } from "@/lib/email-settings";
 import {
   collectStitkyEmailAddresses,
@@ -17,7 +18,7 @@ async function sendStitkyMail(params: {
     return;
   }
 
-  const transporter = nodemailer.createTransport({
+  const transporter = withTestMailPolicy(nodemailer.createTransport({
     host: settings.host,
     port: settings.port,
     secure: settings.secure,
@@ -26,7 +27,7 @@ async function sendStitkyMail(params: {
       settings.host.includes("office365") || settings.host.includes("outlook")
         ? { ciphers: "SSLv3", rejectUnauthorized: false }
         : undefined,
-  });
+  }));
 
   await transporter.sendMail({
     from: settings.fromName ? `"${settings.fromName}" <${settings.from}>` : settings.from,

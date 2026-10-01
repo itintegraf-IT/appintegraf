@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { withTestMailPolicy } from "@/lib/mail-transport";
 import { getEmailSettings, formatSmtpFrom } from "./email-settings";
 import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
 import {
@@ -80,7 +81,7 @@ export async function sendCalendarApprovalEmail(
   `.trim();
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -92,7 +93,7 @@ export async function sendCalendarApprovalEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -163,7 +164,7 @@ export async function sendCalendarReminderEmail(
   `.trim();
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -172,7 +173,7 @@ export async function sendCalendarReminderEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
     await transporter.sendMail({
       from: settings.fromName
         ? `"${settings.fromName}" <${settings.from}>`
@@ -256,7 +257,7 @@ export async function sendCalendarInviteEmail(
   const textHint = params.extraHint ? `\n\n${params.extraHint}` : "";
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -268,7 +269,7 @@ export async function sendCalendarInviteEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -349,7 +350,7 @@ export async function sendCalendarInviteResponseEmail(
   const textReason = !isApprove && params.reason ? `\nDůvod odmítnutí: ${params.reason}` : "";
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -361,7 +362,7 @@ export async function sendCalendarInviteResponseEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -454,7 +455,7 @@ export async function sendEquipmentRequestResultEmail(
   if (params.adminResponse) textLines.push(`Stanovisko vedení: ${params.adminResponse}`);
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -463,7 +464,7 @@ export async function sendEquipmentRequestResultEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -527,7 +528,7 @@ export async function sendEquipmentMovementEmail(
   `.trim();
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -536,7 +537,7 @@ export async function sendEquipmentMovementEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -606,7 +607,7 @@ export async function sendUkolEmail(
   `.trim();
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -618,7 +619,7 @@ export async function sendUkolEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -729,7 +730,7 @@ export async function sendMaketaEmail(
   ].filter(Boolean);
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -741,7 +742,7 @@ export async function sendMaketaEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -820,7 +821,7 @@ export async function sendMaketySoftproofEmail(
   });
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -832,7 +833,7 @@ export async function sendMaketySoftproofEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: formatSmtpFrom(settings, "makety"),
@@ -879,7 +880,7 @@ export async function sendMaketyClientPlainEmail(params: {
     };
   }
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -891,7 +892,7 @@ export async function sendMaketyClientPlainEmail(params: {
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
     const html = `<p style="font-family:Arial,sans-serif;white-space:pre-wrap;">${params.text
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
@@ -968,7 +969,7 @@ export async function sendTestEmail(
   `.trim();
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -980,7 +981,7 @@ export async function sendTestEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -1025,7 +1026,7 @@ async function configuredTransporter() {
   if (!settings.user || !settings.password || !settings.from) {
     return { settings, transporter: null };
   }
-  const transporter = nodemailer.createTransport({
+  const transporter = withTestMailPolicy(nodemailer.createTransport({
     host: settings.host,
     port: settings.port,
     secure: settings.secure,
@@ -1034,7 +1035,7 @@ async function configuredTransporter() {
       settings.host.includes("office365") || settings.host.includes("outlook")
         ? { ciphers: "SSLv3", rejectUnauthorized: false }
         : undefined,
-  });
+  }));
   return { settings, transporter };
 }
 
