@@ -112,7 +112,7 @@ export default function NotificationsSettingsClient() {
             Notifikace pohybů
           </h1>
           <p className="mt-1 text-gray-600">
-            Účtárna a držitel dostávají notifikace vždy; zde jen další osoby.
+            Při přesunu a přiřazení se aplikace zeptá, zda poslat notifikaci držiteli a účtárně (oddělení Účetnictví). Zde přidáte další příjemce.
           </p>
         </div>
         <Link

@@ -45,7 +45,7 @@ const cards = [
     href: "/equipment/settings/notifications",
     icon: Bell,
     title: "Notifikace pohybů",
-    hint: "Další příjemci vedle držitele a účtárny",
+    hint: "Další příjemci vedle držitele a účtárny (oddělení Účetnictví)",
   },
 ] as const;
 

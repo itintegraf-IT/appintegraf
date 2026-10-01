@@ -6,8 +6,8 @@ import {
   filterUserIdsAllowingEmail,
 } from "@/lib/user-email-notifications-db";
 
-/** Oddělení, které dostává info o pohybech majetku (název nebo kód v DB). */
-export const EQUIPMENT_ACCOUNTING_DEPARTMENT = "Účtárna";
+/** Oddělení, které dostává info o pohybech majetku — kód oddělení „Účetnictví“ (hledá se název i kód). */
+export const EQUIPMENT_ACCOUNTING_DEPARTMENT = "ACC";
 
 type Recipient = {
   id: number;
@@ -30,7 +30,8 @@ async function loadUsersByIds(ids: number[]): Promise<Recipient[]> {
   }));
 }
 
-async function collectRecipients(holderUserId: number | null): Promise<Recipient[]> {
+/** Příjemci notifikace o pohybu: držitel, účtárna a další příjemci z nastavení (bez duplicit). */
+export async function collectMovementRecipients(holderUserId: number | null): Promise<Recipient[]> {
   const byId = new Map<number, Recipient>();
 
   if (holderUserId != null) {
@@ -41,6 +42,9 @@ async function collectRecipients(holderUserId: number | null): Promise<Recipient
 
   try {
     const accounting = await getDepartmentMembers(EQUIPMENT_ACCOUNTING_DEPARTMENT);
+    if (accounting.length === 0) {
+      console.warn("equipment-movement-notify: oddělení Účetnictví (ACC) nemá žádné členy — účtárna notifikaci nedostane");
+    }
     for (const u of accounting) {
       if (!byId.has(u.id)) {
         byId.set(u.id, {
@@ -140,7 +144,7 @@ export async function notifyEquipmentAssigned(params: {
 
     const label = equipmentLabel(item.name, item);
     const link = `/equipment/protokol/predani?assignmentId=${params.assignmentId}`;
-    const recipients = await collectRecipients(params.holderUserId);
+    const recipients = await collectMovementRecipients(params.holderUserId);
 
     await notifyRecipients({
       recipients,
@@ -172,7 +176,7 @@ export async function notifyEquipmentReturned(params: {
 
     const label = equipmentLabel(item.name, item);
     const link = `/equipment/protokol/vraceni?assignmentId=${params.assignmentId}`;
-    const recipients = await collectRecipients(params.formerHolderUserId);
+    const recipients = await collectMovementRecipients(params.formerHolderUserId);
 
     await notifyRecipients({
       recipients,
@@ -230,7 +234,7 @@ export async function notifyEquipmentRoomTransfer(params: {
     const fromLabel = roomLabel(fromRoom);
     const toLabel = roomLabel(toRoom);
     const link = `/equipment/protokol/presun-mistnosti?historyId=${params.historyId}`;
-    const recipients = await collectRecipients(activeAssignment?.user_id ?? null);
+    const recipients = await collectMovementRecipients(activeAssignment?.user_id ?? null);
 
     const protocolHint = params.protocolNumber ? ` (${params.protocolNumber})` : "";
     const message = `Majetek „${label}“ přesunut z „${fromLabel}“ do „${toLabel}“${protocolHint}.`;
