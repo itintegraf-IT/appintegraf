@@ -8,10 +8,12 @@ import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
 import {
   EQUIPMENT_UPLOAD_MODULE,
   EQUIPMENT_PHOTO_MAX_BYTES,
-  EQUIPMENT_PHOTO_MIME,
   EQUIPMENT_ATTACHMENT_MAX_BYTES,
-  EQUIPMENT_ATTACHMENT_MIME,
 } from "@/lib/equipment/upload";
+import { verifyEquipmentUpload } from "@/lib/equipment/upload-verify";
+
+/** Rezerva na hlavičky multipart požadavku nad velikostí samotného souboru. */
+const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
 
 async function getItemOr403(id: number, userId: number, write: boolean) {
   const item = await prisma.equipment_items.findUnique({
@@ -79,6 +81,11 @@ export async function POST(
   const check = await getItemOr403(id, userId, true);
   if ("error" in check && check.error) return check.error;
 
+  const declaredLength = Number(req.headers.get("content-length") ?? 0);
+  if (declaredLength > EQUIPMENT_ATTACHMENT_MAX_BYTES + MULTIPART_OVERHEAD_BYTES) {
+    return NextResponse.json({ error: "Soubor je větší než 20 MB." }, { status: 413 });
+  }
+
   try {
     const formData = await req.formData();
     const file = formData.get("file");
@@ -87,12 +94,8 @@ export async function POST(
       return NextResponse.json({ error: "Vyberte soubor." }, { status: 400 });
     }
 
-    const mime = file.type || "application/octet-stream";
     const isPhoto = documentType === "photo" || documentType === "photo_cover";
     if (isPhoto) {
-      if (!EQUIPMENT_PHOTO_MIME.has(mime)) {
-        return NextResponse.json({ error: "Nepovolený typ fotky." }, { status: 400 });
-      }
       if (file.size > EQUIPMENT_PHOTO_MAX_BYTES) {
         return NextResponse.json({ error: "Fotka je větší než 10 MB." }, { status: 400 });
       }
@@ -100,21 +103,22 @@ export async function POST(
       if (!["attachment", "invoice", "delivery_note", "warranty", "service", "other"].includes(documentType)) {
         documentType = "attachment";
       }
-      if (!EQUIPMENT_ATTACHMENT_MIME.has(mime)) {
-        return NextResponse.json({ error: "Nepovolený typ přílohy." }, { status: 400 });
-      }
       if (file.size > EQUIPMENT_ATTACHMENT_MAX_BYTES) {
         return NextResponse.json({ error: "Soubor je větší než 20 MB." }, { status: 400 });
       }
     }
 
+    const buf = Buffer.from(await file.arrayBuffer());
+    const verified = verifyEquipmentUpload(buf, file.type, isPhoto ? "photo" : "attachment");
+    if (!verified.ok) {
+      return NextResponse.json({ error: verified.error }, { status: 400 });
+    }
+
     const uploadDir = path.join(process.cwd(), "public", "uploads", "equipment", String(id));
     await mkdir(uploadDir, { recursive: true });
-    const ext = path.extname(file.name) || (mime.includes("png") ? ".png" : ".jpg");
-    const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}${ext}`;
+    const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}${verified.ext}`;
     const diskPath = path.join(uploadDir, safeName);
     const webPath = `/uploads/equipment/${id}/${safeName}`;
-    const buf = Buffer.from(await file.arrayBuffer());
     await writeFile(diskPath, buf);
 
     const row = await prisma.file_uploads.create({
@@ -123,7 +127,7 @@ export async function POST(
         original_filename: file.name.slice(0, 250),
         file_path: webPath,
         file_size: buf.length,
-        mime_type: mime.slice(0, 100),
+        mime_type: verified.mime,
         module: EQUIPMENT_UPLOAD_MODULE,
         record_id: id,
         document_type: documentType,
