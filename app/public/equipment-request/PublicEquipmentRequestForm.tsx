@@ -97,6 +97,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <input
               type="text"
               required
+              maxLength={100}
               value={form.requester_name}
               onChange={(e) => setForm({ ...form, requester_name: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -107,6 +108,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <input
               type="email"
               required
+              maxLength={100}
               value={form.requester_email}
               onChange={(e) => setForm({ ...form, requester_email: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -116,6 +118,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <label className="mb-1 block text-sm font-medium text-gray-700">Telefon</label>
             <input
               type="tel"
+              maxLength={20}
               value={form.requester_phone}
               onChange={(e) => setForm({ ...form, requester_phone: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -125,6 +128,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <label className="mb-1 block text-sm font-medium text-gray-700">Oddělení</label>
             <input
               type="text"
+              maxLength={100}
               value={form.department}
               onChange={(e) => setForm({ ...form, department: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -134,6 +138,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <label className="mb-1 block text-sm font-medium text-gray-700">Pozice</label>
             <input
               type="text"
+              maxLength={100}
               value={form.position}
               onChange={(e) => setForm({ ...form, position: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -146,6 +151,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <input
               type="text"
               required
+              maxLength={100}
               value={form.equipment_type}
               onChange={(e) => setForm({ ...form, equipment_type: e.target.value })}
               placeholder="např. notebook, monitor"
@@ -168,6 +174,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <label className="mb-1 block text-sm font-medium text-gray-700">Popis požadavku *</label>
             <textarea
               required
+              maxLength={5000}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={4}
