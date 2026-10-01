@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canReadEquipment, canWriteEquipment } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
-import { parseEquipmentScanCode } from "@/lib/equipment/qr";
+import { resolveScanCode } from "@/lib/equipment/scan-resolve";
 
 export async function GET(
   _req: NextRequest,
@@ -87,15 +87,23 @@ export async function POST(
   const code = String(body.code ?? "").trim();
   if (!code) return NextResponse.json({ error: "Chybí code" }, { status: 400 });
 
-  const parsed = parseEquipmentScanCode(code);
-  const item = await prisma.equipment_items.findFirst({
-    where: {
-      OR: [
-        { qr_code: parsed.code || code },
-        { asset_tag: parsed.code || code },
-      ],
-    },
-  });
+  const { resolution } = await resolveScanCode(code, "item");
+  if (resolution.type === "wrong_kind") {
+    return NextResponse.json(
+      { error: "Toto je QR kód místnosti. V inventuře skenujte položky." },
+      { status: 400 }
+    );
+  }
+  if (resolution.type === "qr_pool") {
+    return NextResponse.json(
+      { error: "Tento kód z fondu QR ještě není přiřazený žádné položce." },
+      { status: 400 }
+    );
+  }
+  const item =
+    resolution.type === "item"
+      ? await prisma.equipment_items.findUnique({ where: { id: resolution.itemId } })
+      : null;
   if (!item) return NextResponse.json({ error: "Položka nenalezena" }, { status: 404 });
   if (!(await canWriteEquipment(userId, item.category_id))) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });

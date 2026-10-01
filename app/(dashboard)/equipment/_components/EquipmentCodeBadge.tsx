@@ -86,9 +86,14 @@ export function EquipmentCodeBadge({
   );
 }
 
-/** Jednotný placeholder pro ruční zadání kódu napříč modulem. */
-export const EQUIPMENT_MANUAL_CODE_PLACEHOLDER =
-  "Nebo zadejte inventární č. / kód místnosti";
+/** Jednotné texty pro ruční zadání kódu napříč modulem (inventura, přesun: jen položky). */
+export const EQUIPMENT_MANUAL_CODE_PLACEHOLDER = "Nebo zadejte inventární číslo";
 
 export const EQUIPMENT_MANUAL_CODE_HINT =
-  "Bez skeneru zadejte inventární číslo (EQ-…) nebo kód místnosti.";
+  "Bez skeneru zadejte inventární číslo nebo číslo pod QR kódem štítku.";
+
+/** Skener přijímá i kód místnosti. */
+export const EQUIPMENT_MANUAL_CODE_PLACEHOLDER_WITH_ROOM = "Nebo zadejte inventární číslo / kód místnosti";
+
+export const EQUIPMENT_MANUAL_CODE_HINT_WITH_ROOM =
+  "Bez skeneru zadejte inventární číslo, číslo pod QR kódem štítku nebo kód místnosti.";

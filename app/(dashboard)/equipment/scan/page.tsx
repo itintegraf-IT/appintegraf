@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  EQUIPMENT_MANUAL_CODE_HINT,
-  EQUIPMENT_MANUAL_CODE_PLACEHOLDER,
+  EQUIPMENT_MANUAL_CODE_HINT_WITH_ROOM,
+  EQUIPMENT_MANUAL_CODE_PLACEHOLDER_WITH_ROOM,
 } from "../_components/EquipmentCodeBadge";
 import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
 
@@ -279,7 +279,7 @@ export default function EquipmentScanClient() {
         <div className="flex gap-2">
           <input
             className="flex-1 rounded-lg border px-3 py-2 font-mono"
-            placeholder={EQUIPMENT_MANUAL_CODE_PLACEHOLDER}
+            placeholder={EQUIPMENT_MANUAL_CODE_PLACEHOLDER_WITH_ROOM}
             value={manual}
             onChange={(e) => setManual(e.target.value)}
             autoComplete="off"
@@ -288,7 +288,7 @@ export default function EquipmentScanClient() {
             OK
           </button>
         </div>
-        <p className="text-xs text-gray-500">{EQUIPMENT_MANUAL_CODE_HINT}</p>
+        <p className="text-xs text-gray-500">{EQUIPMENT_MANUAL_CODE_HINT_WITH_ROOM}</p>
       </form>
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}

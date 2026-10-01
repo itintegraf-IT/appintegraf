@@ -1,8 +1,9 @@
 import QRCode from "qrcode";
 import { prisma } from "@/lib/db";
+import { QR_PREFIX_EQ, QR_PREFIX_RM } from "@/lib/equipment/scan-code";
 
-export const QR_PREFIX_EQ = "INTEGRAF:EQ:";
-export const QR_PREFIX_RM = "INTEGRAF:RM:";
+// Parser kódu žije v čistém modulu scan-code.ts (bez Prismy, použitelný i v klientu).
+export { QR_PREFIX_EQ, QR_PREFIX_RM, parseEquipmentScanCode, type ParsedEquipmentCode } from "@/lib/equipment/scan-code";
 
 export function buildEqPayload(qrCode: string): string {
   return `${QR_PREFIX_EQ}${qrCode}`;
@@ -10,32 +11,6 @@ export function buildEqPayload(qrCode: string): string {
 
 export function buildRmPayload(qrCode: string): string {
   return `${QR_PREFIX_RM}${qrCode}`;
-}
-
-export type ParsedEquipmentCode =
-  | { kind: "eq"; code: string }
-  | { kind: "rm"; code: string }
-  | { kind: "raw"; code: string };
-
-/** Parsuje naskenovaný text (plný payload nebo holý kód). */
-export function parseEquipmentScanCode(raw: string): ParsedEquipmentCode {
-  const text = raw.trim();
-  if (!text) return { kind: "raw", code: "" };
-
-  const upper = text.toUpperCase();
-  if (upper.startsWith(QR_PREFIX_EQ)) {
-    return { kind: "eq", code: text.slice(QR_PREFIX_EQ.length).trim() };
-  }
-  if (upper.startsWith(QR_PREFIX_RM)) {
-    return { kind: "rm", code: text.slice(QR_PREFIX_RM.length).trim() };
-  }
-  if (upper.startsWith("EQ-") || /^\d{12}$/.test(text)) {
-    return { kind: "eq", code: text };
-  }
-  if (upper.startsWith("RM-")) {
-    return { kind: "rm", code: text };
-  }
-  return { kind: "raw", code: text };
 }
 
 function randomDigits(n: number): string {

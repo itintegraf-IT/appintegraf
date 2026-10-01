@@ -21,7 +21,7 @@ export default function PresunPage() {
 
   const lookup = async () => {
     setMsg("");
-    const res = await fetch(`/api/equipment/lookup?code=${encodeURIComponent(code)}`);
+    const res = await fetch(`/api/equipment/lookup?code=${encodeURIComponent(code)}&target=item`);
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.type !== "item") {
       setMsg(data.error ?? "Položka nenalezena");
