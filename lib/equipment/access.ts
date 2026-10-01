@@ -27,6 +27,22 @@ export async function canAdministerEquipment(userId: number): Promise<boolean> {
   return hasModuleAccess(userId, "equipment", "admin");
 }
 
+/**
+ * Plná evidence: vidí celý seznam, zařazuje a upravuje položky všech skupin.
+ * Globální admin a úroveň Majetku „write“ (Editor) nebo „admin“ (správce modulu).
+ * Nastavení modulu, import a mazání zůstávají jen pro `canAdministerEquipment`.
+ */
+export async function canManageRegister(userId: number): Promise<boolean> {
+  if (await isAdmin(userId)) return true;
+  return hasModuleAccess(userId, "equipment", "write");
+}
+
+/** Skupiny, do kterých smí uživatel zapisovat (stejná pravidla jako canWriteEquipment); null = všechny. */
+export async function getWritableCategoryIds(userId: number): Promise<number[] | null> {
+  if (await canManageRegister(userId)) return null;
+  return getResponsibleCategoryIds(userId);
+}
+
 export async function isCategoryResponsible(userId: number, categoryId: number): Promise<boolean> {
   const row = await prisma.equipment_categories.findFirst({
     where: { id: categoryId, responsible_user_id: userId },

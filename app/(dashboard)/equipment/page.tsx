@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
+import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
 import Link from "next/link";
 import { Laptop, Plus, ClipboardList, UserCheck, DoorOpen, QrCode, ArrowRightLeft, ClipboardCheck, BarChart3, Map, Upload, Package } from "lucide-react";
@@ -18,7 +18,7 @@ import {
   EQUIPMENT_ITEM_STATUS,
   isEquipmentAssignedStatus,
 } from "@/lib/equipment-status";
-import { canAdministerEquipment } from "@/lib/equipment/access";
+import { canAdministerEquipment, canManageRegister } from "@/lib/equipment/access";
 import type { Prisma } from "@prisma/client";
 
 const EQUIPMENT_LIST_TAKE = 2000;
@@ -62,10 +62,10 @@ export default async function EquipmentPage({
 }) {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
-  const admin = await isAdmin(userId);
+  // Plná evidence (seznam všeho, přidat, upravit): globální admin a Majetek = Editor/Admin.
+  const registerManager = await canManageRegister(userId);
   const canAdminEquipment = await canAdministerEquipment(userId);
   const equipmentRead = await hasModuleAccess(userId, "equipment", "read");
-  const equipmentWrite = await hasModuleAccess(userId, "equipment", "write");
   const params = await searchParams;
   const scope = params.scope ?? "mine";
   const tab = params.tab ?? "equipment";
@@ -98,7 +98,7 @@ export default async function EquipmentPage({
   };
   let equipment: EquipmentRow[] = [];
 
-  if (admin && scope === "all") {
+  if (registerManager && scope === "all") {
     const listWhere: Prisma.equipment_itemsWhereInput = {};
     if (unassigned) listWhere.room_id = null;
     if (noHolder) {
@@ -180,7 +180,7 @@ export default async function EquipmentPage({
 
   const scopeAll = scope === "all" ? ("all" as const) : undefined;
   const onRequestsTab = tab === "requests";
-  const showAdminList = admin && scope === "all";
+  const showAdminList = registerManager && scope === "all";
 
   const adminListRows = showAdminList
     ? equipment.map((e) => {
@@ -266,7 +266,7 @@ export default async function EquipmentPage({
               </Link>
             </div>
           )}
-          {admin && tab === "equipment" && (
+          {registerManager && tab === "equipment" && (
             <>
               <Link
                 href={equipmentListPath({
@@ -310,7 +310,7 @@ export default async function EquipmentPage({
               { href: "/equipment/presun", icon: ArrowRightLeft, label: "Přesun", hint: "Mezi místnostmi" },
               { href: "/equipment/inventura", icon: ClipboardCheck, label: "Inventura", hint: "Kontrola stavu" },
               { href: "/equipment/prirazeni", icon: UserCheck, label: "Přiřazení", hint: "Uživatelům" },
-              ...(admin
+              ...(registerManager
                 ? [
                     {
                       href: "/equipment?scope=all&no_holder=1",
@@ -426,8 +426,8 @@ export default async function EquipmentPage({
             view={view}
             unassigned={unassigned}
             noHolder={noHolder}
-            canEdit={admin}
-            canAssign={admin || equipmentWrite}
+            canEdit={registerManager}
+            canAssign={registerManager}
           />
         </>
       ) : (
@@ -499,8 +499,8 @@ export default async function EquipmentPage({
                           <EquipmentTableActions
                             equipmentId={e.id}
                             assignmentId={e.assignment_id ?? null}
-                            canEdit={admin}
-                            canAssign={(admin || equipmentWrite) && scope === "all"}
+                            canEdit={registerManager}
+                            canAssign={registerManager && scope === "all"}
                           />
                         </td>
                       </tr>
