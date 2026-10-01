@@ -85,6 +85,7 @@ export async function maxSeriesTagInDb(db: PrismaTransactionClient): Promise<num
   return max == null ? null : Number(max);
 }
 
+/** Jen pro zobrazení (stránka nastavení). Kdo podle hodnoty zapisuje, čte ji přes `lockAssetTagSeries`. */
 export async function readAssetTagSeries(db: PrismaTransactionClient): Promise<AssetTagSeries | null> {
   const row = await db.system_settings.findUnique({
     where: { setting_key: ASSET_TAG_SERIES_SETTING_KEY },
@@ -93,15 +94,59 @@ export async function readAssetTagSeries(db: PrismaTransactionClient): Promise<A
   return parseAssetTagSeries(row?.setting_value);
 }
 
-/** Uloží start řady; poslední vydané číslo zachová. */
-export async function saveAssetTagSeriesStart(
-  db: PrismaTransactionClient,
-  start: number,
+/**
+ * Zamkne řádek nastavení řady do konce transakce (SELECT … FOR UPDATE) a vrátí
+ * jeho hodnotu. Musí být PRVNÍM příkazem transakce — snapshot REPEATABLE READ
+ * pak vznikne až po zámku, takže přidělování, ruční čísla i změna startu běží
+ * postupně a každé vidí poslední vydané číslo.
+ */
+export async function lockAssetTagSeries(tx: PrismaTransactionClient): Promise<AssetTagSeries | null> {
+  const rows = await tx.$queryRaw<{ setting_value: string | null }[]>`
+    SELECT setting_value FROM system_settings WHERE setting_key = ${ASSET_TAG_SERIES_SETTING_KEY} FOR UPDATE`;
+  return parseAssetTagSeries(rows[0]?.setting_value);
+}
+
+/**
+ * Ručně zadané číslo ve tvaru řady (1xxxxx) od startu výš patří řadě: mohlo už
+ * být vydané (položka mezitím smazaná) a překlep by řadu natrvalo posunul.
+ * Bez nastavené řady jsou rezervovaná čísla nad nejvyšším použitým. Null = v pořádku.
+ */
+export function manualTagSeriesConflict(
+  tag: string,
+  p: { series: AssetTagSeries | null; maxInDb: number | null }
+): string | null {
+  if (!/^1\d{5}$/.test(tag)) return null;
+  const n = Number(tag);
+  if (p.series) {
+    return n >= p.series.start
+      ? `Čísla od ${p.series.start} výš přiděluje aplikace z číselné řady. Ručně zadejte jen číslo z ABRA Gen nebo starší číslo nižší než ${p.series.start}.`
+      : null;
+  }
+  const reservedFrom = (p.maxInDb ?? ASSET_TAG_SERIES.min - 1) + 1;
+  return n >= reservedFrom
+    ? `Číselná řada ještě není nastavená — čísla řady od ${reservedFrom} výš zatím nejde zadat ručně.`
+    : null;
+}
+
+/**
+ * Nastaví start řady v transakci pod zámkem řady: nejnižší povolený start i poslední
+ * vydané číslo se čtou až po zámku, takže souběžné přidělení nic nepřepíše.
+ */
+export async function setAssetTagSeriesStart(
+  tx: PrismaTransactionClient,
+  rawStart: unknown,
   userId: number
-): Promise<void> {
-  const current = await readAssetTagSeries(db);
-  const value = JSON.stringify({ start, lastIssued: current?.lastIssued ?? null });
-  await db.system_settings.upsert({
+): Promise<{ ok: true; start: number; previous: AssetTagSeries | null } | { ok: false; error: string }> {
+  const previous = await lockAssetTagSeries(tx);
+  const minAllowed = firstAllowedSeriesStart({
+    maxInDb: await maxSeriesTagInDb(tx),
+    lastIssued: previous?.lastIssued ?? null,
+  });
+  const validated = validateSeriesStart(rawStart, minAllowed);
+  if (!validated.ok) return validated;
+
+  const value = JSON.stringify({ start: validated.start, lastIssued: previous?.lastIssued ?? null });
+  await tx.system_settings.upsert({
     where: { setting_key: ASSET_TAG_SERIES_SETTING_KEY },
     create: {
       setting_key: ASSET_TAG_SERIES_SETTING_KEY,
@@ -112,16 +157,15 @@ export async function saveAssetTagSeriesStart(
     },
     update: { setting_value: value, module: "equipment", updated_by: userId, updated_at: new Date() },
   });
+  return { ok: true, start: validated.start, previous };
 }
 
 /**
  * Přidělí `count` čísel uvnitř transakce. Prvním příkazem zamkne řádek
- * nastavení (SELECT … FOR UPDATE), takže souběžná přidělení běží postupně.
+ * nastavení (`lockAssetTagSeries`), takže souběžná přidělení běží postupně.
  */
 export async function allocateAssetTags(tx: PrismaTransactionClient, count: number): Promise<string[]> {
-  const rows = await tx.$queryRaw<{ setting_value: string | null }[]>`
-    SELECT setting_value FROM system_settings WHERE setting_key = ${ASSET_TAG_SERIES_SETTING_KEY} FOR UPDATE`;
-  const series = parseAssetTagSeries(rows[0]?.setting_value);
+  const series = await lockAssetTagSeries(tx);
   if (!series) throw new AssetNumberingNotConfiguredError();
 
   const tags = nextSeriesTags({ ...series, maxInDb: await maxSeriesTagInDb(tx), count });

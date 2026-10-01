@@ -12,6 +12,9 @@ import {
   allocateAssetTags,
   AssetNumberingNotConfiguredError,
   isRetryableAllocationError,
+  lockAssetTagSeries,
+  manualTagSeriesConflict,
+  maxSeriesTagInDb,
   uniqueConstraintIndex,
 } from "@/lib/equipment/asset-number";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
@@ -103,8 +106,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ equipment: items });
 }
 
-/** Inventární číslo zadané ručně už existuje (v evidenci nebo ve fondu QR). */
-class ManualTagTakenError extends Error {}
+/** Ručně zadané inventární číslo nejde použít (už existuje, nebo patří číselné řadě). */
+class ManualTagError extends Error {}
 
 /** Zařazení nové položky (nákup drobného majetku). Viz lib/equipment/new-item-validation.ts. */
 export async function POST(req: NextRequest) {
@@ -196,10 +199,16 @@ export async function POST(req: NextRequest) {
               codes = [claim.qr_code];
               poolId = claim.poolId;
             } else if (d.manualAssetTag) {
+              // Zámek řady prvním příkazem: ruční číslo se posoudí proti aktuálnímu startu řady.
+              const conflict = manualTagSeriesConflict(d.manualAssetTag, {
+                series: await lockAssetTagSeries(tx),
+                maxInDb: await maxSeriesTagInDb(tx),
+              });
+              if (conflict) throw new ManualTagError(conflict);
               const clash =
                 (await tx.equipment_items.count({ where: { asset_tag: d.manualAssetTag } })) +
                 (await tx.equipment_qr_pool.count({ where: { asset_tag: d.manualAssetTag } }));
-              if (clash > 0) throw new ManualTagTakenError(`Inventární číslo ${d.manualAssetTag} už existuje.`);
+              if (clash > 0) throw new ManualTagError(`Inventární číslo ${d.manualAssetTag} už existuje.`);
               tags = [d.manualAssetTag];
             } else {
               // Musí být prvním příkazem transakce (zámek řady).
@@ -266,7 +275,7 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
-    if (e instanceof PoolCodeError || e instanceof ManualTagTakenError) {
+    if (e instanceof PoolCodeError || e instanceof ManualTagError) {
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
     if (uniqueConstraintIndex(e) === "serial_number") {

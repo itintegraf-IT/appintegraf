@@ -1,9 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import type { PrismaTransactionClient } from "@/lib/db";
 import {
+  allocateAssetTags,
   firstAllowedSeriesStart,
   isRetryableAllocationError,
+  manualTagSeriesConflict,
   nextSeriesTags,
   parseAssetTagSeries,
+  setAssetTagSeriesStart,
   uniqueConstraintIndex,
   validateSeriesStart,
 } from "./asset-number";
@@ -125,5 +129,100 @@ describe("nastavení startu řady", () => {
     ["prázdné", ""],
   ])("odmítne start: %s", (_label, value) => {
     expect(validateSeriesStart(value, 100876).ok).toBe(false);
+  });
+});
+
+describe("manualTagSeriesConflict — ruční číslo nesmí zasáhnout do řady", () => {
+  const series = { start: 100876, lastIssued: 100880 };
+
+  it("číslo z Gen mimo tvar řady projde", () => {
+    expect(manualTagSeriesConflict("1215", { series, maxInDb: 100880 })).toBeNull();
+  });
+
+  it("starší číslo pod startem řady projde (dohledaný drobný majetek z Gen)", () => {
+    expect(manualTagSeriesConflict("100500", { series, maxInDb: 100880 })).toBeNull();
+  });
+
+  it.each([
+    ["už vydané číslo (položka mezitím smazaná)", "100878"],
+    ["start řady", "100876"],
+    ["překlep, který by řadu posunul o tisíce čísel", "108750"],
+  ])("odmítne %s", (_label, tag) => {
+    expect(manualTagSeriesConflict(tag, { series, maxInDb: 100880 })).toMatch(/100876/);
+  });
+
+  it("bez nastavené řady odmítne čísla nad nejvyšším použitým (budoucí řada)", () => {
+    expect(manualTagSeriesConflict("100500", { series: null, maxInDb: 100875 })).toBeNull();
+    expect(manualTagSeriesConflict("100876", { series: null, maxInDb: 100875 })).toMatch(/není nastavená/);
+  });
+});
+
+/** Maketa transakce: zaznamená pořadí příkazů; `FOR UPDATE` = zámek řádku nastavení řady. */
+function fakeTx(settingValue: string | null, maxInDb: number | null) {
+  const calls: string[] = [];
+  const upsert = vi.fn(async (args: unknown) => {
+    calls.push("upsert");
+    return args;
+  });
+  const update = vi.fn(async (args: unknown) => {
+    calls.push("update");
+    return args;
+  });
+  const tx = {
+    $queryRaw: vi.fn(async (strings: TemplateStringsArray) => {
+      const sql = strings.join("?");
+      if (sql.includes("FOR UPDATE")) {
+        calls.push("lock");
+        return settingValue === null ? [] : [{ setting_value: settingValue }];
+      }
+      calls.push("max");
+      return [{ max: maxInDb === null ? null : BigInt(maxInDb) }];
+    }),
+    system_settings: {
+      findUnique: vi.fn(async () => {
+        calls.push("read-bez-zamku");
+        return settingValue === null ? null : { setting_value: settingValue };
+      }),
+      upsert,
+      update,
+    },
+  };
+  return { tx: tx as unknown as PrismaTransactionClient, calls, upsert, update };
+}
+
+describe("setAssetTagSeriesStart — změna startu pod zámkem řady", () => {
+  it("zamkne řadu prvním příkazem a zachová poslední vydané číslo přečtené pod zámkem", async () => {
+    const { tx, calls, upsert } = fakeTx('{"start":100876,"lastIssued":100880}', 100880);
+    const res = await setAssetTagSeriesStart(tx, 100900, 1);
+    expect(res).toEqual({ ok: true, start: 100900, previous: { start: 100876, lastIssued: 100880 } });
+    expect(calls[0]).toBe("lock");
+    expect(calls).not.toContain("read-bez-zamku");
+    const args = upsert.mock.calls[0][0] as { update: { setting_value: string } };
+    expect(JSON.parse(args.update.setting_value)).toEqual({ start: 100900, lastIssued: 100880 });
+  });
+
+  it("odmítne start, který by znovu vydal už vydané číslo", async () => {
+    const { tx, upsert } = fakeTx('{"start":100876,"lastIssued":100880}', 100879);
+    const res = await setAssetTagSeriesStart(tx, 100880, 1);
+    expect(res.ok).toBe(false);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+
+  it("první nastavení řadu založí", async () => {
+    const { tx, upsert } = fakeTx(null, 100875);
+    const res = await setAssetTagSeriesStart(tx, "100876", 1);
+    expect(res).toEqual({ ok: true, start: 100876, previous: null });
+    const args = upsert.mock.calls[0][0] as { create: { setting_value: string } };
+    expect(JSON.parse(args.create.setting_value)).toEqual({ start: 100876, lastIssued: null });
+  });
+});
+
+describe("allocateAssetTags", () => {
+  it("zamkne řadu prvním příkazem a uloží poslední vydané číslo", async () => {
+    const { tx, calls, update } = fakeTx('{"start":100876,"lastIssued":100880}', 100880);
+    await expect(allocateAssetTags(tx, 2)).resolves.toEqual(["100881", "100882"]);
+    expect(calls[0]).toBe("lock");
+    const args = update.mock.calls[0][0] as { data: { setting_value: string } };
+    expect(JSON.parse(args.data.setting_value)).toEqual({ start: 100876, lastIssued: 100882 });
   });
 });
