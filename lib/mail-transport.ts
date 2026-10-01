@@ -1,6 +1,9 @@
 import nodemailer, { type Transporter } from "nodemailer";
 import { applyTestRedirect, testMailMode, type MailPolicyEnv } from "@/lib/email-test-redirect";
 
+/** Varování o aktivním přesměrování jen jednou za běh serveru. */
+let redirectWarned = false;
+
 /**
  * Obalí SMTP spojení pojistkou testovacího prostředí (viz `lib/email-test-redirect.ts`).
  * Každé `nodemailer.createTransport(...)` v aplikaci má jít přes tuto funkci.
@@ -19,6 +22,10 @@ export function withTestMailPolicy<T extends Transporter>(
   }
 
   const redirectTo = String(env.EMAIL_REDIRECT_TO).trim();
+  if (!redirectWarned) {
+    redirectWarned = true;
+    console.warn(`E-maily se přesměrovávají na EMAIL_REDIRECT_TO (${redirectTo}) s předmětem [TEST].`);
+  }
   transporter.use("compile", (mail, done) => {
     try {
       applyTestRedirect(mail.data, redirectTo);

@@ -38,7 +38,7 @@ beforeEach(() => {
 describe("e-maily Majetku escapují vstupy", () => {
   it("e-mail o pohybu majetku nevloží HTML ze jména, textu ani popisku", async () => {
     await sendEquipmentMovementEmail({
-      toEmail: "jan@integraf.cz",
+      toEmail: "jan@example.com",
       toName: "<img src=x onerror=alert(1)>",
       subject: "Pohyb majetku",
       intro: 'Položka <b>"Notebook"</b> & spol.',

@@ -73,7 +73,7 @@ export function DeleteItemButton({ equipmentId, itemName, blockReason }: Props) 
           </p>
         )}
         {error ? (
-          <p role="alert" className="mt-3 flex items-start gap-2 font-medium text-primary">
+          <p role="alert" className="mt-3 flex items-start gap-2 font-medium text-primary dark:text-destructive">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             {error}
           </p>

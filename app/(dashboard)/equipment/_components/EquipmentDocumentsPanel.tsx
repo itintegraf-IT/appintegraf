@@ -11,7 +11,6 @@ import {
 
 type FileRow = {
   id: number;
-  file_path: string;
   original_filename: string;
   document_type: string | null;
   mime_type: string | null;

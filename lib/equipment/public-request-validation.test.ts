@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { validatePublicEquipmentRequest } from "./public-request-validation";
+import {
+  isHoneypotTriggered,
+  PUBLIC_REQUEST_HONEYPOT_FIELD,
+  validatePublicEquipmentRequest,
+} from "./public-request-validation";
 
 const valid = {
   requester_name: "  Jan Novák ",
@@ -56,5 +60,37 @@ describe("validatePublicEquipmentRequest", () => {
   it("prioritu předá dál (whitelist hlídá createEquipmentRequest)", () => {
     const res = validatePublicEquipmentRequest({ ...valid, priority: "vysok_" });
     expect(res.ok && res.data.priority).toBe("vysok_");
+  });
+});
+
+describe("řídicí znaky", () => {
+  it.each([
+    ["zalomení řádku ve jménu", { ...valid, requester_name: "Jan\nBcc: x@y.cz" }],
+    ["obrácení směru textu v typu", { ...valid, equipment_type: "Notebook\u202Eexe.fdp" }],
+    ["tabulátor v e-mailu", { ...valid, requester_email: "jan\t@example.com" }],
+  ])("%s → odmítne", (_label, body) => {
+    expect(validatePublicEquipmentRequest(body).ok).toBe(false);
+  });
+
+  it("v popisu jsou řádky povolené", () => {
+    expect(validatePublicEquipmentRequest({ ...valid, description: "Řádek 1\nŘádek 2" }).ok).toBe(true);
+  });
+});
+
+describe("past na roboty", () => {
+  it("má neutrální název, který prohlížeč nevyplní jako firmu ani web", () => {
+    expect(PUBLIC_REQUEST_HONEYPOT_FIELD).not.toMatch(/firma|company|web|url|name|mail/i);
+  });
+
+  it.each([
+    [{ [PUBLIC_REQUEST_HONEYPOT_FIELD]: "http://spam.example" }, true],
+    [{ [PUBLIC_REQUEST_HONEYPOT_FIELD]: 1 }, true],
+    [{ [PUBLIC_REQUEST_HONEYPOT_FIELD]: true }, true],
+    [{ [PUBLIC_REQUEST_HONEYPOT_FIELD]: "" }, false],
+    [{ [PUBLIC_REQUEST_HONEYPOT_FIELD]: "   " }, false],
+    [{}, false],
+    [null, false],
+  ])("%j → %s", (body, expected) => {
+    expect(isHoneypotTriggered(body)).toBe(expected);
   });
 });

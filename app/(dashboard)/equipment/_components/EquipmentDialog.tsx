@@ -51,10 +51,14 @@ export function EquipmentDialog({
         e.preventDefault();
         if (!busy) onCancel();
       }}
+      // Prohlížeč může dialog zavřít i sám (např. tlačítko Zpět na Androidu) — srovnat stav.
+      onClose={() => {
+        if (open) onCancel();
+      }}
       className="m-auto max-h-[calc(100dvh-2rem)] w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-border bg-card p-6 text-card-foreground shadow-xl backdrop:bg-black/40"
     >
       <h2 id={titleId} className="flex items-start gap-2 text-lg font-semibold">
-        {destructive ? <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden /> : null}
+        {destructive ? <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-primary dark:text-destructive" aria-hidden /> : null}
         {title}
       </h2>
       <div className="mt-3 text-sm text-muted-foreground">{children}</div>

@@ -1,5 +1,7 @@
+import { readFileSync } from "fs";
+import path from "path";
 import { describe, expect, it } from "vitest";
-import { itemDeleteBlockReason, type ItemHistoryCounts } from "./item-history";
+import { ITEM_HISTORY_RELATION_MODELS, itemDeleteBlockReason, type ItemHistoryCounts } from "./item-history";
 
 const none: ItemHistoryCounts = {
   assignments: 0,
@@ -34,5 +36,18 @@ describe("itemDeleteBlockReason", () => {
     expect(reason).toMatch(/přiřazení\D*1/);
     expect(reason).toMatch(/inventur\D*3/);
     expect(reason).not.toMatch(/přesun/);
+  });
+});
+
+describe("úplnost ochrany proti mazání", () => {
+  it("počítá všechny tabulky, které na položku odkazují cizím klíčem (jinak by smazání kaskádou zničilo historii)", () => {
+    const schema = readFileSync(path.join(process.cwd(), "prisma/schema.prisma"), "utf8");
+    const referencing: string[] = [];
+    for (const [, model, body] of schema.matchAll(/^model (\w+) \{([\s\S]*?)^\}/gm)) {
+      if (model === "equipment_items") continue;
+      if (/^\s+\w+\s+equipment_items\??\s+@relation/m.test(body)) referencing.push(model);
+    }
+    expect(referencing.length).toBeGreaterThan(0);
+    expect([...ITEM_HISTORY_RELATION_MODELS].sort()).toEqual(referencing.sort());
   });
 });

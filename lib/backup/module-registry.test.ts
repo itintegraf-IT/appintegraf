@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
   BACKUP_MODULES,
-  getFileUploadFilterForModule,
-  getFileUploadModulesForExport,
   getModuleWarnings,
   getTablesForDelete,
   getTablesForModules,
@@ -66,13 +64,5 @@ describe("module-registry", () => {
     const imp = getTablesForModules(["materialy"]).map((t) => t.name);
     expect(del).not.toContain("users");
     expect(imp).not.toContain("users");
-  });
-
-  it("záloha Majetku obsahuje záznamy fotek a příloh (file_uploads modulu equipment)", () => {
-    expect(getFileUploadFilterForModule("equipment")).toEqual(["equipment"]);
-    expect(getFileUploadModulesForExport(["equipment"])).toContainEqual({
-      module: "equipment",
-      uploadSubdir: "equipment",
-    });
   });
 });

@@ -1,7 +1,22 @@
 /** Validace veřejného formuláře požadavku na vybavení (bez přihlášení). Limity podle sloupců equipment_requests. */
 
-/** Skryté pole formuláře: člověk ho nevyplní, robot ano (nestandardní název, aby ho nevyplnil správce hesel). */
-export const PUBLIC_REQUEST_HONEYPOT_FIELD = "firma_web_hp";
+/**
+ * Skryté pole formuláře: člověk ho nevyplní, robot ano. Neutrální název, aby ho
+ * automatické vyplňování prohlížeče nepovažovalo za firmu, web ani jméno.
+ */
+export const PUBLIC_REQUEST_HONEYPOT_FIELD = "ig_hp_7c1";
+
+/** Vyplněná past (jakákoli neprázdná hodnota) = požadavek robota. */
+export function isHoneypotTriggered(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  const value = (body as Record<string, unknown>)[PUBLIC_REQUEST_HONEYPOT_FIELD];
+  if (value == null || value === false) return false;
+  return typeof value === "string" ? value.trim() !== "" : true;
+}
+
+/** Řídicí znaky a obrácení směru textu; v popisu jsou povolené tabulátor a řádky. */
+const SINGLE_LINE_FORBIDDEN = /[\u0000-\u001F\u007F\u202A-\u202E\u2066-\u2069]/;
+const MULTI_LINE_FORBIDDEN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u202A-\u202E\u2066-\u2069]/;
 
 export type PublicEquipmentRequestInput = {
   requester_name: string;
@@ -48,6 +63,10 @@ export function validatePublicEquipmentRequest(
     }
     if (text.length > rule.max) {
       return { ok: false, error: `Pole „${rule.label}“ může mít nejvýše ${rule.max} znaků.` };
+    }
+    const forbidden = key === "description" ? MULTI_LINE_FORBIDDEN : SINGLE_LINE_FORBIDDEN;
+    if (forbidden.test(text)) {
+      return { ok: false, error: `Pole „${rule.label}“ obsahuje nepovolené znaky.` };
     }
     values[key] = text;
   }

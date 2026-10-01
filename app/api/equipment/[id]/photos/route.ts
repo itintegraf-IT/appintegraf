@@ -59,7 +59,16 @@ export async function GET(
       document_type: { in: docTypes },
     },
     orderBy: { created_at: "desc" },
-    include: { users: { select: { first_name: true, last_name: true } } },
+    // Bez file_path: soubory se otevírají jen přes /api/equipment/[id]/files/[fileId] s kontrolou oprávnění.
+    select: {
+      id: true,
+      original_filename: true,
+      document_type: true,
+      mime_type: true,
+      file_size: true,
+      created_at: true,
+      users: { select: { first_name: true, last_name: true } },
+    },
   });
 
   return NextResponse.json({ files });
