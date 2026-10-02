@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
-import { notifyEquipmentRoomTransfer } from "@/lib/equipment-movement-notify";
+import { notifyEquipmentRoomTransfer, notifyEquipmentRoomTransferBulk } from "@/lib/equipment-movement-notify";
 
 export type TransferSource = "scan" | "manual" | "bulk";
 
@@ -114,18 +114,30 @@ export async function transferManyEquipmentToRoom(params: {
   notes?: string | null;
   notify?: boolean;
 }): Promise<TransferResult[]> {
-  const results: TransferResult[] = [];
-  for (const equipmentId of params.equipmentIds) {
-    results.push(
-      await transferEquipmentToRoom({
+  const done: { equipmentId: number; result: TransferResult }[] = [];
+  try {
+    for (const equipmentId of params.equipmentIds) {
+      const result = await transferEquipmentToRoom({
         equipmentId,
         toRoomId: params.toRoomId,
         userId: params.userId,
         source: "bulk",
         notes: params.notes,
-        notify: params.notify,
-      })
-    );
+        notify: false,
+      });
+      done.push({ equipmentId, result });
+    }
+  } finally {
+    // Jedna souhrnná notifikace za dávku (i za přesunuté kusy, když se dávka zastavila na chybě).
+    if (params.notify === true && done.length === 1) {
+      const [{ equipmentId, result }] = done;
+      void notifyEquipmentRoomTransfer({ ...result, equipmentId });
+    } else if (params.notify === true && done.length > 1) {
+      void notifyEquipmentRoomTransferBulk({
+        transfers: done.map(({ equipmentId, result }) => ({ historyId: result.historyId, equipmentId })),
+        toRoomId: params.toRoomId,
+      });
+    }
   }
-  return results;
+  return done.map((d) => d.result);
 }

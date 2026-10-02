@@ -2,6 +2,7 @@ import { prisma } from "@/lib/db";
 import { sendEquipmentMovementEmail } from "@/lib/email";
 import { getDepartmentMembers } from "@/lib/equipment-departments";
 import { getExtraMovementNotifyUserIds } from "@/lib/equipment/movement-extra-recipients";
+import { unitsLabel } from "@/lib/equipment/new-item-validation";
 import {
   filterUserIdsAllowingEmail,
 } from "@/lib/user-email-notifications-db";
@@ -196,6 +197,120 @@ export async function notifyEquipmentReturned(params: {
 function roomLabel(room: { code: string | null; name: string } | null): string {
   if (!room) return "—";
   return [room.code, room.name].filter(Boolean).join(" – ") || room.name;
+}
+
+/** „Židle A, Židle B a další 3“ — výčet do souhrnné notifikace. */
+function itemsSummary(labels: string[], max = 5): string {
+  if (labels.length <= max) return labels.join(", ");
+  return `${labels.slice(0, max).join(", ")} a další ${labels.length - max}`;
+}
+
+async function loadItemLabels(equipmentIds: number[]): Promise<(ids: number[]) => string> {
+  const items = await prisma.equipment_items.findMany({
+    where: { id: { in: equipmentIds } },
+    select: { id: true, name: true, brand: true, model: true },
+  });
+  const labelOf = new Map(items.map((i) => [i.id, equipmentLabel(i.name, i)]));
+  return (ids) => itemsSummary(ids.map((id) => labelOf.get(id) ?? `#${id}`));
+}
+
+/**
+ * Hromadná akce: účtárna a další příjemci dostanou jednu souhrnnou notifikaci o všech kusech,
+ * každý držitel jednu o svých kusech (kdo je v obou skupinách, dostane jen souhrn).
+ */
+async function notifyBulk(
+  equipmentIds: number[],
+  holderByItem: Map<number, number>,
+  send: (recipients: Recipient[], equipmentIds: number[]) => Promise<void>
+): Promise<void> {
+  const office = await collectMovementRecipients(null);
+  await send(office, equipmentIds);
+
+  const officeIds = new Set(office.map((r) => r.id));
+  const byHolder = new Map<number, number[]>();
+  for (const id of equipmentIds) {
+    const holderId = holderByItem.get(id);
+    if (holderId == null || officeIds.has(holderId)) continue;
+    byHolder.set(holderId, [...(byHolder.get(holderId) ?? []), id]);
+  }
+  for (const [holderId, ids] of byHolder) {
+    await send(await loadUsersByIds([holderId]), ids);
+  }
+}
+
+/** Hromadný přesun do místnosti — jedna notifikace na příjemce místo jedné za každý kus. */
+export async function notifyEquipmentRoomTransferBulk(params: {
+  transfers: { historyId: number; equipmentId: number }[];
+  toRoomId: number;
+}): Promise<void> {
+  try {
+    if (params.transfers.length === 0) return;
+    const equipmentIds = params.transfers.map((t) => t.equipmentId);
+    const [describe, toRoom, assignments] = await Promise.all([
+      loadItemLabels(equipmentIds),
+      prisma.equipment_rooms.findUnique({ where: { id: params.toRoomId }, select: { code: true, name: true } }),
+      prisma.equipment_assignments.findMany({
+        where: { equipment_id: { in: equipmentIds }, returned_at: null },
+        select: { equipment_id: true, user_id: true },
+      }),
+    ]);
+    const toLabel = roomLabel(toRoom);
+
+    await notifyBulk(
+      equipmentIds,
+      new Map(assignments.map((a) => [a.equipment_id, a.user_id])),
+      (recipients, ids) => {
+        const message = `Do místnosti „${toLabel}“ přesunuto ${unitsLabel(ids.length)} majetku: ${describe(ids)}.`;
+        return notifyRecipients({
+          recipients,
+          title: "Hromadný přesun majetku",
+          message,
+          type: "equipment_room_transfer",
+          link: `/equipment/rooms/${params.toRoomId}`,
+          emailSubject: `Přesun majetku – ${unitsLabel(ids.length)} do ${toLabel} – INTEGRAF`,
+          emailIntro: `${message} Kusy v místnosti a protokoly o přesunu otevřete odkazem níže.`,
+          protocolLabel: "Otevřít místnost",
+        });
+      }
+    );
+  } catch (e) {
+    console.error("notifyEquipmentRoomTransferBulk error:", e);
+  }
+}
+
+/** Hromadné přiřazení jednomu držiteli — jedna notifikace na příjemce. */
+export async function notifyEquipmentAssignedBulk(params: {
+  equipmentIds: number[];
+  holderUserId: number;
+}): Promise<void> {
+  try {
+    if (params.equipmentIds.length === 0) return;
+    const [describe, holders] = await Promise.all([
+      loadItemLabels(params.equipmentIds),
+      loadUsersByIds([params.holderUserId]),
+    ]);
+    const holderName = holders[0] ? `${holders[0].first_name} ${holders[0].last_name}`.trim() : "uživateli";
+
+    await notifyBulk(
+      params.equipmentIds,
+      new Map(params.equipmentIds.map((id) => [id, params.holderUserId])),
+      (recipients, ids) => {
+        const message = `Uživateli ${holderName} přiděleno ${unitsLabel(ids.length)} majetku: ${describe(ids)}.`;
+        return notifyRecipients({
+          recipients,
+          title: "Přidělení majetku",
+          message,
+          type: "equipment_assigned",
+          link: "/equipment/prirazeni",
+          emailSubject: `Přidělení majetku – ${unitsLabel(ids.length)} – INTEGRAF`,
+          emailIntro: `${message} Předávací protokoly vytisknete v přehledu přiřazení.`,
+          protocolLabel: "Otevřít přehled přiřazení",
+        });
+      }
+    );
+  } catch (e) {
+    console.error("notifyEquipmentAssignedBulk error:", e);
+  }
 }
 
 /** Po přesunu mezi místnostmi — aktivní držitel (pokud je) + účtárna. */

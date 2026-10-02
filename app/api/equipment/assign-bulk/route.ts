@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { assignEquipmentToUser } from "@/lib/equipment/assign-to-user";
+import { notifyEquipmentAssigned, notifyEquipmentAssignedBulk } from "@/lib/equipment-movement-notify";
 import { parseNotifyFlag } from "@/lib/equipment/parse-notify-flag";
 
 export async function POST(req: NextRequest) {
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Uživatel nenalezen nebo není aktivní" }, { status: 400 });
   }
 
-  const assigned: number[] = [];
+  const assigned: { assignmentId: number; equipmentId: number }[] = [];
   const errors: string[] = [];
   for (const equipmentId of ids) {
     try {
@@ -49,12 +50,22 @@ export async function POST(req: NextRequest) {
         targetUserId: targetUser,
         assignedBy: userId,
         notes,
-        notify,
+        notify: false,
       });
-      assigned.push(r.assignmentId);
+      assigned.push({ assignmentId: r.assignmentId, equipmentId });
     } catch (e) {
       errors.push(e instanceof Error ? e.message : `Položka #${equipmentId}`);
     }
+  }
+
+  // Jedna souhrnná notifikace za dávku, ne jedna za každou položku.
+  if (notify && assigned.length === 1) {
+    void notifyEquipmentAssigned({ ...assigned[0], holderUserId: targetUser });
+  } else if (notify && assigned.length > 1) {
+    void notifyEquipmentAssignedBulk({
+      equipmentIds: assigned.map((a) => a.equipmentId),
+      holderUserId: targetUser,
+    });
   }
 
   return NextResponse.json({
