@@ -148,12 +148,9 @@ export default function PresunPage() {
           <span className="min-w-0 flex-1">
             {status.text}
             {status.protocolUrl ? (
-              <>
-                {" "}
-                <a href={status.protocolUrl} className="font-medium underline">
-                  Tisk protokolu
-                </a>
-              </>
+              <a href={status.protocolUrl} className="flex min-h-11 items-center font-medium underline">
+                Tisk protokolu
+              </a>
             ) : null}
           </span>
         </div>

@@ -179,7 +179,7 @@ export function InventuraClient({ canManageRegister, canAdminister }: Props) {
       const label = inventoryLineLabel(data.lineStatus, false).label;
       setFeedback({
         tone: "success",
-        text: data.alreadyScanned ? `${data.name}: už naskenováno (${label})` : `${data.name}: ${label}`,
+        text: data.alreadyScanned ? `${data.name}: už naskenováno — ${label}` : `${data.name}: ${label}`,
       });
       setScanCode("");
       if (!(await fetchDetail(id, true))) {
