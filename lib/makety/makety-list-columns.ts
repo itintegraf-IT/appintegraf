@@ -51,6 +51,7 @@ export type MaketyListRow = {
   job_number: string | null;
   creator_name: string | null;
   assignee_name: string | null;
+  customer_id: number | null;
   customer_name: string | null;
   created_by: number;
   can_edit: boolean;

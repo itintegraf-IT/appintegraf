@@ -137,6 +137,7 @@ export default async function MaketyListPage({
       { label_code: { contains: searchQ } },
       { job_number: { contains: searchQ } },
       { order_number: { contains: searchQ } },
+      { iml_customers: { name: { contains: searchQ } } },
     ];
     if (!Number.isNaN(idNum) && String(idNum) === idRaw) {
       or.push({ id: idNum });
@@ -214,6 +215,7 @@ export default async function MaketyListPage({
       assignee_name: r.users_assignee
         ? `${r.users_assignee.first_name} ${r.users_assignee.last_name}`
         : null,
+      customer_id: r.customer_id,
       customer_name: r.iml_customers?.name ?? null,
       created_by: r.created_by,
       can_edit: canEditRow,
@@ -376,7 +378,7 @@ export default async function MaketyListPage({
             <input
               name="q"
               defaultValue={searchQ}
-              placeholder="#id, kód, zakázka…"
+              placeholder="#id, kód, zakázka, klient…"
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
           </div>

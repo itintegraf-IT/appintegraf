@@ -66,7 +66,7 @@ function statusOptionLabel(status: string, rows: MaketyListRow[]): string {
   return g === m ? g : `${g} / ${m}`;
 }
 
-function toggleValue(list: string[], value: string): string[] {
+function toggleValue<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
 }
 
@@ -76,8 +76,8 @@ function SortFilterHeader({
   filterActive,
   children,
 }: {
-  sortDir: SortDir | null;
-  onCycleSort: () => void;
+  sortDir?: SortDir | null;
+  onCycleSort?: () => void;
   filterActive: boolean;
   children: ReactNode;
 }) {
@@ -91,17 +91,19 @@ function SortFilterHeader({
 
   return (
     <div className="flex items-center gap-0.5" onPointerDown={(e) => e.stopPropagation()}>
-      <button
-        type="button"
-        onClick={onCycleSort}
-        className={`rounded p-0.5 hover:bg-gray-200 ${
-          sortDir ? "text-violet-700" : "text-gray-400 hover:text-gray-600"
-        }`}
-        title={sortTitle}
-        aria-label={sortTitle}
-      >
-        <SortIcon className="h-3.5 w-3.5" />
-      </button>
+      {onCycleSort ? (
+        <button
+          type="button"
+          onClick={onCycleSort}
+          className={`rounded p-0.5 hover:bg-gray-200 ${
+            sortDir ? "text-violet-700" : "text-gray-400 hover:text-gray-600"
+          }`}
+          title={sortTitle}
+          aria-label={sortTitle}
+        >
+          <SortIcon className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
       <details className="relative">
         <summary
           className={`flex cursor-pointer list-none rounded p-0.5 hover:bg-gray-200 [&::-webkit-details-marker]:hidden ${
@@ -220,6 +222,8 @@ export function MaketyActiveTableClient({
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  /** 0 = řádky bez klienta */
+  const [customerFilter, setCustomerFilter] = useState<number[]>([]);
 
   const cycleSort = (column: SortableColumn) => {
     if (sortBy !== column) {
@@ -247,6 +251,25 @@ export function MaketyActiveTableClient({
     return unique;
   }, [rows]);
 
+  const customerOptions = useMemo(() => {
+    const map = new Map<number, string>();
+    let hasNone = false;
+    for (const r of rows) {
+      if (r.customer_id == null) {
+        hasNone = true;
+        continue;
+      }
+      if (!map.has(r.customer_id)) {
+        map.set(r.customer_id, r.customer_name?.trim() || `#${r.customer_id}`);
+      }
+    }
+    const list = [...map.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name, "cs"));
+    if (hasNone) list.unshift({ id: 0, name: "Bez klienta" });
+    return list;
+  }, [rows]);
+
   const displayedRows = useMemo(() => {
     let next = rows;
     if (statusFilter.length > 0) {
@@ -256,6 +279,13 @@ export function MaketyActiveTableClient({
     if (priorityFilter.length > 0) {
       const set = new Set(priorityFilter);
       next = next.filter((r) => set.has(r.priority));
+    }
+    if (customerFilter.length > 0) {
+      const set = new Set(customerFilter);
+      next = next.filter((r) => {
+        const key = r.customer_id ?? 0;
+        return set.has(key);
+      });
     }
     if (!sortBy) return next;
     const dir = sortDir === "asc" ? 1 : -1;
@@ -267,7 +297,9 @@ export function MaketyActiveTableClient({
       if (key !== 0) return key * dir;
       return a.id - b.id;
     });
-  }, [rows, statusFilter, priorityFilter, sortBy, sortDir]);
+  }, [rows, statusFilter, priorityFilter, customerFilter, sortBy, sortDir]);
+
+  const showCustomerFilter = visibleColumnIds.includes("customer");
 
   const columnExtras = {
     status: (
@@ -326,10 +358,38 @@ export function MaketyActiveTableClient({
         )}
       </SortFilterHeader>
     ),
+    ...(showCustomerFilter
+      ? {
+          customer: (
+            <SortFilterHeader filterActive={customerFilter.length > 0}>
+              <p className="mb-1.5 font-medium text-gray-600">Filtrovat klienta</p>
+              {customerOptions.map((opt) => (
+                <label key={opt.id} className="flex cursor-pointer items-center gap-2 py-0.5">
+                  <input
+                    type="checkbox"
+                    checked={customerFilter.includes(opt.id)}
+                    onChange={() => setCustomerFilter((prev) => toggleValue(prev, opt.id))}
+                  />
+                  <span className="truncate">{opt.name}</span>
+                </label>
+              ))}
+              {customerFilter.length > 0 && (
+                <button
+                  type="button"
+                  className="mt-1.5 text-violet-700 hover:underline"
+                  onClick={() => setCustomerFilter([])}
+                >
+                  Zrušit filtr
+                </button>
+              )}
+            </SortFilterHeader>
+          ),
+        }
+      : {}),
   };
 
   const filterNote =
-    statusFilter.length > 0 || priorityFilter.length > 0
+    statusFilter.length > 0 || priorityFilter.length > 0 || customerFilter.length > 0
       ? ` · zobrazeno ${displayedRows.length} z ${rows.length}`
       : null;
 
