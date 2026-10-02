@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { nextInventoryLineStatus, summarizeInventoryLines, validateInventoryCreate } from "./inventory-rules";
-import { inventoryLineLabel } from "./inventory-status";
+import { inventoryLineLabel, itemsCountLabel } from "./inventory-status";
+
+describe("itemsCountLabel", () => {
+  it.each([
+    [0, "0 položek"],
+    [1, "1 položka"],
+    [3, "3 položky"],
+    [14, "14 položek"],
+  ])("%i → %s", (n, label) => {
+    expect(itemsCountLabel(n)).toBe(label);
+  });
+});
 
 describe("validateInventoryCreate", () => {
   it("inventura místnosti s vybranou místností", () => {

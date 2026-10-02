@@ -14,6 +14,12 @@ export const INVENTORY_SCOPE_LABELS: Record<string, string> = {
   category: "Skupina",
 };
 
+/** „1 položka“, „3 položky“, „14 položek“. */
+export function itemsCountLabel(n: number): string {
+  if (n === 1) return "1 položka";
+  return n >= 2 && n <= 4 ? `${n} položky` : `${n} položek`;
+}
+
 export function inventoryLineLabel(status: string, inventoryCompleted: boolean): { label: string; tone: StatusTone } {
   switch (status) {
     case "missing":
