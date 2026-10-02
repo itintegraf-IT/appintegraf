@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarizeInventoryLines, validateInventoryCreate } from "./inventory-rules";
+import { nextInventoryLineStatus, summarizeInventoryLines, validateInventoryCreate } from "./inventory-rules";
 import { inventoryLineLabel } from "./inventory-status";
 
 describe("validateInventoryCreate", () => {
@@ -44,7 +44,50 @@ describe("summarizeInventoryLines", () => {
     const lines = ["found", "found", "missing", "unexpected", "extra", "missing", "found"].map((line_status) => ({
       line_status,
     }));
-    expect(summarizeInventoryLines(lines)).toEqual({ total: 7, found: 3, unexpected: 1, extra: 1, missing: 2 });
+    expect(summarizeInventoryLines(lines)).toMatchObject({ total: 7, found: 3, unexpected: 1, extra: 1, missing: 2 });
+  });
+
+  it("„nalezeno X z Y“ počítá jen očekávané položky, navíc zvlášť", () => {
+    const lines = ["found", "unexpected", "missing", "extra", "extra"].map((line_status) => ({ line_status }));
+    expect(summarizeInventoryLines(lines)).toMatchObject({ expected: 3, foundExpected: 2, extra: 2 });
+  });
+
+  it("inventura bez očekávaných položek není „25 z 25“", () => {
+    const lines = Array.from({ length: 25 }, () => ({ line_status: "extra" }));
+    expect(summarizeInventoryLines(lines)).toMatchObject({ expected: 0, foundExpected: 0, extra: 25 });
+  });
+});
+
+describe("nextInventoryLineStatus — stav řádku po skenu", () => {
+  it("položka mimo seznam = navíc (nový řádek)", () => {
+    expect(nextInventoryLineStatus(null, 80)).toEqual({ status: "extra", alreadyScanned: false });
+  });
+
+  it("očekávaná položka ve své místnosti = nalezeno", () => {
+    expect(nextInventoryLineStatus({ line_status: "missing", expected_room_id: 80 }, 80)).toEqual({
+      status: "found",
+      alreadyScanned: false,
+    });
+  });
+
+  it("očekávaná položka, kterou evidence mezitím vede jinde = nalezeno, evidováno jinde", () => {
+    expect(nextInventoryLineStatus({ line_status: "missing", expected_room_id: 80 }, 81)).toMatchObject({
+      status: "unexpected",
+    });
+  });
+
+  it("opakovaný sken položky navíc ji nezmění na nalezenou", () => {
+    expect(nextInventoryLineStatus({ line_status: "extra", expected_room_id: 81 }, 81)).toEqual({
+      status: "extra",
+      alreadyScanned: true,
+    });
+  });
+
+  it("opakovaný sken nalezené položky jen ohlásí, že už je naskenovaná", () => {
+    expect(nextInventoryLineStatus({ line_status: "found", expected_room_id: 80 }, 80)).toEqual({
+      status: "found",
+      alreadyScanned: true,
+    });
   });
 });
 

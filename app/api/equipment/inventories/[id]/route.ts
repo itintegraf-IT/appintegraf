@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canAdministerEquipment, canReadEquipment, canWriteEquipment } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
-import { summarizeInventoryLines } from "@/lib/equipment/inventory-rules";
+import { nextInventoryLineStatus, summarizeInventoryLines } from "@/lib/equipment/inventory-rules";
 import { resolveScanCode } from "@/lib/equipment/scan-resolve";
 
 export async function GET(
@@ -109,7 +109,7 @@ export async function POST(
 
   // scan
   const code = String(body.code ?? "").trim();
-  if (!code) return NextResponse.json({ error: "Chybí code" }, { status: 400 });
+  if (!code) return NextResponse.json({ error: "Chybí kód" }, { status: 400 });
 
   const { resolution } = await resolveScanCode(code, "item");
   if (resolution.type === "wrong_kind") {
@@ -139,10 +139,7 @@ export async function POST(
     },
   });
 
-  let lineStatus = "found";
-  if (line?.expected_room_id && item.room_id && line.expected_room_id !== item.room_id) {
-    lineStatus = "unexpected";
-  }
+  const { status: lineStatus, alreadyScanned } = nextInventoryLineStatus(line, item.room_id);
 
   if (line) {
     await prisma.equipment_inventory_lines.update({
@@ -159,12 +156,11 @@ export async function POST(
         inventory_id: id,
         equipment_id: item.id,
         expected_room_id: item.room_id,
-        line_status: "extra",
+        line_status: lineStatus,
         scanned_at: new Date(),
         scanned_by: userId,
       },
     });
-    lineStatus = "extra";
   }
 
   await logEquipmentAuditSafe({
@@ -181,5 +177,6 @@ export async function POST(
     equipmentId: item.id,
     name: item.name,
     lineStatus,
+    alreadyScanned,
   });
 }
