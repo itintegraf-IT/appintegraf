@@ -4,13 +4,14 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Html5Qrcode } from "html5-qrcode";
-import { AlertCircle, Info } from "lucide-react";
+import { AlertCircle, CheckCircle2, Info } from "lucide-react";
 import {
   EQUIPMENT_MANUAL_CODE_HINT_WITH_ROOM,
   EQUIPMENT_MANUAL_CODE_PLACEHOLDER_WITH_ROOM,
 } from "../_components/EquipmentCodeBadge";
 import { EquipmentDialog } from "../_components/EquipmentDialog";
-import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
+import { MovementNotifyCheckbox, useMovementNotifyPreference } from "../_components/MovementNotifyCheckbox";
+import { FieldFetchTimeoutError, fieldFetch, fieldFetchErrorMessage } from "@/lib/equipment/field-fetch";
 import { createScanGate } from "@/lib/equipment/scan-gate";
 
 type RoomInfo = { id: number; name: string; code: string };
@@ -27,8 +28,8 @@ type LookupResult = {
 };
 type PendingItem = { id: number; name: string; assetTag: string | null };
 type Choice = { item: LookupResult; room: LookupResult };
-
-const NETWORK_ERROR = "Spojení se serverem selhalo. Nic se neuložilo — zkuste to znovu.";
+/** Jediné stavové místo nad kamerou — se zapnutou kamerou je vše pod ní mimo obrazovku telefonu. */
+type Status = { tone: "error" | "info" | "success"; text: string; protocolUrl?: string } | null;
 
 function vibrate(pattern: number | number[]) {
   try {
@@ -44,12 +45,11 @@ export default function EquipmentScanClient() {
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [manual, setManual] = useState("");
   const [log, setLog] = useState<string[]>([]);
-  const [error, setError] = useState("");
-  const [info, setInfo] = useState("");
-  const [protocolUrl, setProtocolUrl] = useState("");
+  const [status, setStatus] = useState<Status>(null);
   const [pendingItem, setPendingItem] = useState<PendingItem | null>(null);
   const [choice, setChoice] = useState<Choice | null>(null);
   const [placing, setPlacing] = useState(false);
+  const [notify, setNotify] = useMovementNotifyPreference();
   const scannerRef = useRef<HTMLDivElement>(null);
   const roomRef = useRef<RoomInfo | null>(null);
   const modeRef = useRef(mode);
@@ -60,19 +60,20 @@ export default function EquipmentScanClient() {
   roomRef.current = room;
   modeRef.current = mode;
 
+  const setError = (text: string) => setStatus({ tone: "error", text });
+  const setInfo = (text: string) => setStatus({ tone: "info", text });
   const push = (msg: string) => setLog((l) => [msg, ...l].slice(0, 30));
 
   const placeItem = async (item: PendingItem, target: RoomInfo) => {
-    const notify = askSendEquipmentMovementNotify();
     let placeRes: Response;
     try {
-      placeRes = await fetch("/api/equipment/placement", {
+      placeRes = await fieldFetch("/api/equipment/placement", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ equipment_id: item.id, to_room_id: target.id, source: "scan", notify }),
       });
-    } catch {
-      setError(NETWORK_ERROR);
+    } catch (e) {
+      setError(fieldFetchErrorMessage(e));
       return;
     }
     const placeData = await placeRes.json().catch(() => ({}));
@@ -80,8 +81,9 @@ export default function EquipmentScanClient() {
       setError(placeData.error ?? "Umístění se nepodařilo.");
       return;
     }
-    push(`Umístěno: ${item.name} → ${target.code}`);
-    setProtocolUrl(placeData.protocolUrl ?? "");
+    const text = `Umístěno: ${item.name} → ${target.code}`;
+    push(text);
+    setStatus({ tone: "success", text, protocolUrl: placeData.protocolUrl || undefined });
     vibrate([40, 40, 40]);
   };
 
@@ -126,6 +128,7 @@ export default function EquipmentScanClient() {
         return false;
       }
       setRoom({ id: data.id, name: data.name ?? "", code: data.code ?? "" });
+      setStatus({ tone: "success", text: `Místnost ${data.code} – ${data.name}. Teď skenujte majetek.` });
       push(`Místnost: ${data.code} – ${data.name}`);
       vibrate(50);
       return false;
@@ -160,16 +163,19 @@ export default function EquipmentScanClient() {
     if (busyRef.current) return;
     busyRef.current = true;
     if (source === "camera") gateRef.current.markHandled(code, now);
-    setError("");
-    setInfo("");
+    setStatus(null);
 
     let keepLock = false;
     try {
       let res: Response;
       try {
-        res = await fetch(`/api/equipment/lookup?code=${encodeURIComponent(code)}`);
-      } catch {
-        setError(NETWORK_ERROR);
+        res = await fieldFetch(`/api/equipment/lookup?code=${encodeURIComponent(code)}`);
+      } catch (e) {
+        setError(
+          e instanceof FieldFetchTimeoutError
+            ? "Server neodpovídá. Oddalte kameru a naskenujte kód znovu."
+            : "Spojení se serverem selhalo. Oddalte kameru a naskenujte kód znovu."
+        );
         return;
       }
       const data: LookupResult & { error?: string; item?: LookupResult; room?: LookupResult } = await res
@@ -206,7 +212,8 @@ export default function EquipmentScanClient() {
         scanner = new Html5Qrcode("equipment-qr-reader");
         started = scanner.start(
           { facingMode: "environment" },
-          { fps: 8, qrbox: { width: 240, height: 240 } },
+          // Čtvercový náhled: na výšku telefonu zůstane stav nad kamerou i tlačítka pod ní na obrazovce.
+          { fps: 8, qrbox: { width: 240, height: 240 }, aspectRatio: 1 },
           (decoded) => {
             if (!cancelled) void handleCodeRef.current(decoded, "camera");
           },
@@ -221,8 +228,10 @@ export default function EquipmentScanClient() {
       cancelled = true;
       const s = scanner;
       // Kamera se vypne, i když odchod přišel během dotazu na povolení (start ještě běží).
+      // Bez clear(): ten hledá kontejner podle id až při volání a po rychlém návratu
+      // na stránku by vymazal náhled nové kamery. Starý kontejner odstraní React.
       if (s && started) {
-        void started.then(() => s.stop()).then(() => s.clear()).catch(() => undefined);
+        void started.then(() => s.stop()).catch(() => undefined);
       }
     };
   }, []);
@@ -230,6 +239,7 @@ export default function EquipmentScanClient() {
   const switchMode = (next: "place" | "assign") => {
     setPendingItem(null);
     setChoice(null);
+    setStatus(null);
     busyRef.current = false;
     gateRef.current.reset();
     setMode(next);
@@ -284,6 +294,7 @@ export default function EquipmentScanClient() {
             onClick={() => {
               setRoom(null);
               setPendingItem(null);
+              setStatus(null);
               busyRef.current = false;
               gateRef.current.reset();
             }}
@@ -299,6 +310,36 @@ export default function EquipmentScanClient() {
       ) : (
         <p className="text-sm text-muted-foreground">Naskenujte volný QR ze štítku fondu.</p>
       )}
+
+      {status ? (
+        <div
+          role={status.tone === "error" ? "alert" : "status"}
+          className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${
+            status.tone === "error"
+              ? "border-primary/40 font-medium text-primary dark:text-destructive"
+              : "border-border"
+          }`}
+        >
+          {status.tone === "error" ? (
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          ) : status.tone === "success" ? (
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-(--success)" aria-hidden />
+          ) : (
+            <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          )}
+          <span className="min-w-0 flex-1">
+            {status.text}
+            {status.protocolUrl ? (
+              <>
+                {" "}
+                <a href={status.protocolUrl} className="font-medium underline">
+                  Tisk protokolu
+                </a>
+              </>
+            ) : null}
+          </span>
+        </div>
+      ) : null}
 
       <div id="equipment-qr-reader" ref={scannerRef} className="overflow-hidden rounded-xl border bg-black" />
 
@@ -316,11 +357,14 @@ export default function EquipmentScanClient() {
         <div className="flex gap-2">
           <input
             id="scan-manual"
-            className="min-h-11 flex-1 rounded-lg border border-border bg-background px-3 font-mono"
+            className="min-h-11 min-w-0 flex-1 rounded-lg border border-border bg-background px-3 font-mono"
             placeholder={EQUIPMENT_MANUAL_CODE_PLACEHOLDER_WITH_ROOM}
             value={manual}
             onChange={(e) => setManual(e.target.value)}
             autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="characters"
+            spellCheck={false}
           />
           <button type="submit" className="min-h-11 rounded-lg bg-primary px-4 font-medium text-primary-foreground">
             OK
@@ -328,24 +372,6 @@ export default function EquipmentScanClient() {
         </div>
         <p className="text-xs text-muted-foreground">{EQUIPMENT_MANUAL_CODE_HINT_WITH_ROOM}</p>
       </form>
-
-      {error ? (
-        <p role="alert" className="flex items-start gap-2 rounded-lg border border-primary/40 p-3 text-sm font-medium text-primary dark:text-destructive">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          {error}
-        </p>
-      ) : null}
-      {info ? (
-        <p role="status" className="flex items-start gap-2 rounded-lg border border-border p-3 text-sm">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          {info}
-        </p>
-      ) : null}
-      {protocolUrl ? (
-        <a href={protocolUrl} className="block text-sm text-primary underline">
-          Tisk protokolu přesunu
-        </a>
-      ) : null}
 
       <ul className="space-y-1 text-sm text-muted-foreground">
         {log.map((l, i) => (
@@ -362,16 +388,19 @@ export default function EquipmentScanClient() {
         onCancel={cancelPlace}
       >
         {pendingItem && room ? (
-          <p>
-            Umístit <strong>„{pendingItem.name}“</strong>
-            {pendingItem.assetTag ? (
-              <>
-                {" "}
-                (inv. <span className="font-mono">{pendingItem.assetTag}</span>)
-              </>
-            ) : null}{" "}
-            do <strong>{room.code} – {room.name}</strong>?
-          </p>
+          <div className="space-y-3">
+            <p>
+              Umístit <strong>„{pendingItem.name}“</strong>
+              {pendingItem.assetTag ? (
+                <>
+                  {" "}
+                  (inv. <span className="font-mono">{pendingItem.assetTag}</span>)
+                </>
+              ) : null}{" "}
+              do <strong>{room.code} – {room.name}</strong>?
+            </p>
+            <MovementNotifyCheckbox checked={notify} onChange={setNotify} />
+          </div>
         ) : null}
       </EquipmentDialog>
 
