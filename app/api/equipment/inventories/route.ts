@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import {
   canAdministerEquipment,
+  canManageRegister,
   canReadEquipment,
   canWriteEquipment,
   getAccessibleCategoryIds,
@@ -45,18 +46,24 @@ export async function POST(req: NextRequest) {
   }
   const { scopeType, scopeId, name } = validated;
 
-  // Celofiremní inventura jen pro správce; skupina jen se zápisem do ní; místnost se zápisem do některé skupiny.
+  // Celofiremní inventura jen pro správce; skupina se zápisem do ní (i zodpovědná osoba);
+  // místnost jen správa evidence — seznam místnosti musí obsahovat všechny kusy, jinak by
+  // neúplná inventura jednoho člověka (409 na stejný rozsah) blokovala ostatní.
   const allowed =
     scopeType === "all"
       ? await canAdministerEquipment(userId)
       : scopeType === "category"
         ? await canWriteEquipment(userId, scopeId ?? undefined)
-        : await canWriteEquipment(userId);
+        : await canManageRegister(userId);
   if (!allowed) {
     return NextResponse.json(
       {
         error:
-          scopeType === "all" ? "Celofiremní inventuru může založit jen správce majetku." : "Nemáte oprávnění",
+          scopeType === "all"
+            ? "Celofiremní inventuru může založit jen správce majetku."
+            : scopeType === "room"
+              ? "Inventuru místnosti zakládá správa evidence majetku. Vy můžete založit inventuru své skupiny."
+              : "Nemáte oprávnění",
       },
       { status: 403 }
     );
