@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { canAdministerEquipment, canReadEquipment, canWriteEquipment } from "@/lib/equipment/access";
+import { canAdministerEquipment, canReadEquipment } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
 
 export async function GET(
@@ -42,7 +42,11 @@ export async function PATCH(
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
-  const admin = await canAdministerEquipment(userId);
+  // Jen správce Majetku: zodpovědná osoba skupiny má právo zápisu do celé skupiny
+  // a dostává její notifikace — změnit ji tedy znamená rozdávat oprávnění.
+  if (!(await canAdministerEquipment(userId))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
+  }
 
   const id = parseInt((await params).id, 10);
   if (Number.isNaN(id)) {
@@ -53,11 +57,6 @@ export async function PATCH(
   if (!existing) return NextResponse.json({ error: "Nenalezeno" }, { status: 404 });
 
   const body = await req.json().catch(() => ({}));
-  const keys = Object.keys(body).filter((k) => body[k] !== undefined);
-  const onlyResponsible = keys.length === 1 && keys[0] === "responsible_user_id";
-  if (!admin && !(onlyResponsible && (await canWriteEquipment(userId, id)))) {
-    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
-  }
   const data: {
     name?: string;
     code?: string;
@@ -83,6 +82,10 @@ export async function PATCH(
     }
   }
 
+  const oldValues = Object.fromEntries(
+    Object.keys(data).map((k) => [k, existing[k as keyof typeof data]])
+  );
+
   try {
     const row = await prisma.equipment_categories.update({ where: { id }, data });
     await logEquipmentAuditSafe({
@@ -91,6 +94,7 @@ export async function PATCH(
       tableName: "equipment_categories",
       recordId: id,
       detail: data,
+      oldValues,
     });
     return NextResponse.json(row);
   } catch {

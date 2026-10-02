@@ -235,7 +235,7 @@ export default function EditEquipmentPage() {
                 currentPerson={
                   categories.find((c) => String(c.id) === form.category_id)?.users_responsible ?? null
                 }
-                canEdit
+                canEdit={false}
               />
             </div>
           ) : null}

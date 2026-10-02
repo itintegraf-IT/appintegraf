@@ -12,6 +12,9 @@ import {
   allocateAssetTags,
   AssetNumberingNotConfiguredError,
   isRetryableAllocationError,
+  lockAssetTagSeries,
+  manualTagSeriesConflict,
+  maxSeriesTagInDb,
   uniqueConstraintIndex,
 } from "@/lib/equipment/asset-number";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
@@ -103,8 +106,8 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ equipment: items });
 }
 
-/** Inventární číslo zadané ručně už existuje (v evidenci nebo ve fondu QR). */
-class ManualTagTakenError extends Error {}
+/** Ručně zadané inventární číslo nejde použít (už existuje, nebo patří číselné řadě). */
+class ManualTagError extends Error {}
 
 /** Zařazení nové položky (nákup drobného majetku). Viz lib/equipment/new-item-validation.ts. */
 export async function POST(req: NextRequest) {
@@ -113,14 +116,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
+  // Nákupy zařazuje jen správa evidence (účtárna = Editor Majetku, správce modulu):
+  // každé zařazení čerpá čísla z účetní řady drobného majetku.
+  if (!(await canManageRegister(userId))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
+  }
 
   const body: unknown = await req.json().catch(() => null);
-  const validated = validateNewItemInput(body, {
-    canSetManualTag: await canManageRegister(userId),
-    today: new Date(),
-  });
+  const validated = validateNewItemInput(body, { canSetManualTag: true, today: new Date() });
   if (!validated.ok) {
-    return NextResponse.json({ error: validated.error }, { status: 400 });
+    return NextResponse.json({ error: validated.error, field: validated.field }, { status: 400 });
   }
   const d = validated.data;
 
@@ -134,7 +139,10 @@ export async function POST(req: NextRequest) {
       select: { is_active: true },
     });
     if (!category || category.is_active === false) {
-      return NextResponse.json({ error: "Vybraná skupina neexistuje nebo není aktivní." }, { status: 400 });
+      return NextResponse.json(
+        { error: "Vybraná skupina neexistuje nebo není aktivní.", field: "category" },
+        { status: 400 }
+      );
     }
     if (d.roomId != null) {
       const room = await prisma.equipment_rooms.findUnique({
@@ -142,7 +150,10 @@ export async function POST(req: NextRequest) {
         select: { is_active: true },
       });
       if (!room || !room.is_active) {
-        return NextResponse.json({ error: "Vybraná místnost neexistuje nebo není aktivní." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Vybraná místnost neexistuje nebo není aktivní.", field: "room" },
+          { status: 400 }
+        );
       }
     }
     const serials = d.serialNumbers.filter((sn): sn is string => sn !== null);
@@ -153,7 +164,7 @@ export async function POST(req: NextRequest) {
       });
       if (taken.length > 0) {
         return NextResponse.json(
-          { error: `Sériové číslo už existuje: ${taken.map((t) => t.serial_number).join(", ")}` },
+          { error: `Sériové číslo už existuje: ${taken.map((t) => t.serial_number).join(", ")}`, field: "serials" },
           { status: 400 }
         );
       }
@@ -196,10 +207,16 @@ export async function POST(req: NextRequest) {
               codes = [claim.qr_code];
               poolId = claim.poolId;
             } else if (d.manualAssetTag) {
+              // Zámek řady prvním příkazem: ruční číslo se posoudí proti aktuálnímu startu řady.
+              const conflict = manualTagSeriesConflict(d.manualAssetTag, {
+                series: await lockAssetTagSeries(tx),
+                maxInDb: await maxSeriesTagInDb(tx),
+              });
+              if (conflict) throw new ManualTagError(conflict);
               const clash =
                 (await tx.equipment_items.count({ where: { asset_tag: d.manualAssetTag } })) +
                 (await tx.equipment_qr_pool.count({ where: { asset_tag: d.manualAssetTag } }));
-              if (clash > 0) throw new ManualTagTakenError(`Inventární číslo ${d.manualAssetTag} už existuje.`);
+              if (clash > 0) throw new ManualTagError(`Inventární číslo ${d.manualAssetTag} už existuje.`);
               tags = [d.manualAssetTag];
             } else {
               // Musí být prvním příkazem transakce (zámek řady).
@@ -247,6 +264,7 @@ export async function POST(req: NextRequest) {
           qr_code: row.qr_code,
           serial_number: row.serial_number,
           numbering: d.poolCode ? "pool" : d.manualAssetTag ? "manual" : "series",
+          confirmed_small_asset: d.confirmedSmallAsset,
         },
       });
     }
@@ -266,11 +284,11 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
-    if (e instanceof PoolCodeError || e instanceof ManualTagTakenError) {
-      return NextResponse.json({ error: e.message }, { status: 400 });
+    if (e instanceof PoolCodeError || e instanceof ManualTagError) {
+      return NextResponse.json({ error: e.message, field: "assetTag" }, { status: 400 });
     }
     if (uniqueConstraintIndex(e) === "serial_number") {
-      return NextResponse.json({ error: "Sériové číslo už existuje." }, { status: 400 });
+      return NextResponse.json({ error: "Sériové číslo už existuje.", field: "serials" }, { status: 400 });
     }
     console.error("Equipment POST error:", e);
     return NextResponse.json({ error: "Chyba při vytváření vybavení" }, { status: 500 });

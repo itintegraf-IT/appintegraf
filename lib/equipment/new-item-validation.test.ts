@@ -1,5 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { validateNewItemInput } from "./new-item-validation";
+import { unitsLabel, validateNewItemInput } from "./new-item-validation";
+
+describe("unitsLabel", () => {
+  it.each([
+    [1, "1 kus"],
+    [2, "2 kusy"],
+    [4, "4 kusy"],
+    [5, "5 kusů"],
+    [22, "22 kusů"],
+    [50, "50 kusů"],
+  ])("%i → %s", (n, label) => {
+    expect(unitsLabel(n)).toBe(label);
+  });
+});
 
 const today = new Date("2026-10-01T10:00:00");
 const base = {
@@ -55,17 +68,61 @@ describe("validateNewItemInput — povinné údaje nákupu", () => {
     expect(b.ok && b.data.purchasePrice).toBe("1500.50");
   });
 
-  it("od 80 000 Kč upozorní, že odepisovaný majetek patří do ABRA Gen", () => {
-    const res = validateNewItemInput({ ...base, purchase_price: "80000" }, opts);
-    expect(res.ok && res.warnings.join(" ")).toMatch(/80\s?000/);
-    const below = validateNewItemInput({ ...base, purchase_price: "79999.99" }, opts);
-    expect(below.ok && below.warnings).toEqual([]);
+  it.each([
+    ["chybí cena", { ...base, purchase_price: "" }, "purchasePrice"],
+    ["datum v budoucnu", { ...base, purchase_date: "2026-10-02" }, "purchaseDate"],
+    ["chybí doklad", { ...base, invoice_number: "" }, "invoiceNumber"],
+    ["chybí skupina", { ...base, category_id: "" }, "category"],
+    ["51 kusů", { ...base, unit_count: 51 }, "units"],
+  ])("chyba (%s) nese pole, ke kterému patří", (_label, body, field) => {
+    expect(validateNewItemInput(body, opts)).toMatchObject({ ok: false, field });
+  });
+
+  it("u prázdného formuláře hlásí nejdřív doklad (pořadí polí ve formuláři)", () => {
+    const empty = { name: "", category_id: "", purchase_date: "", purchase_price: "", invoice_number: "" };
+    expect(validateNewItemInput(empty, opts)).toMatchObject({ ok: false, field: "invoiceNumber" });
+    expect(validateNewItemInput({ ...empty, invoice_number: "F1", purchase_date: "2026-09-28", purchase_price: "1" }, opts))
+      .toMatchObject({ ok: false, field: "name" });
+  });
+});
+
+describe("validateNewItemInput — hranice odepisovaného majetku (vyšší než 80 000 Kč)", () => {
+  const manager = { ...opts, canSetManualTag: true };
+
+  it("přesně 80 000 Kč je ještě drobný majetek", () => {
+    expect(validateNewItemInput({ ...base, purchase_price: "80000" }, opts)).toMatchObject({ ok: true, warnings: [] });
+  });
+
+  it("nad 80 000 Kč s číslem z řady chce potvrzení, že jde o drobný majetek", () => {
+    const res = validateNewItemInput({ ...base, purchase_price: "80000,01" }, manager);
+    expect(res).toMatchObject({ ok: false, field: "assetTag" });
+    expect(!res.ok && res.error).toMatch(/80 000/);
+    const confirmed = validateNewItemInput({ ...base, purchase_price: "80000,01", confirm_small_asset: true }, manager);
+    expect(confirmed.ok).toBe(true);
+  });
+
+  it("nad 80 000 Kč s číslem z ABRA Gen projde bez potvrzení", () => {
+    const res = validateNewItemInput({ ...base, purchase_price: "95000", manual_asset_tag: "1215" }, manager);
+    expect(res).toMatchObject({ ok: true, warnings: [] });
+  });
+
+  it("nad 80 000 Kč víc kusů najednou odmítne (každý kus má v Gen vlastní číslo)", () => {
+    const res = validateNewItemInput(
+      { ...base, purchase_price: "95000", unit_count: 2, confirm_small_asset: true },
+      manager
+    );
+    expect(res).toMatchObject({ ok: false, field: "units" });
   });
 });
 
 describe("validateNewItemInput — inventární číslo a fond QR", () => {
   it("ruční číslo bez oprávnění odmítne", () => {
     expect(validateNewItemInput({ ...base, manual_asset_tag: "1215" }, opts).ok).toBe(false);
+  });
+
+  it("zvolené ruční číslo nesmí zůstat prázdné (žádné tiché přidělení z řady)", () => {
+    const res = validateNewItemInput({ ...base, manual_asset_tag: "  " }, { ...opts, canSetManualTag: true });
+    expect(res).toMatchObject({ ok: false, field: "assetTag" });
   });
 
   it("ruční číslo s oprávněním přijme (oříznuté)", () => {
