@@ -12,7 +12,9 @@ import { EquipmentTransferModal } from "../_components/EquipmentTransferModal";
 import { EquipmentCodeBadge } from "../_components/EquipmentCodeBadge";
 import { EquipmentResponsibleEditor } from "../_components/EquipmentResponsibleEditor";
 import { formatEquipmentPrice } from "@/lib/equipment/format-price";
-import { canReadEquipment, canWriteEquipment } from "@/lib/equipment/access";
+import { canAdministerEquipment, canReadEquipment, canWriteEquipment } from "@/lib/equipment/access";
+import { getItemHistoryCounts, itemDeleteBlockReason } from "@/lib/equipment/item-history";
+import { DeleteItemButton } from "./DeleteItemButton";
 
 function fmtPrice(p: unknown): string {
   return formatEquipmentPrice(p);
@@ -63,6 +65,10 @@ export default async function EquipmentViewPage({
   if (!(await canReadEquipment(userId, item.category_id))) notFound();
 
   const canWrite = await canWriteEquipment(userId, item.category_id);
+  const canAdmin = await canAdministerEquipment(userId);
+  const deleteBlockReason = canAdmin
+    ? itemDeleteBlockReason(await getItemHistoryCounts(prisma, item.id))
+    : null;
   const rooms = await prisma.equipment_rooms.findMany({
     where: { is_active: true },
     orderBy: { code: "asc" },
@@ -113,6 +119,9 @@ export default async function EquipmentViewPage({
               rooms={rooms}
               currentRoomId={item.room_id}
             />
+          ) : null}
+          {canAdmin ? (
+            <DeleteItemButton equipmentId={item.id} itemName={item.name} blockReason={deleteBlockReason} />
           ) : null}
           <Link
             href="/equipment"
