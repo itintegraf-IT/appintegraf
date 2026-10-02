@@ -1,24 +1,23 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import { canManageRegister, canWriteEquipment } from "@/lib/equipment/access";
+import { canManageRegister } from "@/lib/equipment/access";
 import { AddEquipmentForm } from "./AddEquipmentForm";
 
-/** Zařazení nového majetku. `?pool=` = kód ze štítku fondu QR (ze skeneru), `?room=` = místnost. */
+/**
+ * Zařazení nákupu do evidence — jen správa evidence (účtárna = Editor Majetku, správce).
+ * `?pool=` = kód ze štítku fondu QR (ze skeneru), `?room=` = místnost.
+ */
 export default async function AddEquipmentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ pool?: string; room?: string }>;
+  searchParams: Promise<{ pool?: string | string[]; room?: string | string[] }>;
 }) {
   const session = await auth();
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
-  if (!(await canWriteEquipment(userId))) redirect("/equipment");
+  if (!(await canManageRegister(userId))) redirect("/equipment");
 
   const params = await searchParams;
-  return (
-    <AddEquipmentForm
-      canSetManualTag={await canManageRegister(userId)}
-      initialPoolCode={(params.pool ?? "").slice(0, 120)}
-      initialRoomId={/^\d+$/.test(params.room ?? "") ? (params.room as string) : ""}
-    />
-  );
+  const pool = typeof params.pool === "string" ? params.pool.slice(0, 120) : "";
+  const room = typeof params.room === "string" && /^\d+$/.test(params.room) ? params.room : "";
+  return <AddEquipmentForm initialPoolCode={pool} initialRoomId={room} />;
 }
