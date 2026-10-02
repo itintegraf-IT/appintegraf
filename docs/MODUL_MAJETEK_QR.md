@@ -99,13 +99,15 @@ flowchart TB
 
 | Role | Přidělení | Oprávnění |
 |------|-----------|-----------|
-| **Správce majetku** | `equipment:admin` v Admin → Uživatelé | Skupiny, místnosti, přístupy nahlížení, hromadný tisk štítků místností |
-| **Editor modulu** | `equipment:write` | Zápis všech položek (zachovat pro IT workflow) |
+| **Správce majetku** | `equipment:admin` v Admin → Uživatelé (nebo globální admin) | Vše jako Editor + nastavení (skupiny, místnosti, číselná řada, štítky, notifikace), import z Excelu, smazání omylem založené položky bez historie, změna zodpovědné osoby skupiny, celofiremní inventura |
+| **Editor modulu = správa evidence** | `equipment:write` | Celá evidence: zařazování nákupů (číslo z řady), úpravy, přiřazení, přesuny, inventura místnosti a skupiny. Úroveň pro **účtárnu** |
 | **Čtenář modulu** | `equipment:read` | Čtení všeho, nebo jen přidělených skupin (pokud má záznamy v `equipment_user_category_access`) |
-| **Zodpovědný za skupinu** | `responsible_user_id` na `equipment_categories` | CRUD položek ve skupině, skenování, přesuny, inventura skupiny |
+| **Zodpovědný za skupinu** | `responsible_user_id` na `equipment_categories` (mění jen správce) | Položky své skupiny: úpravy, přiřazení, skenování, přesuny, inventura skupiny. Nákupy nezařazuje |
 | **Nahlížení** | `equipment_user_category_access` | Jen čtení přidělených skupin |
 
-Centrální logika: `lib/equipment/access.ts` – všechny API routes kontrolují přístup přes `canReadEquipment` / `canWriteEquipment` s kontextem `categoryId`.
+Centrální logika: `lib/equipment/access.ts` – `canReadEquipment` / `canWriteEquipment` (s kontextem `categoryId`), `canManageRegister` (správa evidence), `canAdministerEquipment` (správce).
+
+Úroveň **Admin** u Majetku dostává i notifikace o nových požadavcích a tiketech helpdesku (`getUsersWithModuleAdmin("equipment")`) — účetním proto dávat **Editor**.
 
 ---
 
@@ -220,6 +222,16 @@ Výchozí seed skupin: *Výpočetní a komunikační technika*, *Bílá technika
 
 Sdílená komponenta: `EquipmentItemForm`.
 
+**Zařazení nákupu** (`/equipment/add`, jen správa evidence; od 1. 10. 2026 je aplikace hlavní evidencí drobného majetku):
+
+- Povinné: doklad (číslo faktury), datum pořízení, pořizovací cena za kus **bez DPH** (při neuplatněném odpočtu s DPH), název, skupina. Validace `lib/equipment/new-item-validation.ts` je společná pro formulář i server.
+- Inventární číslo přidělí aplikace z **číselné řady drobného majetku 100xxx** (`lib/equipment/asset-number.ts`). Start řady nastaví správce v Nastavení → Inventární čísla zadáním posledního čísla z ABRA Gen; čísla se přidělují postupně pod zámkem a nikdy se nepoužijí znovu.
+- Majetek s cenou **vyšší než 80 000 Kč** je odepisovaný a eviduje se v ABRA Gen → zadává se ručně jeho číslo z Gen, po jednom kuse. Číslo z řady jen s výslovným potvrzením, že jde o drobný majetek.
+- Ručně zadané číslo ve tvaru řady od startu výš aplikace odmítne (patří řadě).
+- Více kusů najednou: každý kus má vlastní číslo; po uložení souhrn přidělených čísel.
+
+**Smazání:** jen omylem založená položka bez historie (přiřazení, přesuny, inventury, soubory, kódy z fondu) a jen správce; jinak se položka vyřadí. Kontrola `lib/equipment/item-history.ts`.
+
 ### 3. QR kódy a štítky
 
 **Formát štítku:** jedna vizitka (výchozí **90 × 50 mm**) — majetek i místnost. Ne celý A4 jako jeden štítek.
@@ -258,7 +270,9 @@ Stavy kódu: `available` (volný) → `assigned` (přiřazený) / `void` (ztrace
 
 API: `POST …/qr-pool/generate`, `GET …/batches/[id]/pdf`, `POST …/qr-pool/assign`, `POST …/qr-pool/[id]/void`.
 
-Alternativa: při vytvoření položky bez skenu se `qr_code` + `asset_tag` vygenerují automaticky (jako dosud v plánu).
+**Stav 10/2026:** generování nového fondu je dočasně vypnuté — zavede se s novými štítky (vlna 2), aby kódy fondu nesly čísla z řady drobného majetku. Volný kód z fondu naskenovaný v režimu *Přiřadit QR* otevře formulář zařazení nákupu (povinné údaje dokladu); neplatný nebo použitý kód je chyba.
+
+Bez fondu: při zařazení se `qr_code` vygeneruje a `asset_tag` přidělí z číselné řady.
 
 ### 4. PWA skener (Android / mobil)
 
@@ -271,7 +285,19 @@ Stránka `/equipment/scan`:
 
 Závislost: `html5-qrcode`. Fallback: ruční zadání kódu.
 
-**Ruční zadání:** na skenování, přesunu i inventuře lze vždy zadat **inventární číslo** položky (`EQ-…` / `asset_tag`) nebo **kód místnosti** (např. `V-ADM`) — stejné hodnoty, které jsou vytištěné na vizitkových štítcích vedle QR. Lookup API (`parseEquipmentScanCode` / `/api/equipment/lookup`) akceptuje `asset_tag`, `qr_code` i `code` místnosti.
+**Rozpoznání kódu** (jedno pro celý modul: `lib/equipment/scan-code.ts` = čistá logika, `scan-resolve.ts` = dotazy, `GET /api/equipment/lookup?code=…&target=any|item|room`):
+
+- QR s prefixem `INTEGRAF:EQ:` je vždy položka, `INTEGRAF:RM:` vždy místnost.
+- Holý kód (ruční zadání, inventární číslo, sériové číslo, kód místnosti): u položky má přednost inventární číslo, pak QR, pak sériové číslo. Když kód odpovídá položce i místnosti (např. `1012`), skener nabídne výběr — nikdy tiché přepnutí.
+- **Přesun a inventura přijímají jen položky** (`target=item`); kód místnosti tam vrátí srozumitelnou chybu. Kód místnosti se zadává jen na skeneru.
+
+**Chování skeneru v terénu:**
+
+- Kód, který zůstává v záběru kamery, se zpracuje jednou; znovu až po oddálení kamery (`lib/equipment/scan-gate.ts`).
+- Položka už v cílové místnosti → jen informace, bez dialogu. Umístění vždy po potvrzení v dialogu; notifikace držiteli a účtárně se volí zaškrtnutím přímo v dialogu (volba platí pro relaci).
+- Stav (chyba, informace, potvrzení s odkazem na protokol) je nad kamerou, náhled kamery je čtvercový.
+- Požadavky terénních obrazovek (sken, přesun, inventura) mají časový limit 12 s (`lib/equipment/field-fetch.ts`); při výpadku sítě obrazovka řekne, zda se změna mohla uložit.
+- Kamera se vypne i při odchodu ze stránky během dotazu na povolení.
 
 ### 5. Přesun mezi místnostmi
 
@@ -289,6 +315,8 @@ Jednotná funkce `transferEquipmentToRoom()` v `lib/equipment/room-transfer.ts`:
 - PDF: `GET /api/equipment/transfers/[historyId]/pdf`
 
 **Audit:** `equipment_location_history` + `audit_log` (`action: room_transfer`).
+
+**Notifikace o pohybu** (přesun, přiřazení, vrácení — jen se souhlasem uživatele): držitel, členové oddělení **Účetnictví** (kód `ACC`) a další příjemci z Nastavení → Notifikace (`lib/equipment-movement-notify.ts`). Hromadný přesun nebo přiřazení pošle **jednu souhrnnou** notifikaci na příjemce (držitel jednu za své kusy), ne jednu za každou položku.
 
 ### 6. Fotogalerie a přílohy
 
@@ -322,10 +350,12 @@ Jednotná funkce `transferEquipmentToRoom()` v `lib/equipment/room-transfer.ts`:
 
 **Živá inventura** (`/equipment/inventura`):
 
-- Založení akce s výběrem rozsahu
-- Skenování QR v místnosti / seznamu
-- Stavy: nalezeno, chybí, neočekávané (špatná místnost), navíc (není v rozsahu)
-- Po uzavření → inventurní protokol
+- Založení akce s výběrem rozsahu — **kdo smí:** místnost správa evidence (Editor/správce; seznam místnosti obsahuje všechny kusy), skupina kdokoli se zápisem do skupiny (i zodpovědný), celá firma jen správce. Rozsah se vždy vybírá výslovně (žádná „omylem celofiremní“ inventura).
+- Pro stejný rozsah běží nejvýš jedna inventura; druhé založení otevře probíhající.
+- Skenování položek (kód místnosti v inventuře je chyba). Stavy řádku (`lib/equipment/inventory-rules.ts`, `inventory-status.ts`): *Čeká na sken* → *Nalezeno* / *Nalezeno, evidováno jinde*; položka mimo seznam *Navíc (není v seznamu)* — opakovaný sken ji nezmění; po uzavření nenaskenované *Chybí*.
+- Souhrn „Nalezeno X z Y“ počítá jen položky ze seznamu, položky navíc zvlášť.
+- Uzavírá zakladatel nebo správce, po potvrzení v dialogu se souhrnem; uzavření nelze vrátit. Sken i uzavření míří vždy na zobrazenou inventuru.
+- Po uzavření → inventurní protokol (soupis podle § 30 ZoÚ: vlna 3)
 
 **Statická inventurní sestava** (`/equipment/reporty`):
 
