@@ -581,6 +581,8 @@ model equipment_categories {
   icon                       String?                          @db.VarChar(50)
   is_active                  Boolean?                         @default(true)
   responsible_user_id        Int?
+  /// false = skupina se štítky nepolepuje (auta, budovy, software — inventura podle dokladů)
+  label_required             Boolean                          @default(true)
   created_at                 DateTime                         @default(now()) @db.Timestamp(0)
   equipment_items            equipment_items[]
   users_responsible          users?                           @relation("equipment_categories_responsible", fields: [responsible_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "equipment_categories_responsible_fk")
@@ -599,6 +601,8 @@ model equipment_rooms {
   floor                        String?                       @db.VarChar(50)
   description                  String?                       @db.Text
   qr_code                      String                        @unique(map: "equipment_rooms_qr_code_unique") @db.VarChar(64)
+  /// Kdy byl štítek místnosti potvrzen jako vytištěný
+  label_printed_at             DateTime?                     @db.Timestamp(0)
   is_active                    Boolean                       @default(true)
   floor_plan_id                Int?
   /// JSON: [{ "x": 0..1, "y": 0..1 }, ...] – souřadnice relativní k obrázku plánu
@@ -659,6 +663,8 @@ model equipment_items {
   serial_number         String?                     @unique(map: "serial_number") @db.VarChar(100)
   asset_tag             String?                     @unique(map: "equipment_items_asset_tag_unique") @db.VarChar(40)
   qr_code               String?                     @unique(map: "equipment_items_qr_code_unique") @db.VarChar(64)
+  /// Kdy byl štítek položky potvrzen jako vytištěný
+  label_printed_at      DateTime?                   @db.Timestamp(0)
   description           String?                     @db.Text
   category_id           Int
   purchase_date         DateTime?                   @db.Date
