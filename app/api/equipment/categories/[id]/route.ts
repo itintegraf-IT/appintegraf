@@ -64,6 +64,7 @@ export async function PATCH(
     icon?: string | null;
     is_active?: boolean;
     responsible_user_id?: number | null;
+    label_required?: boolean;
   } = {};
 
   if (body.name != null) data.name = String(body.name).trim();
@@ -73,6 +74,7 @@ export async function PATCH(
   }
   if (body.icon !== undefined) data.icon = body.icon ? String(body.icon).trim() : null;
   if (body.is_active !== undefined) data.is_active = Boolean(body.is_active);
+  if (body.label_required !== undefined) data.label_required = Boolean(body.label_required);
   if (body.responsible_user_id !== undefined) {
     if (body.responsible_user_id === null || body.responsible_user_id === "") {
       data.responsible_user_id = null;

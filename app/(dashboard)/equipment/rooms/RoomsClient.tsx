@@ -6,6 +6,7 @@ import { Search } from "lucide-react";
 import { normalizeEquipmentSearch } from "../_components/EquipmentFilterCombobox";
 import { LabelPrintDialog } from "../_components/LabelPrintDialog";
 import { labelsCountLabel } from "@/lib/equipment/label-text";
+import { roomNeedsLabel } from "@/lib/equipment/label-filters";
 
 type Room = {
   id: number;
@@ -15,6 +16,7 @@ type Room = {
   floor: string | null;
   qr_code: string;
   is_active: boolean;
+  label_printed_at: string | null;
   _count?: { equipment_items: number };
 };
 
@@ -29,6 +31,7 @@ export default function RoomsClient({ canManageRegister }: { canManageRegister: 
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<number[]>([]);
+  const [onlyWithoutLabel, setOnlyWithoutLabel] = useState(false);
   /** ID místností v otevřeném dialogu tisku štítků (null = zavřený). */
   const [labelIds, setLabelIds] = useState<number[] | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -173,15 +176,16 @@ export default function RoomsClient({ canManageRegister }: { canManageRegister: 
 
   const filteredRooms = useMemo(() => {
     const q = normalizeEquipmentSearch(search);
-    if (!q) return rooms;
-    return rooms.filter((r) => {
+    const base = onlyWithoutLabel ? rooms.filter((r) => roomNeedsLabel(r)) : rooms;
+    if (!q) return base;
+    return base.filter((r) => {
       const hay = [r.code, r.name, r.building, r.floor]
         .filter(Boolean)
         .map((s) => normalizeEquipmentSearch(String(s)))
         .join(" ");
       return hay.includes(q);
     });
-  }, [rooms, search]);
+  }, [rooms, search, onlyWithoutLabel]);
 
   const filteredIds = useMemo(() => filteredRooms.map((r) => r.id), [filteredRooms]);
   const allSelected =
@@ -290,6 +294,14 @@ export default function RoomsClient({ canManageRegister }: { canManageRegister: 
             ) : null}
           </p>
           <div className="flex flex-wrap items-center gap-2">
+            <label className="flex min-h-11 items-center gap-2 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={onlyWithoutLabel}
+                onChange={(e) => setOnlyWithoutLabel(e.target.checked)}
+              />
+              Jen bez štítku
+            </label>
             <label className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <input
@@ -329,19 +341,20 @@ export default function RoomsClient({ canManageRegister }: { canManageRegister: 
               <th className="px-3 py-2">Název</th>
               <th className="px-3 py-2">Budova</th>
               <th className="px-3 py-2">Položek</th>
+              <th className="px-3 py-2">Štítek</th>
               <th className="px-3 py-2">Akce</th>
             </tr>
           </thead>
           <tbody>
             {rooms.length === 0 ? (
               <tr>
-                <td colSpan={canManageRegister ? 6 : 5} className="px-3 py-6 text-center text-gray-500">
+                <td colSpan={canManageRegister ? 7 : 6} className="px-3 py-6 text-center text-gray-500">
                   Zatím žádné místnosti.
                 </td>
               </tr>
             ) : filteredRooms.length === 0 ? (
               <tr>
-                <td colSpan={canManageRegister ? 6 : 5} className="px-3 py-6 text-center text-gray-500">
+                <td colSpan={canManageRegister ? 7 : 6} className="px-3 py-6 text-center text-gray-500">
                   Žádná místnost neodpovídá hledání.
                 </td>
               </tr>
@@ -374,6 +387,7 @@ export default function RoomsClient({ canManageRegister }: { canManageRegister: 
                     </td>
                     <td className="px-3 py-2">{r.building ?? "—"}</td>
                     <td className="px-3 py-2">{r._count?.equipment_items ?? 0}</td>
+                    <td className="px-3 py-2">{r.label_printed_at ? "vytištěn" : "—"}</td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-3">
                         <button

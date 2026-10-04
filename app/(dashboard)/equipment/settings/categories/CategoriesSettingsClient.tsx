@@ -10,6 +10,8 @@ type Category = {
   description: string | null;
   is_active: boolean | null;
   responsible_user_id: number | null;
+  /** false = skupina se štítky nepolepuje (auta, budovy, software). */
+  label_required: boolean;
   users_responsible: { id: number; first_name: string; last_name: string } | null;
   _count?: { equipment_items: number };
 };
@@ -21,6 +23,7 @@ const emptyForm = {
   code: "",
   description: "",
   responsible_user_id: "",
+  label_required: true,
 };
 
 export default function CategoriesSettingsClient() {
@@ -62,6 +65,7 @@ export default function CategoriesSettingsClient() {
       code: r.code,
       description: r.description ?? "",
       responsible_user_id: r.responsible_user_id ? String(r.responsible_user_id) : "",
+      label_required: r.label_required !== false,
     });
     formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
@@ -88,6 +92,7 @@ export default function CategoriesSettingsClient() {
             code,
             description: form.description.trim() || null,
             responsible_user_id: form.responsible_user_id || null,
+            label_required: form.label_required,
           }),
         }
       );
@@ -212,6 +217,21 @@ export default function CategoriesSettingsClient() {
               </option>
             ))}
           </select>
+          <label className="flex min-h-11 items-start gap-2 text-sm sm:col-span-2">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-5 w-5"
+              checked={form.label_required}
+              onChange={(e) => setForm({ ...form, label_required: e.target.checked })}
+            />
+            <span>
+              Tisknout štítky
+              <span className="block text-gray-500">
+                Vypněte u skupin, které se inventarizují podle dokladů (auta, budovy, software) — nebudou ve filtru Bez
+                štítku.
+              </span>
+            </span>
+          </label>
         </div>
         <div className="mt-3 flex gap-2">
           <button
@@ -238,6 +258,7 @@ export default function CategoriesSettingsClient() {
               <th className="px-3 py-2">Kód</th>
               <th className="px-3 py-2">Zodpovědný</th>
               <th className="px-3 py-2">Položek</th>
+              <th className="px-3 py-2">Štítky</th>
               <th className="px-3 py-2">Stav</th>
               <th className="px-3 py-2">Akce</th>
             </tr>
@@ -245,7 +266,7 @@ export default function CategoriesSettingsClient() {
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
+                <td colSpan={7} className="px-3 py-6 text-center text-gray-500">
                   Zatím žádné skupiny. Přidejte první výše.
                 </td>
               </tr>
@@ -265,6 +286,7 @@ export default function CategoriesSettingsClient() {
                         : "—"}
                     </td>
                     <td className="px-3 py-2">{r._count?.equipment_items ?? 0}</td>
+                    <td className="px-3 py-2">{r.label_required === false ? "ne" : "ano"}</td>
                     <td className="px-3 py-2">
                       {active ? (
                         <span className="text-green-700">Aktivní</span>

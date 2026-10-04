@@ -19,6 +19,7 @@ import {
   isEquipmentAssignedStatus,
 } from "@/lib/equipment-status";
 import { canAdministerEquipment, canManageRegister } from "@/lib/equipment/access";
+import { buildLabelMissingWhere } from "@/lib/equipment/label-filters";
 import type { Prisma } from "@prisma/client";
 
 const EQUIPMENT_LIST_TAKE = 2000;
@@ -34,6 +35,8 @@ function equipmentListPath(opts: {
   unassigned?: boolean;
   /** Bez aktivního držitele (skladem). */
   noHolder?: boolean;
+  /** Bez potvrzeného štítku. */
+  labelMissing?: boolean;
 }) {
   const q = new URLSearchParams();
   if (opts.tab === "requests") q.set("tab", "requests");
@@ -43,6 +46,7 @@ function equipmentListPath(opts: {
   if (opts.view) q.set("view", opts.view);
   if (opts.unassigned) q.set("unassigned", "1");
   if (opts.noHolder) q.set("no_holder", "1");
+  if (opts.labelMissing) q.set("label", "missing");
   const s = q.toString();
   return s ? `/equipment?${s}` : "/equipment";
 }
@@ -58,6 +62,7 @@ export default async function EquipmentPage({
     view?: string;
     unassigned?: string;
     no_holder?: string;
+    label?: string;
   }>;
 }) {
   const session = await auth();
@@ -74,6 +79,7 @@ export default async function EquipmentPage({
   const view = parseEquipmentListView(params.view);
   const unassigned = params.unassigned === "1";
   const noHolder = params.no_holder === "1";
+  const labelMissing = params.label === "missing";
 
   type EquipmentRow = {
     id: number;
@@ -105,6 +111,7 @@ export default async function EquipmentPage({
       listWhere.status = EQUIPMENT_ITEM_STATUS.SKLADEM;
       listWhere.equipment_assignments = { none: { returned_at: null } };
     }
+    if (labelMissing) listWhere.AND = [buildLabelMissingWhere()];
     const rows = await prisma.equipment_items.findMany({
       take: EQUIPMENT_LIST_TAKE,
       where: Object.keys(listWhere).length ? listWhere : undefined,
@@ -358,7 +365,7 @@ export default async function EquipmentPage({
                 view: params.view,
               })}
               className={`rounded-full border px-3 py-1 text-sm ${
-                !unassigned && !noHolder
+                !unassigned && !noHolder && !labelMissing
                   ? "border-red-200 bg-red-50 text-red-700"
                   : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
               }`}
@@ -397,6 +404,22 @@ export default async function EquipmentPage({
             >
               Bez místnosti
             </Link>
+            <Link
+              href={equipmentListPath({
+                scope: "all",
+                sort: params.sort,
+                dir: params.dir,
+                view: params.view,
+                labelMissing: true,
+              })}
+              className={`rounded-full border px-3 py-1 text-sm ${
+                labelMissing
+                  ? "border-red-200 bg-red-50 text-red-700"
+                  : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              Bez štítku
+            </Link>
             {unassigned ? (
               <Link
                 href="/equipment/scan"
@@ -411,6 +434,12 @@ export default async function EquipmentPage({
             <p className="mb-3 text-sm text-gray-600">
               Položky skladem bez držitele. Vyberte je v tabulce a přiřaďte uživateli (hromadně nebo
               jednotlivě).
+            </p>
+          ) : null}
+          {labelMissing ? (
+            <p className="mb-3 text-sm text-gray-600">
+              Položky, jejichž štítek ještě nikdo nepotvrdil jako vytištěný (skupiny bez štítků se nepočítají). Vyberte
+              je a dejte Tisk štítků — PDF se seřadí po místnostech.
             </p>
           ) : null}
           {unassigned ? (
