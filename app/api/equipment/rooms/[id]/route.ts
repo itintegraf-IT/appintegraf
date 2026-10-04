@@ -6,6 +6,7 @@ import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
 import {
   defaultPlanColor,
   parseRoomPolygon,
+  roomLocationFromPlan,
   serializeRoomPolygon,
 } from "@/lib/equipment/floor-plan";
 
@@ -70,6 +71,9 @@ export async function PATCH(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
+  const existing = await prisma.equipment_rooms.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: "Místnost nenalezena" }, { status: 404 });
+
   const body = await req.json().catch(() => ({}));
   const data: Record<string, unknown> = { updated_at: new Date() };
   if (body.name != null) {
@@ -119,6 +123,25 @@ export async function PATCH(
       ? String(body.plan_color).trim().slice(0, 20)
       : defaultPlanColor(id);
   }
+  // Zakreslení do plánku doplní prázdné patro a budovu z plánku.
+  if (typeof data.floor_plan_id === "number") {
+    const plan = await prisma.equipment_floor_plans.findUnique({
+      where: { id: data.floor_plan_id },
+      select: { floor_label: true, building: true },
+    });
+    if (plan) {
+      Object.assign(
+        data,
+        roomLocationFromPlan(existing, plan, { floor: body.floor !== undefined, building: body.building !== undefined })
+      );
+    }
+  }
+
+  const oldValues = Object.fromEntries(
+    Object.keys(data)
+      .filter((k) => k !== "updated_at")
+      .map((k) => [k, existing[k as keyof typeof existing] ?? null])
+  );
 
   try {
     const row = await prisma.equipment_rooms.update({ where: { id }, data });
@@ -128,6 +151,7 @@ export async function PATCH(
       tableName: "equipment_rooms",
       recordId: id,
       detail: data,
+      oldValues,
     });
     return NextResponse.json({ ...row, polygon: parseRoomPolygon(row.polygon_json) });
   } catch {

@@ -275,6 +275,14 @@ export default function FloorPlanClient({
     h: plan?.image_height || imgRef.current?.naturalHeight || 800,
   };
 
+  /** Přizpůsobí zvětšení šířce okna (na telefonu je plánek jinak mnohem širší než displej). */
+  const fitToWidth = (imageWidth: number) => {
+    const vp = viewportRef.current;
+    if (!vp || !imageWidth) return;
+    setScale(Math.min(1, Math.max(0.25, vp.clientWidth / imageWidth)));
+    setOffset({ x: 0, y: 0 });
+  };
+
   const toNorm = (clientX: number, clientY: number): PlanPoint | null => {
     const vp = viewportRef.current;
     if (!vp) return null;
@@ -752,8 +760,8 @@ export default function FloorPlanClient({
             : "Načítám plán…"}
         </div>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
-          <div className="space-y-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="min-w-0 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex rounded-lg border bg-white p-1">
                 <button
@@ -797,10 +805,7 @@ export default function FloorPlanClient({
               <button
                 type="button"
                 className="rounded border bg-white px-2 py-1 text-xs"
-                onClick={() => {
-                  setScale(1);
-                  setOffset({ x: 0, y: 0 });
-                }}
+                onClick={() => fitToWidth(imgNatural.w)}
               >
                 <Crosshair className="mr-1 inline h-3.5 w-3.5" />
                 Reset
@@ -884,6 +889,7 @@ export default function FloorPlanClient({
                   onLoad={(e) => {
                     setImageLoadError("");
                     const img = e.currentTarget;
+                    fitToWidth(plan.image_width || img.naturalWidth);
                     if (
                       planId &&
                       (!plan.image_width || !plan.image_height) &&

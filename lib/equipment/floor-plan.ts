@@ -82,3 +82,18 @@ export function defaultPlanColor(seed: number | string): string {
       : [...String(seed)].reduce((a, c) => a + c.charCodeAt(0), 0);
   return PLAN_COLORS[Math.abs(n) % PLAN_COLORS.length];
 }
+
+/**
+ * Při zakreslení místnosti do plánku doplní prázdné patro a budovu z plánku.
+ * Vyplněné hodnoty ani to, co uživatel posílá sám (`explicit`), nepřepisuje.
+ */
+export function roomLocationFromPlan(
+  room: { floor: string | null; building: string | null },
+  plan: { floor_label: string | null; building: string | null },
+  explicit: { floor?: boolean; building?: boolean }
+): { floor?: string; building?: string } {
+  const out: { floor?: string; building?: string } = {};
+  if (!explicit.floor && !room.floor?.trim() && plan.floor_label?.trim()) out.floor = plan.floor_label.trim();
+  if (!explicit.building && !room.building?.trim() && plan.building?.trim()) out.building = plan.building.trim();
+  return out;
+}
