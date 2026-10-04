@@ -26,7 +26,7 @@ export type HolderRow = {
   userId: number;
   kind: "full" | "surname";
   holderText: string;
-  /** Držitel už má otevřenou položku se stejným názvem — nejspíš duplicitní záznam. */
+  /** Držitel už má otevřenou položku se stejným nebo podobným názvem — možná duplicitní záznam. */
   warning?: "same_name_holder";
 };
 
@@ -80,16 +80,37 @@ export function classifyHolderMatch(raw: string, users: HolderUser[]): HolderMat
   return { kind: "none" };
 }
 
+const GENERIC_NAME_WORDS = new Set(["mobil", "mobilni", "telefon"]);
+
+function nameTokens(name: string): Set<string> {
+  return new Set(
+    normalizeForMatch(name)
+      .split(/[^a-z0-9]+/)
+      .filter((t) => t.length >= 2 && !GENERIC_NAME_WORDS.has(t))
+  );
+}
+
+/**
+ * Podobné názvy položek (možná duplicita): aspoň 2 společná slova a aspoň ¾ slov
+ * kratšího názvu je i v delším — „Motorola Moto G86“ ~ „Mobil Motorola Moto G86“,
+ * ale „Galaxy S25“ ≁ „Galaxy A15“.
+ */
+export function similarItemNames(a: string, b: string): boolean {
+  const ta = nameTokens(a);
+  const tb = nameTokens(b);
+  const overlap = [...ta].filter((t) => tb.has(t)).length;
+  const shorter = Math.min(ta.size, tb.size);
+  return overlap >= 2 && shorter > 0 && overlap / shorter >= 0.75;
+}
+
 export function planHolderAssignments(
   items: HolderItem[],
   users: HolderUser[],
   openAssignments: { userId: number; itemName: string }[]
 ): HolderPlan {
-  const heldNames = new Map<number, Set<string>>();
+  const heldNames = new Map<number, string[]>();
   for (const a of openAssignments) {
-    const set = heldNames.get(a.userId) ?? new Set<string>();
-    set.add(normalizeForMatch(a.itemName));
-    heldNames.set(a.userId, set);
+    heldNames.set(a.userId, [...(heldNames.get(a.userId) ?? []), a.itemName]);
   }
 
   const rows: HolderRow[] = [];
@@ -109,7 +130,9 @@ export function planHolderAssignments(
     }
     const match = classifyHolderMatch(holderText, users);
     if (match.kind === "full" || match.kind === "surname") {
-      const duplicate = heldNames.get(match.userId)?.has(normalizeForMatch(item.name));
+      const duplicate = (heldNames.get(match.userId) ?? []).some(
+        (held) => normalizeForMatch(held) === normalizeForMatch(item.name) || similarItemNames(held, item.name)
+      );
       rows.push({
         itemId: item.id,
         userId: match.userId,

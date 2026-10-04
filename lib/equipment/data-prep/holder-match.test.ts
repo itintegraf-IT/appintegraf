@@ -3,6 +3,7 @@ import {
   classifyHolderMatch,
   parseNoteHolder,
   planHolderAssignments,
+  similarItemNames,
   stripPersonTitles,
   type HolderItem,
   type HolderUser,
@@ -108,5 +109,29 @@ describe("planHolderAssignments", () => {
     expect(rows[7]).toBeUndefined();
     expect(rows[8]).toBeUndefined();
     expect(rows[9]).toBeUndefined();
+  });
+});
+
+describe("similarItemNames", () => {
+  it.each([
+    ["Motorola Moto G86", "Mobil Motorola Moto G86", true],
+    ["Samsung Galaxy S25", "Mobil Samsung Galaxy S25 5G Dual SIM", true],
+    ["Samsung G556 Galaxy XCover7 128GB Black", "Mobil SAMSUNG G556 Galaxy XCover7", true],
+    ["Samsung Galaxy S25", "Samsung Galaxy A15", false],
+    ["Monitor Dell", "Notebook Lenovo", false],
+    ["Mobil", "Mobil Samsung", false],
+  ] as const)("%s ~ %s → %s", (a, b, expected) => {
+    expect(similarItemNames(a, b)).toBe(expected);
+  });
+});
+
+describe("planHolderAssignments — podobný název u téhož držitele", () => {
+  it("varuje i když se názvy liší předponou a doplňky", () => {
+    const plan = planHolderAssignments(
+      [item(30, "Pracovník: Černý Tomáš", { name: "Mobil Motorola Moto G86" })],
+      users,
+      [{ userId: 5, itemName: "Motorola Moto G86" }]
+    );
+    expect(plan.rows[0]).toMatchObject({ itemId: 30, warning: "same_name_holder" });
   });
 });
