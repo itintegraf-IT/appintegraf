@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { Html5Qrcode } from "html5-qrcode";
@@ -40,8 +39,6 @@ function vibrate(pattern: number | number[]) {
 }
 
 export default function EquipmentScanClient() {
-  const router = useRouter();
-  const [mode, setMode] = useState<"place" | "assign">("place");
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [manual, setManual] = useState("");
   const [log, setLog] = useState<string[]>([]);
@@ -52,13 +49,11 @@ export default function EquipmentScanClient() {
   const [notify, setNotify] = useMovementNotifyPreference();
   const scannerRef = useRef<HTMLDivElement>(null);
   const roomRef = useRef<RoomInfo | null>(null);
-  const modeRef = useRef(mode);
   const busyRef = useRef(false);
   /** Brána proti opakovanému zpracování kódu, který drží v záběru kamery. */
   const gateRef = useRef(createScanGate());
 
   roomRef.current = room;
-  modeRef.current = mode;
 
   const setError = (text: string) => setStatus({ tone: "error", text });
   const setInfo = (text: string) => setStatus({ tone: "info", text });
@@ -110,18 +105,6 @@ export default function EquipmentScanClient() {
   const applyResult = (data: LookupResult): boolean => {
     const currentRoom = roomRef.current;
 
-    if (modeRef.current === "assign") {
-      if (data.type === "qr_pool" && data.status === "available") {
-        // Zařazení s povinnými údaji nákupu (cena, datum, doklad) jen přes formulář.
-        const params = new URLSearchParams({ pool: String(data.qr_code ?? "") });
-        if (currentRoom) params.set("room", String(currentRoom.id));
-        router.push(`/equipment/add?${params.toString()}`);
-        return false;
-      }
-      setError("Naskenujte volný QR z fondu.");
-      return false;
-    }
-
     if (data.type === "room") {
       if (currentRoom?.id === data.id) {
         setInfo(`Místnost ${data.code} – ${data.name} už je vybraná.`);
@@ -148,7 +131,7 @@ export default function EquipmentScanClient() {
       return true;
     }
     if (data.type === "qr_pool" && data.status === "available") {
-      setError("Volný QR z fondu – přepněte do režimu Přiřadit QR.");
+      setError("Tento štítek zatím nepatří žádné položce v evidenci.");
       return false;
     }
     setError("Tento kód tu nejde použít.");
@@ -236,33 +219,11 @@ export default function EquipmentScanClient() {
     };
   }, []);
 
-  const switchMode = (next: "place" | "assign") => {
-    setPendingItem(null);
-    setChoice(null);
-    setStatus(null);
-    busyRef.current = false;
-    gateRef.current.reset();
-    setMode(next);
-  };
-
   const pick = (result: LookupResult) => {
     setChoice(null);
     const keepLock = applyResult(result);
     if (!keepLock) busyRef.current = false;
   };
-
-  const modeButton = (value: "place" | "assign", label: string) => (
-    <button
-      type="button"
-      aria-pressed={mode === value}
-      className={`min-h-11 flex-1 rounded-lg px-2 text-sm font-medium ${
-        mode === value ? "bg-primary text-primary-foreground" : "border border-border hover:bg-muted"
-      }`}
-      onClick={() => switchMode(value)}
-    >
-      {label}
-    </button>
-  );
 
   return (
     <div className="mx-auto max-w-lg space-y-4 p-2">
@@ -278,12 +239,7 @@ export default function EquipmentScanClient() {
         </div>
       </div>
 
-      <div className="flex gap-2">
-        {modeButton("place", "Spárovat s místností")}
-        {modeButton("assign", "Přiřadit QR")}
-      </div>
-
-      {mode === "place" && room ? (
+      {room ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-card p-3 text-sm">
           <span>
             Cílová místnost: <strong>{room.code} – {room.name}</strong>
@@ -302,13 +258,11 @@ export default function EquipmentScanClient() {
             Změnit
           </button>
         </div>
-      ) : mode === "place" ? (
+      ) : (
         <p className="text-sm text-muted-foreground">
           Nejdřív naskenujte QR místnosti, potom QR majetku. Místnost zůstane nastavená, další kusy jdou
           za sebou. Před uložením se zeptáme na potvrzení.
         </p>
-      ) : (
-        <p className="text-sm text-muted-foreground">Naskenujte volný QR ze štítku fondu.</p>
       )}
 
       {status ? (

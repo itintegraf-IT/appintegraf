@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canAdministerEquipment } from "@/lib/equipment/access";
-import { FolderTree, QrCode, Shield, Upload, Bell, LayoutGrid, Hash } from "lucide-react";
+import { FolderTree, Shield, Upload, Bell, LayoutGrid, Hash } from "lucide-react";
 
 const cards = [
   {
@@ -28,12 +28,6 @@ const cards = [
     icon: Hash,
     title: "Inventární čísla",
     hint: "Číselná řada drobného majetku (navazuje na ABRA Gen)",
-  },
-  {
-    href: "/equipment/settings/qr-pool",
-    icon: QrCode,
-    title: "Fond QR",
-    hint: "Generování, tisk a přiřazení inventárních QR kódů",
   },
   {
     href: "/equipment/settings/labels",
