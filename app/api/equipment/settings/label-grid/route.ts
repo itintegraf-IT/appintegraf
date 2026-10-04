@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { canAdministerEquipment, canReadEquipment } from "@/lib/equipment/access";
+import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
 import {
+  activeLabelGridSpec,
+  buildEquipmentLabelGridSettings,
   getEquipmentLabelGridSettings,
   listEquipmentLabelTemplates,
   setEquipmentLabelGridSettings,
 } from "@/lib/equipment/label-grid-settings";
-import { labelsPerPage } from "@/lib/equipment/label-layout";
+import { labelGridFitError, labelsPerPage } from "@/lib/equipment/label-layout";
 
 export async function GET() {
   const session = await auth();
@@ -19,10 +22,7 @@ export async function GET() {
   }
 
   const settings = await getEquipmentLabelGridSettings();
-  const activeSpec = settings.useCustom
-    ? settings.customSpec
-    : listEquipmentLabelTemplates().find((t) => t.key === settings.templateKey)?.spec ??
-      settings.customSpec;
+  const activeSpec = activeLabelGridSpec(settings);
 
   return NextResponse.json({
     settings,
@@ -43,23 +43,31 @@ export async function PUT(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const settings = await setEquipmentLabelGridSettings(
-    {
-      templateKey: typeof body.templateKey === "string" ? body.templateKey : undefined,
-      useCustom: Boolean(body.useCustom),
-      customSpec: body.customSpec && typeof body.customSpec === "object" ? body.customSpec : undefined,
-    },
-    userId
-  );
+  const next = buildEquipmentLabelGridSettings({
+    templateKey: typeof body.templateKey === "string" ? body.templateKey : undefined,
+    useCustom: Boolean(body.useCustom),
+    customSpec: body.customSpec && typeof body.customSpec === "object" ? body.customSpec : undefined,
+  });
+  const activeSpec = activeLabelGridSpec(next);
+  const fitError = labelGridFitError(activeSpec);
+  if (fitError) {
+    return NextResponse.json({ error: fitError }, { status: 400 });
+  }
+
+  const previous = await getEquipmentLabelGridSettings();
+  const settings = await setEquipmentLabelGridSettings(next, userId);
+  await logEquipmentAuditSafe({
+    userId,
+    action: "label_grid_update",
+    tableName: "system_settings",
+    detail: settings,
+    oldValues: previous,
+  });
 
   return NextResponse.json({
     settings,
     templates: listEquipmentLabelTemplates(),
-    labelsPerPage: labelsPerPage(
-      settings.useCustom
-        ? settings.customSpec
-        : listEquipmentLabelTemplates().find((t) => t.key === settings.templateKey)?.spec ??
-            settings.customSpec
-    ),
+    activeSpec,
+    labelsPerPage: labelsPerPage(activeSpec),
   });
 }

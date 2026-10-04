@@ -83,29 +83,37 @@ export async function resolveEquipmentLabelGrid(
   };
 }
 
-export async function setEquipmentLabelGridSettings(
-  input: {
-    templateKey?: string;
-    useCustom?: boolean;
-    customSpec?: Partial<EquipmentLabelGridSpec>;
-  },
-  updatedBy?: number
-): Promise<EquipmentLabelGridSettings> {
+/** Normalizuje vstup z formuláře na uložitelná nastavení (bez zápisu). */
+export function buildEquipmentLabelGridSettings(input: {
+  templateKey?: string;
+  useCustom?: boolean;
+  customSpec?: Partial<EquipmentLabelGridSpec>;
+}): EquipmentLabelGridSettings {
   const templateKey = resolveEquipmentLabelTemplate(input.templateKey);
   const base = getTemplateSpec(templateKey);
-  const next: EquipmentLabelGridSettings = {
+  return {
     templateKey,
     useCustom: Boolean(input.useCustom),
     customSpec: normalizeEquipmentLabelGridSpec(input.customSpec ?? base, base),
   };
+}
 
+/** Mřížka, podle které se tiskne: vlastní rozměry, nebo zvolená šablona. */
+export function activeLabelGridSpec(settings: EquipmentLabelGridSettings): EquipmentLabelGridSpec {
+  return settings.useCustom ? settings.customSpec : getTemplateSpec(settings.templateKey);
+}
+
+export async function setEquipmentLabelGridSettings(
+  next: EquipmentLabelGridSettings,
+  updatedBy?: number
+): Promise<EquipmentLabelGridSettings> {
   await prisma.system_settings.upsert({
     where: { setting_key: EQUIPMENT_LABEL_GRID_KEY },
     create: {
       setting_key: EQUIPMENT_LABEL_GRID_KEY,
       setting_value: JSON.stringify(next),
       module: MODULE,
-      description: "Mřížka A4 pro hromadný tisk QR štítků majetku a místností",
+      description: "Mřížka A4 pro tisk QR štítků majetku a místností",
       updated_by: updatedBy ?? null,
     },
     update: {

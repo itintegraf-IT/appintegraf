@@ -5,6 +5,10 @@ import Link from "next/link";
 import {
   A4_HEIGHT_MM,
   A4_WIDTH_MM,
+  DEFAULT_EQUIPMENT_LABEL_TEMPLATE,
+  PAPER_SAFE_MARGIN_MM,
+  getTemplateSpec,
+  labelGridFitError,
   labelsPerPage,
   type EquipmentLabelGridSpec,
   type EquipmentLabelTemplateKey,
@@ -28,15 +32,7 @@ type ApiResponse = {
   error?: string;
 };
 
-const emptySpec: EquipmentLabelGridSpec = {
-  cols: 2,
-  rows: 5,
-  labelWidthMm: 90,
-  labelHeightMm: 50,
-  pageMarginMm: 8,
-  colGapMm: 3,
-  rowGapMm: 3,
-};
+const emptySpec: EquipmentLabelGridSpec = getTemplateSpec(DEFAULT_EQUIPMENT_LABEL_TEMPLATE);
 
 function GridPreview({ spec }: { spec: EquipmentLabelGridSpec }) {
   const scale = 1.1;
@@ -47,8 +43,8 @@ function GridPreview({ spec }: { spec: EquipmentLabelGridSpec }) {
     for (let row = 0; row < spec.rows; row++) {
       for (let col = 0; col < spec.cols; col++) {
         out.push({
-          left: (spec.pageMarginMm + col * (spec.labelWidthMm + spec.colGapMm)) * scale,
-          top: (spec.pageMarginMm + row * (spec.labelHeightMm + spec.rowGapMm)) * scale,
+          left: (spec.marginLeftMm + col * (spec.labelWidthMm + spec.colGapMm)) * scale,
+          top: (spec.marginTopMm + row * (spec.labelHeightMm + spec.rowGapMm)) * scale,
           w: spec.labelWidthMm * scale,
           h: spec.labelHeightMm * scale,
         });
@@ -70,13 +66,22 @@ function GridPreview({ spec }: { spec: EquipmentLabelGridSpec }) {
           style={{ left: c.left, top: c.top, width: c.w, height: c.h }}
         />
       ))}
+      <div
+        className="pointer-events-none absolute border border-dashed border-gray-400"
+        style={{
+          left: PAPER_SAFE_MARGIN_MM * scale,
+          top: PAPER_SAFE_MARGIN_MM * scale,
+          width: (A4_WIDTH_MM - 2 * PAPER_SAFE_MARGIN_MM) * scale,
+          height: (A4_HEIGHT_MM - 2 * PAPER_SAFE_MARGIN_MM) * scale,
+        }}
+      />
     </div>
   );
 }
 
 export default function LabelsSettingsClient() {
   const [templates, setTemplates] = useState<TemplateOpt[]>([]);
-  const [templateKey, setTemplateKey] = useState<EquipmentLabelTemplateKey>("visitka_2x5");
+  const [templateKey, setTemplateKey] = useState<EquipmentLabelTemplateKey>(DEFAULT_EQUIPMENT_LABEL_TEMPLATE);
   const [useCustom, setUseCustom] = useState(false);
   const [spec, setSpec] = useState<EquipmentLabelGridSpec>(emptySpec);
   const [error, setError] = useState("");
@@ -113,6 +118,7 @@ export default function LabelsSettingsClient() {
     if (useCustom) return spec;
     return templates.find((t) => t.key === templateKey)?.spec ?? spec;
   }, [useCustom, spec, templates, templateKey]);
+  const fitError = labelGridFitError(previewSpec);
 
   const applyTemplateToCustom = (key: EquipmentLabelTemplateKey) => {
     const t = templates.find((x) => x.key === key);
@@ -164,7 +170,7 @@ export default function LabelsSettingsClient() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Štítky / mřížka A4</h1>
           <p className="mt-1 text-gray-600">
-            Rozložení QR štítků na stránku pro hromadný tisk místností, majetku a fondu QR
+            Rozložení QR štítků na arch A4 — jeden formát pro majetek i místnosti
           </p>
         </div>
         <Link href="/equipment/settings" className="rounded-lg border px-3 py-2 text-sm hover:bg-gray-50">
@@ -216,7 +222,8 @@ export default function LabelsSettingsClient() {
                 ["rows", "Řádky"],
                 ["labelWidthMm", "Šířka štítku (mm)"],
                 ["labelHeightMm", "Výška štítku (mm)"],
-                ["pageMarginMm", "Okraj stránky (mm)"],
+                ["marginTopMm", "Horní okraj (mm)"],
+                ["marginLeftMm", "Levý okraj (mm)"],
                 ["colGapMm", "Mezera sloupců (mm)"],
                 ["rowGapMm", "Mezera řádků (mm)"],
               ] as const
@@ -235,6 +242,15 @@ export default function LabelsSettingsClient() {
             ))}
           </div>
 
+          {fitError ? (
+            <p role="alert" className="text-sm font-medium text-destructive">
+              {fitError}
+            </p>
+          ) : null}
+          <p className="text-sm text-gray-600">
+            Obsah štítku drží odstup {PAPER_SAFE_MARGIN_MM} mm od okraje papíru (čárkovaně v náhledu), aby ho tiskárna
+            neořízla.
+          </p>
           <p className="text-sm text-gray-600">
             Na stránku: <strong>{labelsPerPage(previewSpec)}</strong> štítků (
             {previewSpec.cols}×{previewSpec.rows}, {previewSpec.labelWidthMm}×
@@ -244,7 +260,7 @@ export default function LabelsSettingsClient() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={saving}
+              disabled={saving || Boolean(fitError)}
               onClick={() => void save()}
               className="rounded-lg bg-red-600 px-4 py-2 text-white disabled:opacity-50"
             >
