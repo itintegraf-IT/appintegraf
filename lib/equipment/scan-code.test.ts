@@ -12,6 +12,12 @@ describe("parseEquipmentScanCode", () => {
     ["1012", { kind: "raw", code: "1012" }],
     ["100500", { kind: "raw", code: "100500" }],
     ["", { kind: "raw", code: "" }],
+    ["https://appintegraf.integraf.cz/q/123456789012", { kind: "eq", code: "123456789012" }],
+    ["http://192.168.10.210:3011/q/RM-084092796419", { kind: "rm", code: "RM-084092796419" }],
+    ["HTTPS://APPINTEGRAF.INTEGRAF.CZ/Q/RM-084092796419?x=1", { kind: "rm", code: "RM-084092796419" }],
+    ["https://appintegraf.integraf.cz/q/100500", { kind: "raw", code: "100500" }],
+    ["https://appintegraf.integraf.cz/q/INTEGRAF:EQ:123456789012", { kind: "eq", code: "123456789012" }],
+    ["https://appintegraf.integraf.cz/equipment/12", { kind: "raw", code: "https://appintegraf.integraf.cz/equipment/12" }],
   ] as const)("%j → %j", (raw, parsed) => {
     expect(parseEquipmentScanCode(raw)).toEqual(parsed);
   });

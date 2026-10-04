@@ -3,19 +3,23 @@
  * (použitelná i v klientu). Načtení kandidátů z DB: lib/equipment/scan-resolve.ts.
  */
 
-export const QR_PREFIX_EQ = "INTEGRAF:EQ:";
-export const QR_PREFIX_RM = "INTEGRAF:RM:";
+import { extractQrUrlCode, QR_PREFIX_EQ, QR_PREFIX_RM } from "@/lib/equipment/qr-url";
+
+export { QR_PREFIX_EQ, QR_PREFIX_RM };
 
 export type ParsedEquipmentCode =
   | { kind: "eq"; code: string }
   | { kind: "rm"; code: string }
   | { kind: "raw"; code: string };
 
-/** Parsuje naskenovaný text (plný payload nebo holý kód). */
+/** Parsuje naskenovaný text: odkaz `…/q/<kód>`, plný payload nebo holý kód. */
 export function parseEquipmentScanCode(raw: string): ParsedEquipmentCode {
   const text = raw.trim();
   if (!text) return { kind: "raw", code: "" };
+  return parseBareCode(extractQrUrlCode(text) ?? text);
+}
 
+function parseBareCode(text: string): ParsedEquipmentCode {
   const upper = text.toUpperCase();
   if (upper.startsWith(QR_PREFIX_EQ)) {
     return { kind: "eq", code: text.slice(QR_PREFIX_EQ.length).trim() };

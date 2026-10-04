@@ -1,16 +1,25 @@
 import QRCode from "qrcode";
 import { prisma } from "@/lib/db";
-import { QR_PREFIX_EQ, QR_PREFIX_RM } from "@/lib/equipment/scan-code";
+import { buildQrPayload, resolveQrBaseUrl } from "@/lib/equipment/qr-url";
 
 // Parser kódu žije v čistém modulu scan-code.ts (bez Prismy, použitelný i v klientu).
 export { QR_PREFIX_EQ, QR_PREFIX_RM, parseEquipmentScanCode, type ParsedEquipmentCode } from "@/lib/equipment/scan-code";
 
-export function buildEqPayload(qrCode: string): string {
-  return `${QR_PREFIX_EQ}${qrCode}`;
+function qrBaseUrl(): string | null {
+  return resolveQrBaseUrl({
+    EQUIPMENT_QR_BASE_URL: process.env.EQUIPMENT_QR_BASE_URL,
+    AUTH_URL: process.env.AUTH_URL,
+  });
 }
 
+/** Obsah QR položky: odkaz do aplikace (`EQUIPMENT_QR_BASE_URL` / `AUTH_URL`), jinak starý textový formát. */
+export function buildEqPayload(qrCode: string): string {
+  return buildQrPayload("item", qrCode, qrBaseUrl());
+}
+
+/** Obsah QR místnosti: odkaz do aplikace (`EQUIPMENT_QR_BASE_URL` / `AUTH_URL`), jinak starý textový formát. */
 export function buildRmPayload(qrCode: string): string {
-  return `${QR_PREFIX_RM}${qrCode}`;
+  return buildQrPayload("room", qrCode, qrBaseUrl());
 }
 
 function randomDigits(n: number): string {
