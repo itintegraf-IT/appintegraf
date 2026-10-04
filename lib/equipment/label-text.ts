@@ -97,3 +97,10 @@ export function normalizeLabelOwnerText(raw: unknown): string {
   if (typeof raw !== "string") return DEFAULT_LABEL_OWNER_TEXT;
   return Array.from(raw.trim()).slice(0, LABEL_OWNER_TEXT_MAX).join("");
 }
+
+/** „1 štítek“, „3 štítky“, „5 štítků“. */
+export function labelsCountLabel(n: number): string {
+  if (n === 1) return "1 štítek";
+  if (n >= 2 && n <= 4) return `${n} štítky`;
+  return `${n} štítků`;
+}

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AlertCircle, ArrowLeft } from "lucide-react";
 import { EquipmentCodeBadge } from "../../_components/EquipmentCodeBadge";
+import { LabelPrintButton } from "../../_components/LabelPrintButton";
 import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
 import { readApiResponse } from "@/lib/equipment/api-response";
 
@@ -22,6 +23,8 @@ type RoomDetail = {
   qr_code: string;
   building: string | null;
   floor: string | null;
+  label_printed_at: string | null;
+  can_manage_register: boolean;
   items: Item[];
 };
 
@@ -126,12 +129,13 @@ export default function RoomDetailClient() {
           </p>
         </div>
         <div className="flex gap-2">
-          <a
-            href={`/api/equipment/rooms/${room.id}/label`}
-            className="rounded-lg border px-3 py-2 text-sm"
-          >
-            Tisk štítku
-          </a>
+          <LabelPrintButton
+            kind="room"
+            id={room.id}
+            printedAt={room.label_printed_at}
+            canConfirm={room.can_manage_register}
+            onChanged={() => void loadRoom()}
+          />
           <Link href="/equipment/rooms" className="rounded-lg border px-3 py-2 text-sm">
             Zpět
           </Link>

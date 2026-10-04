@@ -4,12 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import { normalizeEquipmentSearch } from "../_components/EquipmentFilterCombobox";
-import {
-  DEFAULT_EQUIPMENT_LABEL_TEMPLATE,
-  EQUIPMENT_LABEL_TEMPLATES,
-  labelsPerPage,
-  type EquipmentLabelTemplateKey,
-} from "@/lib/equipment/label-layout";
+import { LabelPrintDialog } from "../_components/LabelPrintDialog";
+import { labelsCountLabel } from "@/lib/equipment/label-text";
 
 type Room = {
   id: number;
@@ -24,15 +20,7 @@ type Room = {
 
 const emptyForm = { name: "", code: "", building: "", floor: "" };
 
-const TEMPLATE_OPTIONS = (
-  Object.keys(EQUIPMENT_LABEL_TEMPLATES) as EquipmentLabelTemplateKey[]
-).map((key) => ({
-  key,
-  label: EQUIPMENT_LABEL_TEMPLATES[key].label,
-  perPage: labelsPerPage(EQUIPMENT_LABEL_TEMPLATES[key].spec),
-}));
-
-export default function RoomsClient() {
+export default function RoomsClient({ canManageRegister }: { canManageRegister: boolean }) {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [form, setForm] = useState(emptyForm);
   const [editing, setEditing] = useState<Room | null>(null);
@@ -41,8 +29,8 @@ export default function RoomsClient() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<number[]>([]);
-  const [layoutKey, setLayoutKey] = useState<string>(DEFAULT_EQUIPMENT_LABEL_TEMPLATE);
-  const [printing, setPrinting] = useState(false);
+  /** ID místností v otevřeném dialogu tisku štítků (null = zavřený). */
+  const [labelIds, setLabelIds] = useState<number[] | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
   const load = async () => {
@@ -213,39 +201,6 @@ export default function RoomsClient() {
     );
   };
 
-  const printLabels = async () => {
-    if (selected.length === 0) return;
-    setError("");
-    setOkMsg("");
-    setPrinting(true);
-    try {
-      const res = await fetch("/api/equipment/rooms/labels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: selected, layoutKey }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setError(data.error ?? "Tisk se nezdařil");
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "stitky-mistnosti.pdf";
-      a.click();
-      URL.revokeObjectURL(url);
-      setOkMsg(`PDF štítků (${selected.length} ks, A4) ke stažení.`);
-    } catch {
-      setError("Tisk se nezdařil");
-    } finally {
-      setPrinting(false);
-    }
-  };
-
-  const selectedTemplate = TEMPLATE_OPTIONS.find((t) => t.key === layoutKey);
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -345,51 +300,31 @@ export default function RoomsClient() {
                 className="w-56 rounded-lg border border-gray-300 bg-white py-1.5 pl-8 pr-2.5 text-sm"
               />
             </label>
-            <select
-              className="rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm"
-              value={layoutKey}
-              onChange={(e) => setLayoutKey(e.target.value)}
-              title="Šablona stránky A4"
-            >
-              {TEMPLATE_OPTIONS.map((t) => (
-                <option key={t.key} value={t.key}>
-                  {t.label} · {t.perPage}/str.
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              disabled={selected.length === 0 || printing}
-              onClick={() => void printLabels()}
-              className="rounded-lg bg-red-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
-            >
-              {printing
-                ? "Připravuji PDF…"
-                : `Tisk QR (A4)${selected.length ? ` · ${selected.length}` : ""}`}
-            </button>
+            {canManageRegister ? (
+              <button
+                type="button"
+                disabled={selected.length === 0}
+                onClick={() => setLabelIds(selected)}
+                className="min-h-11 rounded-lg bg-red-600 px-3 py-1.5 text-sm text-white disabled:opacity-50"
+              >
+                {`Tisk štítků${selected.length ? ` · ${selected.length}` : ""}`}
+              </button>
+            ) : null}
           </div>
         </div>
-        {selectedTemplate ? (
-          <p className="border-b bg-white px-3 py-1.5 text-xs text-gray-500">
-            Šablona: {selectedTemplate.label} ({selectedTemplate.perPage} štítků na stránku). Výchozí
-            mřížku upravíte v{" "}
-            <Link href="/equipment/settings/labels" className="text-red-700 hover:underline">
-              Nastavení → Štítky
-            </Link>
-            .
-          </p>
-        ) : null}
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50 text-left">
             <tr>
-              <th className="px-3 py-2">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  aria-label="Vybrat vše"
-                />
-              </th>
+              {canManageRegister ? (
+                <th className="px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    aria-label="Vybrat vše"
+                  />
+                </th>
+              ) : null}
               <th className="px-3 py-2">Kód</th>
               <th className="px-3 py-2">Název</th>
               <th className="px-3 py-2">Budova</th>
@@ -400,13 +335,13 @@ export default function RoomsClient() {
           <tbody>
             {rooms.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
+                <td colSpan={canManageRegister ? 6 : 5} className="px-3 py-6 text-center text-gray-500">
                   Zatím žádné místnosti.
                 </td>
               </tr>
             ) : filteredRooms.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
+                <td colSpan={canManageRegister ? 6 : 5} className="px-3 py-6 text-center text-gray-500">
                   Žádná místnost neodpovídá hledání.
                 </td>
               </tr>
@@ -418,14 +353,16 @@ export default function RoomsClient() {
                     key={r.id}
                     className={`border-t ${active ? "" : "bg-gray-50 text-gray-500"}`}
                   >
-                    <td className="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selected.includes(r.id)}
-                        onChange={() => toggleOne(r.id)}
-                        aria-label={`Vybrat ${r.code}`}
-                      />
-                    </td>
+                    {canManageRegister ? (
+                      <td className="px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={selected.includes(r.id)}
+                          onChange={() => toggleOne(r.id)}
+                          aria-label={`Vybrat ${r.code}`}
+                        />
+                      </td>
+                    ) : null}
                     <td className="px-3 py-2 font-mono">{r.code}</td>
                     <td className="px-3 py-2">
                       <Link href={`/equipment/rooms/${r.id}`} className="text-red-700 hover:underline">
@@ -439,12 +376,13 @@ export default function RoomsClient() {
                     <td className="px-3 py-2">{r._count?.equipment_items ?? 0}</td>
                     <td className="px-3 py-2">
                       <div className="flex flex-wrap gap-3">
-                        <a
-                          href={`/api/equipment/rooms/${r.id}/label`}
+                        <button
+                          type="button"
                           className="text-red-700 hover:underline"
+                          onClick={() => setLabelIds([r.id])}
                         >
                           Tisk štítku
-                        </a>
+                        </button>
                         <button
                           type="button"
                           className="text-red-700 hover:underline"
@@ -478,6 +416,18 @@ export default function RoomsClient() {
           </tbody>
         </table>
       </div>
+      <LabelPrintDialog
+        open={labelIds != null}
+        kind="room"
+        ids={labelIds ?? []}
+        canConfirm={canManageRegister}
+        onClose={() => setLabelIds(null)}
+        onConfirmed={(printed) => {
+          setError("");
+          setOkMsg(`Označeno jako vytištěné: ${labelsCountLabel(printed.length)}.`);
+          void load();
+        }}
+      />
     </div>
   );
 }

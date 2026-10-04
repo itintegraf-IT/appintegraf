@@ -9,6 +9,8 @@ type Props = {
   assignmentId?: number | null;
   canEdit: boolean;
   canAssign: boolean;
+  /** Otevře dialog tisku štítku; bez něj vede ikona přímo na PDF (pozice 1). */
+  onPrintLabel?: () => void;
 };
 
 export function EquipmentTableActions({
@@ -16,6 +18,7 @@ export function EquipmentTableActions({
   assignmentId = null,
   canEdit,
   canAssign,
+  onPrintLabel,
 }: Props) {
   return (
     <div className="flex items-center justify-end gap-1">
@@ -44,13 +47,25 @@ export function EquipmentTableActions({
           <UserPlus className="h-4 w-4" />
         </Link>
       )}
-      <a
-        href={`/api/equipment/${equipmentId}/label`}
-        className="rounded p-2 text-gray-600 hover:bg-gray-100"
-        title="Tisk QR štítku"
-      >
-        <QrCode className="h-4 w-4" />
-      </a>
+      {onPrintLabel ? (
+        <button
+          type="button"
+          onClick={onPrintLabel}
+          className="rounded p-2 text-gray-600 hover:bg-gray-100"
+          title="Tisk štítku"
+          aria-label="Tisk štítku"
+        >
+          <QrCode className="h-4 w-4" />
+        </button>
+      ) : (
+        <a
+          href={`/api/equipment/${equipmentId}/label`}
+          className="rounded p-2 text-gray-600 hover:bg-gray-100"
+          title="Tisk štítku"
+        >
+          <QrCode className="h-4 w-4" />
+        </a>
+      )}
       {assignmentId != null && (
         <>
           <Link

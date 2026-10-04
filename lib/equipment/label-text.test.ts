@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LABEL_OWNER_TEXT, fitFontSize, fitTextToWidth, normalizeLabelOwnerText, wrapTextLines } from "./label-text";
+import { DEFAULT_LABEL_OWNER_TEXT, fitFontSize, fitTextToWidth, labelsCountLabel, normalizeLabelOwnerText, wrapTextLines } from "./label-text";
 
 /** Každý znak = 1 jednotka šířky (při velikosti písma 1). */
 const measure = (s: string) => s.length;
@@ -89,5 +89,17 @@ describe("normalizeLabelOwnerText", () => {
 
   it("jiný typ než text → výchozí", () => {
     expect(normalizeLabelOwnerText(42)).toBe(DEFAULT_LABEL_OWNER_TEXT);
+  });
+});
+
+describe("labelsCountLabel", () => {
+  it.each([
+    [0, "0 štítků"],
+    [1, "1 štítek"],
+    [3, "3 štítky"],
+    [5, "5 štítků"],
+    [22, "22 štítků"],
+  ] as const)("%i → %s", (n, label) => {
+    expect(labelsCountLabel(n)).toBe(label);
   });
 });

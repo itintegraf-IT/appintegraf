@@ -9,6 +9,7 @@ import {
   labelsPerPage,
   mmToPt,
   normalizeEquipmentLabelGridSpec,
+  nextStartPosition,
   planLabelSheets,
   validateStartPosition,
   type EquipmentLabelGridSpec,
@@ -124,5 +125,16 @@ describe("planLabelSheets a validateStartPosition", () => {
     const result = validateStartPosition(raw, 24);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("1–24");
+  });
+});
+
+describe("nextStartPosition", () => {
+  it.each([
+    [1, 3, 24, 4],
+    [8, 17, 24, 1],
+    [20, 10, 24, 6],
+    [24, 1, 24, 1],
+  ] as const)("start %i + %i štítků na archu %i → %i", (start, count, perPage, next) => {
+    expect(nextStartPosition(start, count, perPage)).toBe(next);
   });
 });

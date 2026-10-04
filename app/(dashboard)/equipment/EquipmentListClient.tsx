@@ -21,6 +21,8 @@ import type {
 } from "@/lib/equipment-list-sort";
 import { formatEquipmentPrice } from "@/lib/equipment/format-price";
 import { EquipmentTableActions } from "./EquipmentTableActions";
+import { LabelPrintDialog } from "./_components/LabelPrintDialog";
+import { labelsCountLabel } from "@/lib/equipment/label-text";
 import { isEquipmentAssignedStatus } from "@/lib/equipment-status";
 import {
   EquipmentFilterCombobox,
@@ -144,7 +146,9 @@ export function EquipmentListClient({
   const [users, setUsers] = useState<UserOpt[]>([]);
   const [toRoom, setToRoom] = useState("");
   const [toUser, setToUser] = useState("");
-  const [busy, setBusy] = useState<"room" | "user" | "print" | null>(null);
+  const [busy, setBusy] = useState<"room" | "user" | null>(null);
+  /** ID položek v otevřeném dialogu tisku štítků (null = zavřený). */
+  const [labelIds, setLabelIds] = useState<number[] | null>(null);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [search, setSearch] = useState("");
@@ -278,37 +282,6 @@ export function EquipmentListClient({
       router.refresh();
     } catch {
       setErr("Přiřazení se nezdařilo");
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  const printLabels = async () => {
-    if (selected.length === 0) return;
-    setErr("");
-    setMsg("");
-    setBusy("print");
-    try {
-      const res = await fetch("/api/equipment/labels", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ids: selected }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        setErr(data.error ?? "Tisk se nezdařil");
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "majetek-stitky.pdf";
-      a.click();
-      URL.revokeObjectURL(url);
-      setMsg(`PDF štítků (${selected.length} ks, A4) ke stažení.`);
-    } catch {
-      setErr("Tisk se nezdařil");
     } finally {
       setBusy(null);
     }
@@ -464,11 +437,11 @@ export function EquipmentListClient({
             <button
               type="button"
               disabled={selected.length === 0 || busy != null}
-              onClick={() => void printLabels()}
+              onClick={() => setLabelIds(selected)}
               className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-50"
             >
               <Printer className="h-4 w-4" />
-              {busy === "print" ? "Připravuji PDF…" : "Tisk QR (A4)"}
+              Tisk štítků
             </button>
           </div>
           {msg ? <p className="text-sm text-green-700">{msg}</p> : null}
@@ -551,6 +524,7 @@ export function EquipmentListClient({
                         assignmentId={row.assignmentId}
                         canEdit={canEdit}
                         canAssign={canAssign}
+                        onPrintLabel={() => setLabelIds([row.id])}
                       />
                     </div>
                   </li>
@@ -648,6 +622,7 @@ export function EquipmentListClient({
                       assignmentId={row.assignmentId}
                       canEdit={canEdit}
                       canAssign={canAssign}
+                      onPrintLabel={() => setLabelIds([row.id])}
                     />
                   </td>
                 </tr>
@@ -656,6 +631,18 @@ export function EquipmentListClient({
           </table>
         </div>
       )}
+      <LabelPrintDialog
+        open={labelIds != null}
+        kind="item"
+        ids={labelIds ?? []}
+        canConfirm={canEdit || canAssign}
+        onClose={() => setLabelIds(null)}
+        onConfirmed={(printed) => {
+          setErr("");
+          setMsg(`Označeno jako vytištěné: ${labelsCountLabel(printed.length)}.`);
+          router.refresh();
+        }}
+      />
     </div>
   );
 }

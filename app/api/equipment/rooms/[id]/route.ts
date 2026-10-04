@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { canAdministerEquipment, canReadEquipment, getAccessibleCategoryIds } from "@/lib/equipment/access";
+import { canAdministerEquipment, canManageRegister, canReadEquipment, getAccessibleCategoryIds } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
 import {
   defaultPlanColor,
@@ -47,6 +47,8 @@ export async function GET(
     ...room,
     polygon: parseRoomPolygon(room.polygon_json),
     items,
+    /** Smí potvrzovat tisk štítku místnosti (správa evidence). */
+    can_manage_register: await canManageRegister(userId),
   });
 }
 

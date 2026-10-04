@@ -233,3 +233,8 @@ export function validateStartPosition(
   }
   return { ok: true, value };
 }
+
+/** Pozice, kde bude volno po vytištění `count` štítků od `start` (aby další tisk navázal). */
+export function nextStartPosition(start: number, count: number, perPage: number): number {
+  return ((start - 1 + count) % perPage) + 1;
+}

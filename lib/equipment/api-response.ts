@@ -40,3 +40,18 @@ export async function readApiResponse<T>(res: Response, fallbackError: string): 
   }
   return { ok: true, data: data as T };
 }
+
+export type PdfResult =
+  | { ok: true; blob: Blob; headers: Headers }
+  | { ok: false; sessionExpired: boolean; error: string };
+
+/** Čtení odpovědi, která má být PDF (tisk štítků); chyby a vypršelé přihlášení jako u readApiResponse. */
+export async function readPdfResponse(res: Response, fallbackError: string): Promise<PdfResult> {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (res.ok && contentType.includes("application/pdf") && !(res.redirected && pathOf(res.url) === "/login")) {
+    return { ok: true, blob: await res.blob(), headers: res.headers };
+  }
+  const result = await readApiResponse<unknown>(res, fallbackError);
+  if (result.ok) return { ok: false, sessionExpired: false, error: fallbackError };
+  return { ok: false, sessionExpired: result.sessionExpired, error: result.error };
+}

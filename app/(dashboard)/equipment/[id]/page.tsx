@@ -15,6 +15,7 @@ import { formatEquipmentPrice } from "@/lib/equipment/format-price";
 import { canAdministerEquipment, canReadEquipment, canWriteEquipment } from "@/lib/equipment/access";
 import { getItemHistoryCounts, itemDeleteBlockReason } from "@/lib/equipment/item-history";
 import { DeleteItemButton } from "./DeleteItemButton";
+import { LabelPrintButton } from "../_components/LabelPrintButton";
 
 function fmtPrice(p: unknown): string {
   return formatEquipmentPrice(p);
@@ -106,12 +107,12 @@ export default async function EquipmentViewPage({
             </Link>
           ) : null}
           {item.qr_code ? (
-            <a
-              href={`/api/equipment/${item.id}/label`}
-              className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-            >
-              Tisk štítku
-            </a>
+            <LabelPrintButton
+              kind="item"
+              id={item.id}
+              printedAt={item.label_printed_at ? item.label_printed_at.toISOString() : null}
+              canConfirm={canWrite}
+            />
           ) : null}
           {canWrite && item.status !== EQUIPMENT_ITEM_STATUS.VYRAZENO ? (
             <EquipmentTransferModal
