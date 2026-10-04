@@ -2,9 +2,15 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { canAdministerEquipment } from "@/lib/equipment/access";
-import { FolderTree, Shield, Upload, Bell, LayoutGrid, Hash } from "lucide-react";
+import { FolderTree, Shield, Upload, Bell, LayoutGrid, Hash, ListChecks } from "lucide-react";
 
 const cards = [
+  {
+    href: "/equipment/settings/data-prep",
+    icon: ListChecks,
+    title: "Příprava dat",
+    hint: "Místnosti a držitelé z původní evidence — náhled a provedení",
+  },
   {
     href: "/equipment/import",
     icon: Upload,
