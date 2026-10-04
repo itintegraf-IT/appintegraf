@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { AlertCircle, ArrowLeft } from "lucide-react";
 import { EquipmentCodeBadge } from "../../_components/EquipmentCodeBadge";
 import { askSendEquipmentMovementNotify } from "@/lib/equipment/ask-send-notify";
+import { readApiResponse } from "@/lib/equipment/api-response";
 
 type Item = {
   id: number;
@@ -13,60 +15,104 @@ type Item = {
   equipment_categories: { name: string };
 };
 
+type RoomDetail = {
+  id: number;
+  name: string;
+  code: string;
+  qr_code: string;
+  building: string | null;
+  floor: string | null;
+  items: Item[];
+};
+
+const NETWORK_ERROR = "Spojení se serverem selhalo. Zkuste stránku načíst znovu.";
+
 export default function RoomDetailClient() {
   const params = useParams();
   const id = params.id as string;
-  const [room, setRoom] = useState<{
-    id: number;
-    name: string;
-    code: string;
-    qr_code: string;
-    building: string | null;
-    floor: string | null;
-    items: Item[];
-  } | null>(null);
+  const [room, setRoom] = useState<RoomDetail | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selected, setSelected] = useState<number[]>([]);
   const [rooms, setRooms] = useState<{ id: number; name: string; code: string }[]>([]);
   const [toRoom, setToRoom] = useState("");
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState<{ tone: "ok" | "error"; text: string } | null>(null);
+
+  const loadRoom = useCallback(
+    () =>
+      fetch(`/api/equipment/rooms/${id}`)
+        .then((res) => readApiResponse<RoomDetail>(res, "Místnost se nepodařilo načíst."))
+        .then((result) => {
+          if (!result.ok) {
+            setRoom(null);
+            setLoadError(result.error);
+            return;
+          }
+          setRoom(result.data);
+          setLoadError(null);
+        })
+        .catch(() => setLoadError(NETWORK_ERROR)),
+    [id]
+  );
 
   useEffect(() => {
-    fetch(`/api/equipment/rooms/${id}`)
-      .then((r) => r.json())
-      .then((d) => setRoom(d));
+    void loadRoom();
     fetch("/api/equipment/rooms")
-      .then((r) => r.json())
-      .then((d) => setRooms(Array.isArray(d) ? d : []));
-  }, [id]);
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setRooms(Array.isArray(d) ? d : []))
+      .catch(() => setRooms([]));
+  }, [loadRoom]);
 
   const toggle = (itemId: number) => {
     setSelected((p) => (p.includes(itemId) ? p.filter((x) => x !== itemId) : [...p, itemId]));
   };
 
   const bulkMove = async () => {
-    setMsg("");
+    setMsg(null);
     const notify = askSendEquipmentMovementNotify();
-    const res = await fetch("/api/equipment/transfers", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        equipment_ids: selected,
-        to_room_id: parseInt(toRoom, 10),
-        notify,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setMsg(data.error ?? "Chyba");
+    let result;
+    try {
+      const res = await fetch("/api/equipment/transfers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          equipment_ids: selected,
+          to_room_id: parseInt(toRoom, 10),
+          notify,
+        }),
+      });
+      result = await readApiResponse<{ results?: unknown[] }>(res, "Přesun se nepodařil.");
+    } catch {
+      setMsg({ tone: "error", text: "Spojení se serverem selhalo. Nic se nepřesunulo — zkuste to znovu." });
       return;
     }
-    setMsg(`Přesunuto ${data.results?.length ?? 0} položek.`);
+    if (!result.ok) {
+      setMsg({ tone: "error", text: result.error });
+      return;
+    }
+    setMsg({ tone: "ok", text: `Přesunuto ${result.data.results?.length ?? 0} položek.` });
     setSelected([]);
-    const r = await fetch(`/api/equipment/rooms/${id}`);
-    setRoom(await r.json());
+    await loadRoom();
   };
 
-  if (!room) return <p className="p-4 text-gray-500">Načítání…</p>;
+  if (loadError) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col gap-4 py-10">
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-border bg-card p-6 shadow-sm">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" aria-hidden />
+          <p className="font-medium">{loadError}</p>
+        </div>
+        <Link
+          href="/equipment/rooms"
+          className="inline-flex min-h-11 w-fit items-center gap-2 rounded-lg border border-border px-4 py-2 font-medium hover:bg-muted"
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden />
+          Zpět na místnosti
+        </Link>
+      </div>
+    );
+  }
+
+  if (!room) return <p className="p-4 text-muted-foreground">Načítání…</p>;
 
   return (
     <div className="space-y-4">
@@ -127,7 +173,14 @@ export default function RoomDetailClient() {
           </button>
         </div>
       ) : null}
-      {msg ? <p className="text-sm text-green-700">{msg}</p> : null}
+      {msg ? (
+        <p
+          role={msg.tone === "error" ? "alert" : "status"}
+          className={`text-sm font-medium ${msg.tone === "error" ? "text-destructive" : "text-(--success)"}`}
+        >
+          {msg.text}
+        </p>
+      ) : null}
 
       <table className="min-w-full rounded-xl border bg-white text-sm shadow-sm">
         <thead className="bg-gray-50 text-left">

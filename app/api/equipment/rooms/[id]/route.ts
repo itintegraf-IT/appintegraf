@@ -28,7 +28,7 @@ export async function GET(
   }
 
   const room = await prisma.equipment_rooms.findUnique({ where: { id } });
-  if (!room) return NextResponse.json({ error: "Nenalezeno" }, { status: 404 });
+  if (!room) return NextResponse.json({ error: "Místnost nenalezena" }, { status: 404 });
 
   const catFilter = await getAccessibleCategoryIds(userId);
   const items = await prisma.equipment_items.findMany({
