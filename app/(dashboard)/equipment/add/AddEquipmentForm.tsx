@@ -3,8 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, AlertTriangle, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowLeft, CheckCircle2, Printer } from "lucide-react";
 import { EquipmentResponsibleEditor } from "../_components/EquipmentResponsibleEditor";
+import { LabelPrintDialog } from "../_components/LabelPrintDialog";
+import { labelsCountLabel } from "@/lib/equipment/label-text";
 import { readApiResponse } from "@/lib/equipment/api-response";
 import {
   DEPRECIABLE_ASSET_THRESHOLD_CZK,
@@ -100,6 +102,8 @@ export function AddEquipmentForm({ initialPoolCode, initialRoomId }: Props) {
   const [fieldError, setFieldError] = useState<{ field: NewItemField; message: string } | null>(null);
   const [loading, setLoading] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
+  const [labelsOpen, setLabelsOpen] = useState(false);
+  const [labelsDone, setLabelsDone] = useState("");
   const [unitsText, setUnitsText] = useState("1");
   const [serials, setSerials] = useState<string[]>([""]);
   const [poolCode, setPoolCode] = useState(initialPoolCode);
@@ -315,10 +319,27 @@ export function AddEquipmentForm({ initialPoolCode, initialRoomId }: Props) {
               </li>
             ))}
           </ul>
+          {labelsDone ? (
+            <p role="status" className="mt-4 flex items-center gap-2 text-sm font-medium text-(--success)">
+              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+              {labelsDone}
+            </p>
+          ) : null}
           <div className="mt-6 flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={startNext}
+              onClick={() => setLabelsOpen(true)}
+              className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-border px-4 font-medium hover:bg-muted"
+            >
+              <Printer className="h-4 w-4" aria-hidden />
+              Tisk štítků ({created.count})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setLabelsDone("");
+                startNext();
+              }}
               className="min-h-11 rounded-lg bg-primary px-4 font-medium text-primary-foreground hover:opacity-90"
             >
               Zařadit další položku z dokladu
@@ -331,6 +352,14 @@ export function AddEquipmentForm({ initialPoolCode, initialRoomId }: Props) {
             </Link>
           </div>
         </div>
+        <LabelPrintDialog
+          open={labelsOpen}
+          kind="item"
+          ids={created.ids}
+          canConfirm
+          onClose={() => setLabelsOpen(false)}
+          onConfirmed={(printed) => setLabelsDone(`Štítky označeny jako vytištěné: ${labelsCountLabel(printed.length)}.`)}
+        />
       </>
     );
   }
