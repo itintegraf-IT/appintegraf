@@ -4,6 +4,7 @@ import { canReadEquipment } from "@/lib/equipment/access";
 import { getRoomTransferProtocolById } from "@/lib/equipment/room-transfer-protocol-data";
 import { ProtocolPrintBar } from "../ProtocolPrintBar";
 import { ProtocolAutoPrint } from "../ProtocolAutoPrint";
+import { TRANSFER_SOURCE_IMPORT, transferSourceLabel } from "@/lib/equipment/transfer-source";
 
 function fmtDate(d: Date | null) {
   if (!d) return "—";
@@ -30,7 +31,8 @@ export default async function PrintPresunMistnostiPage({
   const userId = session?.user?.id ? parseInt(session.user.id, 10) : 0;
 
   const data = await getRoomTransferProtocolById(hid);
-  if (!data) notFound();
+  // Zařazení z původní evidence (úklid dat) není přesun — protokol k němu neexistuje.
+  if (!data || data.source === TRANSFER_SOURCE_IMPORT) notFound();
   if (!(await canReadEquipment(userId, data.equipment_items.category_id))) notFound();
 
   const eq = data.equipment_items;
@@ -61,7 +63,7 @@ export default async function PrintPresunMistnostiPage({
             </tr>
             <tr>
               <th>Zdroj</th>
-              <td>{data.source}</td>
+              <td>{transferSourceLabel(data.source)}</td>
             </tr>
             <tr>
               <th>Z místnosti</th>

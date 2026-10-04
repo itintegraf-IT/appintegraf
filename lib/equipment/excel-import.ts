@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { stripDiacritics } from "@/lib/equipment/text-normalize";
 
 export type ParsedEquipmentCategory = {
   name: string;
@@ -48,9 +49,8 @@ function cell(row: unknown[], index: number): string {
   return String(v).replace(/\s+/g, " ").trim();
 }
 
-export function stripDiacritics(s: string): string {
-  return s.normalize("NFD").replace(/\p{M}/gu, "");
-}
+// Sdílená normalizace (bez knihovny xlsx, smí do klienta) — re-export kvůli dosavadním importům.
+export { stripDiacritics };
 
 export function normalizeHeader(s: string): string {
   return stripDiacritics(String(s ?? ""))
@@ -395,7 +395,7 @@ export function parseEquipmentWorkbook(wb: XLSX.WorkBook): ParsedEquipmentWorkbo
     warnings.push("Záložka místností nebyla rozpoznána — místnosti se nezaloží.");
   }
 
-  let categories = catsAoa ? parseCategoriesSheet(catsAoa, warnings) : [];
+  const categories = catsAoa ? parseCategoriesSheet(catsAoa, warnings) : [];
   if (!catsAoa) {
     warnings.push("Záložka kategorií nebyla rozpoznána — skupiny se odvodí z listu majetku.");
   }

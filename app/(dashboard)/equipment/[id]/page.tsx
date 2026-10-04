@@ -16,6 +16,9 @@ import { canAdministerEquipment, canReadEquipment, canWriteEquipment } from "@/l
 import { getItemHistoryCounts, itemDeleteBlockReason } from "@/lib/equipment/item-history";
 import { DeleteItemButton } from "./DeleteItemButton";
 import { LabelPrintButton } from "../_components/LabelPrintButton";
+import { TRANSFER_SOURCE_IMPORT, transferSourceLabel } from "@/lib/equipment/transfer-source";
+
+const historyDate = new Intl.DateTimeFormat("cs-CZ", { day: "numeric", month: "numeric", year: "numeric", timeZone: "Europe/Prague" });
 
 function fmtPrice(p: unknown): string {
   return formatEquipmentPrice(p);
@@ -272,15 +275,18 @@ export default async function EquipmentViewPage({
                       → {h.room_to.code} – {h.room_to.name}
                       <span className="text-gray-500">
                         {" "}
-                        ({h.users.last_name} {h.users.first_name}, {h.source})
+                        ({historyDate.format(h.transferred_at)} · {transferSourceLabel(h.source)} · {h.users.last_name}{" "}
+                        {h.users.first_name})
                       </span>
                     </span>
-                    <a
-                      href={`/equipment/protokol/presun-mistnosti?historyId=${h.id}`}
-                      className="text-red-700 hover:underline"
-                    >
-                      Protokol
-                    </a>
+                    {h.source === TRANSFER_SOURCE_IMPORT ? null : (
+                      <a
+                        href={`/equipment/protokol/presun-mistnosti?historyId=${h.id}`}
+                        className="text-red-700 hover:underline"
+                      >
+                        Protokol
+                      </a>
+                    )}
                   </li>
                 ))}
               </ul>
