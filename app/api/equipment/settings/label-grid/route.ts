@@ -47,6 +47,7 @@ export async function PUT(req: NextRequest) {
     templateKey: typeof body.templateKey === "string" ? body.templateKey : undefined,
     useCustom: Boolean(body.useCustom),
     customSpec: body.customSpec && typeof body.customSpec === "object" ? body.customSpec : undefined,
+    ownerText: body.ownerText,
   });
   const activeSpec = activeLabelGridSpec(next);
   const fitError = labelGridFitError(activeSpec);

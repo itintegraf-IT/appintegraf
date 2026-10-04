@@ -1,239 +1,232 @@
-import { rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import { setupPdfWithFonts } from "@/lib/vyroba/protocol/fonts";
 import {
   A4_HEIGHT_MM,
   A4_WIDTH_MM,
-  LABEL_HEIGHT_MM,
-  LABEL_WIDTH_MM,
-  getLabelSlotsOnA4,
+  labelContentBox,
   mmToPt,
+  planLabelSheets,
   type EquipmentLabelGridSpec,
+  type MmBox,
 } from "@/lib/equipment/label-layout";
 import { resolveEquipmentLabelGrid } from "@/lib/equipment/label-grid-settings";
+import { fitFontSize, fitTextToWidth, wrapTextLines } from "@/lib/equipment/label-text";
 import { buildEqPayload, buildRmPayload, generateQrPng } from "@/lib/equipment/qr";
+import { isTestLabelEnvironment } from "@/lib/equipment/qr-url";
 
 type LabelContent = {
+  /** Inventární číslo nebo kód místnosti — nikdy se nezkracuje, jen zmenší písmo. */
+  code: string;
+  /** Místo inventárního čísla dlouhý QR kód (starší položky) → menší písmo. */
+  codeIsFallback: boolean;
+  /** Název položky nebo místnosti — nejvýš 2 řádky, zbytek „…“. */
   title: string;
-  subtitle?: string;
-  line3?: string;
+  /** Skupina u položky, budova a patro u místnosti. */
+  detail?: string;
+  /** Počítaná položka (víc kusů na jednom záznamu) → „× N ks“. */
+  quantity?: number;
   qrPayload: string;
-  assetTag: string;
 };
 
-type QrImage = Awaited<
-  ReturnType<Awaited<ReturnType<typeof setupPdfWithFonts>>["doc"]["embedPng"]>
->;
+export type LabelPrintOptions = {
+  /** Mřížka; bez ní uložené nastavení. */
+  spec?: EquipmentLabelGridSpec;
+  /** Text vlastníka; bez něj uložené nastavení. */
+  ownerText?: string;
+  /** Pozice prvního štítku na archu (1 = levý horní). */
+  startPosition?: number;
+};
 
-async function drawVisitkaLabel(
+const TEST_OWNER_TEXT = "TEST — neplatný štítek";
+const QR_GAP_MM = 2;
+const CODE_SIZES = [16, 15, 14, 13, 12, 11, 10, 9, 8, 7];
+const FALLBACK_CODE_SIZES = [9, 8, 7, 6];
+
+const ptToMm = (pt: number) => (pt / 72) * 25.4;
+
+function drawLabel(
   page: PDFPage,
-  font: PDFFont,
-  fontBold: PDFFont,
-  x: number,
-  y: number,
+  fonts: { font: PDFFont; fontBold: PDFFont },
+  box: MmBox,
   content: LabelContent,
-  qrImage: QrImage,
-  sizeMm: { widthMm: number; heightMm: number } = {
-    widthMm: LABEL_WIDTH_MM,
-    heightMm: LABEL_HEIGHT_MM,
-  }
+  qr: PDFImage,
+  owner: { text: string; warning: boolean }
 ) {
-  const w = mmToPt(sizeMm.widthMm);
-  const h = mmToPt(sizeMm.heightMm);
-  const pad = mmToPt(Math.min(3, sizeMm.widthMm * 0.05));
-  const scale = Math.min(sizeMm.widthMm / LABEL_WIDTH_MM, sizeMm.heightMm / LABEL_HEIGHT_MM, 1.2);
+  const pageHeightPt = mmToPt(A4_HEIGHT_MM);
+  const ink = rgb(0, 0, 0);
 
-  page.drawRectangle({
-    x,
-    y,
-    width: w,
-    height: h,
-    borderColor: rgb(0.2, 0.2, 0.2),
-    borderWidth: 0.8,
+  const qrMm = Math.min(box.hMm, box.wMm * 0.45);
+  page.drawImage(qr, {
+    x: mmToPt(box.xMm),
+    y: pageHeightPt - mmToPt(box.yMm + (box.hMm - qrMm) / 2 + qrMm),
+    width: mmToPt(qrMm),
+    height: mmToPt(qrMm),
   });
 
-  const qrSize = Math.min(mmToPt(28 * scale), h - pad * 2, w * 0.42);
-  page.drawImage(qrImage, {
-    x: x + pad,
-    y: y + (h - qrSize) / 2,
-    width: qrSize,
-    height: qrSize,
-  });
+  const textXMm = box.xMm + qrMm + QR_GAP_MM;
+  const textWidthPt = mmToPt(box.wMm - qrMm - QR_GAP_MM);
+  const bottomMm = box.yMm + box.hMm;
+  let cursorMm = box.yMm;
 
-  const textX = x + pad + qrSize + mmToPt(2);
-  const maxTextW = Math.max(8, w - (textX - x) - pad);
-  let ty = y + h - pad - 8 * scale;
-  const titleSize = Math.max(5.5, 8 * scale);
-  const tagSize = Math.max(5, 7 * scale);
-  const subSize = Math.max(4.5, 6.5 * scale);
-
-  page.drawText(content.title.slice(0, 40), {
-    x: textX,
-    y: ty,
-    size: titleSize,
-    font: fontBold,
-    color: rgb(0, 0, 0),
-    maxWidth: maxTextW,
-  });
-  ty -= titleSize + 3;
-
-  page.drawText(content.assetTag, {
-    x: textX,
-    y: ty,
-    size: tagSize,
-    font,
-    color: rgb(0.15, 0.15, 0.15),
-    maxWidth: maxTextW,
-  });
-  ty -= tagSize + 2;
-
-  if (content.subtitle && ty > y + pad + 6) {
-    page.drawText(content.subtitle.slice(0, 36), {
-      x: textX,
-      y: ty,
-      size: subSize,
-      font,
-      color: rgb(0.3, 0.3, 0.3),
-      maxWidth: maxTextW,
-    });
-    ty -= subSize + 2;
-  }
-  if (content.line3 && ty > y + pad + 4) {
-    page.drawText(content.line3.slice(0, 36), {
-      x: textX,
-      y: ty,
-      size: Math.max(4, 6 * scale),
-      font,
-      color: rgb(0.35, 0.35, 0.35),
-      maxWidth: maxTextW,
-    });
-  }
-}
-
-async function buildSingleLabelPdf(content: LabelContent): Promise<Uint8Array> {
-  const { doc, font, fontBold } = await setupPdfWithFonts();
-  const page = doc.addPage([mmToPt(LABEL_WIDTH_MM), mmToPt(LABEL_HEIGHT_MM)]);
-  const png = await generateQrPng(content.qrPayload);
-  const img = await doc.embedPng(png);
-  await drawVisitkaLabel(page, font, fontBold, 0, 0, content, img);
-  return doc.save();
-}
-
-async function resolveBulkSpec(spec?: EquipmentLabelGridSpec | null, layoutKey?: string | null) {
-  if (spec) return spec;
-  const resolved = await resolveEquipmentLabelGrid(layoutKey);
-  return resolved.spec;
-}
-
-async function buildBulkLabelsPdf(
-  items: LabelContent[],
-  options?: { spec?: EquipmentLabelGridSpec | null; layoutKey?: string | null }
-): Promise<Uint8Array> {
-  const grid = await resolveBulkSpec(options?.spec, options?.layoutKey);
-  const { doc, font, fontBold } = await setupPdfWithFonts();
-  const slots = getLabelSlotsOnA4(grid);
-  let slotIdx = 0;
-  let page = doc.addPage([mmToPt(A4_WIDTH_MM), mmToPt(A4_HEIGHT_MM)]);
-
-  for (const content of items) {
-    if (slotIdx >= slots.length) {
-      page = doc.addPage([mmToPt(A4_WIDTH_MM), mmToPt(A4_HEIGHT_MM)]);
-      slotIdx = 0;
+  /** Řádek textu shora; vrátí false, když se pod sebe už nevejde. */
+  const line = (text: string, size: number, font: PDFFont, color = ink): boolean => {
+    const heightMm = ptToMm(size * 1.2);
+    if (cursorMm + heightMm > bottomMm + 0.01) return false;
+    if (text) {
+      page.drawText(text, {
+        x: mmToPt(textXMm),
+        y: pageHeightPt - mmToPt(cursorMm) - size * 0.9,
+        size,
+        font,
+        color,
+      });
     }
-    const slot = slots[slotIdx++];
-    const png = await generateQrPng(content.qrPayload);
-    const img = await doc.embedPng(png);
-    await drawVisitkaLabel(page, font, fontBold, slot.x, slot.y, content, img, {
-      widthMm: slot.widthMm,
-      heightMm: slot.heightMm,
-    });
+    cursorMm += heightMm;
+    return true;
+  };
+
+  if (owner.text) {
+    if (owner.warning) {
+      const size = 7;
+      const text = fitTextToWidth(owner.text, textWidthPt - 4, (s) => fonts.fontBold.widthOfTextAtSize(s, size));
+      page.drawRectangle({
+        x: mmToPt(textXMm),
+        y: pageHeightPt - mmToPt(cursorMm) - size * 1.2,
+        width: fonts.fontBold.widthOfTextAtSize(text, size) + 4,
+        height: size * 1.2,
+        color: ink,
+      });
+      page.drawText(text, {
+        x: mmToPt(textXMm) + 2,
+        y: pageHeightPt - mmToPt(cursorMm) - size * 0.95,
+        size,
+        font: fonts.fontBold,
+        color: rgb(1, 1, 1),
+      });
+      cursorMm += ptToMm(size * 1.2) + 0.6;
+    } else {
+      const size = 6;
+      line(fitTextToWidth(owner.text, textWidthPt, (s) => fonts.font.widthOfTextAtSize(s, size)), size, fonts.font);
+    }
+  }
+
+  const codeSize = fitFontSize(
+    content.code,
+    textWidthPt,
+    content.codeIsFallback ? FALLBACK_CODE_SIZES : CODE_SIZES,
+    (s, size) => fonts.fontBold.widthOfTextAtSize(s, size)
+  );
+  line(content.code, codeSize, fonts.fontBold);
+
+  const titleSize = box.hMm >= 40 ? 9 : 7.5;
+  const titleLines = wrapTextLines(content.title, textWidthPt, 2, (s) => fonts.font.widthOfTextAtSize(s, titleSize));
+  for (const titleLine of titleLines) {
+    if (!line(titleLine, titleSize, fonts.font)) break;
+  }
+
+  const detailSize = 6;
+  const detail = [content.detail, content.quantity && content.quantity > 1 ? `× ${content.quantity} ks` : null]
+    .filter(Boolean)
+    .join(" · ");
+  if (detail) {
+    line(
+      fitTextToWidth(detail, textWidthPt, (s) => fonts.font.widthOfTextAtSize(s, detailSize)),
+      detailSize,
+      fonts.font,
+      rgb(0.25, 0.25, 0.25)
+    );
+  }
+}
+
+async function buildLabelsPdf(contents: LabelContent[], options: LabelPrintOptions = {}): Promise<Uint8Array> {
+  const needSettings = !options.spec || options.ownerText === undefined;
+  const resolved = needSettings ? await resolveEquipmentLabelGrid() : null;
+  const spec = options.spec ?? resolved!.spec;
+  const ownerText = options.ownerText ?? resolved!.settings.ownerText;
+  const owner = isTestLabelEnvironment({ APP_ENV: process.env.APP_ENV })
+    ? { text: TEST_OWNER_TEXT, warning: true }
+    : { text: ownerText, warning: false };
+
+  const { doc, font, fontBold } = await setupPdfWithFonts();
+  const placements = planLabelSheets(contents, spec, options.startPosition ?? 1);
+  const pages: PDFPage[] = [];
+  const pageCount = placements.length ? placements[placements.length - 1].page + 1 : 1;
+  for (let i = 0; i < pageCount; i++) pages.push(doc.addPage([mmToPt(A4_WIDTH_MM), mmToPt(A4_HEIGHT_MM)]));
+
+  for (const placement of placements) {
+    const qr = await doc.embedPng(await generateQrPng(placement.entry.qrPayload));
+    drawLabel(pages[placement.page], { font, fontBold }, labelContentBox(spec, placement.slot), placement.entry, qr, owner);
   }
 
   return doc.save();
 }
 
-export async function buildEquipmentLabelPdf(item: {
+type ItemLabelInput = {
   name: string;
   asset_tag: string | null;
   qr_code: string;
   categoryName?: string | null;
-}): Promise<Uint8Array> {
-  return buildSingleLabelPdf({
-    title: item.name,
-    subtitle: item.categoryName ?? undefined,
-    assetTag: item.asset_tag ?? item.qr_code,
-    qrPayload: buildEqPayload(item.qr_code),
-  });
-}
+  quantity?: number | null;
+};
 
-export async function buildRoomLabelPdf(room: {
+type RoomLabelInput = {
   name: string;
   code: string;
   qr_code: string;
   building?: string | null;
   floor?: string | null;
-}): Promise<Uint8Array> {
-  const line3 = [room.building, room.floor].filter(Boolean).join(", ") || undefined;
-  return buildSingleLabelPdf({
+};
+
+function itemContent(item: ItemLabelInput): LabelContent {
+  return {
+    code: item.asset_tag ?? item.qr_code,
+    codeIsFallback: !item.asset_tag,
+    title: item.name,
+    detail: item.categoryName ?? undefined,
+    quantity: item.quantity ?? undefined,
+    qrPayload: buildEqPayload(item.qr_code),
+  };
+}
+
+function roomContent(room: RoomLabelInput): LabelContent {
+  return {
+    code: room.code,
+    codeIsFallback: false,
     title: room.name,
-    subtitle: room.code,
-    line3,
-    assetTag: room.code,
+    detail: [room.building, room.floor].filter(Boolean).join(", ") || undefined,
     qrPayload: buildRmPayload(room.qr_code),
-  });
+  };
+}
+
+export async function buildEquipmentLabelPdf(item: ItemLabelInput, options?: LabelPrintOptions): Promise<Uint8Array> {
+  return buildLabelsPdf([itemContent(item)], options);
+}
+
+export async function buildRoomLabelPdf(room: RoomLabelInput, options?: LabelPrintOptions): Promise<Uint8Array> {
+  return buildLabelsPdf([roomContent(room)], options);
+}
+
+export async function buildEquipmentLabelsBulkPdf(
+  items: ItemLabelInput[],
+  options?: LabelPrintOptions
+): Promise<Uint8Array> {
+  return buildLabelsPdf(items.map(itemContent), options);
+}
+
+export async function buildRoomLabelsBulkPdf(rooms: RoomLabelInput[], options?: LabelPrintOptions): Promise<Uint8Array> {
+  return buildLabelsPdf(rooms.map(roomContent), options);
 }
 
 export async function buildPoolLabelsBulkPdf(
   codes: { qr_code: string; asset_tag: string }[],
-  options?: { spec?: EquipmentLabelGridSpec | null; layoutKey?: string | null }
+  options?: LabelPrintOptions
 ): Promise<Uint8Array> {
-  return buildBulkLabelsPdf(
+  return buildLabelsPdf(
     codes.map((code) => ({
-      title: "INTEGRAF",
-      subtitle: "Majetek",
-      assetTag: code.asset_tag,
+      code: code.asset_tag,
+      codeIsFallback: false,
+      title: "Majetek",
       qrPayload: buildEqPayload(code.qr_code),
-    })),
-    options
-  );
-}
-
-export async function buildEquipmentLabelsBulkPdf(
-  items: {
-    name: string;
-    asset_tag: string | null;
-    qr_code: string;
-    categoryName?: string | null;
-  }[],
-  options?: { spec?: EquipmentLabelGridSpec | null; layoutKey?: string | null }
-): Promise<Uint8Array> {
-  return buildBulkLabelsPdf(
-    items.map((item) => ({
-      title: item.name,
-      subtitle: item.categoryName ?? undefined,
-      assetTag: item.asset_tag ?? item.qr_code,
-      qrPayload: buildEqPayload(item.qr_code),
-    })),
-    options
-  );
-}
-
-export async function buildRoomLabelsBulkPdf(
-  rooms: {
-    name: string;
-    code: string;
-    qr_code: string;
-    building?: string | null;
-    floor?: string | null;
-  }[],
-  options?: { spec?: EquipmentLabelGridSpec | null; layoutKey?: string | null }
-): Promise<Uint8Array> {
-  return buildBulkLabelsPdf(
-    rooms.map((room) => ({
-      title: room.name,
-      subtitle: room.code,
-      line3: [room.building, room.floor].filter(Boolean).join(", ") || undefined,
-      assetTag: room.code,
-      qrPayload: buildRmPayload(room.qr_code),
     })),
     options
   );

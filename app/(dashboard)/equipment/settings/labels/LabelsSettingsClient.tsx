@@ -13,6 +13,7 @@ import {
   type EquipmentLabelGridSpec,
   type EquipmentLabelTemplateKey,
 } from "@/lib/equipment/label-layout";
+import { DEFAULT_LABEL_OWNER_TEXT, LABEL_OWNER_TEXT_MAX } from "@/lib/equipment/label-text";
 
 type TemplateOpt = {
   key: EquipmentLabelTemplateKey;
@@ -26,6 +27,7 @@ type ApiResponse = {
     templateKey: EquipmentLabelTemplateKey;
     useCustom: boolean;
     customSpec: EquipmentLabelGridSpec;
+    ownerText: string;
   };
   templates: TemplateOpt[];
   labelsPerPage?: number;
@@ -84,6 +86,7 @@ export default function LabelsSettingsClient() {
   const [templateKey, setTemplateKey] = useState<EquipmentLabelTemplateKey>(DEFAULT_EQUIPMENT_LABEL_TEMPLATE);
   const [useCustom, setUseCustom] = useState(false);
   const [spec, setSpec] = useState<EquipmentLabelGridSpec>(emptySpec);
+  const [ownerText, setOwnerText] = useState(DEFAULT_LABEL_OWNER_TEXT);
   const [error, setError] = useState("");
   const [okMsg, setOkMsg] = useState("");
   const [saving, setSaving] = useState(false);
@@ -103,6 +106,7 @@ export default function LabelsSettingsClient() {
       setTemplateKey(data.settings.templateKey);
       setUseCustom(data.settings.useCustom);
       setSpec(data.settings.customSpec);
+      setOwnerText(data.settings.ownerText ?? DEFAULT_LABEL_OWNER_TEXT);
     } catch {
       setError("Chyba načtení");
     } finally {
@@ -137,6 +141,7 @@ export default function LabelsSettingsClient() {
           templateKey,
           useCustom,
           customSpec: spec,
+          ownerText,
         }),
       });
       const data = (await res.json().catch(() => ({}))) as ApiResponse;
@@ -151,6 +156,7 @@ export default function LabelsSettingsClient() {
         setTemplateKey(data.settings.templateKey);
         setUseCustom(data.settings.useCustom);
         setSpec(data.settings.customSpec);
+        setOwnerText(data.settings.ownerText);
       }
     } catch {
       setError("Chyba uložení");
@@ -202,6 +208,18 @@ export default function LabelsSettingsClient() {
               ))}
             </select>
           </div>
+
+          <label className="block text-sm">
+            <span className="mb-1 block font-medium text-gray-700">Text vlastníka na štítku</span>
+            <input
+              type="text"
+              maxLength={LABEL_OWNER_TEXT_MAX}
+              className="w-full rounded-lg border px-3 py-2"
+              value={ownerText}
+              onChange={(e) => setOwnerText(e.target.value)}
+            />
+            <span className="mt-1 block text-gray-500">Prázdné pole = štítek bez řádku vlastníka.</span>
+          </label>
 
           <label className="flex items-center gap-2 text-sm text-gray-800">
             <input

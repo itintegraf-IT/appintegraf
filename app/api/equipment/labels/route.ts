@@ -50,19 +50,14 @@ export async function POST(req: NextRequest) {
     .map((id) => withQr.find((i) => i.id === id))
     .filter((i): i is (typeof withQr)[number] => i != null);
 
-  const layoutKey =
-    typeof (body as { layoutKey?: unknown }).layoutKey === "string"
-      ? String((body as { layoutKey: string }).layoutKey)
-      : null;
-
   const pdf = await buildEquipmentLabelsBulkPdf(
     ordered.map((item) => ({
       name: item.name,
       asset_tag: item.asset_tag,
       qr_code: item.qr_code as string,
       categoryName: item.equipment_categories.name,
-    })),
-    { layoutKey }
+      quantity: item.quantity,
+    }))
   );
 
   return new NextResponse(Buffer.from(pdf), {

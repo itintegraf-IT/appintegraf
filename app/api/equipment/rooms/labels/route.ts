@@ -25,10 +25,6 @@ export async function POST(req: NextRequest) {
         .filter((n): n is number => Number.isFinite(n))
     ),
   ];
-  const layoutKey =
-    typeof (body as { layoutKey?: unknown }).layoutKey === "string"
-      ? String((body as { layoutKey: string }).layoutKey)
-      : null;
 
   if (ids.length === 0) {
     return NextResponse.json({ error: "Vyberte místnosti k tisku" }, { status: 400 });
@@ -55,8 +51,7 @@ export async function POST(req: NextRequest) {
       qr_code: room.qr_code,
       building: room.building,
       floor: room.floor,
-    })),
-    { layoutKey }
+    }))
   );
 
   return new NextResponse(Buffer.from(pdf), {

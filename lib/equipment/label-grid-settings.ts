@@ -8,6 +8,7 @@ import {
   type EquipmentLabelGridSpec,
   type EquipmentLabelTemplateKey,
 } from "@/lib/equipment/label-layout";
+import { DEFAULT_LABEL_OWNER_TEXT, normalizeLabelOwnerText } from "@/lib/equipment/label-text";
 
 export const EQUIPMENT_LABEL_GRID_KEY = "equipment_label_grid";
 const MODULE = "equipment";
@@ -17,6 +18,8 @@ export type EquipmentLabelGridSettings = {
   /** Pokud true, použije se `customSpec` místo vestavěné šablony. */
   useCustom: boolean;
   customSpec: EquipmentLabelGridSpec;
+  /** Text vlastníka na štítku (prázdný = bez řádku vlastníka). */
+  ownerText: string;
 };
 
 function defaultSettings(): EquipmentLabelGridSettings {
@@ -24,6 +27,7 @@ function defaultSettings(): EquipmentLabelGridSettings {
     templateKey: DEFAULT_EQUIPMENT_LABEL_TEMPLATE,
     useCustom: false,
     customSpec: getTemplateSpec(DEFAULT_EQUIPMENT_LABEL_TEMPLATE),
+    ownerText: DEFAULT_LABEL_OWNER_TEXT,
   };
 }
 
@@ -38,6 +42,7 @@ function parseSettings(raw: string | null | undefined): EquipmentLabelGridSettin
       templateKey,
       useCustom: Boolean(parsed.useCustom),
       customSpec: normalizeEquipmentLabelGridSpec(parsed.customSpec, base),
+      ownerText: normalizeLabelOwnerText(parsed.ownerText),
     };
   } catch {
     return fallback;
@@ -52,35 +57,13 @@ export async function getEquipmentLabelGridSettings(): Promise<EquipmentLabelGri
   return parseSettings(row?.setting_value);
 }
 
-/** Aktivní mřížka pro tisk (šablona nebo custom). */
-export async function resolveEquipmentLabelGrid(
-  layoutKey?: string | null
-): Promise<{
+/** Aktivní mřížka a text vlastníka pro tisk — vždy podle uloženého nastavení (jeden formát pro vše). */
+export async function resolveEquipmentLabelGrid(): Promise<{
   settings: EquipmentLabelGridSettings;
   spec: EquipmentLabelGridSpec;
-  templateKey: EquipmentLabelTemplateKey;
 }> {
   const settings = await getEquipmentLabelGridSettings();
-  if (layoutKey) {
-    const templateKey = resolveEquipmentLabelTemplate(layoutKey);
-    return {
-      settings,
-      templateKey,
-      spec: getTemplateSpec(templateKey),
-    };
-  }
-  if (settings.useCustom) {
-    return {
-      settings,
-      templateKey: settings.templateKey,
-      spec: settings.customSpec,
-    };
-  }
-  return {
-    settings,
-    templateKey: settings.templateKey,
-    spec: getTemplateSpec(settings.templateKey),
-  };
+  return { settings, spec: activeLabelGridSpec(settings) };
 }
 
 /** Normalizuje vstup z formuláře na uložitelná nastavení (bez zápisu). */
@@ -88,6 +71,7 @@ export function buildEquipmentLabelGridSettings(input: {
   templateKey?: string;
   useCustom?: boolean;
   customSpec?: Partial<EquipmentLabelGridSpec>;
+  ownerText?: unknown;
 }): EquipmentLabelGridSettings {
   const templateKey = resolveEquipmentLabelTemplate(input.templateKey);
   const base = getTemplateSpec(templateKey);
@@ -95,6 +79,7 @@ export function buildEquipmentLabelGridSettings(input: {
     templateKey,
     useCustom: Boolean(input.useCustom),
     customSpec: normalizeEquipmentLabelGridSpec(input.customSpec ?? base, base),
+    ownerText: normalizeLabelOwnerText(input.ownerText),
   };
 }
 
