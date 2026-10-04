@@ -279,7 +279,7 @@ export default function FloorPlanClient({
   const fitToWidth = (imageWidth: number) => {
     const vp = viewportRef.current;
     if (!vp || !imageWidth) return;
-    setScale(Math.min(1, Math.max(0.25, vp.clientWidth / imageWidth)));
+    setScale(Math.min(1, Math.max(0.1, vp.clientWidth / imageWidth)));
     setOffset({ x: 0, y: 0 });
   };
 
@@ -381,7 +381,7 @@ export default function FloorPlanClient({
   const onWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
-    setScale((s) => Math.min(4, Math.max(0.25, s * delta)));
+    setScale((s) => Math.min(4, Math.max(0.1, s * delta)));
   };
 
   const createPlan = async () => {
@@ -799,7 +799,7 @@ export default function FloorPlanClient({
               <button type="button" className="rounded border bg-white p-1.5" onClick={() => setScale((s) => Math.min(4, s * 1.2))}>
                 <ZoomIn className="h-4 w-4" />
               </button>
-              <button type="button" className="rounded border bg-white p-1.5" onClick={() => setScale((s) => Math.max(0.25, s / 1.2))}>
+              <button type="button" className="rounded border bg-white p-1.5" onClick={() => setScale((s) => Math.max(0.1, s / 1.2))}>
                 <ZoomOut className="h-4 w-4" />
               </button>
               <button
