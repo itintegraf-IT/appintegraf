@@ -4,6 +4,7 @@ Platí POUZE pro modul Majetek. Jeho soubory:
 
 - `app/(dashboard)/equipment/**` — stránky a klientské komponenty (včetně `_components/`)
 - `app/api/equipment/**` — REST API routes
+- `app/(dashboard)/q/**` — odkaz z QR štítku (`/q/<kód>` otevře kartu položky nebo místnosti)
 - `lib/equipment/**` — logika modulu (QR, štítky, půdorysy, přesuny, inventura, import z Excelu)
 - `lib/equipment-*.ts` — starší pomocné soubory modulu v kořeni `lib/` (postupně přesouvat do `lib/equipment/`)
 - `docs/MODUL_MAJETEK_*.md` — dokumentace modulu
