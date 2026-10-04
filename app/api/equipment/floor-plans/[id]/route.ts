@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canAdministerEquipment, canReadEquipment, getAccessibleCategoryIds } from "@/lib/equipment/access";
-import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
+import { logEquipmentAudit, logEquipmentAuditSafe } from "@/lib/equipment/audit";
 import { parseRoomPolygon } from "@/lib/equipment/floor-plan";
 
 export async function GET(
@@ -145,23 +145,45 @@ export async function DELETE(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
-  await prisma.$transaction([
-    prisma.equipment_rooms.updateMany({
-      where: { floor_plan_id: id },
-      data: { floor_plan_id: null, polygon_json: null, updated_at: new Date() },
-    }),
-    prisma.equipment_floor_plans.update({
-      where: { id },
-      data: { is_active: false, updated_at: new Date() },
-    }),
-  ]);
+  const plan = await prisma.equipment_floor_plans.findUnique({ where: { id }, select: { id: true, is_active: true } });
+  if (!plan) return NextResponse.json({ error: "Plánek nenalezen" }, { status: 404 });
 
-  await logEquipmentAuditSafe({
-    userId,
-    action: "floor_plan_deactivate",
-    tableName: "equipment_floor_plans",
-    recordId: id,
-  });
+  // Smazání by zahodilo obrysy zakreslených místností — dovolíme ho jen bez nich.
+  const drawn = await prisma.equipment_rooms.count({ where: { floor_plan_id: id, polygon_json: { not: null } } });
+  if (drawn > 0) {
+    return NextResponse.json(
+      {
+        error: `Plánek má zakreslené místnosti (${drawn}). Nejdřív je z plánku odeberte — jinak by se jejich obrysy ztratily.`,
+      },
+      { status: 409 }
+    );
+  }
+
+  await prisma.$transaction(
+    async (tx) => {
+      const linked = await tx.equipment_rooms.findMany({ where: { floor_plan_id: id }, select: { id: true } });
+      await tx.equipment_rooms.updateMany({
+        where: { floor_plan_id: id },
+        data: { floor_plan_id: null, updated_at: new Date() },
+      });
+      await tx.equipment_floor_plans.update({
+        where: { id },
+        data: { is_active: false, updated_at: new Date() },
+      });
+      await logEquipmentAudit(
+        {
+          userId,
+          action: "floor_plan_deactivate",
+          tableName: "equipment_floor_plans",
+          recordId: id,
+          detail: { is_active: false, unlinked_room_ids: linked.map((r) => r.id) },
+          oldValues: { is_active: plan.is_active },
+        },
+        tx
+      );
+    },
+    { maxWait: 5000, timeout: 20000 }
+  );
 
   return NextResponse.json({ ok: true });
 }
