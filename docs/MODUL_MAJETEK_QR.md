@@ -22,8 +22,8 @@ Související dokumentace:
 
 - **Skupiny majetku** – plná administrace (IT technika, bílá technika, nářadí…), zodpovědný uživatel za skupinu
 - **Místnosti** – samostatná evidence s QR štítky (odděleně od kalendáře rezervací)
-- **QR / inventární kódy** – `asset_tag`, `qr_code`, tisk štítků **vizitka (90×50 mm)**
-- **Předgenerované QR** – generace X kódů naprázdno, tisk, pozdější sken a přiřazení majetku
+- **QR / inventární kódy** – `asset_tag`, `qr_code`, QR jako odkaz do aplikace, tisk štítků na arch **A4 70 × 37 mm**
+- **Předgenerované QR** – generace X kódů naprázdno, tisk, pozdější sken a přiřazení majetku (od 10/2026 se nepoužívá — štítek se tiskne po zařazení)
 - **PWA skener** – naskenovat místnost + zařízení → umístění v databázi
 - **Přesun mezi místnostmi** – sken, ručně, hromadně; protokol HTML/PDF; append-only historie
 - **Role** – správce majetku, zodpovědný za skupinu, nahlížení dle skupin
@@ -159,14 +159,15 @@ Centrální logika: `lib/equipment/access.ts` – `canReadEquipment` / `canWrite
 
 | Pole | Popis |
 |------|-------|
-| `asset_tag` | Inventární číslo (např. EQ-00001234) |
-| `qr_code` | Payload pro QR kód |
+| `asset_tag` | Inventární číslo (z účetní evidence nebo z číselné řady 100xxx) |
+| `qr_code` | Kód v QR štítku (12 číslic; obsah QR viz kap. 3) |
+| `label_printed_at` | Kdy byl štítek potvrzen jako vytištěný (null = bez štítku) |
 | `room_id` | FK na místnost |
 | `cover_file_id` | Náhledová fotka |
 | `warranty_until` | Konec záruky |
 | `last_service_at` | Poslední servis |
 
-Pole `location` (volný text) zůstává – synchronizuje se z místnosti při přesunu.
+Pole `location` (volný text) zůstává jako legacy z importu („Název (kód)“); místnost je `room_id`. Text čte jen Příprava dat (kap. 3b).
 
 ### Soubory (`file_uploads`)
 
@@ -188,6 +189,9 @@ UI: sekce **Dokumenty** na detailu položky (`EquipmentDocumentsPanel`). API: `G
 ### Rozšíření `equipment_categories`
 
 - `responsible_user_id` – zodpovědný uživatel za skupinu
+- `label_required` – skupina se polepuje štítky (vypnuto u majetku inventarizovaného podle dokladů: auta, budovy, software)
+
+Místnosti (`equipment_rooms`) mají také `label_printed_at`.
 
 ---
 
@@ -200,9 +204,11 @@ UI: sekce **Dokumenty** na detailu položky (`EquipmentDocumentsPanel`). API: `G
 | Skupiny majetku | `/equipment/settings/categories` | Správce |
 | Přístupy nahlížení | `/equipment/settings/access` | Správce |
 | Místnosti | `/equipment/rooms` | Správce |
-| Tisk štítku místnosti (1×) | `GET …/rooms/[id]/label` | Čtení majetku |
-| Hromadný tisk místností (A4) | `POST …/rooms/labels` `{ ids, layoutKey? }` | Správce |
-| Mřížka A4 (šablony) | `/equipment/settings/labels` · `GET/PUT …/settings/label-grid` | Správce |
+| Tisk štítku místnosti (1×) | `GET …/rooms/[id]/label?start=N` | Čtení majetku |
+| Hromadný tisk místností (A4) | `POST …/rooms/labels` `{ ids, startPosition }` | Čtení (tlačítko jen správa evidence) |
+| Potvrzení vytištění | `POST …/labels/confirm` `{ kind, ids, printed }` | Zápis do skupiny / správa evidence u místností |
+| Mřížka A4, text vlastníka | `/equipment/settings/labels` · `GET/PUT …/settings/label-grid` | Správce |
+| Příprava dat | `/equipment/settings/data-prep` · `GET/POST …/data-prep/[rooms\|holders]` | Správce |
 
 Výchozí seed skupin: *Výpočetní a komunikační technika*, *Bílá technika*, *Nářadí*.
 
@@ -234,45 +240,40 @@ Sdílená komponenta: `EquipmentItemForm`.
 
 ### 3. QR kódy a štítky
 
-**Formát štítku:** jedna vizitka (výchozí **90 × 50 mm**) — majetek i místnost. Ne celý A4 jako jeden štítek.
+**QR je odkaz:** `<adresa aplikace>/q/<qr_code>` — fotoaparát telefonu otevře kartu položky nebo místnosti (po přihlášení). Adresa z `EQUIPMENT_QR_BASE_URL`, jinak `AUTH_URL`; lokálně (localhost) zůstává starý text `INTEGRAF:EQ:{qr_code}` / `INTEGRAF:RM:{qr_code}`. Skener čte oba formáty. Stránka `/q/[kód]` položku bez oprávnění neprozradí; u kódu shodného s položkou i místností nabídne volbu. Implementace: `lib/equipment/qr-url.ts`, `qr-landing.ts`.
+
+**Formát štítku:** jeden materiál pro majetek i místnosti — **arch A4 70 × 37 mm, 3 × 8** (výchozí šablona `a4_70x37_3x8`; další šablony a vlastní rozměry v `/equipment/settings/labels`, uloženo v `system_settings` klíč `equipment_label_grid`, mřížka se musí vejít na A4).
 
 | Typ | Obsah na štítku |
 |-----|-----------------|
-| Majetek | Název, asset tag, skupina, QR |
-| Místnost | Název, kód, budova/patro, QR |
-| **Předgenerovaný (fond)** | QR + asset tag (+ „INTEGRAF“) — **bez názvu** majetku |
+| Majetek | vlastník („Majetek Integraf, s.r.o.“, nastavitelný), inventární číslo (tučně, nikdy se nezkracuje), název (max. 2 řádky), skupina, u počítané položky „× N ks“, QR |
+| Místnost | vlastník, kód, název, budova/patro, QR |
 
-- Formát QR payloadu: `INTEGRAF:EQ:{qr_code}` / `INTEGRAF:RM:{qr_code}`
-- API obrázku: `GET /api/equipment/qr?code=…`
-- **Jednotlivý tisk:** PDF = 1 stránka = 1 vizitka
-- **Hromadný tisk:** více štítků na A4 podle mřížky
-  - Výchozí šablona: `visitka_2x5` (2×5 / 90×50 mm)
-  - Alternativa: `compact_3x7` (3×7 / 60×35 mm)
-  - Vlastní mm parametry: `/equipment/settings/labels` (uloženo v `system_settings` klíč `equipment_label_grid`)
-  - Místnosti: checkboxy v `/equipment/rooms` → **Tisk QR (A4)** → `POST /api/equipment/rooms/labels`
-  - Majetek: `POST /api/equipment/labels`; fond QR: `print_batch` — stejná aktivní mřížka
-- Kartička majetku PDF (A4) — samostatný dokument se všemi údaji, **není** náhradou za vizitkový štítek
+- Obsah drží odstup ≥ 4 mm od okraje papíru (laserová tiskárna kraj nepotiskne). Tisknout ve **skutečné velikosti (100 %)**.
+- Mimo produkci (`APP_ENV=test`) štítek nese výrazné **TEST — neplatný štítek**.
+- **Tisk:** dialog Tisk štítků (seznam, řádek, detail, souhrn zařazení, místnosti) — počet, **pozice na načatém archu**, stažení PDF. PDF je seřazené po místnostech. Generování nic nezapisuje.
+- **Evidence tisku:** po stažení se dialog zeptá „Vytiskly se štítky správně?“ — teprve potvrzení zapíše `label_printed_at`; na detailu jde označit jako nevytištěný. Filtr **Bez štítku** v seznamu (s QR, bez potvrzeného tisku, nevyřazené, jen skupiny se štítky) a „Jen bez štítku“ u místností.
+- API obrázku QR: `GET /api/equipment/qr?code=…`
 
-Implementace: `lib/equipment/label-layout.ts`, `label-grid-settings.ts`, `label-pdf.ts` (`buildRoomLabelsBulkPdf`, …).
+Implementace: `lib/equipment/label-layout.ts`, `label-text.ts`, `label-plan.ts`, `label-filters.ts`, `label-grid-settings.ts`, `label-pdf.ts`, `_components/LabelPrintDialog.tsx`.
 
-#### Předgenerované QR (tisk naprázdno → přiřazení)
+**Fond předgenerovaných QR se od 10/2026 nepoužívá** — štítek se tiskne až po zařazení (číslo vždy z řady, žádné párování kódů). Nastavení fondu a režim *Přiřadit QR* ve skeneru jsou schované; tabulka `equipment_qr_pool` a API zůstávají. Naskenovaný volný kód z fondu skener nahlásí.
 
-Praktický workflow: správce vygeneruje X kódů, vytiskne vizitky, nalepí je na zařízení, a teprve při evidenci naskenuje štítek a přiřadí ho položce.
+### 3b. Příprava dat (úklid původní evidence)
 
-| Krok | Co se děje |
-|------|------------|
-| 1. Generace | `/equipment/settings/qr-pool` — zadat počet X (1–500) → dávka v `equipment_qr_pool` (`status: available`) |
-| 2. Tisk | PDF dávky — mřížka vizitek 90×50 mm (jen QR + inventární číslo) |
-| 3. Nalepení | Fyzicky na zařízení |
-| 4. Přiřazení | Sken volného QR → nová položka / existující bez QR / PWA režim *Přiřadit QR* |
+Stránka `/equipment/settings/data-prep` (jen správce), jednorázově před lepením štítků a inventurou:
 
-Stavy kódu: `available` (volný) → `assigned` (přiřazený) / `void` (ztracený nebo poškozený štítek).
+| Krok | Co dělá |
+|------|---------|
+| Místnosti podle textu umístění | Z `location` („Název (kód)“) navrhne místnost: automaticky jen kde sedí kód i název (nebo dřívější název sloučené místnosti z popisu „Také: …“); neznámý kód s jednoznačným názvem a kód s jiným názvem jsou návrhy k potvrzení; středisko, prázdné a neznámé zůstanou ve skupinách k obchůzce. Kód vždy rozhoduje před názvem. |
+| Držitelé z poznámek | Z „Pracovník: …“ přiřadí držitele: shoda celého jména předvybraná, shoda jen podle příjmení k potvrzení, pracoviště a nejednoznačná jména nikdy. Upozorní na možnou duplicitu (držitel už má podobnou položku). |
 
-API: `POST …/qr-pool/generate`, `GET …/batches/[id]/pdf`, `POST …/qr-pool/assign`, `POST …/qr-pool/[id]/void`.
+- Náhled ukáže přesně, co se změní; provedou se jen vybrané řádky, které jsou v plánu i v okamžiku zápisu (opakování nic nezdvojí). Vše v jedné transakci se souhrnným auditem, bez notifikací.
+- Zařazení do místnosti zapíše historii **„Z původní evidence“** (`source: import`) bez protokolu přesunu; původní text umístění i poznámky zůstávají.
+- Během probíhající inventury se úklid neprovede.
+- Virtuální místa: Praha a manipulační technika dostanou vlastní místnosti (kódy 30004, 30003, 30002 podle původní evidence) — po jejich založení je krok Místnosti zařadí automaticky. Auta, budovy a software jsou ve skupinách se štítky vypnutými.
 
-**Stav 10/2026:** generování nového fondu je dočasně vypnuté — zavede se s novými štítky (vlna 2), aby kódy fondu nesly čísla z řady drobného majetku. Volný kód z fondu naskenovaný v režimu *Přiřadit QR* otevře formulář zařazení nákupu (povinné údaje dokladu); neplatný nebo použitý kód je chyba.
-
-Bez fondu: při zařazení se `qr_code` vygeneruje a `asset_tag` přidělí z číselné řady.
+Implementace: `lib/equipment/data-prep/location-match.ts`, `holder-match.ts`, `apply.ts`, `app/api/equipment/data-prep/[step]/route.ts`.
 
 ### 4. PWA skener (Android / mobil)
 
@@ -287,7 +288,7 @@ Závislost: `html5-qrcode`. Fallback: ruční zadání kódu.
 
 **Rozpoznání kódu** (jedno pro celý modul: `lib/equipment/scan-code.ts` = čistá logika, `scan-resolve.ts` = dotazy, `GET /api/equipment/lookup?code=…&target=any|item|room`):
 
-- QR s prefixem `INTEGRAF:EQ:` je vždy položka, `INTEGRAF:RM:` vždy místnost.
+- Odkaz `…/q/<kód>` z QR štítku se převede na kód. QR s prefixem `INTEGRAF:EQ:` (nebo 12místný kód) je vždy položka, `INTEGRAF:RM:` / `RM-…` vždy místnost.
 - Holý kód (ruční zadání, inventární číslo, sériové číslo, kód místnosti): u položky má přednost inventární číslo, pak QR, pak sériové číslo. Když kód odpovídá položce i místnosti (např. `1012`), skener nabídne výběr — nikdy tiché přepnutí.
 - **Přesun a inventura přijímají jen položky** (`target=item`); kód místnosti tam vrátí srozumitelnou chybu. Kód místnosti se zadává jen na skeneru.
 
@@ -470,7 +471,8 @@ Jednotná funkce `transferEquipmentToRoom()` v `lib/equipment/room-transfer.ts`:
 | Přístupová práva | `lib/equipment/access.ts` |
 | Přesuny | `lib/equipment/room-transfer.ts` |
 | QR / štítky | `lib/equipment/qr.ts`, `label-layout.ts`, `label-grid-settings.ts`, `label-pdf.ts` |
-| Fond QR | `lib/equipment/qr-pool.ts`, `app/api/equipment/qr-pool/**`, `equipment/settings/qr-pool/**` |
+| Fond QR (nepoužívá se) | `lib/equipment/qr-pool.ts`, `app/api/equipment/qr-pool/**` |
+| Příprava dat | `lib/equipment/data-prep/**`, `app/api/equipment/data-prep/**`, `equipment/settings/data-prep/**` |
 | Upload | `lib/equipment/upload.ts` |
 | API | `app/api/equipment/**` |
 | UI | `app/(dashboard)/equipment/**` |
@@ -498,7 +500,7 @@ Jednotná funkce `transferEquipmentToRoom()` v `lib/equipment/room-transfer.ts`:
 
 V levém sidebaru je jen položka **Majetek** → `/equipment` (bez rozbalovací podnabídky).
 
-Uvnitř modulu je horní lišta záložek (`EquipmentModuleNav`): Přehled, Přiřazení, Místnosti, **Půdorys**, Skenovat, Přesun, Inventura, Reporty, a pro správce **Nastavení** (`/equipment/settings` – hub se skupinami, přístupy a fondem QR).
+Uvnitř modulu je horní lišta záložek (`EquipmentModuleNav`): Přehled, Přiřazení, Místnosti, **Půdorys**, Skenovat, Přesun, Inventura, Reporty, a pro správce **Nastavení** (`/equipment/settings` – hub se skupinami, přístupy, číselnou řadou, štítky a přípravou dat).
 
 Na přehledu jsou navíc rychlé dlaždice na hlavní workflow.
 
