@@ -1,63 +1,57 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { canAdministerEquipment } from "@/lib/equipment/access";
+import { canReadEquipment } from "@/lib/equipment/access";
+import { resolveEquipmentLabelGrid } from "@/lib/equipment/label-grid-settings";
+import { labelsPerPage, validateStartPosition } from "@/lib/equipment/label-layout";
 import { buildRoomLabelsBulkPdf } from "@/lib/equipment/label-pdf";
+import { parseLabelIds, sortRoomsForLabels } from "@/lib/equipment/label-plan";
 
+/**
+ * Štítky vybraných místností jako PDF (A4, uložená mřížka, od zvolené pozice).
+ * Nic nezapisuje — vytištění potvrzuje správa evidence zvlášť.
+ */
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
   }
   const userId = parseInt(session.user.id, 10);
-  if (!(await canAdministerEquipment(userId))) {
+  if (!(await canReadEquipment(userId))) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
-  const body = await req.json().catch(() => ({}));
-  const rawIds = Array.isArray((body as { ids?: unknown }).ids)
-    ? (body as { ids: unknown[] }).ids
-    : [];
-  const ids: number[] = [
-    ...new Set(
-      rawIds
-        .map((x) => parseInt(String(x), 10))
-        .filter((n): n is number => Number.isFinite(n))
-    ),
-  ];
+  const body = (await req.json().catch(() => ({}))) as { ids?: unknown; startPosition?: unknown };
+  const parsedIds = parseLabelIds(body.ids);
+  if (!parsedIds.ok) return NextResponse.json({ error: parsedIds.error }, { status: 400 });
 
-  if (ids.length === 0) {
-    return NextResponse.json({ error: "Vyberte místnosti k tisku" }, { status: 400 });
-  }
-  if (ids.length > 500) {
-    return NextResponse.json({ error: "Najednou lze tisknout nejvýše 500 štítků" }, { status: 400 });
-  }
+  const { settings, spec } = await resolveEquipmentLabelGrid();
+  const start = validateStartPosition(body.startPosition, labelsPerPage(spec));
+  if (!start.ok) return NextResponse.json({ error: start.error }, { status: 400 });
 
-  const rooms = await prisma.equipment_rooms.findMany({
-    where: { id: { in: ids } },
-  });
+  const rooms = await prisma.equipment_rooms.findMany({ where: { id: { in: parsedIds.ids } } });
   if (rooms.length === 0) {
     return NextResponse.json({ error: "Místnosti nenalezeny" }, { status: 404 });
   }
-
-  const ordered = ids
-    .map((id) => rooms.find((r) => r.id === id))
-    .filter((r): r is (typeof rooms)[number] => r != null);
+  const sorted = sortRoomsForLabels(rooms);
 
   const pdf = await buildRoomLabelsBulkPdf(
-    ordered.map((room) => ({
+    sorted.map((room) => ({
       name: room.name,
       code: room.code,
       qr_code: room.qr_code,
       building: room.building,
       floor: room.floor,
-    }))
+    })),
+    { spec, ownerText: settings.ownerText, startPosition: start.value }
   );
 
   return new NextResponse(Buffer.from(pdf), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": 'attachment; filename="stitky-mistnosti.pdf"',
+      "Content-Disposition": 'inline; filename="stitky-mistnosti.pdf"',
+      "X-Labels-Skipped": String(parsedIds.ids.length - rooms.length),
+      "X-Labels-Ids": sorted.map((room) => room.id).join(","),
     },
   });
 }
