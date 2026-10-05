@@ -436,7 +436,9 @@ export default function RoomsClient({ canManageRegister }: { canManageRegister: 
         ids={labelIds ?? []}
         canConfirm={canManageRegister}
         onClose={() => setLabelIds(null)}
-        onConfirmed={(_ids, updated) => {
+        onConfirmed={(confirmedIds, updated) => {
+          // Vytištěné místnosti z výběru pryč — jinak by je další tisk přibalil znovu.
+          setSelected((prev) => prev.filter((id) => !confirmedIds.includes(id)));
           setError("");
           setOkMsg(`Označeno jako vytištěné: ${labelsCountLabel(updated)}.`);
           void load();
