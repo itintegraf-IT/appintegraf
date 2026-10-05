@@ -1,42 +1,48 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getRequestIp } from "@/lib/auth-audit";
 import { createEquipmentRequest } from "@/lib/equipment-request-create";
+import {
+  isHoneypotTriggered,
+  validatePublicEquipmentRequest,
+} from "@/lib/equipment/public-request-validation";
+import { rateLimit } from "@/lib/rate-limit";
+
+const WINDOW_MS = 10 * 60 * 1000;
+const MAX_PER_IP = 5;
+const MAX_TOTAL = 30;
+
+function tooManyRequests(retryAfterSeconds: number) {
+  return NextResponse.json(
+    { error: "Příliš mnoho požadavků, zkuste to prosím za chvíli." },
+    { status: 429, headers: { "Retry-After": String(Math.max(retryAfterSeconds, 60)) } }
+  );
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const {
-      requester_name,
-      requester_email,
-      requester_phone = "",
-      department = "",
-      position = "",
-      equipment_type,
-      description,
-      priority = "st_edn_",
-    } = body;
+    const body: unknown = await req.json().catch(() => null);
 
-    if (!requester_name || !requester_email || !equipment_type || !description) {
-      return NextResponse.json(
-        { error: "Vyplňte jméno, e-mail, typ vybavení a popis" },
-        { status: 400 }
-      );
+    // 1) Past na roboty: tichý „úspěch“ bez zápisu a bez čerpání limitů ostatních.
+    if (isHoneypotTriggered(body)) {
+      console.warn("public equipment request: vyplněné skryté pole, požadavek zahozen");
+      return NextResponse.json({ success: true, message: "Požadavek odeslán." });
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(requester_email.trim())) {
-      return NextResponse.json({ error: "Neplatný e-mail" }, { status: 400 });
+    // 2) Limit na odesílatele; odmítnutý požadavek už dál nic nečerpá.
+    const ip = ((await getRequestIp()) ?? "unknown").slice(0, 64);
+    const perIp = await rateLimit({ key: `public-eq-request:ip:${ip}`, max: MAX_PER_IP, windowMs: WINDOW_MS });
+    if (!perIp.allowed) return tooManyRequests(perIp.retryAfterSeconds);
+
+    const validated = validatePublicEquipmentRequest(body);
+    if (!validated.ok) {
+      return NextResponse.json({ error: validated.error }, { status: 400 });
     }
 
-    const request = await createEquipmentRequest({
-      requester_name: String(requester_name),
-      requester_email: String(requester_email),
-      requester_phone: requester_phone ? String(requester_phone) : null,
-      department: department ? String(department) : null,
-      position: position ? String(position) : null,
-      equipment_type: String(equipment_type),
-      description: String(description),
-      priority,
-    });
+    // 3) Celkový strop počítá jen platné požadavky, které se opravdu uloží.
+    const total = await rateLimit({ key: "public-eq-request:all", max: MAX_TOTAL, windowMs: WINDOW_MS });
+    if (!total.allowed) return tooManyRequests(total.retryAfterSeconds);
+
+    const request = await createEquipmentRequest(validated.data);
 
     return NextResponse.json({
       success: true,

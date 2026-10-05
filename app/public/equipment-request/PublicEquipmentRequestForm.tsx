@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { PUBLIC_REQUEST_HONEYPOT_FIELD } from "@/lib/equipment/public-request-validation";
 
 export function PublicEquipmentRequestForm({ showInternalLink = false }: { showInternalLink?: boolean }) {
   const [loading, setLoading] = useState(false);
@@ -18,8 +19,9 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
     priority: "st_edn_",
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const trap = new FormData(e.currentTarget).get(PUBLIC_REQUEST_HONEYPOT_FIELD);
     setError("");
     setSuccess("");
     setLoading(true);
@@ -28,7 +30,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
       const res = await fetch("/api/public/equipment-request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, [PUBLIC_REQUEST_HONEYPOT_FIELD]: typeof trap === "string" ? trap : "" }),
       });
 
       const data = await res.json().catch(() => ({}));
@@ -72,6 +74,16 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
         onSubmit={handleSubmit}
         className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
       >
+        {/* Past na roboty: člověk pole nevidí ani nevyplní. */}
+        <input
+          type="text"
+          name={PUBLIC_REQUEST_HONEYPOT_FIELD}
+          tabIndex={-1}
+          autoComplete="off"
+          aria-hidden="true"
+          className="hidden"
+          defaultValue=""
+        />
         {error && (
           <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
@@ -85,6 +97,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <input
               type="text"
               required
+              maxLength={100}
               value={form.requester_name}
               onChange={(e) => setForm({ ...form, requester_name: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -95,6 +108,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <input
               type="email"
               required
+              maxLength={100}
               value={form.requester_email}
               onChange={(e) => setForm({ ...form, requester_email: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -104,6 +118,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <label className="mb-1 block text-sm font-medium text-gray-700">Telefon</label>
             <input
               type="tel"
+              maxLength={20}
               value={form.requester_phone}
               onChange={(e) => setForm({ ...form, requester_phone: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -113,6 +128,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <label className="mb-1 block text-sm font-medium text-gray-700">Oddělení</label>
             <input
               type="text"
+              maxLength={100}
               value={form.department}
               onChange={(e) => setForm({ ...form, department: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -122,6 +138,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <label className="mb-1 block text-sm font-medium text-gray-700">Pozice</label>
             <input
               type="text"
+              maxLength={100}
               value={form.position}
               onChange={(e) => setForm({ ...form, position: e.target.value })}
               className="w-full rounded-lg border border-gray-300 px-3 py-2"
@@ -134,6 +151,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <input
               type="text"
               required
+              maxLength={100}
               value={form.equipment_type}
               onChange={(e) => setForm({ ...form, equipment_type: e.target.value })}
               placeholder="např. notebook, monitor"
@@ -156,6 +174,7 @@ export function PublicEquipmentRequestForm({ showInternalLink = false }: { showI
             <label className="mb-1 block text-sm font-medium text-gray-700">Popis požadavku *</label>
             <textarea
               required
+              maxLength={5000}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               rows={4}

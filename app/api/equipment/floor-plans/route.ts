@@ -3,65 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canAdministerEquipment, canReadEquipment } from "@/lib/equipment/access";
 import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
-import { writeFloorPlanImageFile } from "@/lib/equipment/floor-plan-storage";
-import { pdfBufferToJpeg } from "@/lib/iml-product-preview-pdf-server";
-
-async function savePlanImage(
-  planId: number,
-  file: File
-): Promise<{ image_path: string; image_width: number | null; image_height: number | null }> {
-  const buf = Buffer.from(await file.arrayBuffer());
-  const mime = (file.type || "").toLowerCase();
-  const isPdf =
-    mime === "application/pdf" ||
-    file.name.toLowerCase().endsWith(".pdf") ||
-    (buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46);
-
-  let outBuf: Buffer = buf;
-  let ext = ".jpg";
-  let width: number | null = null;
-  let height: number | null = null;
-
-  if (isPdf) {
-    const jpeg = await pdfBufferToJpeg(buf, { maxSide: 2800, jpegQuality: 0.92 });
-    if (!jpeg) {
-      throw new Error(
-        "PDF se nepodařilo převést na obrázek. Nahrajte PNG/JPG, nebo na serveru spusťte npm run verify:canvas."
-      );
-    }
-    outBuf = jpeg;
-    ext = ".jpg";
-  } else if (mime.includes("png") || file.name.toLowerCase().endsWith(".png")) {
-    ext = ".png";
-  } else if (mime.includes("webp") || file.name.toLowerCase().endsWith(".webp")) {
-    ext = ".webp";
-  } else if (mime.includes("jpeg") || mime.includes("jpg") || /\.jpe?g$/i.test(file.name)) {
-    ext = ".jpg";
-  } else {
-    throw new Error("Povolené formáty: PDF, PNG, JPG, WebP");
-  }
-
-  if (outBuf.length > 25 * 1024 * 1024) {
-    throw new Error("Soubor je větší než 25 MB");
-  }
-
-  try {
-    const canvasMod = await import("@napi-rs/canvas");
-    const img = await canvasMod.loadImage(outBuf);
-    width = img.width;
-    height = img.height;
-  } catch {
-    /* dimensions optional */
-  }
-
-  const safeName = `plan_${Date.now()}${ext}`;
-  const saved = await writeFloorPlanImageFile(planId, safeName, outBuf);
-  return {
-    image_path: saved.image_path,
-    image_width: width,
-    image_height: height,
-  };
-}
+import { FloorPlanUploadError, saveFloorPlanUpload } from "@/lib/equipment/floor-plan-upload";
 
 export async function GET() {
   const session = await auth();
@@ -130,7 +72,7 @@ export async function POST(req: NextRequest) {
     });
 
     try {
-      const saved = await savePlanImage(plan.id, file);
+      const saved = await saveFloorPlanUpload(plan.id, file);
       const updated = await prisma.equipment_floor_plans.update({
         where: { id: plan.id },
         data: {
@@ -160,9 +102,9 @@ export async function POST(req: NextRequest) {
         { status: 503 }
       );
     }
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Chyba při vytváření půdorysu" },
-      { status: 500 }
-    );
+    if (e instanceof FloorPlanUploadError) {
+      return NextResponse.json({ error: e.message }, { status: 400 });
+    }
+    return NextResponse.json({ error: "Chyba při vytváření půdorysu" }, { status: 500 });
   }
 }

@@ -8,10 +8,13 @@ import { logEquipmentAuditSafe } from "@/lib/equipment/audit";
 import {
   EQUIPMENT_UPLOAD_MODULE,
   EQUIPMENT_PHOTO_MAX_BYTES,
-  EQUIPMENT_PHOTO_MIME,
   EQUIPMENT_ATTACHMENT_MAX_BYTES,
-  EQUIPMENT_ATTACHMENT_MIME,
 } from "@/lib/equipment/upload";
+import { verifyEquipmentUpload } from "@/lib/equipment/upload-verify";
+import { equipmentFileDiskPath } from "@/lib/equipment/files";
+
+/** Rezerva na hlavičky multipart požadavku nad velikostí samotného souboru. */
+const MULTIPART_OVERHEAD_BYTES = 1024 * 1024;
 
 async function getItemOr403(id: number, userId: number, write: boolean) {
   const item = await prisma.equipment_items.findUnique({
@@ -56,7 +59,16 @@ export async function GET(
       document_type: { in: docTypes },
     },
     orderBy: { created_at: "desc" },
-    include: { users: { select: { first_name: true, last_name: true } } },
+    // Bez file_path: soubory se otevírají jen přes /api/equipment/[id]/files/[fileId] s kontrolou oprávnění.
+    select: {
+      id: true,
+      original_filename: true,
+      document_type: true,
+      mime_type: true,
+      file_size: true,
+      created_at: true,
+      users: { select: { first_name: true, last_name: true } },
+    },
   });
 
   return NextResponse.json({ files });
@@ -79,6 +91,11 @@ export async function POST(
   const check = await getItemOr403(id, userId, true);
   if ("error" in check && check.error) return check.error;
 
+  const declaredLength = Number(req.headers.get("content-length") ?? 0);
+  if (declaredLength > EQUIPMENT_ATTACHMENT_MAX_BYTES + MULTIPART_OVERHEAD_BYTES) {
+    return NextResponse.json({ error: "Soubor je větší než 20 MB." }, { status: 413 });
+  }
+
   try {
     const formData = await req.formData();
     const file = formData.get("file");
@@ -87,12 +104,8 @@ export async function POST(
       return NextResponse.json({ error: "Vyberte soubor." }, { status: 400 });
     }
 
-    const mime = file.type || "application/octet-stream";
     const isPhoto = documentType === "photo" || documentType === "photo_cover";
     if (isPhoto) {
-      if (!EQUIPMENT_PHOTO_MIME.has(mime)) {
-        return NextResponse.json({ error: "Nepovolený typ fotky." }, { status: 400 });
-      }
       if (file.size > EQUIPMENT_PHOTO_MAX_BYTES) {
         return NextResponse.json({ error: "Fotka je větší než 10 MB." }, { status: 400 });
       }
@@ -100,21 +113,22 @@ export async function POST(
       if (!["attachment", "invoice", "delivery_note", "warranty", "service", "other"].includes(documentType)) {
         documentType = "attachment";
       }
-      if (!EQUIPMENT_ATTACHMENT_MIME.has(mime)) {
-        return NextResponse.json({ error: "Nepovolený typ přílohy." }, { status: 400 });
-      }
       if (file.size > EQUIPMENT_ATTACHMENT_MAX_BYTES) {
         return NextResponse.json({ error: "Soubor je větší než 20 MB." }, { status: 400 });
       }
     }
 
+    const buf = Buffer.from(await file.arrayBuffer());
+    const verified = verifyEquipmentUpload(buf, file.type, isPhoto ? "photo" : "attachment");
+    if (!verified.ok) {
+      return NextResponse.json({ error: verified.error }, { status: 400 });
+    }
+
     const uploadDir = path.join(process.cwd(), "public", "uploads", "equipment", String(id));
     await mkdir(uploadDir, { recursive: true });
-    const ext = path.extname(file.name) || (mime.includes("png") ? ".png" : ".jpg");
-    const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}${ext}`;
+    const safeName = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}${verified.ext}`;
     const diskPath = path.join(uploadDir, safeName);
     const webPath = `/uploads/equipment/${id}/${safeName}`;
-    const buf = Buffer.from(await file.arrayBuffer());
     await writeFile(diskPath, buf);
 
     const row = await prisma.file_uploads.create({
@@ -123,7 +137,7 @@ export async function POST(
         original_filename: file.name.slice(0, 250),
         file_path: webPath,
         file_size: buf.length,
-        mime_type: mime.slice(0, 100),
+        mime_type: verified.mime,
         module: EQUIPMENT_UPLOAD_MODULE,
         record_id: id,
         document_type: documentType,
@@ -190,29 +204,37 @@ export async function DELETE(
   if (!fileRow) return NextResponse.json({ error: "Soubor nenalezen" }, { status: 404 });
 
   try {
-    const disk = path.join(process.cwd(), "public", fileRow.file_path.replace(/^\//, ""));
-    await unlink(disk).catch(() => undefined);
-  } catch {
-    /* ignore */
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.file_uploads.delete({ where: { id: fileRow.id } });
+        await tx.equipment_items.updateMany({
+          where: { id, cover_file_id: fileRow.id },
+          data: { cover_file_id: null, updated_at: new Date() },
+        });
+      },
+      { maxWait: 5000, timeout: 20000 }
+    );
+  } catch (e) {
+    console.error("equipment photos DELETE:", e);
+    return NextResponse.json({ error: "Soubor se nepodařilo smazat" }, { status: 500 });
   }
 
-  await prisma.file_uploads.delete({ where: { id: fileId } });
-  const item = await prisma.equipment_items.findUnique({
-    where: { id },
-    select: { cover_file_id: true },
-  });
-  if (item?.cover_file_id === fileId) {
-    await prisma.equipment_items.update({
-      where: { id },
-      data: { cover_file_id: null, updated_at: new Date() },
-    });
-  }
+  // Soubor z disku až po potvrzeném smazání záznamu (jen ze složky této položky).
+  const disk = equipmentFileDiskPath(id, fileRow.file_path);
+  if (disk) await unlink(disk).catch(() => undefined);
 
+  const isPhoto = fileRow.document_type === "photo" || fileRow.document_type === "photo_cover";
   await logEquipmentAuditSafe({
     userId,
-    action: "photo_delete",
+    action: isPhoto ? "photo_delete" : "attachment_delete",
     tableName: "file_uploads",
-    recordId: fileId,
+    recordId: fileRow.id,
+    oldValues: {
+      equipmentId: id,
+      original_filename: fileRow.original_filename,
+      document_type: fileRow.document_type,
+      file_path: fileRow.file_path,
+    },
   });
 
   return NextResponse.json({ ok: true });
@@ -237,18 +259,56 @@ export async function PATCH(
   const check = await getItemOr403(id, userId, true);
   if ("error" in check && check.error) return check.error;
 
-  await prisma.file_uploads.updateMany({
-    where: { module: EQUIPMENT_UPLOAD_MODULE, record_id: id, document_type: "photo_cover" },
-    data: { document_type: "photo" },
-  });
-  await prisma.file_uploads.update({
-    where: { id: fileId },
-    data: { document_type: "photo_cover" },
-  });
-  await prisma.equipment_items.update({
-    where: { id },
-    data: { cover_file_id: fileId, updated_at: new Date() },
-  });
+  try {
+    const result = await prisma.$transaction(
+      async (tx) => {
+        // Titulní fotkou může být jen fotka této položky.
+        const photo = await tx.file_uploads.findFirst({
+          where: {
+            id: fileId,
+            module: EQUIPMENT_UPLOAD_MODULE,
+            record_id: id,
+            document_type: { in: ["photo", "photo_cover"] },
+          },
+          select: { id: true },
+        });
+        if (!photo) return null;
+        const item = await tx.equipment_items.findUnique({
+          where: { id },
+          select: { cover_file_id: true },
+        });
+        await tx.file_uploads.updateMany({
+          where: { module: EQUIPMENT_UPLOAD_MODULE, record_id: id, document_type: "photo_cover" },
+          data: { document_type: "photo" },
+        });
+        await tx.file_uploads.update({
+          where: { id: photo.id },
+          data: { document_type: "photo_cover" },
+        });
+        await tx.equipment_items.update({
+          where: { id },
+          data: { cover_file_id: photo.id, updated_at: new Date() },
+        });
+        return { previousCoverId: item?.cover_file_id ?? null };
+      },
+      { maxWait: 5000, timeout: 20000 }
+    );
+    if (!result) {
+      return NextResponse.json({ error: "Fotka nenalezena" }, { status: 404 });
+    }
 
-  return NextResponse.json({ ok: true });
+    await logEquipmentAuditSafe({
+      userId,
+      action: "photo_cover_set",
+      tableName: "equipment_items",
+      recordId: id,
+      oldValues: { cover_file_id: result.previousCoverId },
+      detail: { cover_file_id: fileId },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("equipment photos PATCH:", e);
+    return NextResponse.json({ error: "Titulní fotku se nepodařilo nastavit" }, { status: 500 });
+  }
 }

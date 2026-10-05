@@ -60,7 +60,6 @@ type Props = {
   noHolder?: boolean;
   canEdit: boolean;
   canAssign: boolean;
-  canDelete: boolean;
 };
 
 function buildHref(
@@ -138,7 +137,6 @@ export function EquipmentListClient({
   noHolder = false,
   canEdit,
   canAssign,
-  canDelete,
 }: Props) {
   const router = useRouter();
   const [selected, setSelected] = useState<number[]>([]);
@@ -553,7 +551,6 @@ export function EquipmentListClient({
                         assignmentId={row.assignmentId}
                         canEdit={canEdit}
                         canAssign={canAssign}
-                        canDelete={canDelete}
                       />
                     </div>
                   </li>
@@ -651,7 +648,6 @@ export function EquipmentListClient({
                       assignmentId={row.assignmentId}
                       canEdit={canEdit}
                       canAssign={canAssign}
-                      canDelete={canDelete}
                     />
                   </td>
                 </tr>
