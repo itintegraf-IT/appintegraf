@@ -15,6 +15,18 @@ describe("parseLabelIds", () => {
     const many = Array.from({ length: 501 }, (_, i) => i + 1);
     expect(parseLabelIds(many)).toEqual({ ok: false, error: "Najednou lze tisknout nejvýše 500 štítků." });
   });
+
+  it("víc než 500 hodnot v požadavku je chyba, i když se opakují", () => {
+    const repeated = Array.from({ length: 600 }, (_, i) => (i % 3) + 1);
+    expect(parseLabelIds(repeated)).toEqual({ ok: false, error: "Najednou lze tisknout nejvýše 500 štítků." });
+  });
+
+  it("obří výběr odmítne hned, bez dlouhého počítání (server se nezasekne)", () => {
+    const huge = Array.from({ length: 50_000 }, (_, i) => i + 1);
+    const started = performance.now();
+    expect(parseLabelIds(huge).ok).toBe(false);
+    expect(performance.now() - started).toBeLessThan(100);
+  });
 });
 
 describe("splitPrintable", () => {

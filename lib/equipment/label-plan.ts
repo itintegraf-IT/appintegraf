@@ -5,19 +5,22 @@
 
 export const MAX_LABELS_PER_PRINT = 500;
 
-/** ID z požadavku: celá kladná čísla bez duplicit v původním pořadí, nejvýš 500. */
+/**
+ * ID z požadavku: celá kladná čísla bez duplicit v původním pořadí. Požadavek s víc než
+ * 500 hodnotami se odmítne hned — obří pole by jinak zbytečně zaměstnalo server.
+ */
 export function parseLabelIds(raw: unknown): { ok: true; ids: number[] } | { ok: false; error: string } {
   const values = Array.isArray(raw) ? raw : [];
-  const ids: number[] = [];
-  for (const value of values) {
-    const n = typeof value === "number" ? value : Number(String(value).trim());
-    if (Number.isInteger(n) && n > 0 && !ids.includes(n)) ids.push(n);
-  }
-  if (ids.length === 0) return { ok: false, error: "Vyberte, co chcete tisknout." };
-  if (ids.length > MAX_LABELS_PER_PRINT) {
+  if (values.length > MAX_LABELS_PER_PRINT) {
     return { ok: false, error: `Najednou lze tisknout nejvýše ${MAX_LABELS_PER_PRINT} štítků.` };
   }
-  return { ok: true, ids };
+  const ids = new Set<number>();
+  for (const value of values) {
+    const n = typeof value === "number" ? value : Number(String(value).trim());
+    if (Number.isInteger(n) && n > 0) ids.add(n);
+  }
+  if (ids.size === 0) return { ok: false, error: "Vyberte, co chcete tisknout." };
+  return { ok: true, ids: [...ids] };
 }
 
 /** Štítek jde vytisknout jen s QR kódem; ostatní se přeskočí a nahlásí. */
