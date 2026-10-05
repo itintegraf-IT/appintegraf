@@ -482,23 +482,26 @@ model makety_status_log {
 }
 
 model makety_softproof_links {
-  id            Int       @id @default(autoincrement())
-  token_hash    String    @unique(map: "makety_softproof_links_token_hash") @db.VarChar(64)
-  maketa_id     Int
-  file_id       Int
-  locale        String    @db.VarChar(8)
-  sent_to_email String    @db.VarChar(190)
-  expires_at    DateTime  @db.DateTime(0)
-  used_at       DateTime? @db.DateTime(0)
-  used_action   String?   @db.VarChar(20)
-  reject_reason String?   @db.Text
-  created_by    Int
-  created_at    DateTime  @default(now()) @db.Timestamp(0)
-  makety        makety    @relation(fields: [maketa_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_softproof_links_maketa_fk")
-  users         users     @relation("makety_softproof_links_created", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_softproof_links_user_fk")
+  id               Int       @id @default(autoincrement())
+  token_hash       String    @unique(map: "makety_softproof_links_token_hash") @db.VarChar(64)
+  maketa_id        Int
+  file_id          Int
+  locale           String    @db.VarChar(8)
+  sent_to_email    String    @db.VarChar(190)
+  expires_at       DateTime  @db.DateTime(0)
+  used_at          DateTime? @db.DateTime(0)
+  used_action      String?   @db.VarChar(20)
+  reject_reason    String?   @db.Text
+  created_by       Int
+  reminder_enabled Boolean   @default(false)
+  reminder_sent_at DateTime? @db.DateTime(0)
+  created_at       DateTime  @default(now()) @db.Timestamp(0)
+  makety           makety    @relation(fields: [maketa_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_softproof_links_maketa_fk")
+  users            users     @relation("makety_softproof_links_created", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "makety_softproof_links_user_fk")
 
   @@index([maketa_id], map: "idx_makety_softproof_links_maketa")
   @@index([expires_at], map: "idx_makety_softproof_links_expires")
+  @@index([reminder_enabled, reminder_sent_at, expires_at], map: "idx_makety_softproof_links_reminder")
 }
 
 model makety_file_events {

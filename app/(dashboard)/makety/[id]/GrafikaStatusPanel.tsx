@@ -202,6 +202,7 @@ export function GrafikaStatusPanel({
     attachFile: boolean;
     message: string;
     locale: string;
+    reminderEnabled: boolean;
   }) => {
     const needAck =
       (!resendMode && needsOverrideAck) || (resendMode && softproofViaOverride);
@@ -222,6 +223,7 @@ export function GrafikaStatusPanel({
           attachFile: payload.attachFile,
           message: payload.message || undefined,
           locale: payload.locale,
+          reminderEnabled: payload.reminderEnabled,
           acknowledgeOverride: needAck || undefined,
         }),
       });

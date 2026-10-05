@@ -156,6 +156,8 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
             used_action: true,
             file_id: true,
             locale: true,
+            reminder_enabled: true,
+            reminder_sent_at: true,
           },
         })
       : null;

@@ -10,6 +10,8 @@ export type SoftproofLinkStatusData = {
   expires_at: Date;
   used_at: Date | null;
   used_action: string | null;
+  reminder_enabled?: boolean;
+  reminder_sent_at?: Date | null;
 };
 
 function accessLabel(
@@ -78,6 +80,16 @@ export function SoftproofLinkStatusBox({ link }: Props) {
         <div>
           <dt className="opacity-70">Platnost do</dt>
           <dd>{formatDateTimeCz(link.expires_at)}</dd>
+        </div>
+        <div>
+          <dt className="opacity-70">Připomínka</dt>
+          <dd>
+            {!link.reminder_enabled
+              ? "Vypnuta"
+              : link.reminder_sent_at
+                ? `Odeslána ${formatDateTimeCz(link.reminder_sent_at)}`
+                : "Zapnuta (po vypršení)"}
+          </dd>
         </div>
       </dl>
       <p className="mt-2 text-xs opacity-90">

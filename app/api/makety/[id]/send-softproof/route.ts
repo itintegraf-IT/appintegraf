@@ -16,6 +16,7 @@ import {
 import { createSoftproofLink, revokeOpenSoftproofLinks } from "@/lib/makety-softproof-links";
 import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
 import { getSoftproofTemplate, normalizeSoftproofLocale } from "@/lib/makety-softproof-templates";
+import { loadSoftproofReminderSettings } from "@/lib/makety-softproof-reminder-settings";
 import { assertGrafikaTransition } from "@/lib/makety-grafika-status";
 import { recordMaketyFileEvent } from "@/lib/makety-file-events";
 import { parseMaketyFileKind } from "@/lib/makety-file-kind";
@@ -62,6 +63,7 @@ export async function POST(
     acknowledgeOverride?: boolean;
     message?: string;
     locale?: string;
+    reminderEnabled?: boolean;
   };
   try {
     body = await req.json();
@@ -170,12 +172,17 @@ export async function POST(
   const templates = await loadSoftproofTemplates();
   const locale = getSoftproofTemplate(templates, normalizeSoftproofLocale(body.locale ?? "cs")).locale;
 
+  const reminderSettings = await loadSoftproofReminderSettings();
+  const reminderEnabled =
+    reminderSettings.enabled && body.reminderEnabled === true;
+
   const { rawToken } = await createSoftproofLink({
     maketaId,
     fileId: fileRow.id,
     locale,
     sentToEmail: toEmail,
     createdBy: userId,
+    reminderEnabled,
   });
   const pageUrl = `${getBaseUrl(req)}/public/softproof/${encodeURIComponent(rawToken)}`;
 
@@ -257,6 +264,7 @@ export async function POST(
             to_email: toEmail,
             message: message || null,
             attached: Boolean(attach),
+            reminder_enabled: reminderEnabled,
           },
         });
         await recordMaketyFileEvent({
@@ -302,7 +310,8 @@ export async function POST(
             locale,
             message: message || null,
             attached: Boolean(attach),
-        resend: true,
+            reminder_enabled: reminderEnabled,
+            resend: true,
       },
     });
   }

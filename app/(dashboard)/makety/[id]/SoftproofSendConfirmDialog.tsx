@@ -28,6 +28,7 @@ type Props = {
     attachFile: boolean;
     message: string;
     locale: string;
+    reminderEnabled: boolean;
   }) => void;
 };
 
@@ -56,6 +57,8 @@ export function SoftproofSendConfirmDialog({
     { locale: "cs", label: "Čeština" },
   ]);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [reminderFeatureEnabled, setReminderFeatureEnabled] = useState(false);
+  const [reminderEnabled, setReminderEnabled] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -86,6 +89,18 @@ export function SoftproofSendConfirmDialog({
         }
       })
       .catch(() => {});
+    void fetch("/api/makety/softproof-reminder-settings")
+      .then((r) => r.json())
+      .then((data) => {
+        const enabled = data?.settings?.enabled === true;
+        const defaultOn = data?.settings?.default_on_send !== false;
+        setReminderFeatureEnabled(enabled);
+        setReminderEnabled(enabled && defaultOn);
+      })
+      .catch(() => {
+        setReminderFeatureEnabled(false);
+        setReminderEnabled(false);
+      });
   }, [open, defaultEmail, softproofFiles, initialFileId, initialLocale]);
 
   if (!open) return null;
@@ -108,6 +123,7 @@ export function SoftproofSendConfirmDialog({
       attachFile,
       message: message.trim(),
       locale,
+      reminderEnabled: reminderFeatureEnabled && reminderEnabled,
     });
   };
 
@@ -211,6 +227,24 @@ export function SoftproofSendConfirmDialog({
               />
               Přiložit soubor k e-mailu (max 8 MB), jinak jen odkaz
             </label>
+
+            {reminderFeatureEnabled && (
+              <label className="flex items-start gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={reminderEnabled}
+                  onChange={(e) => setReminderEnabled(e.target.checked)}
+                  disabled={submitting}
+                />
+                <span>
+                  Automatická připomínka po vypršení odkazu (7 dní)
+                  <span className="mt-0.5 block text-xs font-normal text-gray-500">
+                    Pokud klient neschválí, systém pošle nový odkaz e-mailem.
+                  </span>
+                </span>
+              </label>
+            )}
           </div>
         )}
 

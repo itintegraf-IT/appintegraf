@@ -7,6 +7,7 @@ export const MAKETY_FILE_EVENT_TYPES = [
   "deleted",
   "type_changed",
   "softproof_sent",
+  "softproof_reminder_sent",
   "softproof_downloaded",
   "client_approved",
   "client_rejected",
@@ -56,6 +57,8 @@ export function maketyFileEventLabel(eventType: string): string {
       return "Změněn typ souboru";
     case "softproof_sent":
       return "Softproof odeslán klientovi";
+    case "softproof_reminder_sent":
+      return "Softproof připomínka odeslána klientovi";
     case "softproof_downloaded":
       return "Klient stáhl softproof";
     case "client_approved":

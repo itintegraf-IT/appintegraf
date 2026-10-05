@@ -776,6 +776,8 @@ export type SendMaketySoftproofEmailParams = {
   templateOverride?: SoftproofTemplate;
   /** Volitelná příloha (malé soubory); jinak stačí odkaz. */
   attachment?: { filename: string; content: Buffer; contentType: string };
+  /** Prefix předmětu (např. „Připomínka: “). */
+  subjectPrefix?: string;
 };
 
 /**
@@ -837,7 +839,7 @@ export async function sendMaketySoftproofEmail(
     await transporter.sendMail({
       from: formatSmtpFrom(settings, "makety"),
       to: params.toEmail,
-      subject: built.subject,
+      subject: `${params.subjectPrefix ?? ""}${built.subject}`,
       text: built.text,
       html: built.html,
       attachments: params.attachment

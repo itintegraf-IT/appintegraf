@@ -62,11 +62,12 @@ export async function createSoftproofLink(params: {
   locale: string;
   sentToEmail: string;
   createdBy: number;
-}): Promise<{ rawToken: string; expiresAt: Date }> {
+  reminderEnabled?: boolean;
+}): Promise<{ rawToken: string; expiresAt: Date; id: number }> {
   await revokeOpenSoftproofLinks(params.maketaId);
   const rawToken = createSoftproofRawToken();
   const expiresAt = new Date(Date.now() + SOFTPROOF_LINK_TTL_HOURS * 60 * 60 * 1000);
-  await prisma.makety_softproof_links.create({
+  const row = await prisma.makety_softproof_links.create({
     data: {
       token_hash: hashSoftproofToken(rawToken),
       maketa_id: params.maketaId,
@@ -75,9 +76,10 @@ export async function createSoftproofLink(params: {
       sent_to_email: params.sentToEmail.slice(0, 190),
       expires_at: expiresAt,
       created_by: params.createdBy,
+      reminder_enabled: params.reminderEnabled === true,
     },
   });
-  return { rawToken, expiresAt };
+  return { rawToken, expiresAt, id: row.id };
 }
 
 export async function findSoftproofLinkByRawToken(raw: string) {
