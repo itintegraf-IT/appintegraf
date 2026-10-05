@@ -211,7 +211,10 @@ const ROLE_TRANSITIONS: Record<GrafikaTransitionRole, Array<{ from: GrafikaStatu
     { from: "in_progress", to: "done" },
     { from: "data_problem", to: "in_progress" },
   ],
-  zadavatel: [{ from: "data_problem", to: "open" }],
+  zadavatel: [
+    { from: "data_problem", to: "open" },
+    { from: "sent_for_approval", to: "in_progress" },
+  ],
   prepress: [
     { from: "done", to: "prepress_approved" },
     { from: "done", to: "in_progress" },
@@ -219,6 +222,7 @@ const ROLE_TRANSITIONS: Record<GrafikaTransitionRole, Array<{ from: GrafikaStatu
   final: [
     { from: "prepress_approved", to: "sent_for_approval" },
     { from: "sent_for_approval", to: "approved" },
+    { from: "sent_for_approval", to: "in_progress" },
   ],
 };
 

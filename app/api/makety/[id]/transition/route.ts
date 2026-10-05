@@ -21,6 +21,7 @@ import { sendMaketyClientPlainEmail } from "@/lib/email";
 import { notifyMaketaDone, notifyMaketaUsers } from "@/lib/makety-notify";
 import { recordMaketyFileEvent } from "@/lib/makety-file-events";
 import { maketaStatusLabel } from "@/lib/makety-status";
+import { revokeOpenSoftproofLinks } from "@/lib/makety-softproof-links";
 
 export async function GET(
   _req: NextRequest,
@@ -194,6 +195,10 @@ export async function POST(
     });
   });
 
+  if (toStatus === "in_progress" && maketa.status === "sent_for_approval") {
+    await revokeOpenSoftproofLinks(id);
+  }
+
   await notifyAfterGrafikaTransition({
     maketaId: id,
     fromStatus: maketa.status,
@@ -300,6 +305,19 @@ async function notifyAfterGrafikaTransition(params: {
   }
 
   if (toStatus === "in_progress" && fromStatus === "done") {
+    await notifyMaketaUsers({
+      maketaId,
+      userIds: [assigneeUserId, createdBy],
+      bodyPreview,
+      orderNumber,
+      kind: "returned_to_dtp",
+      workType: "grafika",
+      excludeUserId: actorUserId,
+    });
+    return;
+  }
+
+  if (toStatus === "in_progress" && fromStatus === "sent_for_approval") {
     await notifyMaketaUsers({
       maketaId,
       userIds: [assigneeUserId, createdBy],
