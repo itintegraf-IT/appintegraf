@@ -90,6 +90,55 @@ describe("makety-grafika-status", () => {
     ).not.toThrow();
   });
 
+  it("zadavatel a final mohou vrátit ze sent_for_approval grafikovi", () => {
+    expect(getAllowedGrafikaTransitions("sent_for_approval", ["zadavatel"])).toEqual([
+      "in_progress",
+    ]);
+    expect(getAllowedGrafikaTransitions("sent_for_approval", ["final"])).toEqual(
+      expect.arrayContaining(["approved", "in_progress"])
+    );
+    expect(getAllowedGrafikaTransitions("sent_for_approval", ["grafik"])).toEqual([]);
+    expect(grafikaTransitionActionLabel("in_progress", "sent_for_approval")).toBe(
+      "Vrátit grafikovi k opravě"
+    );
+    expect(() =>
+      assertGrafikaTransition({
+        fromStatus: "sent_for_approval",
+        toStatus: "in_progress",
+        comment: "",
+      })
+    ).toThrow(/důvod/i);
+    expect(() =>
+      assertGrafikaTransition({
+        fromStatus: "sent_for_approval",
+        toStatus: "in_progress",
+        comment: "Klient telefonicky stáhl schválení",
+      })
+    ).not.toThrow();
+  });
+
+  it("listGrafikaTransitionOptions: return z klienta dle role", () => {
+    expect(
+      listGrafikaTransitionOptions("sent_for_approval", ["zadavatel"], false)
+    ).toEqual([{ toStatus: "in_progress", viaOverride: false, actingAs: "zadavatel" }]);
+    expect(
+      listGrafikaTransitionOptions("sent_for_approval", ["final"], false)
+    ).toEqual(
+      expect.arrayContaining([
+        { toStatus: "approved", viaOverride: false, actingAs: "final" },
+        { toStatus: "in_progress", viaOverride: false, actingAs: "final" },
+      ])
+    );
+    expect(listGrafikaTransitionOptions("sent_for_approval", ["grafik"], false)).toEqual([]);
+    const adminOverride = listGrafikaTransitionOptions("sent_for_approval", [], true);
+    expect(adminOverride).toEqual(
+      expect.arrayContaining([
+        { toStatus: "approved", viaOverride: true, actingAs: "final" },
+        { toStatus: "in_progress", viaOverride: true, actingAs: "final" },
+      ])
+    );
+  });
+
   it("zadavatel bez override nevidí schválení prepressem", () => {
     const native = listGrafikaTransitionOptions("done", ["zadavatel"], false);
     expect(native).toEqual([]);
