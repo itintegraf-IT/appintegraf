@@ -49,7 +49,7 @@ export async function loadHolderPlan(db: Db): Promise<{
       asset_tag: true,
       notes: true,
       status: true,
-      equipment_assignments: { where: { returned_at: null }, select: { id: true }, take: 1 },
+      equipment_assignments: { select: { id: true }, take: 1 },
     },
   });
   const users = await db.users.findMany({
@@ -66,7 +66,7 @@ export async function loadHolderPlan(db: Db): Promise<{
       name: i.name,
       notes: i.notes,
       status: i.status,
-      hasOpenAssignment: i.equipment_assignments.length > 0,
+      hasAssignment: i.equipment_assignments.length > 0,
     })),
     users,
     open.map((a) => ({ userId: a.user_id, itemName: a.equipment_items.name }))
@@ -157,8 +157,8 @@ export async function applyHolderPairs(
       skipped.push({ itemId: pair.itemId, reason: "changed" });
       continue;
     }
-    const open = await tx.equipment_assignments.count({ where: { equipment_id: pair.itemId, returned_at: null } });
-    const res = open
+    const assignments = await tx.equipment_assignments.count({ where: { equipment_id: pair.itemId } });
+    const res = assignments
       ? { count: 0 }
       : await tx.equipment_items.updateMany({
           where: { id: pair.itemId, status: EQUIPMENT_ITEM_STATUS.SKLADEM },

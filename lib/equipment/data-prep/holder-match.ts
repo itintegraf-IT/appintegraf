@@ -1,7 +1,8 @@
 /**
  * Příprava dat: držitelé podle „Pracovník: …“ v poznámce (z importu staré evidence).
  * Čistá logika bez DB. Pracoviště („tiskárna“, „sklad“) ani nejednoznačná jména
- * se nikdy nepřiřadí; shoda jen podle příjmení je návrh k potvrzení.
+ * se nikdy nepřiřadí; shoda jen podle příjmení je návrh k potvrzení. Položka, která už
+ * v aplikaci držitele měla (i vráceného), se přeskočí — poznámka z importu je starší.
  */
 
 import { EQUIPMENT_ITEM_STATUS } from "@/lib/equipment-status";
@@ -18,7 +19,8 @@ export type HolderItem = {
   name: string;
   notes: string | null;
   status: string | null;
-  hasOpenAssignment: boolean;
+  /** Položka už v aplikaci držitele měla (i vrácené přiřazení) — historie je novější než poznámka. */
+  hasAssignment: boolean;
 };
 
 export type HolderRow = {
@@ -124,7 +126,7 @@ export function planHolderAssignments(
       skipped.notInStock += 1;
       continue;
     }
-    if (item.hasOpenAssignment) {
+    if (item.hasAssignment) {
       skipped.alreadyAssigned += 1;
       continue;
     }

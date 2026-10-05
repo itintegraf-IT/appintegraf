@@ -62,7 +62,7 @@ const item = (id: number, notes: string | null, extra: Partial<HolderItem> = {})
   name: `Položka ${id}`,
   notes,
   status: "skladem",
-  hasOpenAssignment: false,
+  hasAssignment: false,
   ...extra,
 });
 
@@ -77,7 +77,7 @@ describe("planHolderAssignments", () => {
       item(6, "Pracovník: tiskárna"),
       item(7, "Středisko: Výroba"),
       item(8, "Pracovník: Novák Jan", { status: "přiřazeno" }),
-      item(9, "Pracovník: Novák Jan", { hasOpenAssignment: true }),
+      item(9, "Pracovník: Novák Jan", { hasAssignment: true }),
       item(10, "Pracovník: Černý Tomáš", { name: "Mobil  Samsung" }),
     ],
     users,
@@ -104,7 +104,7 @@ describe("planHolderAssignments", () => {
     expect(byLabel["tiskárna"]).toMatchObject({ kind: "none", count: 2, itemIds: [5, 6] });
   });
 
-  it("položky mimo sklad nebo s otevřeným přiřazením přeskočí; bez „Pracovník:“ ignoruje", () => {
+  it("položky mimo sklad nebo s držitelem v aplikaci (i vráceným) přeskočí; bez „Pracovník:“ ignoruje", () => {
     expect(plan.skipped).toEqual({ notInStock: 1, alreadyAssigned: 1 });
     expect(rows[7]).toBeUndefined();
     expect(rows[8]).toBeUndefined();

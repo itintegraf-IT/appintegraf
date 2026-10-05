@@ -8,7 +8,7 @@ type ItemRow = {
   room_id: number | null;
   status: string | null;
   notes: string | null;
-  equipment_assignments: { id: number }[];
+  equipment_assignments: { id: number; returned_at?: Date | null }[];
 };
 
 const ADMIN = 1;
@@ -33,8 +33,17 @@ const h = vi.hoisted(() => {
   });
   const historyCreateMany = vi.fn(async () => ({ count: 0 }));
   const assignmentCreate = vi.fn(async () => ({ id: 1 }));
+  type FindArgs = { select?: { equipment_assignments?: { where?: { returned_at?: null } } } };
   const tx = {
-    equipment_items: { findMany: vi.fn(async () => state.items), updateMany: itemsUpdateMany },
+    equipment_items: {
+      // Jako DB: `where: { returned_at: null }` u vnořeného výběru vrátí jen otevřená přiřazení.
+      findMany: vi.fn(async (args?: FindArgs) =>
+        args?.select?.equipment_assignments?.where?.returned_at === null
+          ? state.items.map((i) => ({ ...i, equipment_assignments: i.equipment_assignments.filter((a) => !a.returned_at) }))
+          : state.items
+      ),
+      updateMany: itemsUpdateMany,
+    },
     equipment_rooms: { findMany: vi.fn(async () => rooms) },
     equipment_location_history: { createMany: historyCreateMany },
     equipment_assignments: { findMany: vi.fn(async () => []), count: vi.fn(async () => 0), create: assignmentCreate },
@@ -165,5 +174,15 @@ describe("data-prep — držitelé", () => {
       data: expect.objectContaining({ equipment_id: 5, user_id: 40, assigned_by: ADMIN }),
     });
     expect(audit).toHaveBeenCalledWith(expect.objectContaining({ action: "data_prep_holders" }), tx);
+  });
+
+  it("položku, kterou už držitel v aplikaci vrátil, znovu nepřiřadí (poznámka je starší než historie)", async () => {
+    state.items = [
+      row(6, null, { notes: "Pracovník: Novák Jan", equipment_assignments: [{ id: 3, returned_at: new Date("2026-08-01") }] }),
+    ];
+    const res = await call("POST", "holders", { pairs: [{ itemId: 6, userId: 40 }] });
+    await expect(res.json()).resolves.toEqual({ applied: 0, skipped: [{ itemId: 6, reason: "changed" }] });
+    expect(assignmentCreate).not.toHaveBeenCalled();
+    expect(itemsUpdateMany).not.toHaveBeenCalled();
   });
 });
