@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
     body.responsible_user_id != null && body.responsible_user_id !== ""
       ? parseInt(String(body.responsible_user_id), 10)
       : null;
+  const labelRequired = body.label_required !== false;
 
   const row = await prisma.equipment_categories.create({
     data: {
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
       icon: body.icon ? String(body.icon).trim() : null,
       is_active: body.is_active !== false,
       responsible_user_id: Number.isFinite(responsibleId as number) ? responsibleId : null,
+      label_required: labelRequired,
     },
   });
 
@@ -91,7 +93,7 @@ export async function POST(req: NextRequest) {
     action: "category_create",
     tableName: "equipment_categories",
     recordId: row.id,
-    detail: { name, code },
+    detail: { name, code, label_required: labelRequired },
   });
 
   return NextResponse.json(row, { status: 201 });
