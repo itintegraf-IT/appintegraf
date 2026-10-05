@@ -1,6 +1,6 @@
 /**
  * Sazba textu na štítek — čistá logika bez DB; šířku textu měří volající (pdf-lib font).
- * Název se smí zkrátit s „…“, inventární číslo nikdy (jen se zmenší písmo).
+ * Název se smí zkrátit s „…“, inventární číslo nikdy (zmenší se písmo, případně se zalomí).
  */
 
 const ELLIPSIS = "…";
@@ -76,17 +76,43 @@ export function wrapTextLines(text: string, maxWidth: number, maxLines: number, 
   return lines;
 }
 
-/** Největší velikost písma ze `sizes` (sestupně), při které se text vejde; jinak nejmenší. */
-export function fitFontSize(
+/** Rozdělí text po znacích na řádky, které se vejdou do šířky — nic nevynechá. */
+function splitToWidth(text: string, maxWidth: number, measure: Measure): string[] {
+  const lines: string[] = [];
+  let current = "";
+  for (const ch of Array.from(text)) {
+    if (current && measure(current + ch) > maxWidth) {
+      lines.push(current);
+      current = ch;
+    } else {
+      current += ch;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
+}
+
+/**
+ * Inventární číslo na štítek: největší písmo ze `sizes` (sestupně), při kterém se vejde
+ * na jeden řádek; jinak největší, při kterém se vejde na dva řádky; jinak nejmenší písmo
+ * a tolik řádků, kolik je třeba. Číslo se nikdy nezkracuje ani nepřeteče do šířky.
+ */
+export function fitCodeLines(
   text: string,
   maxWidth: number,
   sizes: number[],
   measure: (s: string, size: number) => number
-): number {
+): { size: number; lines: string[] } {
+  const code = text.trim();
   for (const size of sizes) {
-    if (measure(text, size) <= maxWidth) return size;
+    if (measure(code, size) <= maxWidth) return { size, lines: [code] };
   }
-  return sizes[sizes.length - 1];
+  for (const size of sizes) {
+    const lines = splitToWidth(code, maxWidth, (s) => measure(s, size));
+    if (lines.length <= 2) return { size, lines };
+  }
+  const smallest = sizes[sizes.length - 1];
+  return { size: smallest, lines: splitToWidth(code, maxWidth, (s) => measure(s, smallest)) };
 }
 
 export const DEFAULT_LABEL_OWNER_TEXT = "Majetek Integraf, s.r.o.";

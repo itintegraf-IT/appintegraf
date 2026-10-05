@@ -10,7 +10,7 @@ import {
   type MmBox,
 } from "@/lib/equipment/label-layout";
 import { resolveEquipmentLabelGrid } from "@/lib/equipment/label-grid-settings";
-import { fitFontSize, fitTextToWidth, wrapTextLines } from "@/lib/equipment/label-text";
+import { fitCodeLines, fitTextToWidth, wrapTextLines } from "@/lib/equipment/label-text";
 import { buildEqPayload, buildRmPayload, generateQrPng } from "@/lib/equipment/qr";
 import { isTestLabelEnvironment } from "@/lib/equipment/qr-url";
 
@@ -110,13 +110,13 @@ function drawLabel(
     }
   }
 
-  const codeSize = fitFontSize(
+  const code = fitCodeLines(
     content.code,
     textWidthPt,
     content.codeIsFallback ? FALLBACK_CODE_SIZES : CODE_SIZES,
     (s, size) => fonts.fontBold.widthOfTextAtSize(s, size)
   );
-  line(content.code, codeSize, fonts.fontBold);
+  for (const codeLine of code.lines) line(codeLine, code.size, fonts.fontBold);
 
   const titleSize = box.hMm >= 40 ? 9 : 7.5;
   const titleLines = wrapTextLines(content.title, textWidthPt, 2, (s) => fonts.font.widthOfTextAtSize(s, titleSize));

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LABEL_OWNER_TEXT, fitFontSize, fitTextToWidth, labelsCountLabel, normalizeLabelOwnerText, wrapTextLines } from "./label-text";
+import {
+  DEFAULT_LABEL_OWNER_TEXT,
+  fitCodeLines,
+  fitTextToWidth,
+  labelsCountLabel,
+  normalizeLabelOwnerText,
+  wrapTextLines,
+} from "./label-text";
 
 /** Každý znak = 1 jednotka šířky (při velikosti písma 1). */
 const measure = (s: string) => s.length;
@@ -59,15 +66,26 @@ describe("wrapTextLines", () => {
   });
 });
 
-describe("fitFontSize", () => {
+describe("fitCodeLines", () => {
   const sizes = [14, 12, 10, 8, 7];
 
-  it("vybere největší velikost, která se vejde", () => {
-    expect(fitFontSize("100123", 72, sizes, measureSized)).toBe(12);
+  it("číslo, které se vejde, zůstane na jednom řádku co největším písmem", () => {
+    expect(fitCodeLines("100123", 72, sizes, measureSized)).toEqual({ size: 12, lines: ["100123"] });
   });
 
-  it("když se nevejde ani nejmenší, vrátí nejmenší (číslo se nikdy nezkracuje)", () => {
-    expect(fitFontSize("123456789012", 40, sizes, measureSized)).toBe(7);
+  it("dlouhé číslo (40 znaků) se rozdělí na dva řádky — nic se neztratí ani nepřeteče", () => {
+    const code = "1234567890".repeat(4);
+    const fit = fitCodeLines(code, 160, sizes, measureSized);
+    expect(fit).toMatchObject({ size: 8 });
+    expect(fit.lines).toHaveLength(2);
+    expect(fit.lines.join("")).toBe(code);
+    for (const line of fit.lines) expect(measureSized(line, fit.size)).toBeLessThanOrEqual(160);
+  });
+
+  it("číslo se nikdy nezkracuje, ani když se nevejde na dva řádky", () => {
+    const fit = fitCodeLines("123456789012", 20, sizes, measureSized);
+    expect(fit.size).toBe(7);
+    expect(fit.lines.join("")).toBe("123456789012");
   });
 });
 
