@@ -17,6 +17,7 @@ type ItemRow = {
   equipment_rooms: { name: string } | null;
 };
 let items: ItemRow[] = [];
+const ROOM = { id: 7, label_printed_at: null, name: "Sklad", code: "1001", qr_code: "900000000007", building: null, floor: null };
 const itemsUpdateMany = vi.fn(async () => ({ count: 0 }));
 const roomsUpdateMany = vi.fn(async () => ({ count: 0 }));
 const tx = { equipment_items: { updateMany: itemsUpdateMany }, equipment_rooms: { updateMany: roomsUpdateMany } };
@@ -31,8 +32,12 @@ vi.mock("@/lib/db", () => ({
   prisma: {
     equipment_items: {
       findMany: vi.fn(async (args: { where: { id: { in: number[] } } }) => items.filter((i) => args.where.id.in.includes(i.id))),
+      findUnique: vi.fn(async (args: { where: { id: number } }) => items.find((i) => i.id === args.where.id) ?? null),
     },
-    equipment_rooms: { findMany: vi.fn(async () => [{ id: 7, label_printed_at: null }]) },
+    equipment_rooms: {
+      findMany: vi.fn(async () => [ROOM]),
+      findUnique: vi.fn(async () => ROOM),
+    },
     $transaction: vi.fn(async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx)),
   },
 }));
@@ -43,13 +48,20 @@ vi.mock("@/lib/equipment/label-grid-settings", () => ({
   })),
 }));
 const buildItems = vi.fn(async () => new Uint8Array([37, 80, 68, 70]));
+const buildOther = vi.fn(async () => new Uint8Array([37, 80, 68, 70]));
 vi.mock("@/lib/equipment/label-pdf", () => ({
   buildEquipmentLabelsBulkPdf: (...args: unknown[]) => buildItems(...(args as [])),
+  buildEquipmentLabelPdf: () => buildOther(),
+  buildRoomLabelPdf: () => buildOther(),
+  buildRoomLabelsBulkPdf: () => buildOther(),
 }));
 const audit = vi.fn<(params: unknown, db?: unknown) => Promise<void>>(async () => undefined);
 vi.mock("@/lib/equipment/audit", () => ({ logEquipmentAudit: (p: unknown, db?: unknown) => audit(p, db) }));
 
 import { POST as printItems } from "@/app/api/equipment/labels/route";
+import { POST as printRooms } from "@/app/api/equipment/rooms/labels/route";
+import { GET as printItem } from "@/app/api/equipment/[id]/label/route";
+import { GET as printRoom } from "@/app/api/equipment/rooms/[id]/label/route";
 import { POST as confirm } from "@/app/api/equipment/labels/confirm/route";
 
 const row = (id: number, qr: string | null, room: string | null, tag: string | null, categoryId = 3): ItemRow => ({
@@ -67,21 +79,24 @@ const post = (handler: typeof printItems, body: unknown) =>
   handler(new Request("http://x/api", { method: "POST", body: JSON.stringify(body) }) as never);
 
 beforeEach(() => {
+  vi.stubEnv("EQUIPMENT_QR_BASE_URL", "https://app.example.cz");
+  vi.stubEnv("AUTH_URL", "");
   currentUser = MANAGER;
   items = [row(1, "111", "Sklad", "100002"), row(2, null, "Sklad", "100001"), row(3, "333", "Recepce", "100003")];
   itemsUpdateMany.mockClear();
   roomsUpdateMany.mockClear();
   audit.mockClear();
   buildItems.mockClear();
+  buildOther.mockClear();
 });
 
 describe("POST /api/equipment/labels — PDF bez vedlejších účinků", () => {
-  it("vrátí PDF, položky bez QR nahlásí a vytištěná ID seřadí po místnostech", async () => {
+  it("vrátí PDF, položky bez QR nahlásí a spočítá vytištěné štítky", async () => {
     const res = await post(printItems, { ids: [1, 2, 3], startPosition: 8 });
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toBe("application/pdf");
     expect(res.headers.get("x-labels-skipped")).toBe("1");
-    expect(res.headers.get("x-labels-ids")).toBe("3,1");
+    expect(res.headers.get("x-labels-count")).toBe("2");
     expect(buildItems).toHaveBeenCalledWith(expect.any(Array), expect.objectContaining({ startPosition: 8 }));
     expect(itemsUpdateMany).not.toHaveBeenCalled();
   });
@@ -95,6 +110,41 @@ describe("POST /api/equipment/labels — PDF bez vedlejších účinků", () => 
     items = [row(2, null, "Sklad", "100001")];
     const res = await post(printItems, { ids: [2] });
     expect(res.status).toBe(400);
+  });
+});
+
+describe("PDF štítků — velké dávky a adresa aplikace", () => {
+  it("500 štítků: hlavičky odpovědi zůstanou krátké (žádný seznam ID — proxy by je odmítla)", async () => {
+    items = Array.from({ length: 500 }, (_, i) => row(1000 + i, String(900000000000 + i), "Sklad", String(100000 + i)));
+    const res = await post(printItems, { ids: items.map((i) => i.id) });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-labels-count")).toBe("500");
+    let headerBytes = 0;
+    res.headers.forEach((value, key) => {
+      headerBytes += key.length + value.length;
+    });
+    expect(headerBytes).toBeLessThan(300);
+  });
+
+  it("bez adresy aplikace se štítky netisknou (QR by nebyl odkaz) — položky i místnosti", async () => {
+    vi.stubEnv("EQUIPMENT_QR_BASE_URL", "");
+    vi.stubEnv("AUTH_URL", "http://localhost:3000");
+    const params = { params: Promise.resolve({ id: "1" }) };
+    const get = (handler: typeof printItem) =>
+      handler(Object.assign(new Request("http://x/api"), { nextUrl: new URL("http://x/api") }) as never, params);
+
+    const responses = [
+      await post(printItems, { ids: [1] }),
+      await post(printRooms, { ids: [7] }),
+      await get(printItem),
+      await get(printRoom),
+    ];
+    for (const res of responses) {
+      expect(res.status).toBe(503);
+      await expect(res.json()).resolves.toMatchObject({ error: expect.stringMatching(/adresu/) });
+    }
+    expect(buildItems).not.toHaveBeenCalled();
+    expect(buildOther).not.toHaveBeenCalled();
   });
 });
 

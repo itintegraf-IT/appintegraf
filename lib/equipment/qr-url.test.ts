@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildQrPayload, extractQrUrlCode, isTestLabelEnvironment, resolveQrBaseUrl } from "./qr-url";
+import { buildQrPayload, extractQrUrlCode, isTestLabelEnvironment, qrLabelBlockedReason, resolveQrBaseUrl } from "./qr-url";
 
 describe("resolveQrBaseUrl", () => {
   it.each([
@@ -84,7 +84,22 @@ describe("isTestLabelEnvironment", () => {
     [{ APP_ENV: " TEST " }, true],
     [{ APP_ENV: "production" }, false],
     [{}, false],
+    [{ NODE_ENV: "development" }, true],
+    [{ NODE_ENV: "production" }, false],
+    [{ APP_ENV: "test", NODE_ENV: "production" }, true],
   ] as const)("%j → %s", (env, expected) => {
     expect(isTestLabelEnvironment(env)).toBe(expected);
+  });
+});
+
+describe("qrLabelBlockedReason", () => {
+  it("bez platné adresy aplikace štítky netiskne — QR by nebyl odkaz a štítek je trvalý", () => {
+    expect(qrLabelBlockedReason({})).toMatch(/adresu/);
+    expect(qrLabelBlockedReason({ AUTH_URL: "http://localhost:3000" })).toMatch(/adresu/);
+  });
+
+  it("s adresou aplikace tisk povolí", () => {
+    expect(qrLabelBlockedReason({ AUTH_URL: "https://app.example.cz" })).toBeNull();
+    expect(qrLabelBlockedReason({ EQUIPMENT_QR_BASE_URL: "http://192.168.10.210:3011" })).toBeNull();
   });
 });

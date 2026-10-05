@@ -143,7 +143,7 @@ async function buildLabelsPdf(contents: LabelContent[], options: LabelPrintOptio
   const resolved = needSettings ? await resolveEquipmentLabelGrid() : null;
   const spec = options.spec ?? resolved!.spec;
   const ownerText = options.ownerText ?? resolved!.settings.ownerText;
-  const owner = isTestLabelEnvironment({ APP_ENV: process.env.APP_ENV })
+  const owner = isTestLabelEnvironment({ APP_ENV: process.env.APP_ENV, NODE_ENV: process.env.NODE_ENV })
     ? { text: TEST_OWNER_TEXT, warning: true }
     : { text: ownerText, warning: false };
 

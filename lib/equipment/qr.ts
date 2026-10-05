@@ -1,15 +1,21 @@
 import QRCode from "qrcode";
 import { prisma } from "@/lib/db";
-import { buildQrPayload, resolveQrBaseUrl } from "@/lib/equipment/qr-url";
+import { buildQrPayload, qrLabelBlockedReason, resolveQrBaseUrl } from "@/lib/equipment/qr-url";
 
 // Parser kódu žije v čistém modulu scan-code.ts (bez Prismy, použitelný i v klientu).
 export { QR_PREFIX_EQ, QR_PREFIX_RM, parseEquipmentScanCode, type ParsedEquipmentCode } from "@/lib/equipment/scan-code";
 
+function qrBaseEnv() {
+  return { EQUIPMENT_QR_BASE_URL: process.env.EQUIPMENT_QR_BASE_URL, AUTH_URL: process.env.AUTH_URL };
+}
+
 function qrBaseUrl(): string | null {
-  return resolveQrBaseUrl({
-    EQUIPMENT_QR_BASE_URL: process.env.EQUIPMENT_QR_BASE_URL,
-    AUTH_URL: process.env.AUTH_URL,
-  });
+  return resolveQrBaseUrl(qrBaseEnv());
+}
+
+/** Důvod, proč teď štítky netisknout (chybí adresa aplikace pro odkaz v QR); jinak null. */
+export function labelPrintBlockedReason(): string | null {
+  return qrLabelBlockedReason(qrBaseEnv());
 }
 
 /** Obsah QR položky: odkaz do aplikace (`EQUIPMENT_QR_BASE_URL` / `AUTH_URL`), jinak starý textový formát. */

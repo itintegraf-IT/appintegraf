@@ -358,7 +358,7 @@ export function AddEquipmentForm({ initialPoolCode, initialRoomId }: Props) {
           ids={created.ids}
           canConfirm
           onClose={() => setLabelsOpen(false)}
-          onConfirmed={(printed) => setLabelsDone(`Štítky označeny jako vytištěné: ${labelsCountLabel(printed.length)}.`)}
+          onConfirmed={(_ids, updated) => setLabelsDone(`Štítky označeny jako vytištěné: ${labelsCountLabel(updated)}.`)}
         />
       </>
     );

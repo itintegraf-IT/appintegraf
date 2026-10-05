@@ -5,6 +5,7 @@ import { canReadEquipment } from "@/lib/equipment/access";
 import { resolveEquipmentLabelGrid } from "@/lib/equipment/label-grid-settings";
 import { labelsPerPage, validateStartPosition } from "@/lib/equipment/label-layout";
 import { buildEquipmentLabelPdf } from "@/lib/equipment/label-pdf";
+import { labelPrintBlockedReason } from "@/lib/equipment/qr";
 
 /** Štítek jedné položky na A4 na pozici `?start=N` (výchozí 1). Nic nezapisuje. */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -28,6 +29,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!(await canReadEquipment(userId, item.category_id))) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
+  const blocked = labelPrintBlockedReason();
+  if (blocked) return NextResponse.json({ error: blocked }, { status: 503 });
 
   const { settings, spec } = await resolveEquipmentLabelGrid();
   const start = validateStartPosition(req.nextUrl.searchParams.get("start"), labelsPerPage(spec));
@@ -48,7 +51,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `inline; filename="stitek-${item.asset_tag ?? item.id}.pdf"`,
-      "X-Labels-Ids": String(item.id),
     },
   });
 }

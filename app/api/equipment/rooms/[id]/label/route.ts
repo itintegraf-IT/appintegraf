@@ -5,6 +5,7 @@ import { canReadEquipment } from "@/lib/equipment/access";
 import { resolveEquipmentLabelGrid } from "@/lib/equipment/label-grid-settings";
 import { labelsPerPage, validateStartPosition } from "@/lib/equipment/label-layout";
 import { buildRoomLabelPdf } from "@/lib/equipment/label-pdf";
+import { labelPrintBlockedReason } from "@/lib/equipment/qr";
 
 /** Štítek jedné místnosti na A4 na pozici `?start=N` (výchozí 1). Nic nezapisuje. */
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -16,6 +17,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!(await canReadEquipment(userId))) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
+  const blocked = labelPrintBlockedReason();
+  if (blocked) return NextResponse.json({ error: blocked }, { status: 503 });
 
   const id = parseInt((await params).id, 10);
   if (Number.isNaN(id)) {
@@ -34,7 +37,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     headers: {
       "Content-Type": "application/pdf",
       "Content-Disposition": `inline; filename="mistnost-${room.code}.pdf"`,
-      "X-Labels-Ids": String(room.id),
     },
   });
 }

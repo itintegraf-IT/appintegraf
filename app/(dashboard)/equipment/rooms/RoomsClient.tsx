@@ -436,9 +436,9 @@ export default function RoomsClient({ canManageRegister }: { canManageRegister: 
         ids={labelIds ?? []}
         canConfirm={canManageRegister}
         onClose={() => setLabelIds(null)}
-        onConfirmed={(printed) => {
+        onConfirmed={(_ids, updated) => {
           setError("");
-          setOkMsg(`Označeno jako vytištěné: ${labelsCountLabel(printed.length)}.`);
+          setOkMsg(`Označeno jako vytištěné: ${labelsCountLabel(updated)}.`);
           void load();
         }}
       />

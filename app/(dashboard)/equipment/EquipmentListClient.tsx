@@ -637,9 +637,9 @@ export function EquipmentListClient({
         ids={labelIds ?? []}
         canConfirm={canEdit || canAssign}
         onClose={() => setLabelIds(null)}
-        onConfirmed={(printed) => {
+        onConfirmed={(_ids, updated) => {
           setErr("");
-          setMsg(`Označeno jako vytištěné: ${labelsCountLabel(printed.length)}.`);
+          setMsg(`Označeno jako vytištěné: ${labelsCountLabel(updated)}.`);
           router.refresh();
         }}
       />

@@ -80,7 +80,8 @@ type Props = {
   /** Smí potvrdit vytištění (zápis do skupiny položek / správa evidence u místností). */
   canConfirm: boolean;
   onClose: () => void;
-  onConfirmed?: (printedIds: number[]) => void;
+  /** Po potvrzení: potvrzená ID (server z nich zapsal jen tisknutelné) a počet zapsaných. */
+  onConfirmed?: (ids: number[], updated: number) => void;
 };
 
 /**
@@ -93,7 +94,7 @@ export function LabelPrintDialog({ open, kind, ids, canConfirm, onClose, onConfi
   const [step, setStep] = useState<"setup" | "confirm">("setup");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [printedIds, setPrintedIds] = useState<number[]>([]);
+  const [printedCount, setPrintedCount] = useState(0);
   const [skipped, setSkipped] = useState(0);
 
   useEffect(() => {
@@ -119,7 +120,7 @@ export function LabelPrintDialog({ open, kind, ids, canConfirm, onClose, onConfi
   const close = () => {
     setStep("setup");
     setError("");
-    setPrintedIds([]);
+    setPrintedCount(0);
     setSkipped(0);
     onClose();
   };
@@ -139,11 +140,8 @@ export function LabelPrintDialog({ open, kind, ids, canConfirm, onClose, onConfi
           setError(result.error);
           return;
         }
-        const printed = (result.headers.get("x-labels-ids") ?? "")
-          .split(",")
-          .map(Number)
-          .filter((n) => Number.isInteger(n) && n > 0);
-        setPrintedIds(printed);
+        const printed = Number(result.headers.get("x-labels-count")) || 0;
+        setPrintedCount(printed);
         setSkipped(Number(result.headers.get("x-labels-skipped")) || 0);
         const href = URL.createObjectURL(result.blob);
         const a = document.createElement("a");
@@ -153,7 +151,7 @@ export function LabelPrintDialog({ open, kind, ids, canConfirm, onClose, onConfi
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(href), 60_000);
-        if (!canConfirm) storeStart(nextStartPosition(start, printed.length, perPage));
+        if (!canConfirm) storeStart(nextStartPosition(start, printed, perPage));
         setStep("confirm");
       })
       .catch(() => setError("Spojení se serverem selhalo. Nic se nestáhlo — zkuste to znovu."))
@@ -167,7 +165,7 @@ export function LabelPrintDialog({ open, kind, ids, canConfirm, onClose, onConfi
     fetch("/api/equipment/labels/confirm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind, ids: printedIds, printed: true }),
+      body: JSON.stringify({ kind, ids, printed: true }),
     })
       .then((res) => readApiResponse<{ updated: number }>(res, "Potvrzení se nepodařilo uložit."))
       .then((result) => {
@@ -175,8 +173,8 @@ export function LabelPrintDialog({ open, kind, ids, canConfirm, onClose, onConfi
           setError(result.error);
           return;
         }
-        storeStart(nextStartPosition(start, printedIds.length, perPage));
-        onConfirmed?.(printedIds);
+        storeStart(nextStartPosition(start, printedCount, perPage));
+        onConfirmed?.(ids, result.data.updated);
         close();
       })
       .catch(() => setError("Spojení se serverem selhalo. Nic se neuložilo — zkuste to znovu."))
@@ -203,7 +201,7 @@ export function LabelPrintDialog({ open, kind, ids, canConfirm, onClose, onConfi
       >
         <div className="flex flex-col gap-3">
           <p>
-            PDF ({labelsCountLabel(printedIds.length)}) je stažené. Vytiskněte ho a zkontrolujte, že QR kód i text jsou
+            PDF ({labelsCountLabel(printedCount)}) je stažené. Vytiskněte ho a zkontrolujte, že QR kód i text jsou
             celé.
           </p>
           {skipped > 0 ? (

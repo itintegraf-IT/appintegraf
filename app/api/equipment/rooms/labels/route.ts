@@ -6,6 +6,7 @@ import { resolveEquipmentLabelGrid } from "@/lib/equipment/label-grid-settings";
 import { labelsPerPage, validateStartPosition } from "@/lib/equipment/label-layout";
 import { buildRoomLabelsBulkPdf } from "@/lib/equipment/label-pdf";
 import { parseLabelIds, sortRoomsForLabels } from "@/lib/equipment/label-plan";
+import { labelPrintBlockedReason } from "@/lib/equipment/qr";
 
 /**
  * Štítky vybraných místností jako PDF (A4, uložená mřížka, od zvolené pozice).
@@ -20,6 +21,8 @@ export async function POST(req: NextRequest) {
   if (!(await canReadEquipment(userId))) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
+  const blocked = labelPrintBlockedReason();
+  if (blocked) return NextResponse.json({ error: blocked }, { status: 503 });
 
   const body = (await req.json().catch(() => ({}))) as { ids?: unknown; startPosition?: unknown };
   const parsedIds = parseLabelIds(body.ids);
@@ -51,7 +54,7 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/pdf",
       "Content-Disposition": 'inline; filename="stitky-mistnosti.pdf"',
       "X-Labels-Skipped": String(parsedIds.ids.length - rooms.length),
-      "X-Labels-Ids": sorted.map((room) => room.id).join(","),
+      "X-Labels-Count": String(sorted.length),
     },
   });
 }

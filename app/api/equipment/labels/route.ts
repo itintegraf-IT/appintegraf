@@ -6,6 +6,7 @@ import { resolveEquipmentLabelGrid } from "@/lib/equipment/label-grid-settings";
 import { labelsPerPage, validateStartPosition } from "@/lib/equipment/label-layout";
 import { buildEquipmentLabelsBulkPdf } from "@/lib/equipment/label-pdf";
 import { parseLabelIds, sortItemsForLabels, splitPrintable } from "@/lib/equipment/label-plan";
+import { labelPrintBlockedReason } from "@/lib/equipment/qr";
 
 /**
  * Štítky vybraných položek jako PDF (A4, od zvolené pozice). Nic nezapisuje —
@@ -39,6 +40,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nemáte oprávnění ke všem vybraným položkám" }, { status: 403 });
     }
   }
+  const blocked = labelPrintBlockedReason();
+  if (blocked) return NextResponse.json({ error: blocked }, { status: 503 });
 
   const { printable, skipped } = splitPrintable(items);
   if (printable.length === 0) {
@@ -64,7 +67,7 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/pdf",
       "Content-Disposition": 'inline; filename="majetek-stitky.pdf"',
       "X-Labels-Skipped": String(skipped.length + (parsedIds.ids.length - items.length)),
-      "X-Labels-Ids": sorted.map((item) => item.id).join(","),
+      "X-Labels-Count": String(sorted.length),
     },
   });
 }

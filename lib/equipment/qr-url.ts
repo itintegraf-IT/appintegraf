@@ -1,7 +1,8 @@
 /**
  * Obsah QR kódu na štítku — čistá logika bez DB (použitelná i v klientu).
  * QR nese odkaz `<adresa aplikace>/q/<kód>`, takže ho otevře i fotoaparát telefonu.
- * Bez platné adresy aplikace (lokální vývoj) zůstává starý textový formát.
+ * Bez platné adresy aplikace zůstává starý textový formát — jen pro zobrazení na obrazovce;
+ * štítky se pak netisknou (`qrLabelBlockedReason`).
  */
 
 export const QR_PREFIX_EQ = "INTEGRAF:EQ:";
@@ -53,7 +54,19 @@ export function extractQrUrlCode(raw: string): string | null {
   }
 }
 
-/** Štítek z testovacího prostředí nese výrazné „TEST“, aby se omylem nenalepil. */
-export function isTestLabelEnvironment(env: { APP_ENV?: string }): boolean {
-  return (env.APP_ENV ?? "").trim().toLowerCase() === "test";
+/**
+ * Štítek mimo produkci nese výrazné „TEST“, aby se omylem nenalepil: testovací server
+ * (`APP_ENV=test`) i lokální vývoj (`next dev`).
+ */
+export function isTestLabelEnvironment(env: { APP_ENV?: string; NODE_ENV?: string }): boolean {
+  return (env.APP_ENV ?? "").trim().toLowerCase() === "test" || env.NODE_ENV === "development";
+}
+
+/**
+ * Proč štítky teď netisknout: bez platné adresy aplikace by QR nebyl odkaz, jen starý text —
+ * a štítek se lepí natrvalo. `null` = tisk je v pořádku.
+ */
+export function qrLabelBlockedReason(env: QrBaseUrlEnv): string | null {
+  if (resolveQrBaseUrl(env)) return null;
+  return "Štítky teď nejde tisknout: aplikace nemá nastavenou svou adresu pro odkaz v QR kódu (EQUIPMENT_QR_BASE_URL). Dejte vědět správci aplikace.";
 }
