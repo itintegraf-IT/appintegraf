@@ -104,6 +104,17 @@ mysql -u root -p appintegraf < prisma/migrations/20260328_users_personal_contact
 
 Skript **nenahrazuje** kopírování dat v MySQL. Mezi prostředími se tabulky `planovani_*` přenášejí např. přes **`mysqldump`** / import SQL. U dumpu z MySQL 8 na MariaDB může být potřeba nahradit kolaci `utf8mb4_0900_ai_ci` za např. `utf8mb4_unicode_ci` před importem.
 
+## Cron úlohy
+
+Produkce musí pravidelně volat cron endpointy s `CRON_SECRET` (hlavička `Authorization: Bearer …` nebo `?secret=`).
+
+| Endpoint | Doporučený interval | Účel |
+|----------|---------------------|------|
+| `POST /api/cron/makety-softproof-reminders` | denně | Softproof: po vypršení odkazu pošle klientovi připomínku s novým odkazem (zapnout v Makety → Nastavení → Softproof) |
+| `POST /api/cron/contracts-expiry` | denně | Končící smlouvy |
+| `POST /api/cron/training-reminders` | denně | Termíny testů školení |
+| `GET/POST /api/cron/calendar-reminders` | 1–5 min | Připomínky kalendáře |
+
 ## Konfigurace PM2
 
 Viz [`ecosystem.config.js`](ecosystem.config.js) — upravte `cwd`, proměnné prostředí a port podle serveru. Citlivé údaje držte v **`.env`** na serveru, ne v repozitáři.
