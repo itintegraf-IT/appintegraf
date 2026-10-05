@@ -240,17 +240,17 @@ Sdílená komponenta: `EquipmentItemForm`.
 
 ### 3. QR kódy a štítky
 
-**QR je odkaz:** `<adresa aplikace>/q/<qr_code>` — fotoaparát telefonu otevře kartu položky nebo místnosti (po přihlášení). Adresa z `EQUIPMENT_QR_BASE_URL`, jinak `AUTH_URL`; lokálně (localhost) zůstává starý text `INTEGRAF:EQ:{qr_code}` / `INTEGRAF:RM:{qr_code}`. Skener čte oba formáty. Stránka `/q/[kód]` položku bez oprávnění neprozradí; u kódu shodného s položkou i místností nabídne volbu. Implementace: `lib/equipment/qr-url.ts`, `qr-landing.ts`.
+**QR je odkaz:** `<adresa aplikace>/q/<qr_code>` — fotoaparát telefonu otevře kartu položky nebo místnosti (po přihlášení). Adresa z `EQUIPMENT_QR_BASE_URL`, jinak `AUTH_URL` (localhost se nepoužije). **Bez platné adresy se štítky netisknou** — tisk skončí hláškou pro správce; na obrazovce zůstává starý text `INTEGRAF:EQ:{qr_code}` / `INTEGRAF:RM:{qr_code}`. Každý server proto musí mít v `.env` `EQUIPMENT_QR_BASE_URL` (produkce `https://…`, test adresa testu). Skener čte oba formáty. Stránka `/q/[kód]` položku bez oprávnění neprozradí; u kódu shodného s položkou i místností nabídne volbu. Implementace: `lib/equipment/qr-url.ts`, `qr-landing.ts`.
 
 **Formát štítku:** jeden materiál pro majetek i místnosti — **arch A4 70 × 37 mm, 3 × 8** (výchozí šablona `a4_70x37_3x8`; další šablony a vlastní rozměry v `/equipment/settings/labels`, uloženo v `system_settings` klíč `equipment_label_grid`, mřížka se musí vejít na A4).
 
 | Typ | Obsah na štítku |
 |-----|-----------------|
-| Majetek | vlastník („Majetek Integraf, s.r.o.“, nastavitelný), inventární číslo (tučně, nikdy se nezkracuje), název (max. 2 řádky), skupina, u počítané položky „× N ks“, QR |
+| Majetek | vlastník („Majetek Integraf, s.r.o.“, nastavitelný), inventární číslo (tučně, nikdy se nezkracuje — dlouhé se zalomí na dva řádky), název (max. 2 řádky), skupina, u počítané položky „× N ks“, QR |
 | Místnost | vlastník, kód, název, budova/patro, QR |
 
 - Obsah drží odstup ≥ 4 mm od okraje papíru (laserová tiskárna kraj nepotiskne). Tisknout ve **skutečné velikosti (100 %)**.
-- Mimo produkci (`APP_ENV=test`) štítek nese výrazné **TEST — neplatný štítek**.
+- Mimo produkci (`APP_ENV=test` na testu, lokální `next dev`) štítek nese výrazné **TEST — neplatný štítek**.
 - **Tisk:** dialog Tisk štítků (seznam, řádek, detail, souhrn zařazení, místnosti) — počet, **pozice na načatém archu**, stažení PDF. PDF je seřazené po místnostech. Generování nic nezapisuje.
 - **Evidence tisku:** po stažení se dialog zeptá „Vytiskly se štítky správně?“ — teprve potvrzení zapíše `label_printed_at`; na detailu jde označit jako nevytištěný. Filtr **Bez štítku** v seznamu (s QR, bez potvrzeného tisku, nevyřazené, jen skupiny se štítky) a „Jen bez štítku“ u místností.
 - API obrázku QR: `GET /api/equipment/qr?code=…`
@@ -266,7 +266,7 @@ Stránka `/equipment/settings/data-prep` (jen správce), jednorázově před lep
 | Krok | Co dělá |
 |------|---------|
 | Místnosti podle textu umístění | Z `location` („Název (kód)“) navrhne místnost: automaticky jen kde sedí kód i název (nebo dřívější název sloučené místnosti z popisu „Také: …“); neznámý kód s jednoznačným názvem a kód s jiným názvem jsou návrhy k potvrzení; středisko, prázdné a neznámé zůstanou ve skupinách k obchůzce. Kód vždy rozhoduje před názvem. |
-| Držitelé z poznámek | Z „Pracovník: …“ přiřadí držitele: shoda celého jména předvybraná, shoda jen podle příjmení k potvrzení, pracoviště a nejednoznačná jména nikdy. Upozorní na možnou duplicitu (držitel už má podobnou položku). |
+| Držitelé z poznámek | Z „Pracovník: …“ přiřadí držitele: shoda celého jména předvybraná, shoda jen podle příjmení k potvrzení, pracoviště a nejednoznačná jména nikdy. Položku, která už v aplikaci držitele měla (i vráceného), přeskočí — poznámka z importu je starší. Upozorní na možnou duplicitu (držitel už má podobnou položku). |
 
 - Náhled ukáže přesně, co se změní; provedou se jen vybrané řádky, které jsou v plánu i v okamžiku zápisu (opakování nic nezdvojí). Vše v jedné transakci se souhrnným auditem, bez notifikací.
 - Zařazení do místnosti zapíše historii **„Z původní evidence“** (`source: import`) bez protokolu přesunu; původní text umístění i poznámky zůstávají.
