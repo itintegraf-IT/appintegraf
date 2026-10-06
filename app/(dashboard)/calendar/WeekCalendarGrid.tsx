@@ -20,6 +20,7 @@ import {
   type CalendarEventMetaMode,
 } from "@/lib/calendar-event-meta";
 import {
+  allDaySpanOverlayPercent,
   computeAllDayWeekSpan,
   isMultiDayAllDay,
   layoutAllDaySpanRows,
@@ -118,20 +119,29 @@ const SPAN_ROW_PADDING = 4;
 const WEEK_DAY_GRID = "grid min-w-0 grid-cols-7";
 const DAY_CELL_BORDER = "min-w-0 border-r border-gray-200 [&:nth-child(7)]:border-r-0";
 
-function spanBarGridPlacement(
+/**
+ * Vícedenní pruhy musí být mimo 7 denních sloupců (absolute overlay).
+ * Jinak další grid children rozbijí zarovnání hlavičky vs. obsahu a
+ * jednodenní události vizuálně „skáčou“ po sloupcích při posunu týdne.
+ */
+function spanBarOverlayPlacement(
   startIdx: number,
   endIdx: number,
   top: number
 ): CSSProperties {
+  const { leftPct, widthPct } = allDaySpanOverlayPercent(startIdx, endIdx);
   return {
-    gridColumn: `${startIdx + 1} / ${endIdx + 2}`,
-    gridRow: 1,
-    marginTop: top,
+    position: "absolute",
+    left: `${leftPct}%`,
+    width: `${widthPct}%`,
+    top,
     height: SPAN_ROW_HEIGHT - 4,
-    alignSelf: "start",
     zIndex: 10,
     minWidth: 0,
     overflow: "hidden",
+    boxSizing: "border-box",
+    paddingLeft: 2,
+    paddingRight: 2,
   };
 }
 
@@ -485,7 +495,7 @@ export function WeekCalendarGrid({
             Celý den
           </div>
           <div className={WEEK_DAY_GRID}>
-            {days.map((dayYmd) => {
+            {days.map((dayYmd, dayIdx) => {
               const dayHolidays = holidaysForDay(dayYmd);
               const isHoliday = dayHolidays.length > 0;
               const isTod = dayYmd === todayYmd;
@@ -500,7 +510,10 @@ export function WeekCalendarGrid({
                         ? "text-slate-700"
                         : "text-gray-700"
                   }`}
-                  style={cellAllDayShadeStyle(accent, isTod, isHoliday)}
+                  style={{
+                    gridColumn: dayIdx + 1,
+                    ...cellAllDayShadeStyle(accent, isTod, isHoliday),
+                  }}
                   title={dayHolidays.map((h) => h.name).join(", ")}
                 >
                   {formatWeekColumnHeaderLabel(dayYmd)}
@@ -513,16 +526,17 @@ export function WeekCalendarGrid({
           </div>
         </div>
 
-        {/* Řádek 2: Obsah Celý den */}
+        {/* Řádek 2: Obsah Celý den — denní sloupce oddělené od vícedenních pruhů */}
         <div className="grid grid-cols-[60px_minmax(0,1fr)] border-b border-gray-200">
           <div className="border-r border-gray-200 bg-gray-50" />
           <div
-            className={`relative ${WEEK_DAY_GRID}`}
+            className="relative min-w-0"
             style={{
               minHeight: Math.max(44, spanAreaHeight + 36),
             }}
           >
-            {days.map((dayYmd) => {
+            <div className={WEEK_DAY_GRID} style={{ minHeight: "100%" }}>
+            {days.map((dayYmd, dayIdx) => {
               const isTod = dayYmd === todayYmd;
               const accent = allDayColumnAccent.get(dayYmd);
               return (
@@ -533,6 +547,7 @@ export function WeekCalendarGrid({
                 onDragOver={handleDragOver}
                 className={`flex min-h-11 cursor-pointer flex-col gap-1 px-1 py-1 align-top transition-colors hover:bg-[var(--accent)]/45 ${DAY_CELL_BORDER}`}
                 style={{
+                  gridColumn: dayIdx + 1,
                   ...cellAllDayShadeStyle(accent, isTod, holidaysForDay(dayYmd).length > 0),
                   paddingTop: spanAreaHeight > 0 ? spanAreaHeight : undefined,
                 }}
@@ -681,6 +696,14 @@ export function WeekCalendarGrid({
               </div>
             );
             })}
+            </div>
+            {spanAreaHeight > 0 && (
+              <div
+                className="pointer-events-none absolute inset-x-0 top-0 z-10"
+                style={{ height: spanAreaHeight }}
+                aria-hidden={false}
+              >
+                <div className="relative h-full w-full">
             {spanningAllDayBars.map((item) => {
               const {
                 id,
@@ -736,7 +759,8 @@ export function WeekCalendarGrid({
                   </>
                 );
                 const barStyle: CSSProperties = {
-                  ...spanBarGridPlacement(startIdx, endIdx, top),
+                  ...spanBarOverlayPlacement(startIdx, endIdx, top),
+                  pointerEvents: "auto",
                   color: lineColor,
                   backgroundColor: `${lineColor}1A`,
                   borderTop: `2px solid ${lineColor}`,
@@ -789,7 +813,10 @@ export function WeekCalendarGrid({
                 <div
                   key={`line-${id}`}
                   className="relative overflow-hidden rounded-sm"
-                  style={spanBarGridPlacement(startIdx, endIdx, top)}
+                  style={{
+                    ...spanBarOverlayPlacement(startIdx, endIdx, top),
+                    pointerEvents: "auto",
+                  }}
                 >
                   <CalendarGlobalEventBlock
                     lines={lines}
@@ -808,6 +835,9 @@ export function WeekCalendarGrid({
                 </div>
               );
             })}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
