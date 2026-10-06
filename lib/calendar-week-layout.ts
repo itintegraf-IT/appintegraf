@@ -114,6 +114,20 @@ export function computeAllDayWeekSpan(
   };
 }
 
+/**
+ * Procentuální left/width vícedenního pruhu v 7sloupcové mřížce.
+ * Používá se v absolute overlay (ne jako další grid child).
+ */
+export function allDaySpanOverlayPercent(
+  startIdx: number,
+  endIdx: number,
+  colCount = 7
+): { leftPct: number; widthPct: number } {
+  const leftPct = (startIdx / colCount) * 100;
+  const widthPct = ((endIdx - startIdx + 1) / colCount) * 100;
+  return { leftPct, widthPct };
+}
+
 /** Je celodenní událost vícedenní v rámci zobrazených dnů? */
 export function isMultiDayAllDay(displayDates: string[]): boolean {
   return displayDates.length > 1;

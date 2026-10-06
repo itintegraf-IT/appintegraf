@@ -4,8 +4,17 @@ import {
   isMultiDayAllDay,
   layoutAllDaySpanRows,
   layoutWeekDayColumns,
+  allDaySpanOverlayPercent,
   type WeekDayLayoutItem,
 } from "./calendar-week-layout";
+import {
+  allDayEventDisplayDates,
+  isAllDayEvent,
+} from "@/app/(dashboard)/calendar/lib/event-types";
+import {
+  allDayYmdRangeToIsoStrings,
+  buildWeekDayYmds,
+} from "./datetime-cz";
 
 function item(
   id: string,
@@ -83,5 +92,39 @@ describe("calendar-week-layout", () => {
     expect(layout.get("ev-1-deputy")?.row).toBe(1);
     expect(layout.get("ev-2-owner")?.row).toBe(2);
     expect(layout.get("ev-2-owner")?.rowCount).toBe(3);
+  });
+
+  it("jednodenní celodenní 15.10 se v posunutých týdnech mapuje jen na 15.10", () => {
+    const { start, end } = allDayYmdRangeToIsoStrings("2026-10-15", "2026-10-15");
+    const s = new Date(start);
+    const e = new Date(end);
+    expect(isAllDayEvent(s, e)).toBe(true);
+    const dates = allDayEventDisplayDates(s, e);
+    expect(dates).toEqual(["2026-10-15"]);
+    expect(isMultiDayAllDay(dates)).toBe(false);
+
+    for (const from of ["2026-10-09", "2026-10-10", "2026-10-14"]) {
+      const week = buildWeekDayYmds(from);
+      expect(week.filter((d) => dates.includes(d))).toEqual(["2026-10-15"]);
+      for (const wrong of ["2026-10-11", "2026-10-12", "2026-10-16"]) {
+        expect(dates.includes(wrong)).toBe(false);
+      }
+      expect(computeAllDayWeekSpan(week, dates)).toEqual({
+        startIdx: week.indexOf("2026-10-15"),
+        endIdx: week.indexOf("2026-10-15"),
+      });
+    }
+  });
+
+  it("allDaySpanOverlayPercent – čtvrtek v týdnu od středy = 2. sloupec", () => {
+    // from=2026-10-14 → index 15.10 = 1 → left 1/7, width 1/7
+    expect(allDaySpanOverlayPercent(1, 1)).toEqual({
+      leftPct: (1 / 7) * 100,
+      widthPct: (1 / 7) * 100,
+    });
+    expect(allDaySpanOverlayPercent(0, 2)).toEqual({
+      leftPct: 0,
+      widthPct: (3 / 7) * 100,
+    });
   });
 });
