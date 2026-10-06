@@ -17,6 +17,8 @@ import { createSoftproofLink, revokeOpenSoftproofLinks } from "@/lib/makety-soft
 import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
 import { getSoftproofTemplate, normalizeSoftproofLocale } from "@/lib/makety-softproof-templates";
 import { loadSoftproofReminderSettings } from "@/lib/makety-softproof-reminder-settings";
+import { getMaketyProhlizecUserIdsForCustomer } from "@/lib/makety-user-customers";
+import { notifyMaketaUsers } from "@/lib/makety-notify";
 import { assertGrafikaTransition } from "@/lib/makety-grafika-status";
 import { recordMaketyFileEvent } from "@/lib/makety-file-events";
 import { parseMaketyFileKind } from "@/lib/makety-file-kind";
@@ -280,8 +282,6 @@ export async function POST(
         });
       });
       status = "sent_for_approval";
-
-      /* Interní hromadný e-mail sent_for_client je vypnutý — klient dostane softproof. */
     } catch (e) {
       console.error("softproof status transition", e);
       return NextResponse.json(
@@ -314,6 +314,25 @@ export async function POST(
             resend: true,
       },
     });
+  }
+
+  if (reminderSettings.notify_prohlizec && maketa.customer_id != null) {
+    try {
+      const prohlizecIds = await getMaketyProhlizecUserIdsForCustomer(maketa.customer_id);
+      if (prohlizecIds.length > 0) {
+        await notifyMaketaUsers({
+          maketaId,
+          userIds: prohlizecIds,
+          bodyPreview: `Softproof (${fileRow.original_filename}) odeslán na ${toEmail}`,
+          orderNumber: maketa.job_number || maketa.order_number,
+          kind: "sent_for_client",
+          workType: "grafika",
+          excludeUserId: userId,
+        });
+      }
+    } catch (e) {
+      console.error("softproof notify prohlížeče", e);
+    }
   }
 
   return NextResponse.json({

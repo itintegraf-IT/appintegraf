@@ -110,8 +110,8 @@ function notifyCopy(
       };
     case "sent_for_client":
       return {
-        title: "Grafika odeslána ke schválení",
-        intro: `Grafika${zak} byla odeslána ke schválení (klient / další krok).`,
+        title: "Data odeslána ke schválení",
+        intro: `Softproof grafiky${zak} byl odeslán ke schválení. Náhled najdete u zakázky v aplikaci.`,
       };
     case "client_approved":
       return {

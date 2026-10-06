@@ -17,15 +17,24 @@ describe("parseSoftproofReminderSettings", () => {
   it("parsuje zapnuté připomínky", () => {
     expect(
       parseSoftproofReminderSettings(
-        JSON.stringify({ enabled: true, default_on_send: false })
+        JSON.stringify({
+          enabled: true,
+          default_on_send: false,
+          notify_prohlizec: true,
+        })
       )
-    ).toEqual({ enabled: true, default_on_send: false });
+    ).toEqual({
+      enabled: true,
+      default_on_send: false,
+      notify_prohlizec: true,
+    });
   });
 
-  it("default_on_send je true pokud chybí", () => {
+  it("default_on_send je true pokud chybí; notify_prohlizec false", () => {
     expect(parseSoftproofReminderSettings(JSON.stringify({ enabled: true }))).toEqual({
       enabled: true,
       default_on_send: true,
+      notify_prohlizec: false,
     });
   });
 });

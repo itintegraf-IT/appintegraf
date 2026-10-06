@@ -5,12 +5,14 @@ import { useEffect, useState } from "react";
 type Settings = {
   enabled: boolean;
   default_on_send: boolean;
+  notify_prohlizec: boolean;
 };
 
 export function SoftproofReminderSettingsForm() {
   const [settings, setSettings] = useState<Settings>({
     enabled: false,
     default_on_send: true,
+    notify_prohlizec: false,
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,6 +29,7 @@ export function SoftproofReminderSettingsForm() {
         setSettings({
           enabled: data.settings?.enabled === true,
           default_on_send: data.settings?.default_on_send !== false,
+          notify_prohlizec: data.settings?.notify_prohlizec === true,
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : "Chyba");
@@ -51,8 +54,9 @@ export function SoftproofReminderSettingsForm() {
       setSettings({
         enabled: data.settings?.enabled === true,
         default_on_send: data.settings?.default_on_send !== false,
+        notify_prohlizec: data.settings?.notify_prohlizec === true,
       });
-      setNotice("Nastavení připomínek uloženo.");
+      setNotice("Nastavení softproofu uloženo.");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Chyba");
     } finally {
@@ -118,6 +122,32 @@ export function SoftproofReminderSettingsForm() {
         </label>
       </div>
 
+      <h3 className="mt-8 text-base font-semibold text-gray-900">Prohlížeči klienta</h3>
+      <p className="mt-1 text-sm text-gray-600">
+        Volitelná notifikace uživatelům s rolí Prohlížeč klienta přiřazeným ke stejnému IML
+        klientovi jako grafika.
+      </p>
+
+      <div className="mt-4 space-y-3">
+        <label className="flex items-start gap-2 text-sm text-gray-800">
+          <input
+            type="checkbox"
+            className="mt-0.5"
+            checked={settings.notify_prohlizec}
+            onChange={(e) =>
+              setSettings((s) => ({ ...s, notify_prohlizec: e.target.checked }))
+            }
+            disabled={saving}
+          />
+          <span>
+            Notifikovat prohlížeče klienta při odeslání softproofu
+            <span className="mt-0.5 block text-xs font-normal text-gray-500">
+              In-app a e-mail (dle preference modulu Makety) s odkazem na zakázku v aplikaci.
+            </span>
+          </span>
+        </label>
+      </div>
+
       <div className="mt-4">
         <button
           type="button"
@@ -125,7 +155,7 @@ export function SoftproofReminderSettingsForm() {
           disabled={saving}
           className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50"
         >
-          {saving ? "Ukládám…" : "Uložit připomínky"}
+          {saving ? "Ukládám…" : "Uložit nastavení"}
         </button>
       </div>
     </div>
