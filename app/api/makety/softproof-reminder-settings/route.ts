@@ -34,11 +34,13 @@ export async function PUT(req: NextRequest) {
     const body = (await req.json()) as {
       enabled?: boolean;
       default_on_send?: boolean;
+      notify_prohlizec?: boolean;
     };
     const saved = await saveSoftproofReminderSettings(
       {
         enabled: body.enabled === true,
         default_on_send: body.default_on_send !== false,
+        notify_prohlizec: body.notify_prohlizec === true,
       },
       userId
     );

@@ -8,11 +8,14 @@ export type SoftproofReminderSettings = {
   enabled: boolean;
   /** Výchozí stav checkboxu při odeslání softproofu. */
   default_on_send: boolean;
+  /** Notifikovat prohlížeče klienta při odeslání softproofu. */
+  notify_prohlizec: boolean;
 };
 
 export const DEFAULT_SOFTPROOF_REMINDER_SETTINGS: SoftproofReminderSettings = {
   enabled: false,
   default_on_send: true,
+  notify_prohlizec: false,
 };
 
 export function parseSoftproofReminderSettings(
@@ -24,6 +27,7 @@ export function parseSoftproofReminderSettings(
     return {
       enabled: data.enabled === true,
       default_on_send: data.default_on_send !== false,
+      notify_prohlizec: data.notify_prohlizec === true,
     };
   } catch {
     return { ...DEFAULT_SOFTPROOF_REMINDER_SETTINGS };
@@ -45,6 +49,7 @@ export async function saveSoftproofReminderSettings(
   const next: SoftproofReminderSettings = {
     enabled: settings.enabled === true,
     default_on_send: settings.default_on_send !== false,
+    notify_prohlizec: settings.notify_prohlizec === true,
   };
   await prisma.system_settings.upsert({
     where: { setting_key: MAKETY_SOFTPROOF_REMINDER_KEY },
@@ -52,7 +57,7 @@ export async function saveSoftproofReminderSettings(
       setting_key: MAKETY_SOFTPROOF_REMINDER_KEY,
       setting_value: JSON.stringify(next),
       module: MAKETY_SOFTPROOF_REMINDER_MODULE,
-      description: "Automatické připomínky softproof odkazu klientovi",
+      description: "Automatické připomínky softproofu a notifikace prohlížečům",
       updated_by: updatedBy ?? null,
     },
     update: {

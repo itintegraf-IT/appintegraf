@@ -1,6 +1,7 @@
 /** Sync přiřazení IML klientů pro roli Prohlížeč klienta. */
 
 import { prisma } from "@/lib/db";
+import { hasExplicitMaketyProhlizecKlientaRole } from "@/lib/auth-utils";
 import { hasMaketyProhlizecKlientaFlag } from "@/lib/makety-module-access-flags";
 
 export async function syncMaketyUserCustomers(
@@ -45,4 +46,27 @@ export async function getMaketyUserCustomerIds(userId: number): Promise<number[]
     select: { customer_id: true },
   });
   return rows.map((r) => r.customer_id);
+}
+
+/** Aktivní uživatelé s rolí prohlížeče klienta přiřazení k danému IML klientovi. */
+export async function getMaketyProhlizecUserIdsForCustomer(
+  customerId: number
+): Promise<number[]> {
+  if (!Number.isFinite(customerId) || customerId <= 0) return [];
+
+  const rows = await prisma.makety_user_customers.findMany({
+    where: {
+      customer_id: customerId,
+      users: { is_active: true },
+    },
+    select: { user_id: true },
+  });
+
+  const result: number[] = [];
+  for (const row of rows) {
+    if (await hasExplicitMaketyProhlizecKlientaRole(row.user_id)) {
+      result.push(row.user_id);
+    }
+  }
+  return result;
 }
