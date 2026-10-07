@@ -12,6 +12,7 @@ describe("parseMaketyImlFieldsFromInput", () => {
       product_id: null,
       die_cut_id: null,
       label_code: null,
+      product_name: null,
       job_number: null,
     });
   });
@@ -22,6 +23,7 @@ describe("parseMaketyImlFieldsFromInput", () => {
       product_id: "34",
       die_cut_id: "5",
       label_code: " IG-001 ",
+      product_name: " Etiketa A ",
       job_number: "Z2026-99",
     });
     expect(result).toEqual({
@@ -29,6 +31,7 @@ describe("parseMaketyImlFieldsFromInput", () => {
       product_id: 34,
       die_cut_id: 5,
       label_code: "IG-001",
+      product_name: "Etiketa A",
       job_number: "Z2026-99",
     });
   });

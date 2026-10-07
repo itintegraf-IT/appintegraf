@@ -180,6 +180,8 @@ export async function POST(
         where: { id: maketaId },
         data: {
           product_id: productId,
+          label_code: draft.ig_code,
+          product_name: draft.client_name,
           product_draft: Prisma.DbNull,
           iml_applied_at: new Date(),
         },
@@ -226,6 +228,8 @@ export async function POST(
         where: { id: maketaId },
         data: {
           product_id: draft.product_id,
+          label_code: draft.ig_code,
+          product_name: draft.client_name,
           product_draft: Prisma.DbNull,
           iml_applied_at: new Date(),
         },
@@ -266,6 +270,7 @@ export async function POST(
         data: {
           product_id: created.id,
           label_code: draft.ig_code,
+          product_name: draft.client_name,
           product_draft: Prisma.DbNull,
           iml_applied_at: new Date(),
         },

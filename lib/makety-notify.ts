@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { sendMaketaEmail } from "@/lib/email";
 import { collectMaketaNotifyUserIds } from "@/lib/makety-recipients";
+import { getMaketaProductNotifyDetails } from "@/lib/makety-notify-product";
 import {
   maketyWorkTypeWording,
   normalizeMaketyWorkType,
@@ -170,6 +171,12 @@ async function sendMaketaEmailsToUsers(
     orderNumber: string | null;
     maketaId: number;
     workType: MaketyWorkType;
+    productDetails?: {
+      labelCode?: string | null;
+      productName?: string | null;
+      jobNumber?: string | null;
+      productId?: number | null;
+    };
   }
 ): Promise<void> {
   for (const u of users) {
@@ -183,6 +190,7 @@ async function sendMaketaEmailsToUsers(
       orderNumber: params.orderNumber,
       maketaId: params.maketaId,
       workType: params.workType,
+      productDetails: params.productDetails,
     });
   }
 }
@@ -228,6 +236,13 @@ export async function notifyMaketaUsers(params: {
   const linkPath = `/makety/${params.maketaId}`;
   const { title, intro } = notifyCopy(workType, params.kind, params.orderNumber);
   const type = `makety_${params.kind}`;
+  const product = await getMaketaProductNotifyDetails(params.maketaId);
+  const productDetails = {
+    labelCode: product.labelCode,
+    productName: product.productName,
+    jobNumber: product.jobNumber,
+    productId: product.productId,
+  };
 
   for (const uid of allIds) {
     await prisma.notifications.create({
@@ -255,6 +270,7 @@ export async function notifyMaketaUsers(params: {
       orderNumber: params.orderNumber,
       maketaId: params.maketaId,
       workType,
+      productDetails,
     });
   }
 }
@@ -339,12 +355,19 @@ export async function notifySpravaVzorkuUpravaDat(params: {
     .filter((id) => id !== params.excludeUserId);
   if (userIds.length === 0) return;
 
+  const resolved = await getMaketaProductNotifyDetails(params.maketaId);
+  const labelCode = resolved.labelCode ?? params.labelCode ?? null;
+  const productName = resolved.productName ?? params.productName ?? null;
+  const jobNumber = resolved.jobNumber ?? params.jobNumber ?? null;
+  const productId = resolved.productId;
+
   const template = await loadSpravaVzorkuNotifyTemplate();
   const linkPath = `/makety/${params.maketaId}`;
   const productDetails = {
-    labelCode: params.labelCode ?? null,
-    productName: params.productName ?? null,
-    jobNumber: params.jobNumber ?? null,
+    labelCode,
+    productName,
+    jobNumber,
+    productId,
   };
 
   const emailIds = await filterUserIdsAllowingEmail(userIds, "makety");
@@ -365,9 +388,9 @@ export async function notifySpravaVzorkuUpravaDat(params: {
     const rendered = renderSpravaVzorkuNotifyTemplate(template, {
       toName,
       orderNumber: params.orderNumber,
-      labelCode: params.labelCode,
-      productName: params.productName,
-      jobNumber: params.jobNumber,
+      labelCode,
+      productName,
+      jobNumber,
       maketaId: params.maketaId,
     });
 
@@ -427,6 +450,8 @@ export async function notifyMaketaCreator(params: {
   });
   if (!creator?.email) return;
 
+  const product = await getMaketaProductNotifyDetails(params.maketaId);
+
   await sendMaketaEmail({
     toEmail: creator.email,
     toName: `${creator.first_name} ${creator.last_name}`.trim() || "Uživateli",
@@ -436,6 +461,12 @@ export async function notifyMaketaCreator(params: {
     orderNumber: params.orderNumber ?? null,
     maketaId: params.maketaId,
     workType,
+    productDetails: {
+      labelCode: product.labelCode,
+      productName: product.productName,
+      jobNumber: product.jobNumber,
+      productId: product.productId,
+    },
   });
 }
 
@@ -518,6 +549,8 @@ export async function notifyMaketaDone(params: {
   });
   if (!creator?.email) return;
 
+  const product = await getMaketaProductNotifyDetails(params.maketaId);
+
   await sendMaketaEmail({
     toEmail: creator.email,
     toName: `${creator.first_name} ${creator.last_name}`.trim() || "Uživateli",
@@ -527,5 +560,11 @@ export async function notifyMaketaDone(params: {
     orderNumber: params.orderNumber,
     maketaId: params.maketaId,
     workType,
+    productDetails: {
+      labelCode: product.labelCode,
+      productName: product.productName,
+      jobNumber: product.jobNumber,
+      productId: product.productId,
+    },
   });
 }

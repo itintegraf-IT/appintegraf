@@ -4,6 +4,7 @@ import { getEmailSettings, formatSmtpFrom } from "./email-settings";
 import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
 import {
   buildSoftproofEmailHtml,
+  escapeHtml,
   getSoftproofTemplate,
   type SoftproofTemplate,
 } from "@/lib/makety-softproof-templates";
@@ -649,11 +650,12 @@ export type SendMaketaEmailParams = {
   orderNumber: string | null;
   maketaId: number;
   workType?: "maketa" | "grafika";
-  /** Volitelný blok údajů o produktu (HTML řádky už escapované nebo plain text). */
+  /** Volitelný blok údajů o produktu (plain text – escapuje se v HTML). */
   productDetails?: {
     labelCode?: string | null;
     productName?: string | null;
     jobNumber?: string | null;
+    productId?: number | null;
   };
   /** Přepsání textu CTA tlačítka. */
   ctaLabel?: string;
@@ -679,41 +681,62 @@ export async function sendMaketaEmail(
     };
   }
 
-  const link = `${getBaseUrl()}/makety/${params.maketaId}`;
+  const baseUrl = getBaseUrl();
+  const link = `${baseUrl}/makety/${params.maketaId}`;
+  const pd = params.productDetails;
+  const productId =
+    typeof pd?.productId === "number" && pd.productId > 0 ? pd.productId : null;
+  const productLink = productId != null ? `${baseUrl}/iml/products/${productId}` : null;
   const openCta =
     params.ctaLabel?.trim() ||
     (params.workType === "grafika" ? "Otevřít grafiku" : "Otevřít maketu");
-  const zak = params.orderNumber
-    ? `<p><strong>Zakázka:</strong> ${params.orderNumber}</p>`
+  const labelCode = pd?.labelCode?.trim() || "";
+  const productName = pd?.productName?.trim() || "";
+  const jobNumber = pd?.jobNumber?.trim() || "";
+  const orderNumber = params.orderNumber?.trim() || "";
+  const zak = orderNumber
+    ? `<p><strong>Zakázka:</strong> ${escapeHtml(orderNumber)}</p>`
     : "";
-  const pd = params.productDetails;
   const productBlock = [
-    pd?.labelCode?.trim()
-      ? `<p><strong>Kód etikety:</strong> ${pd.labelCode.trim()}</p>`
+    labelCode
+      ? `<p><strong>Kód etikety:</strong> ${escapeHtml(labelCode)}</p>`
       : "",
-    pd?.productName?.trim()
-      ? `<p><strong>Produkt:</strong> ${pd.productName.trim()}</p>`
+    productName
+      ? `<p><strong>Produkt:</strong> ${escapeHtml(productName)}</p>`
       : "",
-    pd?.jobNumber?.trim() ? `<p><strong>Job:</strong> ${pd.jobNumber.trim()}</p>` : "",
+    jobNumber ? `<p><strong>Job:</strong> ${escapeHtml(jobNumber)}</p>` : "",
   ]
     .filter(Boolean)
     .join("\n  ");
   const bodySection =
     params.includeBodyPreview === false
       ? ""
-      : `<p><strong>Zadání:</strong> ${params.bodyPreview.slice(0, 500)}</p>`;
+      : `<p><strong>Zadání:</strong> ${escapeHtml(params.bodyPreview.slice(0, 500))}</p>`;
+  const ctaBtn =
+    'display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;';
+  const ctaSecondaryBtn =
+    'display: inline-block; padding: 10px 20px; background: #6d28d9; color: white; text-decoration: none; border-radius: 6px; margin-left: 8px;';
+  const productCtaHtml = productLink
+    ? `<a href="${productLink}" style="${ctaSecondaryBtn}">Otevřít produkt</a>`
+    : "";
+  const linkHints = [
+    `Pokud tlačítko nefunguje, zkopírujte odkaz: ${link}`,
+    productLink ? `Produkt: ${productLink}` : "",
+  ]
+    .filter(Boolean)
+    .join("<br>");
   const html = `
 <!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
-  <p>Dobrý den, ${params.toName},</p>
+  <p>Dobrý den, ${escapeHtml(params.toName)},</p>
   <p>${params.intro}</p>
   ${zak}
   ${productBlock}
   ${bodySection}
-  <p><a href="${link}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">${openCta}</a></p>
-  <p style="color: #666; font-size: 12px;">Pokud tlačítko nefunguje, zkopírujte odkaz: ${link}</p>
+  <p><a href="${link}" style="${ctaBtn}">${escapeHtml(openCta)}</a>${productCtaHtml}</p>
+  <p style="color: #666; font-size: 12px;">${linkHints}</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
   <p style="color: #999; font-size: 11px;">Tento e-mail byl odeslán automaticky z aplikace INTEGRAF.</p>
 </body>
@@ -722,12 +745,13 @@ export async function sendMaketaEmail(
 
   const textParts = [
     params.intro,
-    params.orderNumber ? `Zakázka: ${params.orderNumber}` : "",
-    pd?.labelCode?.trim() ? `Kód etikety: ${pd.labelCode.trim()}` : "",
-    pd?.productName?.trim() ? `Produkt: ${pd.productName.trim()}` : "",
-    pd?.jobNumber?.trim() ? `Job: ${pd.jobNumber.trim()}` : "",
+    orderNumber ? `Zakázka: ${orderNumber}` : "",
+    labelCode ? `Kód etikety: ${labelCode}` : "",
+    productName ? `Produkt: ${productName}` : "",
+    jobNumber ? `Job: ${jobNumber}` : "",
     params.includeBodyPreview === false ? "" : params.bodyPreview.slice(0, 500),
     `Odkaz: ${link}`,
+    productLink ? `Produkt: ${productLink}` : "",
   ].filter(Boolean);
 
   try {
