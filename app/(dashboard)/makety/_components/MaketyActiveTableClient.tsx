@@ -31,7 +31,7 @@ type Props = {
 };
 
 type SortDir = "asc" | "desc";
-type SortableColumn = "status" | "priority";
+type SortableColumn = "status" | "priority" | "due_at";
 
 const STATUS_SORT_ORDER = [
   "awaiting_quote",
@@ -73,13 +73,13 @@ function toggleValue<T>(list: T[], value: T): T[] {
 function SortFilterHeader({
   sortDir,
   onCycleSort,
-  filterActive,
+  filterActive = false,
   children,
 }: {
   sortDir?: SortDir | null;
   onCycleSort?: () => void;
-  filterActive: boolean;
-  children: ReactNode;
+  filterActive?: boolean;
+  children?: ReactNode;
 }) {
   const SortIcon = sortDir === "asc" ? ArrowUp : sortDir === "desc" ? ArrowDown : ArrowUpDown;
   const sortTitle =
@@ -88,6 +88,7 @@ function SortFilterHeader({
       : sortDir === "desc"
         ? "Řazení: sestupně (kliknutím vypnout)"
         : "Řadit vzestupně";
+  const showFilter = children != null;
 
   return (
     <div className="flex items-center gap-0.5" onPointerDown={(e) => e.stopPropagation()}>
@@ -104,19 +105,21 @@ function SortFilterHeader({
           <SortIcon className="h-3.5 w-3.5" />
         </button>
       ) : null}
-      <details className="relative">
-        <summary
-          className={`flex cursor-pointer list-none rounded p-0.5 hover:bg-gray-200 [&::-webkit-details-marker]:hidden ${
-            filterActive ? "text-violet-700" : "text-gray-400 hover:text-gray-600"
-          }`}
-          title={filterActive ? "Filtr je zapnutý" : "Filtrovat"}
-        >
-          <Filter className="h-3.5 w-3.5" />
-        </summary>
-        <div className="absolute right-0 z-30 mt-1 min-w-[12rem] rounded-lg border border-gray-200 bg-white p-2 text-left text-xs font-normal text-gray-800 shadow-lg">
-          {children}
-        </div>
-      </details>
+      {showFilter ? (
+        <details className="relative">
+          <summary
+            className={`flex cursor-pointer list-none rounded p-0.5 hover:bg-gray-200 [&::-webkit-details-marker]:hidden ${
+              filterActive ? "text-violet-700" : "text-gray-400 hover:text-gray-600"
+            }`}
+            title={filterActive ? "Filtr je zapnutý" : "Filtrovat"}
+          >
+            <Filter className="h-3.5 w-3.5" />
+          </summary>
+          <div className="absolute right-0 z-30 mt-1 min-w-[12rem] rounded-lg border border-gray-200 bg-white p-2 text-left text-xs font-normal text-gray-800 shadow-lg">
+            {children}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -290,10 +293,14 @@ export function MaketyActiveTableClient({
     if (!sortBy) return next;
     const dir = sortDir === "asc" ? 1 : -1;
     return [...next].sort((a, b) => {
-      const key =
-        sortBy === "priority"
-          ? prioritySortKey(a.priority) - prioritySortKey(b.priority)
-          : statusSortKey(a.status) - statusSortKey(b.status);
+      let key = 0;
+      if (sortBy === "priority") {
+        key = prioritySortKey(a.priority) - prioritySortKey(b.priority);
+      } else if (sortBy === "due_at") {
+        key = new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
+      } else {
+        key = statusSortKey(a.status) - statusSortKey(b.status);
+      }
       if (key !== 0) return key * dir;
       return a.id - b.id;
     });
@@ -302,6 +309,12 @@ export function MaketyActiveTableClient({
   const showCustomerFilter = visibleColumnIds.includes("customer");
 
   const columnExtras = {
+    due_at: (
+      <SortFilterHeader
+        sortDir={sortBy === "due_at" ? sortDir : null}
+        onCycleSort={() => cycleSort("due_at")}
+      />
+    ),
     status: (
       <SortFilterHeader
         sortDir={sortBy === "status" ? sortDir : null}
