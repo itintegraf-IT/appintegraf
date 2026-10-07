@@ -90,6 +90,8 @@ export async function resolveMaketyImlFields(
         client_code: true,
         ean_code: true,
         die_cut_id: true,
+        client_name: true,
+        ig_short_name: true,
       },
     });
     if (!product) return { error: "Vybraná etiketa neexistuje" };
@@ -104,6 +106,12 @@ export async function resolveMaketyImlFields(
         product.ig_code?.trim() ||
         product.client_code?.trim() ||
         product.ean_code?.trim() ||
+        null;
+    }
+    if (!product_name) {
+      product_name =
+        product.client_name?.trim() ||
+        product.ig_short_name?.trim() ||
         null;
     }
     if (die_cut_id == null && product.die_cut_id != null) {

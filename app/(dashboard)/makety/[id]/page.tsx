@@ -8,6 +8,7 @@ import {
   maketyWorkTypeLabel,
   type MaketyWorkType,
 } from "@/lib/makety-work-type";
+import { formatProductLabel } from "@/lib/iml-product-search";
 import {
   userCanViewMaketa,
   userCanEditMaketa,
@@ -320,15 +321,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
                           href={`/iml/products/${maketa.iml_products.id}`}
                           className="font-medium text-violet-600 hover:underline"
                         >
-                          {maketa.iml_products.ig_code ||
-                            maketa.iml_products.client_code ||
-                            `#${maketa.iml_products.id}`}
-                          {(maketa.iml_products.ig_short_name ||
-                            maketa.iml_products.client_name) &&
-                            ` — ${
-                              maketa.iml_products.ig_short_name ||
-                              maketa.iml_products.client_name
-                            }`}
+                          {formatProductLabel(maketa.iml_products)}
                         </Link>
                       ) : (
                         "—"
