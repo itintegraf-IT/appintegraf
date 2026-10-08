@@ -8,6 +8,7 @@ import { redirect } from "next/navigation";
 import { BackLink } from "@/components/navigation/BackLink";
 import { PreserveReturnToLink } from "@/components/navigation/PreserveReturnToLink";
 import { ImlOrderDetailTemplateExport } from "./ImlOrderDetailTemplateExport";
+import { BulkAssignShape } from "./BulkAssignShape";
 
 export default async function ImlOrderDetailPage({
   params,
@@ -243,6 +244,21 @@ export default async function ImlOrderDetailPage({
           </table>
         </div>
       </div>
+
+      {canWrite && itemsTyped.length > 0 && (
+        <BulkAssignShape
+          orderId={order.id}
+          items={itemsTyped.map((it) => ({
+            id: it.id,
+            productId: it.iml_products.id,
+            label:
+              it.iml_products.client_name ??
+              it.iml_products.ig_short_name ??
+              it.iml_products.ig_code ??
+              `#${it.iml_products.id}`,
+          }))}
+        />
+      )}
     </>
   );
 }

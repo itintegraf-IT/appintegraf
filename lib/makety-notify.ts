@@ -3,6 +3,10 @@ import { sendMaketaEmail } from "@/lib/email";
 import { collectMaketaNotifyUserIds } from "@/lib/makety-recipients";
 import { getMaketaProductNotifyDetails } from "@/lib/makety-notify-product";
 import {
+  allowMaketaEmailByMatrix,
+  partyRoleForMaketa,
+} from "@/lib/makety-notify-matrix";
+import {
   maketyWorkTypeWording,
   normalizeMaketyWorkType,
   type MaketyWorkType,
@@ -47,6 +51,7 @@ export async function hasMaketyCreationNotify(maketaId: number): Promise<boolean
 }
 
 type UserEmailRow = {
+  id?: number;
   email: string | null;
   first_name: string;
   last_name: string;
@@ -256,11 +261,33 @@ export async function notifyMaketaUsers(params: {
     });
   }
 
-  const emailIds = await filterUserIdsAllowingEmail(allIds, "makety");
+  let emailIds = await filterUserIdsAllowingEmail(allIds, "makety");
+  if (workType === "grafika" && emailIds.length > 0) {
+    const maketa = await prisma.makety.findUnique({
+      where: { id: params.maketaId },
+      select: {
+        assignee_user_id: true,
+        prepress_user_id: true,
+        created_by: true,
+      },
+    });
+    emailIds = emailIds.filter((uid) =>
+      allowMaketaEmailByMatrix({
+        workType,
+        kind: params.kind,
+        role: partyRoleForMaketa({
+          userId: uid,
+          assigneeUserId: maketa?.assignee_user_id,
+          prepressUserId: maketa?.prepress_user_id,
+          creatorUserId: maketa?.created_by,
+        }),
+      })
+    );
+  }
   if (emailIds.length > 0) {
     const users = await prisma.users.findMany({
       where: { id: { in: emailIds } },
-      select: { email: true, first_name: true, last_name: true },
+      select: { id: true, email: true, first_name: true, last_name: true },
     });
 
     await sendMaketaEmailsToUsers(users, {

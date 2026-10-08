@@ -95,6 +95,7 @@ export async function POST(
         customer_id: source.customer_id,
         product_id: source.product_id,
         die_cut_id: source.die_cut_id,
+        shape_id: source.shape_id,
         label_code: source.label_code,
         product_name: source.product_name,
         job_number: null,

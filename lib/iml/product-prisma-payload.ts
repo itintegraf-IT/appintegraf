@@ -7,6 +7,10 @@ export type ImlProductExistingFk = {
   customer_id?: number | null;
   foil_id?: number | null;
   die_cut_id?: number | null;
+  shape_id?: number | null;
+  selected_tool_id?: number | null;
+  selected_imposition_id?: number | null;
+  box_type_id?: number | null;
   foil_material_id?: number | null;
   color_material_id?: number | null;
   paper_material_id?: number | null;
@@ -48,6 +52,10 @@ export function toImlProductUpdateData(
     customer_id,
     foil_id,
     die_cut_id,
+    shape_id,
+    selected_tool_id,
+    selected_imposition_id,
+    box_type_id,
     foil_material_id,
     color_material_id,
     paper_material_id,
@@ -67,6 +75,22 @@ export function toImlProductUpdateData(
     ),
     ...spreadRelation("iml_foils", fkRelationUpdate(foil_id, existing?.foil_id)),
     ...spreadRelation("iml_die_cuts", fkRelationUpdate(die_cut_id, existing?.die_cut_id)),
+    ...spreadRelation(
+      "iml_shape_catalog",
+      fkRelationUpdate(shape_id, existing?.shape_id)
+    ),
+    ...spreadRelation(
+      "iml_tool_catalog",
+      fkRelationUpdate(selected_tool_id, existing?.selected_tool_id)
+    ),
+    ...spreadRelation(
+      "iml_imposition_catalog",
+      fkRelationUpdate(selected_imposition_id, existing?.selected_imposition_id)
+    ),
+    ...spreadRelation(
+      "iml_box_types",
+      fkRelationUpdate(box_type_id, existing?.box_type_id)
+    ),
     ...spreadRelation(
       "foil_material",
       fkRelationUpdate(foil_material_id, existing?.foil_material_id)
@@ -94,6 +118,10 @@ export function toImlProductCreateData(
     customer_id,
     foil_id,
     die_cut_id,
+    shape_id,
+    selected_tool_id,
+    selected_imposition_id,
+    box_type_id,
     foil_material_id,
     color_material_id,
     paper_material_id,
@@ -112,6 +140,18 @@ export function toImlProductCreateData(
       : {}),
     ...(foil_id != null ? { iml_foils: { connect: { id: foil_id } } } : {}),
     ...(die_cut_id != null ? { iml_die_cuts: { connect: { id: die_cut_id } } } : {}),
+    ...(shape_id != null
+      ? { iml_shape_catalog: { connect: { id: shape_id } } }
+      : {}),
+    ...(selected_tool_id != null
+      ? { iml_tool_catalog: { connect: { id: selected_tool_id } } }
+      : {}),
+    ...(selected_imposition_id != null
+      ? { iml_imposition_catalog: { connect: { id: selected_imposition_id } } }
+      : {}),
+    ...(box_type_id != null
+      ? { iml_box_types: { connect: { id: box_type_id } } }
+      : {}),
     ...(foil_material_id != null
       ? { foil_material: { connect: { id: foil_material_id } } }
       : {}),

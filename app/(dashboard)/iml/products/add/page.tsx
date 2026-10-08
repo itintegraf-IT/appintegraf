@@ -73,6 +73,20 @@ export default function ImlProductAddPage() {
           ...form,
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
           die_cut_id: form.die_cut_id ? parseInt(form.die_cut_id, 10) : null,
+          shape_id: form.shape_id ? parseInt(form.shape_id, 10) : null,
+          selected_tool_id: form.selected_tool_id
+            ? parseInt(form.selected_tool_id, 10)
+            : null,
+          selected_imposition_id: form.selected_imposition_id
+            ? parseInt(form.selected_imposition_id, 10)
+            : null,
+          box_type_id: form.box_type_id ? parseInt(form.box_type_id, 10) : null,
+          boxes_per_pallet: form.boxes_per_pallet
+            ? parseInt(form.boxes_per_pallet, 10)
+            : null,
+          pallet_weight: form.pallet_weight
+            ? parseFloat(form.pallet_weight.replace(",", "."))
+            : null,
           foil_material_id: form.foil_material_id ? parseInt(form.foil_material_id, 10) : null,
           color_material_id: form.color_material_id ? parseInt(form.color_material_id, 10) : null,
           paper_material_id: form.paper_material_id ? parseInt(form.paper_material_id, 10) : null,

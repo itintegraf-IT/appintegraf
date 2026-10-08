@@ -128,6 +128,20 @@ export async function buildMaketyListWhere(
     return where;
   }
   where.OR = [{ created_by: userId }, { assignee_user_id: userId }];
+
+  // Grafik: skrýt kalkulační stavy maket (Čeká na kalkulaci / schválení nabídky).
+  if (await hasExplicitMaketyGrafikaRole(userId)) {
+    const quoteHide: Prisma.maketyWhereInput = {
+      NOT: { status: { in: ["awaiting_quote", "quote_submitted"] } },
+    };
+    const existingAnd = Array.isArray(where.AND)
+      ? where.AND
+      : where.AND
+        ? [where.AND]
+        : [];
+    where.AND = [...existingAnd, quoteHide];
+  }
+
   return where;
 }
 

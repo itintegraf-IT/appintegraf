@@ -155,6 +155,9 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
     product_format: productFormat,
     format_width_mm: formatWidthMm,
     format_height_mm: formatHeightMm,
+    raw_data_width_mm: parseDecimalMm(body.raw_data_width_mm),
+    raw_data_height_mm: parseDecimalMm(body.raw_data_height_mm),
+    colors_spec: str(body.colors_spec),
     die_cut_tool_code: str(body.die_cut_tool_code),
     assembly_code: str(body.assembly_code),
     positions_on_sheet: int(body.positions_on_sheet),
@@ -163,6 +166,25 @@ export async function parseImlProductBody(body: Record<string, unknown>) {
     ...materialFields,
     labels_per_sheet: parseLabelsPerSheet(body.labels_per_sheet),
     die_cut_id: body.die_cut_id != null && body.die_cut_id !== "" ? int(body.die_cut_id) : null,
+    shape_id: body.shape_id != null && body.shape_id !== "" ? int(body.shape_id) : null,
+    selected_tool_id:
+      body.selected_tool_id != null && body.selected_tool_id !== ""
+        ? int(body.selected_tool_id)
+        : null,
+    selected_imposition_id:
+      body.selected_imposition_id != null && body.selected_imposition_id !== ""
+        ? int(body.selected_imposition_id)
+        : null,
+    box_type_id:
+      body.box_type_id != null && body.box_type_id !== "" ? int(body.box_type_id) : null,
+    boxes_per_pallet: int(body.boxes_per_pallet),
+    pallet_weight:
+      body.pallet_weight != null && body.pallet_weight !== ""
+        ? (() => {
+            const n = parseFloat(String(body.pallet_weight).replace(",", "."));
+            return Number.isFinite(n) ? n : null;
+          })()
+        : null,
     print_note: str(body.print_note),
     has_print_sample: !!body.has_print_sample,
     has_print_proof: !!body.has_print_proof,
@@ -194,7 +216,42 @@ export async function parseImlProductBodyForSave(body: Record<string, unknown>) 
   const merged = { ...data };
   if (merged.foil_material_id != null) merged.foil_id = null;
 
-  if (merged.die_cut_id != null) {
+  if (merged.shape_id != null) {
+    const {
+      buildProductFieldsFromShapeSelection,
+      resolveDefaultToolAndImposition,
+      resolveFirstImpositionForTool,
+    } = await import("@/lib/iml/product-shape-sync");
+
+    // Doplnit výchozí PRIMARY nástroj / první montáž, pokud chybí (jako bulk-assign).
+    if (merged.selected_tool_id == null) {
+      const defaults = await resolveDefaultToolAndImposition(merged.shape_id);
+      if (defaults.toolId != null) merged.selected_tool_id = defaults.toolId;
+      if (merged.selected_imposition_id == null && defaults.impositionId != null) {
+        merged.selected_imposition_id = defaults.impositionId;
+      }
+    } else if (merged.selected_imposition_id == null) {
+      const impositionId = await resolveFirstImpositionForTool(merged.selected_tool_id);
+      if (impositionId != null) merged.selected_imposition_id = impositionId;
+    }
+
+    const synced = await buildProductFieldsFromShapeSelection({
+      shapeId: merged.shape_id,
+      toolId: merged.selected_tool_id,
+      impositionId: merged.selected_imposition_id,
+    });
+    Object.assign(merged, {
+      label_shape_code: synced.label_shape_code ?? merged.label_shape_code,
+      die_cut_tool_code: synced.die_cut_tool_code ?? merged.die_cut_tool_code,
+      assembly_code: synced.assembly_code ?? merged.assembly_code,
+      positions_on_sheet: synced.positions_on_sheet ?? merged.positions_on_sheet,
+      labels_per_sheet: synced.labels_per_sheet ?? merged.labels_per_sheet,
+      format_width_mm: synced.format_width_mm ?? merged.format_width_mm,
+      format_height_mm: synced.format_height_mm ?? merged.format_height_mm,
+      product_format: synced.product_format ?? merged.product_format,
+    });
+    // Balicí matice zůstává u tvaru — do produktu se nepropisuje (jen read-only UI).
+  } else if (merged.die_cut_id != null) {
     const dieCut = await prisma.iml_die_cuts.findUnique({ where: { id: merged.die_cut_id } });
     if (!dieCut || !dieCut.is_active) {
       throw new DieCutNotFoundError(merged.die_cut_id);

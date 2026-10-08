@@ -36,6 +36,7 @@ export default async function ImlPage() {
     productsCount,
     ordersCount,
     dieCutsCount,
+    productsWithoutShape,
     ordersByStatus,
     ordersToProcess,
     recentOrders,
@@ -49,6 +50,9 @@ export default async function ImlPage() {
     prisma.iml_products.count({ where: { is_active: true } }),
     prisma.iml_orders.count(),
     prisma.iml_die_cuts.count({ where: { is_active: true } }),
+    prisma.iml_products.count({
+      where: { is_active: true, shape_id: null, archived_at: null },
+    }),
     prisma.iml_orders.groupBy({
       by: ["status"],
       _count: { id: true },
@@ -122,11 +126,18 @@ export default async function ImlPage() {
     { href: "/iml/customers", icon: Users, value: customersCount, label: "Zákazníci" },
     { href: "/iml/products", icon: Package, value: productsCount, label: "Produkty" },
     {
-      href: "/iml/die-cuts",
+      href: "/iml/products?missing_shape=1&sort=format",
+      icon: Layers,
+      value: productsWithoutShape,
+      label: "Bez tvaru",
+      hint: "Aktivní etikety ke spárování (bulk assign)",
+    },
+    {
+      href: "/iml/vyseky",
       icon: Layers,
       value: dieCutsCount,
       label: "Výseky",
-      hint: "Katalog tvarů etikety",
+      hint: "Tvary · nástroje · montáže · legacy",
     },
     { href: "/iml/orders", icon: ShoppingCart, value: ordersCount, label: "Objednávky" },
     {
@@ -193,7 +204,7 @@ export default async function ImlPage() {
                 Import / Export
               </Link>
               <Link
-                href="/iml/die-cuts"
+                href="/iml/vyseky"
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
               >
                 <Layers className="h-4 w-4" />

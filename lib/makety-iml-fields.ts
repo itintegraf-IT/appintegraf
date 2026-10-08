@@ -4,6 +4,7 @@ export type MaketyImlFields = {
   customer_id: number | null;
   product_id: number | null;
   die_cut_id: number | null;
+  shape_id: number | null;
   label_code: string | null;
   product_name: string | null;
   job_number: string | null;
@@ -40,11 +41,14 @@ export function parseMaketyImlFieldsFromInput(input: {
   if (productRaw === "invalid") return { error: "Neplatná etiketa" };
   const dieCutRaw = parseOptionalId(read("die_cut_id"));
   if (dieCutRaw === "invalid") return { error: "Neplatný výsek" };
+  const shapeRaw = parseOptionalId(read("shape_id"));
+  if (shapeRaw === "invalid") return { error: "Neplatný tvar etikety" };
 
   return {
     customer_id: customerRaw,
     product_id: productRaw,
     die_cut_id: dieCutRaw,
+    shape_id: shapeRaw,
     label_code: parseOptionalText(read("label_code"), 100),
     product_name: parseOptionalText(read("product_name"), 255),
     job_number: parseOptionalText(read("job_number"), 50),
@@ -52,7 +56,7 @@ export function parseMaketyImlFieldsFromInput(input: {
 }
 
 /**
- * Ověří vazby na IML katalog a případně doplní label_code / die_cut_id z produktu.
+ * Ověří vazby na IML katalog a případně doplní label_code / die_cut_id / shape_id z produktu.
  * Pro work_type !== grafika vrací null hodnoty.
  */
 export async function resolveMaketyImlFields(
@@ -64,13 +68,15 @@ export async function resolveMaketyImlFields(
       customer_id: null,
       product_id: null,
       die_cut_id: null,
+      shape_id: null,
       label_code: null,
       product_name: null,
       job_number: null,
     };
   }
 
-  let { customer_id, product_id, die_cut_id, label_code, product_name, job_number } = fields;
+  let { customer_id, product_id, die_cut_id, shape_id, label_code, product_name, job_number } =
+    fields;
 
   if (customer_id != null) {
     const customer = await prisma.iml_customers.findFirst({
@@ -90,6 +96,7 @@ export async function resolveMaketyImlFields(
         client_code: true,
         ean_code: true,
         die_cut_id: true,
+        shape_id: true,
         client_name: true,
         ig_short_name: true,
       },
@@ -117,6 +124,17 @@ export async function resolveMaketyImlFields(
     if (die_cut_id == null && product.die_cut_id != null) {
       die_cut_id = product.die_cut_id;
     }
+    if (shape_id == null && product.shape_id != null) {
+      shape_id = product.shape_id;
+    }
+  }
+
+  if (shape_id != null) {
+    const shape = await prisma.iml_shape_catalog.findFirst({
+      where: { id: shape_id },
+      select: { id: true },
+    });
+    if (!shape) return { error: "Vybraný tvar etikety neexistuje" };
   }
 
   if (die_cut_id != null) {
@@ -134,9 +152,20 @@ export async function resolveMaketyImlFields(
     }
   }
 
-  if ((product_id != null || die_cut_id != null || label_code) && customer_id == null) {
+  if (
+    (product_id != null || die_cut_id != null || shape_id != null || label_code) &&
+    customer_id == null
+  ) {
     return { error: "Nejprve vyberte klienta" };
   }
 
-  return { customer_id, product_id, die_cut_id, label_code, product_name, job_number };
+  return {
+    customer_id,
+    product_id,
+    die_cut_id,
+    shape_id,
+    label_code,
+    product_name,
+    job_number,
+  };
 }

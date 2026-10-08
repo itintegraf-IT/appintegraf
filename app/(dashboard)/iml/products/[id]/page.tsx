@@ -10,6 +10,7 @@ import {
   CircleCheckBig,
   Droplets,
   Layers,
+  Package,
   Printer,
   Settings2,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import ProductDetailView, {
 import ProductImagePreview from "../_components/ProductImagePreview";
 import ProductPdfHistory from "../_components/ProductPdfHistory";
 import { ProductArchiveBanner } from "../_components/ProductArchiveBanner";
+import { ShapePackagingReadonly } from "../_components/ShapePackagingReadonly";
 import { consumptionKg } from "@/lib/iml-color-consumption";
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
@@ -197,8 +199,17 @@ export default async function ImlProductDetailPage({
           <InfoField label="Kód montáže" value={fmt(product.assembly_code)} />
           <InfoField label="Pozic na archu" value={fmtNum(product.positions_on_sheet)} />
           <InfoField label="Etiket na TA" value={fmtNum(product.labels_per_sheet)} />
-          <InfoField label="Kusů v krabici" value={fmtNum(product.pieces_per_box)} />
-          <InfoField label="Kusů na paletě" value={fmtNum(product.pieces_per_pallet)} />
+          {product.shape_id == null && (
+            <>
+              <InfoField label="Kusů v krabici" value={fmtNum(product.pieces_per_box)} />
+              <InfoField label="Kusů na paletě" value={fmtNum(product.pieces_per_pallet)} />
+            </>
+          )}
+          {product.shape_id != null && (
+            <p className="sm:col-span-2 text-sm text-gray-500">
+              Balicí matice tvaru je na záložce Balení.
+            </p>
+          )}
           {product.die_cut_id != null && (
             <p className="sm:col-span-2 text-sm text-gray-500">
               Navázáno na katalog výseků (ID {product.die_cut_id}).{" "}
@@ -209,6 +220,35 @@ export default async function ImlProductDetailPage({
           )}
         </div>
       ),
+    },
+    {
+      id: "pack",
+      label: "Balení",
+      icon: <Package className="h-4 w-4" />,
+      content:
+        product.shape_id != null ? (
+          <ShapePackagingReadonly
+            shapeId={String(product.shape_id)}
+            highlightCodes={[
+              product.foil_type,
+              product.color_coverage,
+              product.foil_material?.code,
+              product.foil_material?.name,
+              product.paper_material?.code,
+              product.paper_material?.name,
+            ].filter((x): x is string => !!x)}
+          />
+        ) : (
+          <div className="space-y-3">
+            <p className="text-sm text-gray-500">
+              Produkt nemá přiřazený tvar. Balicí matice se zobrazí po výběru tvaru.
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <InfoField label="Kusů v krabici" value={fmtNum(product.pieces_per_box)} />
+              <InfoField label="Kusů na paletě" value={fmtNum(product.pieces_per_pallet)} />
+            </div>
+          </div>
+        ),
     },
     {
       id: "material",

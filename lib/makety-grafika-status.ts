@@ -144,42 +144,42 @@ export function grafikaStatusBadgeClass(status: string): string {
   }
 }
 
-/** Třídy tlačítek akcí workflow (semafor). */
+/** Třídy tlačítek akcí workflow (semafor) včetně dark mode. */
 export function grafikaTransitionButtonClass(toStatus: string, selected: boolean): string {
   const base = "rounded-lg border px-3 py-2 text-sm font-medium transition-colors";
   if (selected) {
     switch (toStatus) {
       case "open":
-        return `${base} border-yellow-600 bg-yellow-500 text-white`;
+        return `${base} border-yellow-600 bg-yellow-500 text-white dark:border-yellow-400 dark:bg-yellow-600`;
       case "in_progress":
-        return `${base} border-orange-600 bg-orange-500 text-white`;
+        return `${base} border-orange-600 bg-orange-500 text-white dark:border-orange-400 dark:bg-orange-600`;
       case "data_problem":
-        return `${base} border-red-700 bg-red-600 text-white`;
+        return `${base} border-red-700 bg-red-600 text-white dark:border-red-400 dark:bg-red-700`;
       case "done":
       case "approved":
       case "prepress_approved":
-        return `${base} border-green-700 bg-green-600 text-white`;
+        return `${base} border-green-700 bg-green-600 text-white dark:border-green-400 dark:bg-green-700`;
       case "sent_for_approval":
-        return `${base} border-blue-700 bg-blue-600 text-white`;
+        return `${base} border-blue-700 bg-blue-600 text-white dark:border-blue-400 dark:bg-blue-700`;
       default:
-        return `${base} border-gray-700 bg-gray-700 text-white`;
+        return `${base} border-gray-700 bg-gray-700 text-white dark:border-gray-500 dark:bg-gray-600`;
     }
   }
   switch (toStatus) {
     case "open":
-      return `${base} border-yellow-300 bg-yellow-50 text-yellow-900 hover:bg-yellow-100`;
+      return `${base} border-yellow-300 bg-yellow-50 text-yellow-900 hover:bg-yellow-100 dark:border-yellow-700 dark:bg-yellow-950/50 dark:text-yellow-100 dark:hover:bg-yellow-900/60`;
     case "in_progress":
-      return `${base} border-orange-300 bg-orange-50 text-orange-900 hover:bg-orange-100`;
+      return `${base} border-orange-300 bg-orange-50 text-orange-900 hover:bg-orange-100 dark:border-orange-700 dark:bg-orange-950/50 dark:text-orange-100 dark:hover:bg-orange-900/60`;
     case "data_problem":
-      return `${base} border-red-300 bg-red-50 text-red-800 hover:bg-red-100`;
+      return `${base} border-red-300 bg-red-50 text-red-800 hover:bg-red-100 dark:border-red-700 dark:bg-red-950/50 dark:text-red-100 dark:hover:bg-red-900/60`;
     case "done":
     case "approved":
     case "prepress_approved":
-      return `${base} border-green-300 bg-green-50 text-green-800 hover:bg-green-100`;
+      return `${base} border-green-300 bg-green-50 text-green-800 hover:bg-green-100 dark:border-green-700 dark:bg-green-950/50 dark:text-green-100 dark:hover:bg-green-900/60`;
     case "sent_for_approval":
-      return `${base} border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100`;
+      return `${base} border-blue-300 bg-blue-50 text-blue-800 hover:bg-blue-100 dark:border-blue-700 dark:bg-blue-950/50 dark:text-blue-100 dark:hover:bg-blue-900/60`;
     default:
-      return `${base} border-gray-300 bg-white text-gray-800 hover:bg-gray-50`;
+      return `${base} border-gray-300 bg-white text-gray-800 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800`;
   }
 }
 

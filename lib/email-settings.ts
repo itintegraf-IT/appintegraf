@@ -77,19 +77,41 @@ export async function getEmailSettings(): Promise<EmailSettings> {
   };
 }
 
+/** True, pokud adresa vypadá jako kalendářový odesílatel (nesmí jít u softproofů). */
+export function isCalendarLikeFromAddress(addr: string): boolean {
+  const lower = addr.trim().toLowerCase();
+  return (
+    lower.includes("kalendar") ||
+    lower.includes("kalendář") ||
+    lower.includes("calendar@")
+  );
+}
+
 /** From pro klientské e-maily maket/grafiky (fallback na globální odesílatele). */
 export function formatSmtpFrom(
   settings: EmailSettings,
   kind: "default" | "makety" = "default"
 ): string {
-  const addr =
+  let addr =
     kind === "makety" && settings.fromMakety.trim()
       ? settings.fromMakety.trim()
       : settings.from;
-  const name =
+  let name =
     kind === "makety" && settings.fromNameMakety.trim()
       ? settings.fromNameMakety.trim()
       : settings.fromName;
+
+  // Softproof / makety: nikdy neposílat z kalendář@…
+  if (kind === "makety" && isCalendarLikeFromAddress(addr)) {
+    if (settings.fromMakety.trim() && !isCalendarLikeFromAddress(settings.fromMakety)) {
+      addr = settings.fromMakety.trim();
+      name = settings.fromNameMakety.trim() || name;
+    } else if (settings.from.trim() && !isCalendarLikeFromAddress(settings.from)) {
+      addr = settings.from.trim();
+      name = settings.fromName.trim() || name;
+    }
+  }
+
   return name ? `"${name}" <${addr}>` : addr;
 }
 

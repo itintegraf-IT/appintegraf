@@ -168,6 +168,7 @@ export async function POST(req: NextRequest) {
         customer_id: imlFields.customer_id,
         product_id: imlFields.product_id,
         die_cut_id: imlFields.die_cut_id,
+        shape_id: imlFields.shape_id,
         label_code: imlFields.label_code,
         product_name: imlFields.product_name,
         job_number: imlFields.job_number,

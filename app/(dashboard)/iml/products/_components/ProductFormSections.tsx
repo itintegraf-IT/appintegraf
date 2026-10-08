@@ -7,6 +7,7 @@ import {
   CircleCheckBig,
   Droplets,
   Layers,
+  Package,
   Printer,
 } from "lucide-react";
 import { Tabs, type TabDef } from "../../_components/Tabs";
@@ -24,6 +25,7 @@ import ProductPantoneEditor, {
   type ProductColorRow,
 } from "./ProductPantoneEditor";
 import ProductCmykToggles from "./ProductCmykToggles";
+import { ShapePackagingReadonly } from "./ShapePackagingReadonly";
 import {
   defaultProductCmykFlags,
   hasValidPantoneRows,
@@ -52,6 +54,9 @@ export type ProductFormState = {
   requester: string;
   sku: string;
   die_cut_id: string;
+  shape_id: string;
+  selected_tool_id: string;
+  selected_imposition_id: string;
   label_shape_code: string;
   die_cut_tool_code: string;
   assembly_code: string;
@@ -59,6 +64,9 @@ export type ProductFormState = {
   labels_per_sheet: string;
   pieces_per_box: string;
   pieces_per_pallet: string;
+  boxes_per_pallet: string;
+  pallet_weight: string;
+  box_type_id: string;
   foil_material_id: string;
   color_material_id: string;
   paper_material_id: string;
@@ -72,6 +80,9 @@ export type ProductFormState = {
   item_status: string;
   format_width_mm: string;
   format_height_mm: string;
+  raw_data_width_mm: string;
+  raw_data_height_mm: string;
+  colors_spec: string;
   color_count: string;
   print_colors_text: string;
   label_type: string;
@@ -130,6 +141,21 @@ export default function ProductFormSections({
 }: Props) {
   const err = errors ?? {};
   const [dieCuts, setDieCuts] = useState<DieCutOption[]>([]);
+  const [shapes, setShapes] = useState<
+    Array<{
+      id: number;
+      shape_code: string;
+      width_mm: string | number;
+      height_mm: string | number;
+      tool_assignments: Array<{
+        priority: string;
+        tool: { id: number; tool_code_new: string; tool_code_orig: string };
+      }>;
+    }>
+  >([]);
+  const [impositions, setImpositions] = useState<
+    Array<{ id: number; imposition_code: string; positions_count: number; tool_id: number }>
+  >([]);
   const formatPreview = formatProductFormatFromMm(
     form.format_width_mm ? parseFloat(form.format_width_mm) : null,
     form.format_height_mm ? parseFloat(form.format_height_mm) : null
@@ -148,16 +174,114 @@ export default function ProductFormSections({
       .catch(() => setDieCuts([]));
   }, [form.die_cut_id]);
 
-  const applyDieCut = (idStr: string) => {
+  useEffect(() => {
+    fetch("/api/iml/shapes")
+      .then((r) => r.json())
+      .then((d) => setShapes(d.shapes ?? []))
+      .catch(() => setShapes([]));
+  }, []);
+
+  useEffect(() => {
+    if (!form.selected_tool_id) {
+      setImpositions([]);
+      return;
+    }
+    fetch(`/api/iml/impositions?tool_id=${form.selected_tool_id}`)
+      .then((r) => r.json())
+      .then((d) => setImpositions(d.impositions ?? []))
+      .catch(() => setImpositions([]));
+  }, [form.selected_tool_id]);
+
+  const selectedShape = shapes.find((s) => String(s.id) === form.shape_id) ?? null;
+  const shapeTools = selectedShape?.tool_assignments ?? [];
+
+  /** Stejné pravidlo jako server: první montáž nástroje (id asc), pokud chybí výběr. */
+  useEffect(() => {
+    if (!form.selected_tool_id || form.selected_imposition_id) return;
+    if (impositions.length === 0) return;
+    const sorted = [...impositions].sort((a, b) => a.id - b.id);
+    const first = sorted[0];
+    if (!first) return;
+    setField("selected_imposition_id", String(first.id));
+    setField("assembly_code", first.imposition_code);
+    setField("positions_on_sheet", String(first.positions_count));
+    setField("labels_per_sheet", String(first.positions_count));
+    // setField z rodiče není stabilní — záměrně mimo deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync jen při tool/impositions
+  }, [form.selected_tool_id, form.selected_imposition_id, impositions]);
+
+  const applyShape = (idStr: string) => {
     if (!idStr) {
-      setField("die_cut_id", "");
+      setField("shape_id", "");
+      setField("selected_tool_id", "");
+      setField("selected_imposition_id", "");
       setField("label_shape_code", "");
       setField("die_cut_tool_code", "");
       setField("assembly_code", "");
       setField("positions_on_sheet", "");
       setField("labels_per_sheet", "");
-      setField("pieces_per_box", "");
-      setField("pieces_per_pallet", "");
+      setField("format_width_mm", "");
+      setField("format_height_mm", "");
+      return;
+    }
+    const shape = shapes.find((s) => String(s.id) === idStr);
+    if (!shape) {
+      setField("shape_id", idStr);
+      return;
+    }
+    setField("shape_id", String(shape.id));
+    setField("label_shape_code", shape.shape_code);
+    setField("format_width_mm", String(shape.width_mm));
+    setField("format_height_mm", String(shape.height_mm));
+    const primary =
+      shape.tool_assignments.find((a) => a.priority === "PRIMARY") ??
+      shape.tool_assignments[0];
+    if (primary) {
+      setField("selected_tool_id", String(primary.tool.id));
+      setField(
+        "die_cut_tool_code",
+        primary.tool.tool_code_orig || primary.tool.tool_code_new
+      );
+      setField("selected_imposition_id", "");
+      setField("assembly_code", "");
+      setField("positions_on_sheet", "");
+      setField("labels_per_sheet", "");
+    } else {
+      setField("selected_tool_id", "");
+      setField("die_cut_tool_code", "");
+      setField("selected_imposition_id", "");
+    }
+  };
+
+  const applyTool = (idStr: string) => {
+    setField("selected_tool_id", idStr);
+    setField("selected_imposition_id", "");
+    setField("assembly_code", "");
+    setField("positions_on_sheet", "");
+    setField("labels_per_sheet", "");
+    const a = shapeTools.find((x) => String(x.tool.id) === idStr);
+    if (a) {
+      setField("die_cut_tool_code", a.tool.tool_code_orig || a.tool.tool_code_new);
+    }
+  };
+
+  const applyImposition = (idStr: string) => {
+    setField("selected_imposition_id", idStr);
+    const imp = impositions.find((i) => String(i.id) === idStr);
+    if (imp) {
+      setField("assembly_code", imp.imposition_code);
+      setField("positions_on_sheet", String(imp.positions_count));
+      setField("labels_per_sheet", String(imp.positions_count));
+    } else {
+      setField("assembly_code", "");
+      setField("positions_on_sheet", "");
+      setField("labels_per_sheet", "");
+    }
+  };
+
+  const applyDieCut = (idStr: string) => {
+    if (!idStr) {
+      setField("die_cut_id", "");
       return;
     }
     const dc = dieCuts.find((d) => String(d.id) === idStr);
@@ -166,15 +290,18 @@ export default function ProductFormSections({
       return;
     }
     setField("die_cut_id", String(dc.id));
-    setField("label_shape_code", dc.label_shape_code ?? "");
-    setField("die_cut_tool_code", dc.die_cut_tool_code ?? "");
-    setField("assembly_code", dc.assembly_code ?? "");
-    setField("positions_on_sheet", dc.positions_on_sheet != null ? String(dc.positions_on_sheet) : "");
-    setField("labels_per_sheet", dc.labels_per_sheet != null ? String(dc.labels_per_sheet) : "");
-    setField("pieces_per_box", dc.pieces_per_box != null ? String(dc.pieces_per_box) : "");
-    setField("pieces_per_pallet", dc.pieces_per_pallet != null ? String(dc.pieces_per_pallet) : "");
+    if (!form.shape_id) {
+      setField("label_shape_code", dc.label_shape_code ?? "");
+      setField("die_cut_tool_code", dc.die_cut_tool_code ?? "");
+      setField("assembly_code", dc.assembly_code ?? "");
+      setField("positions_on_sheet", dc.positions_on_sheet != null ? String(dc.positions_on_sheet) : "");
+      setField("labels_per_sheet", dc.labels_per_sheet != null ? String(dc.labels_per_sheet) : "");
+      setField("pieces_per_box", dc.pieces_per_box != null ? String(dc.pieces_per_box) : "");
+      setField("pieces_per_pallet", dc.pieces_per_pallet != null ? String(dc.pieces_per_pallet) : "");
+    }
   };
 
+  const hasShape = !!form.shape_id;
   const hasDieCut = !!form.die_cut_id;
   const roCls = `${inputCls} bg-gray-50 text-gray-700`;
   const legacyApprovalStatus =
@@ -303,44 +430,102 @@ export default function ProductFormSections({
       content: (
         <TabShell
           title="Výseky a rozměry"
-          subtitle="Výběr z globálního katalogu výseků (kód tvaru etikety)"
+          subtitle="Nový model: tvar → nástroj → montáž (číselníky). Legacy výsek zůstává jako bridge."
         >
-          <div className="mb-4">
+          <div className="mb-4 space-y-4">
             <Field
-              label="Výsek (kód tvaru etikety)"
+              label="Tvar etikety"
               error={err.label_shape_code}
-              hint={
-                hasDieCut
-                  ? "Data se berou z katalogu. Úpravy provádějte v menu IML → Výseky."
-                  : "Vyberte výsek z katalogu, nebo nejdřív vytvořte záznam v IML → Výseky."
-              }
+              hint="Šířka × výška se doplní automaticky. Správa: IML → Tvary."
             >
               <div className="flex flex-wrap gap-2">
                 <select
-                  value={form.die_cut_id}
-                  onChange={(e) => applyDieCut(e.target.value)}
+                  value={form.shape_id}
+                  onChange={(e) => applyShape(e.target.value)}
                   className={`${inputCls} flex-1`}
                 >
-                  <option value="">— Vyberte výsek —</option>
-                  {dieCuts.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.label_shape_code}
-                      {d.die_cut_tool_code ? ` — ${d.die_cut_tool_code}` : ""}
+                  <option value="">— Vyberte tvar —</option>
+                  {shapes.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.shape_code} ({Number(s.width_mm)}×{Number(s.height_mm)} mm)
                     </option>
                   ))}
                 </select>
                 <Link
-                  href="/iml/die-cuts"
+                  href="/iml/shapes"
                   className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
                 >
-                  Správa výseků
+                  Tvary
                 </Link>
               </div>
+            </Field>
+            {hasShape && (
+              <>
+                <Field label="Nástroj (PRIMARY / ALT)">
+                  <select
+                    value={form.selected_tool_id}
+                    onChange={(e) => applyTool(e.target.value)}
+                    className={inputCls}
+                  >
+                    <option value="">— Vyberte nástroj —</option>
+                    {shapeTools.map((a) => (
+                      <option key={a.tool.id} value={a.tool.id}>
+                        {a.priority}: {a.tool.tool_code_new} ({a.tool.tool_code_orig})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Montáž / muster">
+                  <select
+                    value={form.selected_imposition_id}
+                    onChange={(e) => applyImposition(e.target.value)}
+                    className={inputCls}
+                    disabled={!form.selected_tool_id}
+                  >
+                    <option value="">— Vyberte montáž —</option>
+                    {impositions.map((i) => (
+                      <option key={i.id} value={i.id}>
+                        {i.imposition_code} ({i.positions_count} užitků)
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </>
+            )}
+            <Field
+              label="Legacy výsek (volitelné)"
+              hint="Dočasný bridge na starý katalog. Preferujte tvar výše."
+            >
+              <select
+                value={form.die_cut_id}
+                onChange={(e) => applyDieCut(e.target.value)}
+                className={inputCls}
+              >
+                <option value="">— bez legacy výseku —</option>
+                {dieCuts.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.label_shape_code}
+                    {d.die_cut_tool_code ? ` — ${d.die_cut_tool_code}` : ""}
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Kód tvaru etikety">
               <input type="text" readOnly value={form.label_shape_code} className={roCls} />
+            </Field>
+            <Field label="Rozměr (mm)">
+              <input
+                type="text"
+                readOnly
+                value={
+                  form.format_width_mm && form.format_height_mm
+                    ? `${form.format_width_mm} × ${form.format_height_mm}`
+                    : ""
+                }
+                className={roCls}
+              />
             </Field>
             <Field label="Kód výsekového nástroje">
               <input type="text" readOnly value={form.die_cut_tool_code} className={roCls} />
@@ -357,13 +542,74 @@ export default function ProductFormSections({
             >
               <input type="text" readOnly value={form.labels_per_sheet} className={roCls} />
             </Field>
-            <Field label="Kusů v krabici">
-              <input type="text" readOnly value={form.pieces_per_box} className={roCls} />
-            </Field>
-            <Field label="Kusů na paletě" span={2}>
-              <input type="text" readOnly value={form.pieces_per_pallet} className={roCls} />
-            </Field>
+            {!hasShape && (
+              <>
+                <Field label="Kusů v krabici" hint="Balicí předpis (expedice) — bez tvaru. S tvarem viz záložka Balení.">
+                  <input
+                    type="text"
+                    value={form.pieces_per_box}
+                    onChange={(e) => setField("pieces_per_box", e.target.value)}
+                    className={hasDieCut ? roCls : inputCls}
+                    readOnly={hasDieCut}
+                  />
+                </Field>
+                <Field label="Kusů na paletě">
+                  <input
+                    type="text"
+                    value={form.pieces_per_pallet}
+                    onChange={(e) => setField("pieces_per_pallet", e.target.value)}
+                    className={hasDieCut ? roCls : inputCls}
+                    readOnly={hasDieCut}
+                  />
+                </Field>
+                <Field label="Krabic na paletě">
+                  <input
+                    type="text"
+                    value={form.boxes_per_pallet}
+                    onChange={(e) => setField("boxes_per_pallet", e.target.value)}
+                    className={inputCls}
+                  />
+                </Field>
+                <Field label="Hmotnost palety (kg)">
+                  <input
+                    type="text"
+                    value={form.pallet_weight}
+                    onChange={(e) => setField("pallet_weight", e.target.value)}
+                    className={inputCls}
+                  />
+                </Field>
+              </>
+            )}
           </div>
+          {hasShape && (
+            <p className="mt-3 text-xs text-gray-500">
+              Materiálová a balicí matice tvaru je na záložce{" "}
+              <span className="font-medium text-gray-700">Balení</span>.
+            </p>
+          )}
+        </TabShell>
+      ),
+    },
+    {
+      id: "pack",
+      label: "Balení",
+      icon: <Package className="h-4 w-4" />,
+      content: (
+        <TabShell
+          title="Balení"
+          subtitle="Materiálová a balicí matice je vázaná na tvar etikety — u produktu jen ke zobrazení."
+        >
+          {hasShape ? (
+            <ShapePackagingReadonly
+              shapeId={form.shape_id}
+              highlightCodes={[form.foil_type, form.color_coverage].filter(Boolean)}
+            />
+          ) : (
+            <p className="text-sm text-gray-500">
+              Nejdřív vyberte tvar na záložce Výseky. Matice (materiál, hmotnost, ks/krabice, ks/paleta,
+              typ krabice) se zobrazí podle zvoleného tvaru.
+            </p>
+          )}
         </TabShell>
       ),
     },
@@ -519,6 +765,42 @@ export default function ProductFormSections({
                   <option key={s} value={s}>{imlItemStatusLabel(s)}</option>
                 ))}
               </select>
+            </Field>
+            <Field
+              label="Šířka dat Fénix (mm)"
+              hint="Velikost čistých grafických dat (odděleně od formátu výseku)."
+              error={err.raw_data_width_mm}
+            >
+              <input
+                type="text"
+                inputMode="decimal"
+                value={form.raw_data_width_mm}
+                onChange={(e) => setField("raw_data_width_mm", e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Výška dat Fénix (mm)" error={err.raw_data_height_mm}>
+              <input
+                type="text"
+                inputMode="decimal"
+                value={form.raw_data_height_mm}
+                onChange={(e) => setField("raw_data_height_mm", e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field
+              label="Barevnost (Fénix)"
+              hint="Krátký souhrn barevnosti pro export; detail Pantone zůstává na záložce Barvy."
+              error={err.colors_spec}
+            >
+              <input
+                type="text"
+                value={form.colors_spec}
+                onChange={(e) => setField("colors_spec", e.target.value)}
+                placeholder="např. CMYK + 2 Pantone"
+                maxLength={100}
+                className={inputCls}
+              />
             </Field>
             <Field label="Verze tiskových dat" error={err.print_data_version}>
               <input
@@ -724,6 +1006,9 @@ export const emptyProductForm: ProductFormState = {
   requester: "",
   sku: "",
   die_cut_id: "",
+  shape_id: "",
+  selected_tool_id: "",
+  selected_imposition_id: "",
   label_shape_code: "",
   die_cut_tool_code: "",
   assembly_code: "",
@@ -731,6 +1016,9 @@ export const emptyProductForm: ProductFormState = {
   labels_per_sheet: "",
   pieces_per_box: "",
   pieces_per_pallet: "",
+  boxes_per_pallet: "",
+  pallet_weight: "",
+  box_type_id: "",
   foil_material_id: "",
   color_material_id: "",
   paper_material_id: "",
@@ -744,6 +1032,9 @@ export const emptyProductForm: ProductFormState = {
   item_status: "aktivní",
   format_width_mm: "",
   format_height_mm: "",
+  raw_data_width_mm: "",
+  raw_data_height_mm: "",
+  colors_spec: "",
   color_count: "",
   print_colors_text: "",
   label_type: "",

@@ -46,10 +46,17 @@ export default async function ImlImportsPage() {
       needsWrite: true,
     },
     {
+      href: "/iml/tools/import",
+      icon: Scissors,
+      label: "Import nástrojů",
+      description: "CSV, Excel – tool_code_new / orig / technology (~150)",
+      needsWrite: true,
+    },
+    {
       href: "/iml/die-cuts/import",
       icon: Scissors,
-      label: "Import výseků",
-      description: "CSV, Excel – mapování polí katalogu výseků",
+      label: "Import výseků (legacy)",
+      description: "CSV, Excel – starý monolitický katalog",
       needsWrite: true,
     },
   ];

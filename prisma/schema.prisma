@@ -430,6 +430,8 @@ model makety {
   customer_id                  Int?
   product_id                   Int?
   die_cut_id                   Int?
+  /// Tvar etikety z iml_shape_catalog (povinný před překlopením do IML).
+  shape_id                     Int?
   label_code                   String?              @db.VarChar(100)
   product_name                 String?              @db.VarChar(255)
   job_number                   String?              @db.VarChar(50)
@@ -447,6 +449,7 @@ model makety {
   iml_customers                iml_customers?       @relation(fields: [customer_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_customer_fk")
   iml_products                 iml_products?        @relation(fields: [product_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_product_fk")
   iml_die_cuts                 iml_die_cuts?        @relation(fields: [die_cut_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_die_cut_fk")
+  iml_shape_catalog            iml_shape_catalog?   @relation(fields: [shape_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "makety_shape_fk")
   makety_departments     makety_departments[]
   makety_comments        makety_comments[]
   makety_status_log      makety_status_log[]
@@ -461,6 +464,7 @@ model makety {
   @@index([work_type, assignee_user_id, queue_position], map: "idx_makety_queue")
   @@index([customer_id], map: "idx_makety_customer")
   @@index([product_id], map: "idx_makety_product")
+  @@index([shape_id], map: "idx_makety_shape")
   @@index([job_number], map: "idx_makety_job_number")
   @@index([prepress_user_id], map: "idx_makety_prepress")
   @@index([final_approver_user_id], map: "idx_makety_final_approver")
@@ -1654,6 +1658,7 @@ model iml_customers {
   iml_customer_emails             iml_customer_emails[]
   iml_customer_contacts           iml_customer_contacts[]
   iml_die_cuts                    iml_die_cuts[]
+  shape_assignments               iml_shape_customer_assignment[]
   makety                          makety[]
   makety_user_customers           makety_user_customers[]
 
@@ -1707,6 +1712,11 @@ model iml_products {
   product_format       String?   @db.VarChar(100)
   format_width_mm      Decimal?  @db.Decimal(8, 2)
   format_height_mm     Decimal?  @db.Decimal(8, 2)
+  /// Velikost čistých grafických dat pro Fénix (odděleně od formátu výseku).
+  raw_data_width_mm    Decimal?  @db.Decimal(6, 2)
+  raw_data_height_mm   Decimal?  @db.Decimal(6, 2)
+  /// Barevnost etikety (souhrn / Fénix).
+  colors_spec          String?   @db.VarChar(100)
   die_cut_tool_code    String?   @db.VarChar(100)
   assembly_code        String?   @db.VarChar(100)
   positions_on_sheet   Int?
@@ -1747,6 +1757,14 @@ model iml_products {
   custom_data          Json?     @db.Json
   labels_per_sheet     Int?
   die_cut_id           Int?
+  /// Tříúrovňový model výseků (nový katalog).
+  shape_id               Int?
+  selected_tool_id       Int?
+  selected_imposition_id Int?
+  /// Balicí předpis (expedice) — boxes_per_pallet / pallet_weight; pieces_* už existují.
+  box_type_id          Int?
+  boxes_per_pallet     Int?
+  pallet_weight        Decimal?  @db.Decimal(8, 2)
   /// Logický archiv produktu (PDF na disku); metadata zůstávají ve vyhledávání.
   archived_at          DateTime? @db.DateTime(0)
   /// Cesta k legacy `pdf_data` na disku (relativní vůči IML_ARCHIVE_DIR).
@@ -1758,6 +1776,10 @@ model iml_products {
   iml_customers       iml_customers?       @relation(fields: [customer_id], references: [id], onDelete: SetNull)
   iml_foils           iml_foils?           @relation(fields: [foil_id], references: [id], onDelete: SetNull)
   iml_die_cuts        iml_die_cuts?        @relation(fields: [die_cut_id], references: [id], onDelete: SetNull)
+  iml_shape_catalog   iml_shape_catalog?   @relation(fields: [shape_id], references: [id], onDelete: SetNull)
+  iml_tool_catalog    iml_tool_catalog?    @relation(fields: [selected_tool_id], references: [id], onDelete: SetNull)
+  iml_imposition_catalog iml_imposition_catalog? @relation(fields: [selected_imposition_id], references: [id], onDelete: SetNull)
+  iml_box_types       iml_box_types?       @relation(fields: [box_type_id], references: [id], onDelete: SetNull)
   iml_order_items     iml_order_items[]
   iml_product_colors  iml_product_colors[]
   iml_product_files   iml_product_files[]
@@ -1775,6 +1797,10 @@ model iml_products {
   @@index([product_kind])
   @@index([foil_id])
   @@index([die_cut_id])
+  @@index([shape_id])
+  @@index([selected_tool_id])
+  @@index([selected_imposition_id])
+  @@index([box_type_id])
   @@index([foil_material_id], map: "idx_iml_products_foil_material")
   @@index([color_material_id], map: "idx_iml_products_color_material")
   @@index([paper_material_id], map: "idx_iml_products_paper_material")
@@ -1783,7 +1809,7 @@ model iml_products {
   @@map("iml_products")
 }
 
-/// Typy krabic pro katalog výseků.
+/// Typy krabic pro katalog výseků a balení produktů.
 model iml_box_types {
   id          Int      @id @default(autoincrement())
   code        String   @unique @db.VarChar(50)
@@ -1794,6 +1820,7 @@ model iml_box_types {
   updated_at  DateTime @updatedAt @db.DateTime(0)
 
   iml_die_cuts iml_die_cuts[]
+  iml_products iml_products[]
 
   @@index([is_active])
   @@map("iml_box_types")
@@ -1840,6 +1867,138 @@ model iml_die_cuts {
   @@index([customer_id])
   @@index([box_type_id])
   @@map("iml_die_cuts")
+}
+
+/// Číselník typů tvarů (CUP/LID/… + uživatelské položky).
+model iml_shape_types {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique @db.VarChar(20)
+  name       String   @db.VarChar(100)
+  is_active  Boolean  @default(true)
+  sort_order Int      @default(0)
+  created_at DateTime @default(now()) @db.DateTime(0)
+  updated_at DateTime @updatedAt @db.DateTime(0)
+
+  @@index([is_active])
+  @@map("iml_shape_types")
+}
+
+/// Číselník geometrických tvarů etiket (úroveň 1).
+model iml_shape_catalog {
+  id                Int      @id @default(autoincrement())
+  shape_code        String   @unique @db.VarChar(30)
+  shape_type        String   @db.VarChar(20)
+  width_mm          Decimal  @db.Decimal(6, 2)
+  height_mm         Decimal  @db.Decimal(6, 2)
+  internal_note     String?  @db.VarChar(255)
+  drawing_file_path String?  @db.VarChar(255)
+  created_at        DateTime @default(now()) @db.DateTime(0)
+  updated_at        DateTime @updatedAt @db.DateTime(0)
+
+  tool_assignments     iml_shape_tool_assignment[]
+  customer_assignments iml_shape_customer_assignment[]
+  material_packaging   iml_shape_material_packaging[]
+  iml_products         iml_products[]
+  makety               makety[]
+
+  @@index([shape_type])
+  @@index([width_mm, height_mm])
+  @@map("iml_shape_catalog")
+}
+
+/// Přiřazení zákazníků ke tvaru (multiselect, nepovinné).
+model iml_shape_customer_assignment {
+  id          Int @id @default(autoincrement())
+  shape_id    Int
+  customer_id Int
+
+  shape    iml_shape_catalog @relation(fields: [shape_id], references: [id], onDelete: Cascade)
+  customer iml_customers     @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@unique([shape_id, customer_id])
+  @@index([customer_id])
+  @@map("iml_shape_customer_assignment")
+}
+
+/// Materiálová a balicí matice tvaru (hmotnosti / ks dle gramáže).
+model iml_shape_material_packaging {
+  id                   Int      @id @default(autoincrement())
+  shape_id             Int
+  material_code        String   @db.VarChar(30)
+  weight_per_thousand  Decimal  @default(0) @db.Decimal(8, 3)
+  pcs_per_box          Int      @default(0)
+  pcs_per_pallet       Int      @default(0)
+  box_type             String?  @db.VarChar(50)
+  created_at           DateTime @default(now()) @db.DateTime(0)
+  updated_at           DateTime @updatedAt @db.DateTime(0)
+
+  shape iml_shape_catalog @relation(fields: [shape_id], references: [id], onDelete: Cascade)
+
+  @@unique([shape_id, material_code])
+  @@index([material_code])
+  @@map("iml_shape_material_packaging")
+}
+
+/// Číselník fyzických výsekových nástrojů (úroveň 2).
+model iml_tool_catalog {
+  id              Int      @id @default(autoincrement())
+  tool_code_new   String   @unique @db.VarChar(30)
+  tool_code_orig  String   @db.VarChar(30)
+  technology      String   @db.VarChar(30)
+  /// Primární výsekový stroj (v2; hmotnosti přesunuty do shape_material_packaging).
+  primary_machine String?  @db.VarChar(50)
+  /// @deprecated – použijte iml_shape_material_packaging (EUP50).
+  weight_50g      Decimal? @db.Decimal(6, 3)
+  /// @deprecated – použijte iml_shape_material_packaging (EUP60).
+  weight_60g      Decimal? @db.Decimal(6, 3)
+  status          String   @default("ACTIVE") @db.VarChar(20)
+  note            String?  @db.Text
+  created_at      DateTime @default(now()) @db.DateTime(0)
+  updated_at      DateTime @updatedAt @db.DateTime(0)
+
+  shape_assignments iml_shape_tool_assignment[]
+  impositions       iml_imposition_catalog[]
+  iml_products      iml_products[]
+
+  @@index([tool_code_orig])
+  @@index([technology])
+  @@index([status])
+  @@map("iml_tool_catalog")
+}
+
+/// Vazba tvar ↔ nástroje s prioritou (max. PRIMARY + 3 ALT).
+model iml_shape_tool_assignment {
+  id       Int    @id @default(autoincrement())
+  shape_id Int
+  tool_id  Int
+  priority String @default("PRIMARY") @db.VarChar(10)
+
+  shape iml_shape_catalog @relation(fields: [shape_id], references: [id], onDelete: Cascade)
+  tool  iml_tool_catalog  @relation(fields: [tool_id], references: [id], onDelete: Restrict)
+
+  @@unique([shape_id, tool_id])
+  @@unique([shape_id, priority])
+  @@index([tool_id])
+  @@map("iml_shape_tool_assignment")
+}
+
+/// Číselník montáží / musterů na nástroji (úroveň 3).
+model iml_imposition_catalog {
+  id              Int     @id @default(autoincrement())
+  tool_id         Int
+  imposition_code String  @db.VarChar(30)
+  positions_count Int
+  layout_type     String  @default("SOLO") @db.VarChar(10)
+  description     String? @db.VarChar(255)
+  created_at      DateTime @default(now()) @db.DateTime(0)
+  updated_at      DateTime @updatedAt @db.DateTime(0)
+
+  tool         iml_tool_catalog @relation(fields: [tool_id], references: [id], onDelete: Cascade)
+  iml_products iml_products[]
+
+  @@index([imposition_code])
+  @@index([tool_id])
+  @@map("iml_imposition_catalog")
 }
 
 model iml_orders {

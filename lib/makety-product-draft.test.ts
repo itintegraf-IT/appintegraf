@@ -81,6 +81,7 @@ describe("supplementProductFromDraft", () => {
         ig_short_name: null,
         production_notes: "",
         die_cut_id: null,
+        shape_id: null,
         customer_id: null,
       },
       draft

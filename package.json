@@ -38,6 +38,7 @@
     "db:pozadavky-migrate": "node scripts/run-pozadavky-migration.mjs",
     "db:projekty-migrate": "node scripts/run-projekty-migration.mjs",
     "iml:backfill-thumbnails": "node scripts/iml-backfill-product-thumbnails.mjs",
+    "iml:backfill-shape-cascade": "node scripts/backfill-product-shape-cascade.mjs",
     "verify:canvas": "node scripts/verify-canvas.mjs"
   },
   "dependencies": {

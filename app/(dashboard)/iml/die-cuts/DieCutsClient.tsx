@@ -287,7 +287,14 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
     <>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Výseky</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Výseky (legacy)</h1>
+          <p className="mt-1 text-sm text-amber-800">
+            Starý monolitický katalog. Nový hub:{" "}
+            <a href="/iml/vyseky" className="font-medium underline">
+              Výseky
+            </a>{" "}
+            (tvary · nástroje · montáže).
+          </p>
           <p className="mt-1 text-gray-600">
             Globální katalog – unikátní klíč je kód tvaru etikety. U produktu se výsek vybírá ze
             seznamu.
@@ -303,6 +310,35 @@ export function DieCutsClient({ canWrite }: { canWrite: boolean }) {
           </Link>
           {canWrite && (
             <>
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-amber-900 hover:bg-amber-100"
+                onClick={async () => {
+                  if (
+                    !confirm(
+                      "Spustit bridge legacy výseků do tvarů/nástrojů/montáží? Produkty se nepřepisují."
+                    )
+                  ) {
+                    return;
+                  }
+                  const res = await fetch("/api/iml/die-cuts/bridge", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ dryRun: false }),
+                  });
+                  const data = await res.json().catch(() => ({}));
+                  if (!res.ok) {
+                    alert(data.error ?? "Bridge selhal");
+                    return;
+                  }
+                  const r = data.report;
+                  alert(
+                    `Bridge hotov.\nTvary: ${r.shapesCreated}\nNástroje: ${r.toolsCreated}\nMontáže: ${r.impositionsCreated}\nVazby: ${r.assignmentsCreated}\nPřeskočeno: ${r.skipped?.length ?? 0}\nChyby: ${r.errors?.length ?? 0}`
+                  );
+                }}
+              >
+                Bridge → nový katalog
+              </button>
               <Link
                 href="/iml/die-cuts/import"
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"

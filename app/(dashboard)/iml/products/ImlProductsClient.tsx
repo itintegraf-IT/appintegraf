@@ -20,6 +20,10 @@ const PRODUCT_LIST_FILTER_DEFAULTS = {
   status: "",
   product_kind: "",
   archive: "",
+  format_width_mm: "",
+  format_height_mm: "",
+  sort: "",
+  missing_shape: "",
   page: "1",
   per_page: "",
 };
@@ -57,7 +61,18 @@ function mergeProductRows(prev: ProductListRow[], next: ProductListRow[]): Produ
 export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const { filters, setFilter, setFilters, listHref } = useListFilters({
     defaults: PRODUCT_LIST_FILTER_DEFAULTS,
-    resetPageOnChange: ["search", "customer_id", "status", "product_kind", "archive", "per_page"],
+    resetPageOnChange: [
+      "search",
+      "customer_id",
+      "status",
+      "product_kind",
+      "archive",
+      "format_width_mm",
+      "format_height_mm",
+      "sort",
+      "missing_shape",
+      "per_page",
+    ],
   });
 
   const search = filters.search;
@@ -65,6 +80,10 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const filterStatus = filters.status;
   const filterProductKind = filters.product_kind;
   const filterArchive = filters.archive || "active";
+  const filterWidth = filters.format_width_mm;
+  const filterHeight = filters.format_height_mm;
+  const filterSort = filters.sort;
+  const filterMissingShape = filters.missing_shape;
   const page = parseInt(filters.page || "1", 10) || 1;
   const perPage = (filters.per_page || "25") as PerPageOption;
   const isInfiniteMode = perPage === "all";
@@ -91,6 +110,13 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const [exportBusy, setExportBusy] = useState(false);
   const [includePrint, setIncludePrint] = useState(false);
   const [includeSoftproof, setIncludeSoftproof] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [shapes, setShapes] = useState<
+    Array<{ id: number; shape_code: string; width_mm: number | string; height_mm: number | string }>
+  >([]);
+  const [bulkShapeId, setBulkShapeId] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
 
   const infinitePageRef = useRef(1);
   const prefetchRef = useRef<{ page: number; products: ProductListRow[]; hasMore: boolean } | null>(
@@ -103,8 +129,30 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
 
   const filterKey = useMemo(
     () =>
-      [search, filterCustomer, filterStatus, filterProductKind, filterArchive, perPage].join("|"),
-    [search, filterCustomer, filterStatus, filterProductKind, filterArchive, perPage]
+      [
+        search,
+        filterCustomer,
+        filterStatus,
+        filterProductKind,
+        filterArchive,
+        filterWidth,
+        filterHeight,
+        filterSort,
+        filterMissingShape,
+        perPage,
+      ].join("|"),
+    [
+      search,
+      filterCustomer,
+      filterStatus,
+      filterProductKind,
+      filterArchive,
+      filterWidth,
+      filterHeight,
+      filterSort,
+      filterMissingShape,
+      perPage,
+    ]
   );
 
   useEffect(() => {
@@ -137,12 +185,28 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
       if (filterStatus) params.set("status", filterStatus);
       if (filterProductKind) params.set("product_kind", filterProductKind);
       if (filterArchive && filterArchive !== "active") params.set("archive", filterArchive);
+      if (filterWidth) params.set("format_width_mm", filterWidth);
+      if (filterHeight) params.set("format_height_mm", filterHeight);
+      if (filterSort) params.set("sort", filterSort);
+      if (filterMissingShape === "1") params.set("missing_shape", "1");
       params.set("page", String(pageNum));
       params.set("per_page", isInfiniteMode ? String(INFINITE_CHUNK_SIZE) : perPage);
       if (opts?.skipTotal) params.set("skip_total", "1");
       return params;
     },
-    [search, filterCustomer, filterStatus, filterProductKind, filterArchive, perPage, isInfiniteMode]
+    [
+      search,
+      filterCustomer,
+      filterStatus,
+      filterProductKind,
+      filterArchive,
+      filterWidth,
+      filterHeight,
+      filterSort,
+      filterMissingShape,
+      perPage,
+      isInfiniteMode,
+    ]
   );
 
   const fetchProductsPage = useCallback(
@@ -263,7 +327,74 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
       .then((r) => r.json())
       .then((d) => setCustomers(d.customers ?? []))
       .catch(() => {});
-  }, []);
+    if (canWrite) {
+      fetch("/api/iml/shapes")
+        .then((r) => r.json())
+        .then((d) => setShapes(d.shapes ?? []))
+        .catch(() => {});
+    }
+  }, [canWrite]);
+
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [filterKey]);
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllPage = () => {
+    setSelectedIds((prev) => {
+      const allSelected = products.length > 0 && products.every((p) => prev.has(p.id));
+      const next = new Set(prev);
+      if (allSelected) {
+        for (const p of products) next.delete(p.id);
+      } else {
+        for (const p of products) next.add(p.id);
+      }
+      return next;
+    });
+  };
+
+  const runBulkAssignShape = async () => {
+    const shapeId = parseInt(bulkShapeId, 10);
+    if (!Number.isFinite(shapeId) || selectedIds.size === 0) return;
+    if (
+      !confirm(
+        `Přiřadit tvar #${shapeId} celkem ${selectedIds.size} produktům (včetně výchozího nástroje a montáže)?`
+      )
+    ) {
+      return;
+    }
+    setBulkBusy(true);
+    setBulkMsg(null);
+    try {
+      const res = await fetch("/api/iml/products/bulk-assign-shape", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shape_id: shapeId,
+          product_ids: [...selectedIds],
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBulkMsg(data.error ?? "Hromadné přiřazení selhalo");
+        return;
+      }
+      setBulkMsg(`Aktualizováno ${data.updatedProducts ?? selectedIds.size} produktů.`);
+      setSelectedIds(new Set());
+      if (isInfiniteMode) void fetchInfiniteInitial();
+      else void fetchPagedProducts();
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -521,6 +652,41 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
               <option value="archived">Jen archiv</option>
               <option value="all">Vše včetně archivu</option>
             </select>
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="Šířka mm"
+              value={filterWidth}
+              onChange={(e) => setFilter("format_width_mm", e.target.value)}
+              className="w-24 rounded-lg border border-gray-300 px-2 py-2 text-sm"
+              title="Filtr formátu – šířka"
+            />
+            <input
+              type="text"
+              inputMode="decimal"
+              placeholder="Výška mm"
+              value={filterHeight}
+              onChange={(e) => setFilter("format_height_mm", e.target.value)}
+              className="w-24 rounded-lg border border-gray-300 px-2 py-2 text-sm"
+              title="Filtr formátu – výška"
+            />
+            <select
+              value={filterSort}
+              onChange={(e) => setFilter("sort", e.target.value)}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            >
+              <option value="">Řazení: ID</option>
+              <option value="format">Řazení: formát ↑</option>
+              <option value="format_desc">Řazení: formát ↓</option>
+            </select>
+            <label className="flex items-center gap-1.5 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={filterMissingShape === "1"}
+                onChange={(e) => setFilter("missing_shape", e.target.checked ? "1" : "")}
+              />
+              Bez tvaru
+            </label>
             <button
               type="submit"
               className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-200"
@@ -528,6 +694,34 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
               Hledat
             </button>
           </form>
+          {canWrite && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-violet-100 bg-violet-50/50 p-3">
+              <span className="text-sm text-gray-700">
+                Vybráno: <strong>{selectedIds.size}</strong>
+              </span>
+              <select
+                value={bulkShapeId}
+                onChange={(e) => setBulkShapeId(e.target.value)}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+              >
+                <option value="">— Vyberte tvar —</option>
+                {shapes.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.shape_code} ({Number(s.width_mm)}×{Number(s.height_mm)} mm)
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={bulkBusy || selectedIds.size === 0 || !bulkShapeId}
+                onClick={() => void runBulkAssignShape()}
+                className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              >
+                Přiřadit tvar vybraným položkám
+              </button>
+              {bulkMsg && <span className="text-sm text-gray-600">{bulkMsg}</span>}
+            </div>
+          )}
         </div>
         <ResizableProductListTable
           visibleColumns={visibleColumns}
@@ -539,6 +733,10 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
           cellContext={cellContext}
           onResizeColumn={setWidth}
           onResetColumnWidth={resetWidth}
+          selectionEnabled={canWrite}
+          selectedIds={selectedIds}
+          onToggleSelect={toggleSelect}
+          onToggleSelectAllPage={toggleSelectAllPage}
           footer={
             isInfiniteMode && !loading && products.length > 0 ? (
               <div ref={sentinelRef} className="h-1 w-full" aria-hidden />

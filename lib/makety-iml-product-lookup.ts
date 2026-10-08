@@ -18,6 +18,7 @@ export type ImlProductIgMatch = {
   production_notes: string | null;
   customer_id: number | null;
   die_cut_id: number | null;
+  shape_id: number | null;
 };
 
 /** Porovná dva kódy IG (normalizace trim + uppercase). */
@@ -52,6 +53,7 @@ const productSelectForLookup = {
   production_notes: true,
   customer_id: true,
   die_cut_id: true,
+  shape_id: true,
 } as const;
 
 export async function findImlProductByIgCode(

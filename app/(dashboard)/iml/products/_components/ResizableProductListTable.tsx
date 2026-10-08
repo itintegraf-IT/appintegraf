@@ -19,6 +19,11 @@ type Props = {
   onResizeColumn: (id: ProductListColumnId, width: number) => void;
   onResetColumnWidth: (id: ProductListColumnId) => void;
   footer?: ReactNode;
+  /** Hromadný výběr řádků (bulk assign tvaru). */
+  selectionEnabled?: boolean;
+  selectedIds?: Set<number>;
+  onToggleSelect?: (id: number) => void;
+  onToggleSelectAllPage?: () => void;
 };
 
 function headerAlignClass(align?: "left" | "center" | "right"): string {
@@ -53,8 +58,16 @@ export function ResizableProductListTable({
   onResizeColumn,
   onResetColumnWidth,
   footer,
+  selectionEnabled = false,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAllPage,
 }: Props) {
-  const colCount = visibleColumns.length;
+  const colCount = visibleColumns.length + (selectionEnabled ? 1 : 0);
+  const allPageSelected =
+    selectionEnabled &&
+    products.length > 0 &&
+    products.every((p) => selectedIds?.has(p.id));
   const [dragWidths, setDragWidths] = useState<Partial<Record<ProductListColumnId, number>>>({});
 
   const effectiveWidths = useMemo(
@@ -87,12 +100,23 @@ export function ResizableProductListTable({
     <div className="overflow-x-auto">
       <table className="w-full table-fixed" style={{ minWidth: "100%" }}>
         <colgroup>
+          {selectionEnabled && <col style={{ width: 40 }} />}
           {visibleColumns.map((col) => (
             <col key={col.id} style={{ width: effectiveWidths[col.id] ?? col.defaultWidthPx }} />
           ))}
         </colgroup>
         <thead className="border-b border-gray-200 bg-gray-50">
           <tr>
+            {selectionEnabled && (
+              <th className="px-2 py-3">
+                <input
+                  type="checkbox"
+                  checked={!!allPageSelected}
+                  onChange={() => onToggleSelectAllPage?.()}
+                  aria-label="Vybrat vše na stránce"
+                />
+              </th>
+            )}
             {visibleColumns.map((col) => (
               <th
                 key={col.id}
@@ -140,6 +164,16 @@ export function ResizableProductListTable({
           ) : (
             products.map((p) => (
               <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+                {selectionEnabled && (
+                  <td className="px-2 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds?.has(p.id) ?? false}
+                      onChange={() => onToggleSelect?.(p.id)}
+                      aria-label={`Vybrat produkt ${p.id}`}
+                    />
+                  </td>
+                )}
                 {visibleColumns.map((col) => {
                   const truncate = col.truncate;
                   const title = truncate ? cellTitle(col.id, p) : undefined;

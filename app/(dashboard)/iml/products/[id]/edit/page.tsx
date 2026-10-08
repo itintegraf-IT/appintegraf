@@ -93,6 +93,9 @@ export default function ImlProductEditPage() {
             requester: s("requester"),
             sku: s("sku"),
             die_cut_id: si("die_cut_id"),
+            shape_id: si("shape_id"),
+            selected_tool_id: si("selected_tool_id"),
+            selected_imposition_id: si("selected_imposition_id"),
             label_shape_code: s("label_shape_code"),
             die_cut_tool_code: s("die_cut_tool_code"),
             assembly_code: s("assembly_code"),
@@ -100,6 +103,12 @@ export default function ImlProductEditPage() {
             labels_per_sheet: si("labels_per_sheet"),
             pieces_per_box: si("pieces_per_box"),
             pieces_per_pallet: si("pieces_per_pallet"),
+            boxes_per_pallet: si("boxes_per_pallet"),
+            pallet_weight:
+              p.pallet_weight != null && p.pallet_weight !== ""
+                ? String(p.pallet_weight)
+                : "",
+            box_type_id: si("box_type_id"),
             foil_material_id: si("foil_material_id"),
             color_material_id: si("color_material_id"),
             paper_material_id: si("paper_material_id"),
@@ -113,6 +122,9 @@ export default function ImlProductEditPage() {
             item_status: s("item_status"),
             format_width_mm: formatWidth,
             format_height_mm: formatHeight,
+            raw_data_width_mm: si("raw_data_width_mm"),
+            raw_data_height_mm: si("raw_data_height_mm"),
+            colors_spec: s("colors_spec"),
             color_count: si("color_count"),
             print_colors_text: s("print_colors_text"),
             label_type: s("label_type"),
@@ -215,6 +227,20 @@ export default function ImlProductEditPage() {
           ...form,
           customer_id: form.customer_id ? parseInt(form.customer_id, 10) : null,
           die_cut_id: form.die_cut_id ? parseInt(form.die_cut_id, 10) : null,
+          shape_id: form.shape_id ? parseInt(form.shape_id, 10) : null,
+          selected_tool_id: form.selected_tool_id
+            ? parseInt(form.selected_tool_id, 10)
+            : null,
+          selected_imposition_id: form.selected_imposition_id
+            ? parseInt(form.selected_imposition_id, 10)
+            : null,
+          box_type_id: form.box_type_id ? parseInt(form.box_type_id, 10) : null,
+          boxes_per_pallet: form.boxes_per_pallet
+            ? parseInt(form.boxes_per_pallet, 10)
+            : null,
+          pallet_weight: form.pallet_weight
+            ? parseFloat(form.pallet_weight.replace(",", "."))
+            : null,
           foil_material_id: form.foil_material_id ? parseInt(form.foil_material_id, 10) : null,
           color_material_id: form.color_material_id ? parseInt(form.color_material_id, 10) : null,
           paper_material_id: form.paper_material_id ? parseInt(form.paper_material_id, 10) : null,
