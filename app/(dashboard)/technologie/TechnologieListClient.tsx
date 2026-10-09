@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Layers, Plus, Search, Settings2 } from "lucide-react";
+import { Layers, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
 import { MachineSelectOptions } from "@/components/shared-machines/MachineSelectOptions";
 
 type SheetType = { id: number; name: string };
@@ -56,6 +56,7 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
   const [printMachines, setPrintMachines] = useState<PrintMachine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [sheetTypeId, setSheetTypeId] = useState(searchParams.get("sheet_type_id") ?? "");
@@ -115,6 +116,30 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
     const next = queryString ? `?${queryString}` : "";
     router.replace(`/technologie${next}`, { scroll: false });
   }, [queryString, router]);
+
+  const onDelete = async (item: Item) => {
+    if (!confirm(`Trvale smazat rozkres „${item.code} – ${item.name}“ včetně PDF?`)) {
+      return;
+    }
+    setDeletingId(item.id);
+    setError("");
+    try {
+      const res = await fetch(`/api/technologie/${item.id}`, { method: "DELETE" });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) {
+        setError(data.error ?? "Smazání se nezdařilo.");
+        return;
+      }
+      await load();
+      router.refresh();
+    } catch {
+      setError("Chyba při mazání.");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const colSpan = canWrite ? 9 : 8;
 
   return (
     <>
@@ -218,25 +243,35 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
                 </th>
                 <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">Poznámka</th>
                 <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">Náhled</th>
+                {canWrite && (
+                  <th className="px-3 py-3 text-right text-sm font-semibold text-gray-700">Akce</th>
+                )}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={colSpan} className="px-4 py-8 text-center text-gray-500">
                     Načítání…
                   </td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={colSpan} className="px-4 py-8 text-center text-gray-500">
                     Žádné záznamy
                   </td>
                 </tr>
               ) : (
                 items.map((item) => (
                   <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-3 py-3 text-sm font-mono text-gray-800">{item.code}</td>
+                    <td className="px-3 py-3 text-sm font-mono">
+                      <Link
+                        href={`/technologie/${item.id}`}
+                        className="text-gray-800 hover:text-red-700 hover:underline"
+                      >
+                        {item.code}
+                      </Link>
+                    </td>
                     <td className="px-3 py-3">
                       <Link
                         href={`/technologie/${item.id}`}
@@ -264,6 +299,30 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
                         updatedAt={item.preview_updated_at}
                       />
                     </td>
+                    {canWrite && (
+                      <td className="px-3 py-3 text-right">
+                        <div className="inline-flex flex-wrap justify-end gap-1">
+                          <Link
+                            href={`/technologie/${item.id}/edit`}
+                            className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                            title="Upravit"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Upravit
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => void onDelete(item)}
+                            disabled={deletingId === item.id}
+                            className="inline-flex items-center gap-1 rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                            title="Smazat"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                            {deletingId === item.id ? "…" : "Smazat"}
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
