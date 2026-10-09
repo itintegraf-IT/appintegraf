@@ -186,6 +186,24 @@ if [[ "$iml_cmyk_exit" -ne 0 ]]; then
   echo ""
 fi
 
+echo "==> SQL: modul Technologie (tabulky + společné stroje + velikosti archů)"
+set +e
+npm run db:technologie-migrate
+technologie_migrate_exit=$?
+npm run db:shared-machines-migrate
+shared_machines_exit=$?
+npm run db:technologie-sheet-sizes-migrate
+technologie_sizes_exit=$?
+set -e
+if [[ "$technologie_migrate_exit" -ne 0 || "$shared_machines_exit" -ne 0 || "$technologie_sizes_exit" -ne 0 ]]; then
+  echo "Upozornění: některá technologie migrace skončila chybou (technologie=$technologie_migrate_exit shared-machines=$shared_machines_exit sheet-sizes=$technologie_sizes_exit)."
+  echo "  Na serveru spusťte ručně:"
+  echo "    npm run db:technologie-migrate"
+  echo "    npm run db:shared-machines-migrate"
+  echo "    npm run db:technologie-sheet-sizes-migrate"
+  echo ""
+fi
+
 if [[ "$DO_PLANOVANI" -eq 1 ]]; then
   echo "==> SQL upgrade plánování (db:planovani-upgrade)"
   npm run db:planovani-upgrade

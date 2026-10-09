@@ -45,6 +45,8 @@ npm run db:technologie-sheet-sizes-migrate
 npx prisma generate
 ```
 
+Tyto tři skripty volá i `scripts/deploy-server.sh` (samotný `prisma migrate deploy` nestačí – např. `sheet_size_id` doplňuje Node skript).
+
 SQL: `prisma/migrations/20261009120000_technologie_module/migration.sql`  
 Skript přesunu starých `vykresy_machines` / `technologie_print_machines`: `npm run db:shared-machines-migrate`
 
