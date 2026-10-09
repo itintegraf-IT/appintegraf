@@ -1363,6 +1363,7 @@ model users {
   iml_product_files_uploaded                                     iml_product_files[]           @relation("iml_product_files_uploader")
   iml_export_templates                                           iml_export_templates[]        @relation("iml_export_templates_owner")
   vykresy_created                                                vykresy[]                     @relation("vykresy_created_by")
+  technologie_created                                            technologie[]                 @relation("technologie_created_by")
   projekty_owned_boards                                          Board[]                       @relation("ProjektyBoardOwner")
   projekty_board_members                                         BoardMember[]
   projekty_card_members                                          CardMember[]
@@ -1383,33 +1384,38 @@ model users {
 
 // --- Technické výkresy a 3D modely ---
 
-model vykresy_machines {
-  id         Int       @id @default(autoincrement())
-  name       String    @db.VarChar(150)
-  is_active  Boolean?  @default(true)
-  sort_order Int?      @default(0)
-  created_at DateTime  @default(now()) @db.Timestamp(0)
-  updated_at DateTime  @default(now()) @db.Timestamp(0)
-  vykresy    vykresy[]
+/// Společný číselník strojů pro Výkresy i Technologie.
+/// machine_group: press | postpress
+model shared_machines {
+  id             Int            @id @default(autoincrement())
+  name           String         @db.VarChar(150)
+  machine_group  String         @default("postpress") @db.VarChar(20)
+  is_active      Boolean?       @default(true)
+  sort_order     Int?           @default(0)
+  created_at     DateTime       @default(now()) @db.Timestamp(0)
+  updated_at     DateTime       @default(now()) @db.Timestamp(0)
+  vykresy        vykresy[]
+  technologie    technologie[]
 
-  @@index([is_active], map: "idx_vykresy_machines_active")
-  @@index([sort_order], map: "idx_vykresy_machines_sort")
-  @@index([name], map: "idx_vykresy_machines_name")
+  @@index([is_active], map: "idx_shared_machines_active")
+  @@index([sort_order], map: "idx_shared_machines_sort")
+  @@index([name], map: "idx_shared_machines_name")
+  @@index([machine_group], map: "idx_shared_machines_group")
 }
 
 model vykresy {
-  id              Int               @id @default(autoincrement())
-  name            String            @db.VarChar(255)
+  id               Int              @id @default(autoincrement())
+  name             String           @db.VarChar(255)
   /// model_3d | cad | pdf | other
-  document_kind   String            @db.VarChar(30)
-  department_id   Int?
-  machine_id      Int?
-  description     String?           @db.Text
-  created_by      Int
-  created_at      DateTime          @default(now()) @db.Timestamp(0)
-  updated_at      DateTime          @default(now()) @db.Timestamp(0)
-  departments     departments?      @relation(fields: [department_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "vykresy_department_fk")
-  vykresy_machines vykresy_machines? @relation(fields: [machine_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "vykresy_machine_fk")
+  document_kind    String           @db.VarChar(30)
+  department_id    Int?
+  machine_id       Int?
+  description      String?          @db.Text
+  created_by       Int
+  created_at       DateTime         @default(now()) @db.Timestamp(0)
+  updated_at       DateTime         @default(now()) @db.Timestamp(0)
+  departments      departments?     @relation(fields: [department_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "vykresy_department_fk")
+  shared_machines  shared_machines? @relation(fields: [machine_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "vykresy_machine_fk")
   users_created_by users            @relation("vykresy_created_by", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "vykresy_created_by_fk")
 
   @@index([name], map: "idx_vykresy_name")
@@ -1418,6 +1424,62 @@ model vykresy {
   @@index([machine_id], map: "idx_vykresy_machine")
   @@index([created_by], map: "idx_vykresy_created_by")
   @@index([created_at], map: "idx_vykresy_created_at")
+}
+
+model technologie_sheet_types {
+  id          Int           @id @default(autoincrement())
+  name        String        @db.VarChar(150)
+  is_active   Boolean?      @default(true)
+  sort_order  Int?          @default(0)
+  created_at  DateTime      @default(now()) @db.Timestamp(0)
+  updated_at  DateTime      @default(now()) @db.Timestamp(0)
+  technologie technologie[]
+
+  @@index([is_active], map: "idx_technologie_sheet_types_active")
+  @@index([sort_order], map: "idx_technologie_sheet_types_sort")
+  @@index([name], map: "idx_technologie_sheet_types_name")
+}
+
+model technologie_sheet_sizes {
+  id          Int           @id @default(autoincrement())
+  name        String        @db.VarChar(64)
+  is_active   Boolean?      @default(true)
+  sort_order  Int?          @default(0)
+  created_at  DateTime      @default(now()) @db.Timestamp(0)
+  updated_at  DateTime      @default(now()) @db.Timestamp(0)
+  technologie technologie[]
+
+  @@index([is_active], map: "idx_technologie_sheet_sizes_active")
+  @@index([sort_order], map: "idx_technologie_sheet_sizes_sort")
+  @@index([name], map: "idx_technologie_sheet_sizes_name")
+}
+
+model technologie {
+  id                      Int                       @id @default(autoincrement())
+  code                    String                    @unique(map: "technologie_code") @db.VarChar(32)
+  name                    String                    @db.VarChar(255)
+  sheet_type_id           Int?
+  format_text             String?                   @db.VarChar(64)
+  sheet_size_id           Int?
+  print_machine_id        Int?
+  note                    String?                   @db.Text
+  preview_updated_at      DateTime?                 @db.Timestamp(0)
+  created_by              Int
+  created_at              DateTime                  @default(now()) @db.Timestamp(0)
+  updated_at              DateTime                  @default(now()) @db.Timestamp(0)
+  technologie_sheet_types technologie_sheet_types?  @relation(fields: [sheet_type_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "technologie_sheet_type_fk")
+  technologie_sheet_sizes technologie_sheet_sizes?  @relation(fields: [sheet_size_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "technologie_sheet_size_fk")
+  shared_machines         shared_machines?          @relation(fields: [print_machine_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "technologie_print_machine_fk")
+  users_created_by        users                     @relation("technologie_created_by", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "technologie_created_by_fk")
+
+  @@index([code], map: "idx_technologie_code")
+  @@index([name], map: "idx_technologie_name")
+  @@index([sheet_type_id], map: "idx_technologie_sheet_type")
+  @@index([sheet_size_id], map: "idx_technologie_sheet_size")
+  @@index([print_machine_id], map: "idx_technologie_print_machine")
+  @@index([created_by], map: "idx_technologie_created_by")
+  @@index([created_at], map: "idx_technologie_created_at")
+  @@index([updated_at], map: "idx_technologie_updated_at")
 }
 
 model notifications {

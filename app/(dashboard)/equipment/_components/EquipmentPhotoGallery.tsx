@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { equipmentFileUrl } from "@/lib/equipment/file-url";
 
 type FileRow = {
   id: number;
-  file_path: string;
   original_filename: string;
   document_type: string | null;
 };
@@ -107,7 +107,7 @@ export function EquipmentPhotoGallery({
         {files.map((f) => (
           <div key={f.id} className="relative overflow-hidden rounded-lg border">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={f.file_path} alt={f.original_filename} className="h-28 w-full object-cover" />
+            <img src={equipmentFileUrl(equipmentId, f.id)} alt={f.original_filename} className="h-28 w-full object-cover" />
             {canWrite ? (
               <div className="absolute inset-x-0 bottom-0 flex gap-1 bg-black/50 p-1 text-[10px] text-white">
                 <button type="button" onClick={() => void setCover(f.id)}>

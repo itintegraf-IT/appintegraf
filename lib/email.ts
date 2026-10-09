@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import { withTestMailPolicy } from "@/lib/mail-transport";
 import { getEmailSettings, formatSmtpFrom } from "./email-settings";
 import { loadSoftproofTemplates } from "@/lib/makety-softproof-templates-db";
 import {
@@ -81,7 +82,7 @@ export async function sendCalendarApprovalEmail(
   `.trim();
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -93,7 +94,7 @@ export async function sendCalendarApprovalEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -164,7 +165,7 @@ export async function sendCalendarReminderEmail(
   `.trim();
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -173,7 +174,7 @@ export async function sendCalendarReminderEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
     await transporter.sendMail({
       from: settings.fromName
         ? `"${settings.fromName}" <${settings.from}>`
@@ -207,7 +208,8 @@ function escHtml(s: string): string {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /**
@@ -257,7 +259,7 @@ export async function sendCalendarInviteEmail(
   const textHint = params.extraHint ? `\n\n${params.extraHint}` : "";
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -269,7 +271,7 @@ export async function sendCalendarInviteEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -350,7 +352,7 @@ export async function sendCalendarInviteResponseEmail(
   const textReason = !isApprove && params.reason ? `\nDůvod odmítnutí: ${params.reason}` : "";
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -362,7 +364,7 @@ export async function sendCalendarInviteResponseEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -424,10 +426,10 @@ export async function sendEquipmentRequestResultEmail(
       : "#16a34a";
 
   const itBlock = params.itResponse
-    ? `<p><strong>Stanovisko IT:</strong><br>${String(params.itResponse).replace(/\n/g, "<br>")}</p>`
+    ? `<p><strong>Stanovisko IT:</strong><br>${escHtml(String(params.itResponse)).replace(/\n/g, "<br>")}</p>`
     : "";
   const adminBlock = params.adminResponse
-    ? `<p><strong>Stanovisko vedení:</strong><br>${String(params.adminResponse).replace(/\n/g, "<br>")}</p>`
+    ? `<p><strong>Stanovisko vedení:</strong><br>${escHtml(String(params.adminResponse)).replace(/\n/g, "<br>")}</p>`
     : "";
 
   const subject = `Požadavek na techniku #${params.requestId} – ${resultText}`;
@@ -436,8 +438,8 @@ export async function sendEquipmentRequestResultEmail(
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
-  <p>Dobrý den, ${params.toName},</p>
-  <p>Váš požadavek <strong>#${params.requestId}</strong> na <strong>${params.equipmentType}</strong> byl
+  <p>Dobrý den, ${escHtml(params.toName)},</p>
+  <p>Váš požadavek <strong>#${params.requestId}</strong> na <strong>${escHtml(params.equipmentType)}</strong> byl
     <strong style="color: ${color};">${resultText}</strong>.</p>
   ${itBlock}
   ${adminBlock}
@@ -455,7 +457,7 @@ export async function sendEquipmentRequestResultEmail(
   if (params.adminResponse) textLines.push(`Stanovisko vedení: ${params.adminResponse}`);
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -464,7 +466,7 @@ export async function sendEquipmentRequestResultEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -517,10 +519,10 @@ export async function sendEquipmentMovementEmail(
 <html>
 <head><meta charset="utf-8"></head>
 <body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
-  <p>Dobrý den, ${params.toName},</p>
-  <p>${params.intro}</p>
-  <p><a href="${link}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">${label}</a></p>
-  <p style="color: #666; font-size: 12px;">Pokud tlačítko nefunguje, zkopírujte odkaz: ${link}</p>
+  <p>Dobrý den, ${escHtml(params.toName)},</p>
+  <p>${escHtml(params.intro)}</p>
+  <p><a href="${escHtml(link)}" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 6px;">${escHtml(label)}</a></p>
+  <p style="color: #666; font-size: 12px;">Pokud tlačítko nefunguje, zkopírujte odkaz: ${escHtml(link)}</p>
   <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
   <p style="color: #999; font-size: 11px;">Tento e-mail byl odeslán automaticky z aplikace INTEGRAF.</p>
 </body>
@@ -528,7 +530,7 @@ export async function sendEquipmentMovementEmail(
   `.trim();
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -537,7 +539,7 @@ export async function sendEquipmentMovementEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -607,7 +609,7 @@ export async function sendUkolEmail(
   `.trim();
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -619,7 +621,7 @@ export async function sendUkolEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -753,7 +755,7 @@ export async function sendMaketaEmail(
   ].filter(Boolean);
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -765,7 +767,7 @@ export async function sendMaketaEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -846,7 +848,7 @@ export async function sendMaketySoftproofEmail(
   });
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -858,7 +860,7 @@ export async function sendMaketySoftproofEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: formatSmtpFrom(settings, "makety"),
@@ -905,7 +907,7 @@ export async function sendMaketyClientPlainEmail(params: {
     };
   }
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -917,7 +919,7 @@ export async function sendMaketyClientPlainEmail(params: {
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
     const html = `<p style="font-family:Arial,sans-serif;white-space:pre-wrap;">${params.text
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
@@ -994,7 +996,7 @@ export async function sendTestEmail(
   `.trim();
 
   try {
-    const transporter = nodemailer.createTransport({
+    const transporter = withTestMailPolicy(nodemailer.createTransport({
       host: settings.host,
       port: settings.port,
       secure: settings.secure,
@@ -1006,7 +1008,7 @@ export async function sendTestEmail(
         settings.host.includes("office365") || settings.host.includes("outlook")
           ? { ciphers: "SSLv3", rejectUnauthorized: false }
           : undefined,
-    });
+    }));
 
     await transporter.sendMail({
       from: settings.fromName
@@ -1051,7 +1053,7 @@ async function configuredTransporter() {
   if (!settings.user || !settings.password || !settings.from) {
     return { settings, transporter: null };
   }
-  const transporter = nodemailer.createTransport({
+  const transporter = withTestMailPolicy(nodemailer.createTransport({
     host: settings.host,
     port: settings.port,
     secure: settings.secure,
@@ -1060,7 +1062,7 @@ async function configuredTransporter() {
       settings.host.includes("office365") || settings.host.includes("outlook")
         ? { ciphers: "SSLv3", rejectUnauthorized: false }
         : undefined,
-  });
+  }));
   return { settings, transporter };
 }
 

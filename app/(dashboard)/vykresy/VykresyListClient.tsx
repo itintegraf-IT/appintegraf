@@ -9,9 +9,10 @@ import {
   VYKRESY_DOCUMENT_KIND_LABELS,
   type VykresyDocumentKind,
 } from "@/lib/vykresy/constants";
+import { MachineSelectOptions } from "@/components/shared-machines/MachineSelectOptions";
 
 type Department = { id: number; name: string };
-type Machine = { id: number; name: string };
+type Machine = { id: number; name: string; machine_group?: string };
 type Item = {
   id: number;
   name: string;
@@ -20,7 +21,7 @@ type Item = {
   created_at: string;
   updated_at: string;
   departments: { id: number; name: string } | null;
-  vykresy_machines: { id: number; name: string } | null;
+  shared_machines: { id: number; name: string; machine_group?: string } | null;
   users_created_by: { first_name: string; last_name: string };
 };
 
@@ -61,7 +62,7 @@ export function VykresyListClient({ canWrite }: { canWrite: boolean }) {
       const [rItems, rDep, rMach] = await Promise.all([
         fetch(`/api/vykresy${queryString ? `?${queryString}` : ""}`),
         fetch("/api/departments"),
-        fetch("/api/vykresy/machines"),
+        fetch("/api/shared-machines"),
       ]);
       const dItems = (await rItems.json().catch(() => ({}))) as {
         items?: Item[];
@@ -120,7 +121,7 @@ export function VykresyListClient({ canWrite }: { canWrite: boolean }) {
           {canWrite && (
             <>
               <Link
-                href="/vykresy/stroje"
+                href="/stroje?from=vykresy"
                 className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
               >
                 <Settings2 className="h-4 w-4" />
@@ -195,11 +196,7 @@ export function VykresyListClient({ canWrite }: { canWrite: boolean }) {
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
             <option value="">Vše</option>
-            {machines.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
+            <MachineSelectOptions machines={machines} />
           </select>
         </label>
       </form>
@@ -253,7 +250,7 @@ export function VykresyListClient({ canWrite }: { canWrite: boolean }) {
                       {item.departments?.name ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {item.vykresy_machines?.name ?? "—"}
+                      {item.shared_machines?.name ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-500">
                       {new Date(item.updated_at).toLocaleString("cs-CZ")}

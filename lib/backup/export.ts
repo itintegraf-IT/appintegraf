@@ -99,6 +99,7 @@ export function allModuleIds(): BackupModuleId[] {
     "personalistika",
     "contracts",
     "vykresy",
+    "technologie",
     "planovani",
     "vyroba",
     "materialy",

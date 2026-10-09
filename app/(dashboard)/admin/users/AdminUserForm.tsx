@@ -59,6 +59,7 @@ const AVAILABLE_MODULES = [
   { key: "makety", label: "Makety a grafika", icon: Printer },
   { key: "personalistika", label: "Personalistika", icon: BriefcaseBusiness },
   { key: "vykresy", label: "Technické výkresy", icon: Cuboid },
+  { key: "technologie", label: "Technologie (rozkresy)", icon: Printer },
 ] as const;
 
 /** Mapování UI úrovní na hodnoty v DB (auth-utils: read/write/admin); u plánování navíc tiskař */

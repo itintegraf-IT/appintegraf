@@ -9,9 +9,10 @@ import {
   VYKRESY_DOCUMENT_KIND_LABELS,
   type VykresyDocumentKind,
 } from "@/lib/vykresy/constants";
+import { MachineSelectOptions } from "@/components/shared-machines/MachineSelectOptions";
 
 type Department = { id: number; name: string };
-type Machine = { id: number; name: string };
+type Machine = { id: number; name: string; machine_group?: string };
 
 type FormState = {
   name: string;
@@ -55,7 +56,7 @@ export function VykresyForm({
         }
       })
       .catch(() => {});
-    fetch("/api/vykresy/machines")
+    fetch("/api/shared-machines")
       .then((r) => r.json())
       .then((data: { machines?: Machine[] }) => {
         setMachines(Array.isArray(data.machines) ? data.machines : []);
@@ -176,11 +177,7 @@ export function VykresyForm({
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
           >
             <option value="">—</option>
-            {machines.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-              </option>
-            ))}
+            <MachineSelectOptions machines={machines} />
           </select>
         </label>
       </div>

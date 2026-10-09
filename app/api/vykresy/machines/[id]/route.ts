@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canWriteVykresy } from "@/lib/vykresy/access";
+import { isSharedMachineGroup } from "@/lib/shared-machines/constants";
 
+/** Kompatibilní alias → shared_machines. */
 export async function PUT(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -22,7 +24,7 @@ export async function PUT(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
-  const existing = await prisma.vykresy_machines.findUnique({ where: { id } });
+  const existing = await prisma.shared_machines.findUnique({ where: { id } });
   if (!existing) {
     return NextResponse.json({ error: "Stroj nenalezen" }, { status: 404 });
   }
@@ -35,6 +37,18 @@ export async function PUT(
       return NextResponse.json({ error: "Vyplňte název stroje." }, { status: 400 });
     }
 
+    let machine_group = existing.machine_group;
+    if (body.machine_group !== undefined) {
+      const groupRaw = String(body.machine_group).trim();
+      if (!isSharedMachineGroup(groupRaw)) {
+        return NextResponse.json(
+          { error: "Neplatná skupina (press | postpress)." },
+          { status: 400 }
+        );
+      }
+      machine_group = groupRaw;
+    }
+
     const sortOrder = Number(body.sort_order);
     const sort_order = Number.isFinite(sortOrder)
       ? Math.floor(sortOrder)
@@ -42,15 +56,18 @@ export async function PUT(
     const is_active =
       body.is_active === undefined ? existing.is_active !== false : body.is_active !== false;
 
-    const machine = await prisma.vykresy_machines.update({
+    const machine = await prisma.shared_machines.update({
       where: { id },
       data: {
         name: name.slice(0, 150),
+        machine_group,
         sort_order,
         is_active,
         updated_at: new Date(),
       },
-      include: { _count: { select: { vykresy: true } } },
+      include: {
+        _count: { select: { vykresy: true, technologie: true } },
+      },
     });
 
     return NextResponse.json({ machine });
@@ -79,28 +96,30 @@ export async function DELETE(
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
   }
 
-  const existing = await prisma.vykresy_machines.findUnique({
+  const existing = await prisma.shared_machines.findUnique({
     where: { id },
-    include: { _count: { select: { vykresy: true } } },
+    include: { _count: { select: { vykresy: true, technologie: true } } },
   });
   if (!existing) {
     return NextResponse.json({ error: "Stroj nenalezen" }, { status: 404 });
   }
 
-  // Pokud je stroj použit u výkresů, pouze deaktivovat
-  if (existing._count.vykresy > 0) {
-    const machine = await prisma.vykresy_machines.update({
+  const used = existing._count.vykresy + existing._count.technologie;
+  if (used > 0) {
+    const machine = await prisma.shared_machines.update({
       where: { id },
       data: { is_active: false, updated_at: new Date() },
-      include: { _count: { select: { vykresy: true } } },
+      include: {
+        _count: { select: { vykresy: true, technologie: true } },
+      },
     });
     return NextResponse.json({
       machine,
       deactivated: true,
-      message: "Stroj je použit u výkresů – byl deaktivován.",
+      message: "Stroj je použit – byl deaktivován.",
     });
   }
 
-  await prisma.vykresy_machines.delete({ where: { id } });
+  await prisma.shared_machines.delete({ where: { id } });
   return NextResponse.json({ success: true });
 }

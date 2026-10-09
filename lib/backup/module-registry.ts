@@ -120,8 +120,21 @@ export const BACKUP_MODULES: Record<BackupModuleId, BackupModuleDef> = {
     id: "vykresy",
     label: "Technické výkresy",
     dependsOn: ["system"],
-    tables: [prisma("vykresy"), prisma("vykresy_machines"), prisma("file_uploads")],
+    tables: [prisma("vykresy"), prisma("shared_machines"), prisma("file_uploads")],
     fileUploadModules: [{ module: "vykresy", uploadSubdir: "vykresy" }],
+  },
+  technologie: {
+    id: "technologie",
+    label: "Technologie – rozkresy",
+    dependsOn: ["system"],
+    tables: [
+      prisma("technologie"),
+      prisma("technologie_sheet_types"),
+      prisma("technologie_sheet_sizes"),
+      prisma("shared_machines"),
+      prisma("file_uploads"),
+    ],
+    fileUploadModules: [{ module: "technologie", uploadSubdir: "technologie" }],
   },
   planovani: {
     id: "planovani",

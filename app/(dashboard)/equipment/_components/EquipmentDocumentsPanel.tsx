@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Download, FileText, Trash2, Upload } from "lucide-react";
+import { equipmentFileUrl } from "@/lib/equipment/file-url";
 import {
   EQUIPMENT_ATTACHMENT_DOC_TYPES,
   equipmentAttachmentTypeLabel,
@@ -10,7 +11,6 @@ import {
 
 type FileRow = {
   id: number;
-  file_path: string;
   original_filename: string;
   document_type: string | null;
   mime_type: string | null;
@@ -152,7 +152,7 @@ export function EquipmentDocumentsPanel({
               </div>
               <div className="flex shrink-0 items-center gap-2">
                 <a
-                  href={f.file_path}
+                  href={equipmentFileUrl(equipmentId, f.id)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs hover:bg-gray-50"

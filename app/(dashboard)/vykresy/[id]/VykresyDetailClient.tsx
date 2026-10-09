@@ -39,7 +39,7 @@ type Item = {
   created_at: string;
   updated_at: string;
   departments: { id: number; name: string } | null;
-  vykresy_machines: { id: number; name: string } | null;
+  shared_machines: { id: number; name: string; machine_group?: string } | null;
   users_created_by: { first_name: string; last_name: string };
 };
 
@@ -198,7 +198,7 @@ export function VykresyDetailClient({
           <p className="mt-1 text-sm text-gray-500">
             {kindLabel(item.document_kind)}
             {item.departments ? ` · ${item.departments.name}` : ""}
-            {item.vykresy_machines ? ` · ${item.vykresy_machines.name}` : ""}
+            {item.shared_machines ? ` · ${item.shared_machines.name}` : ""}
           </p>
         </div>
         {canWrite && (
@@ -243,7 +243,7 @@ export function VykresyDetailClient({
           <div>
             <dt className="text-gray-500">Stroj</dt>
             <dd className="font-medium text-gray-900">
-              {item.vykresy_machines?.name ?? "—"}
+              {item.shared_machines?.name ?? "—"}
             </dd>
           </div>
           <div>

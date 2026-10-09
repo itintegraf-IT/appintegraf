@@ -484,6 +484,13 @@ const navItems: NavItem[] = [
     module: "vykresy",
     isActive: (p) => p.startsWith("/vykresy"),
   },
+  {
+    href: "/technologie",
+    icon: Printer,
+    label: "Technologie",
+    module: "technologie",
+    isActive: (p) => p.startsWith("/technologie"),
+  },
   { href: "/kiosk", icon: Tv, label: "Kiosk Monitory", module: "kiosk" },
   { href: "/phone-list", icon: Phone, label: "Telefonní seznam", module: null },
   { href: "/training", icon: GraduationCap, label: "IT Školení", module: "training" },
