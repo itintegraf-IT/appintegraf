@@ -62,6 +62,10 @@ export const HELP_DOC_SLUGS: Record<
     file: "MODUL_MATERIALY.md",
     title: "Katalog materiálů – dokumentace",
   },
+  "modul-technologie": {
+    file: "MODUL_TECHNOLOGIE.md",
+    title: "Modul Technologie – rozkresy",
+  },
   "modul-vykresy": {
     file: "MODUL_VYKRESY.md",
     title: "Technické výkresy – dokumentace",

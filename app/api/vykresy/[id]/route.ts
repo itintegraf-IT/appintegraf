@@ -10,7 +10,7 @@ import {
 
 const detailInclude = {
   departments: { select: { id: true, name: true } },
-  vykresy_machines: { select: { id: true, name: true } },
+  shared_machines: { select: { id: true, name: true, machine_group: true } },
   users_created_by: { select: { id: true, first_name: true, last_name: true } },
 } as const;
 
@@ -100,7 +100,7 @@ export async function PUT(
       if (!Number.isFinite(m) || m <= 0) {
         return NextResponse.json({ error: "Neplatný stroj." }, { status: 400 });
       }
-      const machine = await prisma.vykresy_machines.findUnique({
+      const machine = await prisma.shared_machines.findUnique({
         where: { id: m },
         select: { id: true },
       });

@@ -9,12 +9,12 @@ Modul klíč: `vykresy` (Admin → uživatelé).
 | Úroveň | Možnosti |
 |--------|----------|
 | `read` | Seznam, detail, stažení, náhled PDF/obrázků |
-| `write` / `admin` | CRUD záznamů, upload/mazání souborů, správa číselníku strojů |
+| `write` / `admin` | CRUD záznamů, upload/mazání souborů, správa společného číselníku strojů |
 
 ## Datový model
 
-- **`vykresy`** – metadata: název, `document_kind` (`model_3d` \| `cad` \| `pdf` \| `image` \| `other`), oddělení (`departments`), stroj (`vykresy_machines`), popis
-- **`vykresy_machines`** – číselník strojů (název, aktivní, pořadí)
+- **`vykresy`** – metadata: název, `document_kind` (`model_3d` \| `cad` \| `pdf` \| `image` \| `other`), oddělení (`departments`), stroj (`shared_machines`), popis
+- **`shared_machines`** – společný číselník strojů s modulem Technologie (`machine_group`: `press` \| `postpress`)
 - **`file_uploads`** – přílohy (`module = vykresy`, `record_id` = id záznamu)
 
 Soubory na disku: `public/uploads/vykresy/` (ne BLOB v DB). Limit 50 MB.
@@ -27,7 +27,7 @@ Soubory na disku: `public/uploads/vykresy/` (ne BLOB v DB). Limit 50 MB.
 | `/vykresy/new` | Nový záznam |
 | `/vykresy/[id]` | Detail + přílohy (upload/download/náhled) |
 | `/vykresy/[id]/edit` | Úprava metadat |
-| `/vykresy/stroje` | Číselník strojů |
+| `/stroje` | Společný číselník strojů (Press / Postpress); `/vykresy/stroje` přesměruje sem |
 
 ### Náhled souborů
 
@@ -46,10 +46,12 @@ API: `GET /api/vykresy/[id]/files/[fileId]?inline=1` (`Content-Disposition: inli
 
 ```bash
 npm run db:vykresy-migrate
+npm run db:shared-machines-migrate
 npx prisma generate
 ```
 
-SQL: `prisma/migrations/20260918120000_vykresy_module/migration.sql`
+SQL: `prisma/migrations/20260918120000_vykresy_module/migration.sql`  
+Po přechodu na společný číselník: `npm run db:shared-machines-migrate`
 
 ## Mimo scope
 

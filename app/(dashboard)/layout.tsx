@@ -38,6 +38,7 @@ export default async function DashboardLayout({
     stitky,
     projekty,
     vykresy,
+    technologie,
   } =
     await getLayoutAccess(userId);
 
@@ -58,6 +59,7 @@ export default async function DashboardLayout({
     stitky,
     projekty,
     vykresy,
+    technologie,
   };
 
   return (

@@ -23,6 +23,7 @@ describe("module-registry", () => {
         "personalistika",
         "planovani",
         "system",
+        "technologie",
         "training",
         "ukoly",
         "vykresy",
