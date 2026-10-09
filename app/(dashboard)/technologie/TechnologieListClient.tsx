@@ -7,17 +7,18 @@ import { Layers, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
 import { MachineSelectOptions } from "@/components/shared-machines/MachineSelectOptions";
 
 type SheetType = { id: number; name: string };
+type SheetSize = { id: number; name: string };
 type PrintMachine = { id: number; name: string; machine_group?: string };
 type Item = {
   id: number;
   code: string;
   name: string;
   format_text: string | null;
-  sheet_size_text: string | null;
   note: string | null;
   preview_updated_at: string | null;
   updated_at: string;
   technologie_sheet_types: { id: number; name: string } | null;
+  technologie_sheet_sizes: { id: number; name: string } | null;
   shared_machines: { id: number; name: string; machine_group?: string } | null;
 };
 
@@ -53,6 +54,7 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
   const searchParams = useSearchParams();
   const [items, setItems] = useState<Item[]>([]);
   const [sheetTypes, setSheetTypes] = useState<SheetType[]>([]);
+  const [sheetSizes, setSheetSizes] = useState<SheetSize[]>([]);
   const [printMachines, setPrintMachines] = useState<PrintMachine[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -60,6 +62,7 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
 
   const [q, setQ] = useState(searchParams.get("q") ?? "");
   const [sheetTypeId, setSheetTypeId] = useState(searchParams.get("sheet_type_id") ?? "");
+  const [sheetSizeId, setSheetSizeId] = useState(searchParams.get("sheet_size_id") ?? "");
   const [printMachineId, setPrintMachineId] = useState(
     searchParams.get("print_machine_id") ?? ""
   );
@@ -68,17 +71,19 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
     const sp = new URLSearchParams();
     if (q.trim()) sp.set("q", q.trim());
     if (sheetTypeId) sp.set("sheet_type_id", sheetTypeId);
+    if (sheetSizeId) sp.set("sheet_size_id", sheetSizeId);
     if (printMachineId) sp.set("print_machine_id", printMachineId);
     return sp.toString();
-  }, [q, sheetTypeId, printMachineId]);
+  }, [q, sheetTypeId, sheetSizeId, printMachineId]);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const [rItems, rTypes, rMach] = await Promise.all([
+      const [rItems, rTypes, rSizes, rMach] = await Promise.all([
         fetch(`/api/technologie${queryString ? `?${queryString}` : ""}`),
         fetch("/api/technologie/sheet-types"),
+        fetch("/api/technologie/sheet-sizes"),
         fetch("/api/shared-machines"),
       ]);
       const dItems = (await rItems.json().catch(() => ({}))) as {
@@ -95,6 +100,10 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
       if (rTypes.ok) {
         const dTypes = (await rTypes.json().catch(() => ({}))) as { items?: SheetType[] };
         setSheetTypes(Array.isArray(dTypes.items) ? dTypes.items : []);
+      }
+      if (rSizes.ok) {
+        const dSizes = (await rSizes.json().catch(() => ({}))) as { items?: SheetSize[] };
+        setSheetSizes(Array.isArray(dSizes.items) ? dSizes.items : []);
       }
       if (rMach.ok) {
         const dMach = (await rMach.json().catch(() => ({}))) as { machines?: PrintMachine[] };
@@ -174,7 +183,7 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
       </div>
 
       <form
-        className="mb-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-3"
+        className="mb-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4"
         onSubmit={(e) => {
           e.preventDefault();
           void load();
@@ -203,6 +212,21 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
             {sheetTypes.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-gray-600">Velikost archu</span>
+          <select
+            value={sheetSizeId}
+            onChange={(e) => setSheetSizeId(e.target.value)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">Vše</option>
+            {sheetSizes.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
               </option>
             ))}
           </select>
@@ -285,7 +309,7 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-600">{item.format_text ?? "—"}</td>
                     <td className="px-3 py-3 text-sm text-gray-600">
-                      {item.sheet_size_text ?? "—"}
+                      {item.technologie_sheet_sizes?.name ?? "—"}
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-600">
                       {item.shared_machines?.name ?? "—"}

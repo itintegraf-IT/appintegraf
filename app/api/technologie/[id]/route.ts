@@ -3,9 +3,15 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canReadTechnologie, canWriteTechnologie } from "@/lib/technologie/access";
 import { deleteTechnologieRecord } from "@/lib/technologie/delete-record";
+import {
+  parseOptionalPrintMachineId,
+  parseOptionalSheetSizeId,
+  parseOptionalSheetTypeId,
+} from "@/lib/technologie/parse-body";
 
 const detailInclude = {
   technologie_sheet_types: { select: { id: true, name: true } },
+  technologie_sheet_sizes: { select: { id: true, name: true } },
   shared_machines: { select: { id: true, name: true, machine_group: true } },
   users_created_by: { select: { id: true, first_name: true, last_name: true } },
 } as const;
@@ -83,44 +89,21 @@ export async function PUT(
       return NextResponse.json({ error: "Kód už existuje." }, { status: 400 });
     }
 
-    let sheet_type_id: number | null = null;
-    if (body.sheet_type_id != null && body.sheet_type_id !== "") {
-      const d = parseInt(String(body.sheet_type_id), 10);
-      if (!Number.isFinite(d) || d <= 0) {
-        return NextResponse.json({ error: "Neplatný typ archu." }, { status: 400 });
-      }
-      const row = await prisma.technologie_sheet_types.findUnique({
-        where: { id: d },
-        select: { id: true },
-      });
-      if (!row) {
-        return NextResponse.json({ error: "Typ archu nenalezen." }, { status: 400 });
-      }
-      sheet_type_id = d;
+    const sheetType = await parseOptionalSheetTypeId(body.sheet_type_id);
+    if (!sheetType.ok) {
+      return NextResponse.json({ error: sheetType.error }, { status: 400 });
     }
-
-    let print_machine_id: number | null = null;
-    if (body.print_machine_id != null && body.print_machine_id !== "") {
-      const m = parseInt(String(body.print_machine_id), 10);
-      if (!Number.isFinite(m) || m <= 0) {
-        return NextResponse.json({ error: "Neplatný tiskový stroj." }, { status: 400 });
-      }
-      const machine = await prisma.shared_machines.findUnique({
-        where: { id: m },
-        select: { id: true },
-      });
-      if (!machine) {
-        return NextResponse.json({ error: "Tiskový stroj nenalezen." }, { status: 400 });
-      }
-      print_machine_id = m;
+    const sheetSize = await parseOptionalSheetSizeId(body.sheet_size_id);
+    if (!sheetSize.ok) {
+      return NextResponse.json({ error: sheetSize.error }, { status: 400 });
+    }
+    const printMachine = await parseOptionalPrintMachineId(body.print_machine_id);
+    if (!printMachine.ok) {
+      return NextResponse.json({ error: printMachine.error }, { status: 400 });
     }
 
     const format_text =
       typeof body.format_text === "string" ? body.format_text.trim().slice(0, 64) || null : null;
-    const sheet_size_text =
-      typeof body.sheet_size_text === "string"
-        ? body.sheet_size_text.trim().slice(0, 64) || null
-        : null;
     const note = typeof body.note === "string" ? body.note.trim() || null : null;
 
     const item = await prisma.technologie.update({
@@ -128,10 +111,10 @@ export async function PUT(
       data: {
         code: code.slice(0, 32),
         name: name.slice(0, 255),
-        sheet_type_id,
-        print_machine_id,
+        sheet_type_id: sheetType.value,
+        sheet_size_id: sheetSize.value,
+        print_machine_id: printMachine.value,
         format_text,
-        sheet_size_text,
         note,
         updated_at: new Date(),
       },

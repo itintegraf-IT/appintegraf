@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { MachineSelectOptions } from "@/components/shared-machines/MachineSelectOptions";
 
 type SheetType = { id: number; name: string };
+type SheetSize = { id: number; name: string };
 type PrintMachine = { id: number; name: string; machine_group?: string };
 
 type FormState = {
@@ -14,7 +15,7 @@ type FormState = {
   name: string;
   sheet_type_id: string;
   format_text: string;
-  sheet_size_text: string;
+  sheet_size_id: string;
   print_machine_id: string;
   note: string;
 };
@@ -24,7 +25,7 @@ const emptyForm: FormState = {
   name: "",
   sheet_type_id: "",
   format_text: "",
-  sheet_size_text: "",
+  sheet_size_id: "",
   print_machine_id: "",
   note: "",
 };
@@ -41,6 +42,7 @@ export function TechnologieForm({
   const router = useRouter();
   const [form, setForm] = useState<FormState>({ ...emptyForm, ...initial });
   const [sheetTypes, setSheetTypes] = useState<SheetType[]>([]);
+  const [sheetSizes, setSheetSizes] = useState<SheetSize[]>([]);
   const [printMachines, setPrintMachines] = useState<PrintMachine[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -50,6 +52,12 @@ export function TechnologieForm({
       .then((r) => r.json())
       .then((data: { items?: SheetType[] }) => {
         setSheetTypes(Array.isArray(data.items) ? data.items : []);
+      })
+      .catch(() => {});
+    fetch("/api/technologie/sheet-sizes")
+      .then((r) => r.json())
+      .then((data: { items?: SheetSize[] }) => {
+        setSheetSizes(Array.isArray(data.items) ? data.items : []);
       })
       .catch(() => {});
     fetch("/api/shared-machines")
@@ -70,7 +78,7 @@ export function TechnologieForm({
         name: form.name,
         sheet_type_id: form.sheet_type_id || null,
         format_text: form.format_text,
-        sheet_size_text: form.sheet_size_text,
+        sheet_size_id: form.sheet_size_id || null,
         print_machine_id: form.print_machine_id || null,
         note: form.note,
       };
@@ -184,13 +192,18 @@ export function TechnologieForm({
         </label>
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-gray-700">Velikost archu</span>
-          <input
-            value={form.sheet_size_text}
-            onChange={(e) => setForm((f) => ({ ...f, sheet_size_text: e.target.value }))}
+          <select
+            value={form.sheet_size_id}
+            onChange={(e) => setForm((f) => ({ ...f, sheet_size_id: e.target.value }))}
             className="w-full rounded-lg border border-gray-300 px-3 py-2"
-            maxLength={64}
-            placeholder="1000x700"
-          />
+          >
+            <option value="">—</option>
+            {sheetSizes.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
         </label>
       </div>
 

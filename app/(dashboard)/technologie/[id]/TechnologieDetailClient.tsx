@@ -19,11 +19,11 @@ type Item = {
   code: string;
   name: string;
   format_text: string | null;
-  sheet_size_text: string | null;
   note: string | null;
   preview_updated_at: string | null;
   updated_at: string;
   technologie_sheet_types: { id: number; name: string } | null;
+  technologie_sheet_sizes: { id: number; name: string } | null;
   shared_machines: { id: number; name: string; machine_group?: string } | null;
   users_created_by: { first_name: string; last_name: string };
 };
@@ -245,7 +245,9 @@ export function TechnologieDetailClient({
           </div>
           <div>
             <dt className="text-gray-500">Velikost archu</dt>
-            <dd className="font-medium text-gray-900">{item.sheet_size_text ?? "—"}</dd>
+            <dd className="font-medium text-gray-900">
+              {item.technologie_sheet_sizes?.name ?? "—"}
+            </dd>
           </div>
           <div>
             <dt className="text-gray-500">Vytvořil</dt>

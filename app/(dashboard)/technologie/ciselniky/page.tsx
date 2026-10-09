@@ -42,6 +42,17 @@ export default async function TechnologieCiselnikyHubPage() {
         </li>
         <li>
           <Link
+            href="/technologie/ciselniky/velikosti"
+            className="block rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm hover:border-red-200"
+          >
+            <span className="font-medium text-gray-900">Velikosti archů</span>
+            <span className="mt-1 block text-sm text-gray-500">
+              1020x720, 1000x700, 900x640, 900x630…
+            </span>
+          </Link>
+        </li>
+        <li>
+          <Link
             href="/stroje?from=technologie"
             className="block rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm hover:border-red-200"
           >

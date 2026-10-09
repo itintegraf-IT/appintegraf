@@ -15,6 +15,7 @@ Modul klíč: `technologie` (Admin → uživatelé).
 
 - **`technologie`** – kód (unikátní), název, typ archu, formát, velikost archu, tiskový stroj, poznámka, `preview_updated_at`
 - **`technologie_sheet_types`** – číselník typů archu (volný list, V1, …) – jen Technologie
+- **`technologie_sheet_sizes`** – číselník velikostí archu (1020x720, 1000x700, …) – jen Technologie
 - **`shared_machines`** – **společný** číselník strojů s modulem Výkresy (`machine_group`: `press` \| `postpress`)
 - **`file_uploads`** – `module = technologie`, `document_type`: `pdf` \| `thumbnail`
 
@@ -28,7 +29,7 @@ Soubory: `public/uploads/technologie/`. Limit PDF 50 MB.
 | `/technologie/new` | Nový rozkres |
 | `/technologie/[id]` | Detail + upload PDF |
 | `/technologie/[id]/edit` | Úprava metadat |
-| `/technologie/ciselniky` | Typy archů + odkaz na společné stroje |
+| `/technologie/ciselniky` | Typy archů, velikosti archů + odkaz na společné stroje |
 | `/stroje` | Společný číselník strojů (Press / Postpress) |
 
 Náhled v seznamu: `GET /api/technologie/[id]/preview` (JPEG). PDF inline: `GET /api/technologie/[id]/files/[fileId]?inline=1`.
@@ -40,6 +41,7 @@ Stroje API: `GET/POST /api/shared-machines` (alias `/api/technologie/print-machi
 ```bash
 npm run db:technologie-migrate
 npm run db:shared-machines-migrate
+npm run db:technologie-sheet-sizes-migrate
 npx prisma generate
 ```
 
