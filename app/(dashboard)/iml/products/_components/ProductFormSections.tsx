@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Boxes,
@@ -24,13 +24,7 @@ import { MaterialSelect } from "../../_components/MaterialSelect";
 import ProductPantoneEditor, {
   type ProductColorRow,
 } from "./ProductPantoneEditor";
-import ProductCmykToggles from "./ProductCmykToggles";
 import { ShapePackagingReadonly } from "./ShapePackagingReadonly";
-import {
-  defaultProductCmykFlags,
-  hasValidPantoneRows,
-  type ProductCmykFlags,
-} from "@/lib/iml-print-colors-summary";
 
 type DieCutOption = {
   id: number;
@@ -113,8 +107,6 @@ type Props = {
    */
   colors?: ProductColorRow[];
   onColorsChange?: (colors: ProductColorRow[]) => void;
-  cmykFlags?: ProductCmykFlags;
-  onCmykChange?: (flags: ProductCmykFlags) => void;
 };
 
 const inputCls = "w-full rounded-lg border border-gray-300 px-3 py-2";
@@ -124,7 +116,7 @@ const inputCls = "w-full rounded-lg border border-gray-300 px-3 py-2";
  *   id       – Identifikace (zákazník, kódy, názvy, SKU, zadavatel)
  *   cut      – Výseky a rozměry (kód tvaru, formát, výsek, montáž, pozic, balení)
  *   material – Materiály a tisk (fólie, barevnost, EAN, vzor, poznámky k tisku/výrobě)
- *   print    – Tisková data (stav schválení/položky, verze PDF, skladem, log, interní pozn.)
+ *   print    – Tisková data (stav schválení/položky, verze PDF, log, interní pozn.)
  *
  * Aktivní záložka se synchronizuje s URL parametrem ?tab=id|cut|material|print
  * (sdílitelný odkaz na konkrétní sekci).
@@ -136,8 +128,6 @@ export default function ProductFormSections({
   errors,
   colors,
   onColorsChange,
-  cmykFlags,
-  onCmykChange,
 }: Props) {
   const err = errors ?? {};
   const [dieCuts, setDieCuts] = useState<DieCutOption[]>([]);
@@ -309,30 +299,6 @@ export default function ProductFormSections({
     !(IML_APPROVAL_STATUSES as readonly string[]).includes(form.approval_status)
       ? form.approval_status
       : null;
-
-  const hasPantone = colors ? hasValidPantoneRows(colors) : false;
-  const prevHasPantoneRef = useRef<boolean | null>(null);
-
-  useEffect(() => {
-    if (!onCmykChange || colors === undefined) return;
-
-    if (prevHasPantoneRef.current === null) {
-      prevHasPantoneRef.current = hasPantone;
-      if (hasPantone) {
-        onCmykChange({ c: false, m: false, y: false, k: false });
-      }
-      return;
-    }
-
-    if (hasPantone === prevHasPantoneRef.current) return;
-
-    if (hasPantone) {
-      onCmykChange({ c: false, m: false, y: false, k: false });
-    } else {
-      onCmykChange(defaultProductCmykFlags());
-    }
-    prevHasPantoneRef.current = hasPantone;
-  }, [hasPantone, onCmykChange, colors]);
 
   const tabs: TabDef[] = [
     {
@@ -703,15 +669,8 @@ export default function ProductFormSections({
             content: (
               <TabShell
                 title="Barvy"
-                subtitle="Procesní CMYK a Pantone barvy s pokrytím v %"
+                subtitle="Pantone barvy s pokrytím v %"
               >
-                {cmykFlags !== undefined && onCmykChange && (
-                  <ProductCmykToggles
-                    flags={cmykFlags}
-                    onChange={onCmykChange}
-                    hasPantone={hasPantone}
-                  />
-                )}
                 <ProductPantoneEditor
                   colors={colors}
                   onChange={onColorsChange}
@@ -766,56 +725,12 @@ export default function ProductFormSections({
                 ))}
               </select>
             </Field>
-            <Field
-              label="Šířka dat Fénix (mm)"
-              hint="Velikost čistých grafických dat (odděleně od formátu výseku)."
-              error={err.raw_data_width_mm}
-            >
-              <input
-                type="text"
-                inputMode="decimal"
-                value={form.raw_data_width_mm}
-                onChange={(e) => setField("raw_data_width_mm", e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field label="Výška dat Fénix (mm)" error={err.raw_data_height_mm}>
-              <input
-                type="text"
-                inputMode="decimal"
-                value={form.raw_data_height_mm}
-                onChange={(e) => setField("raw_data_height_mm", e.target.value)}
-                className={inputCls}
-              />
-            </Field>
-            <Field
-              label="Barevnost (Fénix)"
-              hint="Krátký souhrn barevnosti pro export; detail Pantone zůstává na záložce Barvy."
-              error={err.colors_spec}
-            >
-              <input
-                type="text"
-                value={form.colors_spec}
-                onChange={(e) => setField("colors_spec", e.target.value)}
-                placeholder="např. CMYK + 2 Pantone"
-                maxLength={100}
-                className={inputCls}
-              />
-            </Field>
             <Field label="Verze tiskových dat" error={err.print_data_version}>
               <input
                 type="text"
                 value={form.print_data_version}
                 onChange={(e) => setField("print_data_version", e.target.value)}
                 placeholder="v1, v2…"
-                className={inputCls}
-              />
-            </Field>
-            <Field label="Skladem" error={err.stock_quantity}>
-              <input
-                type="number"
-                value={form.stock_quantity}
-                onChange={(e) => setField("stock_quantity", e.target.value)}
                 className={inputCls}
               />
             </Field>

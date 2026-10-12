@@ -6,7 +6,6 @@ import { ArrowLeft } from "lucide-react";
 import { useRouter, useParams } from "next/navigation";
 import { useReturnTo } from "@/lib/navigation/use-return-to";
 import { ProductFilesUpload } from "../../_components/ProductFilesUpload";
-import { CustomFieldsFormSection } from "../../../_components/CustomFieldsFormSection";
 import ProductFormSections, {
   emptyProductForm,
   type ProductFormState,
@@ -343,14 +342,6 @@ export default function ImlProductEditPage() {
             customers={customers}
             colors={colors}
             onColorsChange={setColors}
-            cmykFlags={cmykFlags}
-            onCmykChange={setCmykFlags}
-          />
-
-          <CustomFieldsFormSection
-            entity="products"
-            values={customData}
-            onChange={setCustomData}
           />
 
           <div className="flex gap-2">

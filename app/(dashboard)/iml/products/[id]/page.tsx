@@ -12,7 +12,6 @@ import {
   Layers,
   Package,
   Printer,
-  Settings2,
 } from "lucide-react";
 import ProductDetailView, {
   type ProductDetailSection,
@@ -26,7 +25,7 @@ import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
 import { imlLabelTypeLabel, imlProductKindLabel } from "@/lib/iml-constants";
 import { formatProductFormatFromMm } from "@/lib/iml/product-format";
-import { cmykFlagsFromProduct, formatPrintColorsSummaryForDisplay } from "@/lib/iml-print-colors-summary";
+import { formatPrintColorsSummaryForDisplay } from "@/lib/iml-print-colors-summary";
 import { normalizePantoneCode, resolvePantoneSwatchHex } from "@/lib/iml-pantone";
 
 export default async function ImlProductDetailPage({
@@ -47,7 +46,7 @@ export default async function ImlProductDetailPage({
   const id = parseInt((await params).id, 10);
   if (isNaN(id)) notFound();
 
-  const [product, customFields, hasFileTablePdf] = await Promise.all([
+  const [product, hasFileTablePdf] = await Promise.all([
     prisma.iml_products.findUnique({
       where: { id },
       include: {
@@ -63,10 +62,6 @@ export default async function ImlProductDetailPage({
           orderBy: [{ sort_order: "asc" }, { id: "asc" }],
         },
       },
-    }),
-    prisma.iml_custom_fields.findMany({
-      where: { entity: "products", is_active: true },
-      orderBy: { sort_order: "asc" },
     }),
     imlProductHasPdfInFilesTable(id),
   ]);
@@ -101,12 +96,6 @@ export default async function ImlProductDetailPage({
     }
   }
 
-  const customData = (product.custom_data as Record<string, unknown> | null) ?? {};
-  const hasCustomData = Object.keys(customData).length > 0;
-
-  type CustomFieldRow = { id: number; field_key: string; label: string };
-  const customFieldsTyped = customFields as CustomFieldRow[];
-
   const fmt = (v: unknown) => (v != null && v !== "" ? String(v) : "-");
   const fmtNum = (v: unknown) => (v != null ? String(v) : "-");
   const fmtDate = (v: unknown) => {
@@ -137,18 +126,6 @@ export default async function ImlProductDetailPage({
   const hasLegacyPdf =
     !!(product.pdf_data && product.pdf_data.length > 0) || !!product.pdf_archive_path;
   const hasPdf = hasLegacyPdf || hasFileTablePdf;
-  const cmyk = cmykFlagsFromProduct(product);
-  const hasPantoneColors = product.iml_product_colors.length > 0;
-  const cmykActive = [cmyk.c && "C", cmyk.m && "M", cmyk.y && "Y", cmyk.k && "K"].filter(
-    Boolean
-  ) as string[];
-  const cmykLabel = hasPantoneColors
-    ? "Bez procesního CMYK (Pantone)"
-    : cmykActive.length === 4
-      ? "CMYK (plný proces)"
-      : cmykActive.length > 0
-        ? cmykActive.join(", ")
-        : "Žádný CMYK kanál";
 
   const sections: ProductDetailSection[] = [
     {
@@ -289,13 +266,6 @@ export default async function ImlProductDetailPage({
       icon: <Droplets className="h-4 w-4" />,
       content: (
         <div className="space-y-4">
-          <div>
-            <h4 className="mb-1 text-sm font-semibold text-gray-700">Procesní barvy (CMYK)</h4>
-            <p className="text-sm text-gray-800">{cmykLabel}</p>
-            {product.print_colors_text && (
-              <p className="mt-1 text-xs text-gray-500">Souhrn: {product.print_colors_text}</p>
-            )}
-          </div>
           {product.iml_product_colors.length > 0 ? (
             <ProductColorsTable
               colors={product.iml_product_colors.map((c) => {
@@ -346,7 +316,6 @@ export default async function ImlProductDetailPage({
               value={product.item_status?.trim() ? fmt(product.item_status) : "bez stavu"}
             />
             <InfoField label="Verze tiskových dat" value={fmt(product.print_data_version)} />
-            <InfoField label="Skladem" value={fmtNum(product.stock_quantity)} />
             <InfoField label="Formát" value={formatDisplay} />
             <InfoField label="Počet barev" value={fmtNum(product.color_count)} />
             <InfoField label="Etiketa" value={imlLabelTypeLabel(product.label_type) || "-"} />
@@ -418,29 +387,6 @@ export default async function ImlProductDetailPage({
       ),
     },
   ];
-
-  if (hasCustomData) {
-    sections.push({
-      id: "custom",
-      label: "Vlastní pole",
-      icon: <Settings2 className="h-4 w-4" />,
-      content: (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {customFieldsTyped.map((f) => {
-            const val = customData[f.field_key];
-            if (val === undefined || val === null || val === "") return null;
-            return (
-              <InfoField
-                key={f.id}
-                label={f.label}
-                value={typeof val === "boolean" ? (val ? "Ano" : "Ne") : String(val)}
-              />
-            );
-          })}
-        </div>
-      ),
-    });
-  }
 
   const title =
     product.client_name ?? product.ig_short_name ?? product.ig_code ?? `Produkt #${id}`;
