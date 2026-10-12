@@ -213,7 +213,7 @@ export function GrafikaImlFields({ initial }: Props) {
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 className="text-sm font-semibold text-gray-900">Propojení s IML katalogem</h3>
       <p className="mt-1 text-xs text-gray-500">
-        Klient, tvar etikety a etiketa pro párování dat. Tvar je povinný před zápisem do IML.
+        Klient, tvar etikety a etiketa pro párování dat. Tvar lze doplnit později v IML.
       </p>
 
       {loadError && (
@@ -349,16 +349,15 @@ export function GrafikaImlFields({ initial }: Props) {
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">
-            Tvar etikety <span className="text-red-600">*</span>
+            Tvar etikety
           </label>
           <select
             name="shape_id"
             value={shapeId}
             onChange={(e) => setShapeId(e.target.value)}
-            required
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
           >
-            <option value="">— Vyberte tvar —</option>
+            <option value="">— volitelné —</option>
             {shapes.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.shape_code} ({Number(s.width_mm)}×{Number(s.height_mm)} mm)
@@ -366,7 +365,7 @@ export function GrafikaImlFields({ initial }: Props) {
             ))}
           </select>
           <p className="mt-1 text-xs text-gray-500">
-            Číselník IML → Výseky → Tvary. Povinné před překlopením do IML.
+            Číselník IML → Výseky → Tvary. Lze doplnit později u produktu.
           </p>
         </div>
 

@@ -61,6 +61,20 @@ describe("buildMaketyProductDraft client_name", () => {
     });
     expect(draft.item_status).toBe("aktivní");
   });
+
+  it("shape_id je volitelný — bez tvaru není v missing_fields", () => {
+    const draft = buildMaketyProductDraft({
+      customer_id: 1,
+      product_id: null,
+      die_cut_id: null,
+      shape_id: null,
+      label_code: "02-02-510",
+      body: "Poznámka",
+    });
+    expect(draft.shape_id).toBeNull();
+    expect(draft.missing_fields).toEqual([]);
+    expect(draft.ig_code).toBe("02-02-510");
+  });
 });
 
 describe("supplementProductFromDraft", () => {

@@ -110,7 +110,6 @@ export async function POST(
 
   if (draft.customer_id == null) draft.missing_fields.push("customer_id");
   if (!draft.ig_code?.trim()) draft.missing_fields.push("ig_code");
-  if (draft.shape_id == null) draft.missing_fields.push("shape_id");
 
   if (!draft.client_name?.trim() && maketa.product_name?.trim()) {
     draft.client_name = maketa.product_name.trim();
@@ -120,12 +119,9 @@ export async function POST(
   }
 
   if (draft.missing_fields.length > 0) {
-    const shapeHint = draft.missing_fields.includes("shape_id")
-      ? " Před překlopením do IML musí být vybrán kód tvaru etikety (číselník tvarů)."
-      : "";
     return NextResponse.json(
       {
-        error: `Doplňte povinná pole před uložením produktu.${shapeHint}`,
+        error: "Doplňte povinná pole před uložením produktu.",
         missing_fields: draft.missing_fields,
         draft,
       },

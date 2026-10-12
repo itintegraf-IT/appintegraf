@@ -116,7 +116,6 @@ export function buildMaketyProductDraft(input: {
   const missing_fields: string[] = [];
   if (input.customer_id == null) missing_fields.push("customer_id");
   if (!ig_code) missing_fields.push("ig_code");
-  if (input.shape_id == null) missing_fields.push("shape_id");
 
   return {
     mode,
