@@ -7,6 +7,7 @@ export type GrafikaImlInitial = {
   customer_id: number | null;
   product_id: number | null;
   die_cut_id: number | null;
+  shape_id: number | null;
   label_code: string | null;
   product_name: string | null;
   job_number: string | null;
@@ -27,6 +28,12 @@ type DieCutOpt = {
   label_shape_code: string;
   die_cut_tool_code: string | null;
   internal_name: string | null;
+};
+type ShapeOpt = {
+  id: number;
+  shape_code: string;
+  width_mm: number | string;
+  height_mm: number | string;
 };
 
 type Props = {
@@ -52,6 +59,7 @@ export function GrafikaImlFields({ initial }: Props) {
   const [allCustomers, setAllCustomers] = useState<CustomerOpt[]>([]);
   const [products, setProducts] = useState<ProductOpt[]>([]);
   const [dieCuts, setDieCuts] = useState<DieCutOpt[]>([]);
+  const [shapes, setShapes] = useState<ShapeOpt[]>([]);
   const [customerId, setCustomerId] = useState<string>(
     initial?.customer_id != null ? String(initial.customer_id) : ""
   );
@@ -60,6 +68,9 @@ export function GrafikaImlFields({ initial }: Props) {
   );
   const [dieCutId, setDieCutId] = useState<string>(
     initial?.die_cut_id != null ? String(initial.die_cut_id) : ""
+  );
+  const [shapeId, setShapeId] = useState<string>(
+    initial?.shape_id != null ? String(initial.shape_id) : ""
   );
   const [labelCode, setLabelCode] = useState(initial?.label_code ?? "");
   const [productName, setProductName] = useState(initial?.product_name ?? "");
@@ -96,6 +107,18 @@ export function GrafikaImlFields({ initial }: Props) {
   useEffect(() => {
     void loadCustomers();
   }, [loadCustomers]);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch("/api/iml/shapes");
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) setShapes(Array.isArray(data.shapes) ? data.shapes : []);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
 
   const selectedCustomer = useMemo(
     () => allCustomers.find((c) => String(c.id) === customerId) ?? null,
@@ -164,6 +187,8 @@ export function GrafikaImlFields({ initial }: Props) {
     setCustomerOpen(false);
   };
 
+  // shape_id se nemění při změně klienta – tvary jsou globální
+
   const onProductChange = (value: string) => {
     setProductId(value);
     if (!value) return;
@@ -188,7 +213,7 @@ export function GrafikaImlFields({ initial }: Props) {
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 className="text-sm font-semibold text-gray-900">Propojení s IML katalogem</h3>
       <p className="mt-1 text-xs text-gray-500">
-        Klient, etiketa a výsek pro párování dat. Číslo zakázky slouží pro budoucí ERP.
+        Klient, tvar etikety a etiketa pro párování dat. Tvar je povinný před zápisem do IML.
       </p>
 
       {loadError && (
@@ -323,7 +348,32 @@ export function GrafikaImlFields({ initial }: Props) {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Kód výseku</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Tvar etikety <span className="text-red-600">*</span>
+          </label>
+          <select
+            name="shape_id"
+            value={shapeId}
+            onChange={(e) => setShapeId(e.target.value)}
+            required
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="">— Vyberte tvar —</option>
+            {shapes.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.shape_code} ({Number(s.width_mm)}×{Number(s.height_mm)} mm)
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            Číselník IML → Výseky → Tvary. Povinné před překlopením do IML.
+          </p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Legacy výsek (volitelné)
+          </label>
           <select
             name="die_cut_id"
             value={dieCutId}
@@ -331,7 +381,7 @@ export function GrafikaImlFields({ initial }: Props) {
             disabled={!customerId}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           >
-            <option value="">— volitelné —</option>
+            <option value="">— bez legacy výseku —</option>
             {dieCuts.map((d) => (
               <option key={d.id} value={d.id}>
                 {dieCutLabel(d)}

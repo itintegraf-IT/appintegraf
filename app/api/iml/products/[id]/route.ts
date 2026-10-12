@@ -149,6 +149,11 @@ export async function PUT(
       {
         customer_id: existing.customer_id,
         foil_id: existing.foil_id,
+        die_cut_id: existing.die_cut_id,
+        shape_id: existing.shape_id,
+        selected_tool_id: existing.selected_tool_id,
+        selected_imposition_id: existing.selected_imposition_id,
+        box_type_id: existing.box_type_id,
         foil_material_id: existing.foil_material_id,
         color_material_id: existing.color_material_id,
         paper_material_id: existing.paper_material_id,

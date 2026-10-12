@@ -125,6 +125,29 @@ export async function GET(req: NextRequest) {
     where.archived_at = null;
   }
 
+  const formatWidth = searchParams.get("format_width_mm")?.trim();
+  const formatHeight = searchParams.get("format_height_mm")?.trim();
+  if (formatWidth) {
+    const w = parseFloat(formatWidth.replace(",", "."));
+    if (Number.isFinite(w)) where.format_width_mm = w;
+  }
+  if (formatHeight) {
+    const h = parseFloat(formatHeight.replace(",", "."));
+    if (Number.isFinite(h)) where.format_height_mm = h;
+  }
+  const missingShape = searchParams.get("missing_shape");
+  if (missingShape === "1" || missingShape === "true") {
+    where.shape_id = null;
+  }
+
+  const sortParam = (searchParams.get("sort") ?? "").trim();
+  const orderBy: Prisma.iml_productsOrderByWithRelationInput[] =
+    sortParam === "format"
+      ? [{ format_width_mm: "asc" }, { format_height_mm: "asc" }, { id: "desc" }]
+      : sortParam === "format_desc"
+        ? [{ format_width_mm: "desc" }, { format_height_mm: "desc" }, { id: "desc" }]
+        : [{ id: "desc" }];
+
   const pageParam = searchParams.get("page");
   const perPageParam = searchParams.get("per_page");
   const skipTotal =
@@ -147,7 +170,7 @@ export async function GET(req: NextRequest) {
   if (!paginated) {
     products = await prisma.iml_products.findMany({
       where,
-      orderBy: { id: "desc" },
+      orderBy,
       take: 200,
       select: listSelect,
     });
@@ -164,7 +187,7 @@ export async function GET(req: NextRequest) {
 
     const rows = await prisma.iml_products.findMany({
       where,
-      orderBy: { id: "desc" },
+      orderBy,
       skip,
       take: perPage,
       select: listSelect,
