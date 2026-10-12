@@ -67,6 +67,41 @@ Na základě poskytnutého přepisu rozhovoru jsou hlavními body diskuse a jeji
 *   **Problém:** Potřeba efektivně seskupovat produkty se stejnými Pantone barvami nebo výseky na jeden tiskový arch.
 *   **Návrh řešení:** Systém by měl umožnit řazení produktů v objednávce podle barevnosti. Uživatel by pak mohl manuálně přiřazovat produkty ke konkrétním tiskovým archům (např. označením "Arch 1", "Arch 2"). Toto se bude podrobněji řešit až po naplnění databáze.
 
+Na základě záznamu z porady (zdroj "imlporada.mp3") lze identifikovat následující klíčové oblasti, které je potřeba v aplikaci (databázi/systému Igis) dovyvinout, doplnit nebo upravit:
+
+### 1. Správa kódů a struktura databáze
+*   **Unikátní kódy tvarů:** Současný systém neumožňuje zadat stejný název (např. „obvodová etiketa“) dvakrát, což způsobuje chyby v přiřazování nástrojů. Je nutné zavést **unikátní kódy pro každý tvar** (např. IML001, K001), které nebudou čistě textové jako dosud.
+*   **Podskupiny a adresáře:** Místo plochého seznamu je potřeba vytvořit strukturu „adresářů“ (složek) pro typy etiket (např. obvodové, víčka, krčky), pod kterými budou uloženy konkrétní plechy a detaily.
+*   **Vazba na stroje:** Umožnit k jednomu tvaru (např. kolečko 100 mm) přiřadit různé verze pro různé stroje (např. verze pro Atlas, verze pro Montex) v rámci podskupin.
+
+### 2. Uživatelské rozhraní a zobrazení (UI/UX)
+*   **Filtrování:** Doplnit možnost filtrovat produkty podle **rozměrů** a podle **plžety**.
+*   **Posuvníky:** V seznamech s mnoha sloupci chybí vodorovný posuvník (vpravo/vlevo), v současnosti je k dispozici pouze svislý.
+*   **Správa sloupců:** I když je možnost zaklikávat sloupce, uživatelé požadují intuitivnější ovládání a zobrazení informací bez nutnosti proklikávat se hluboko zpět.
+
+### 3. Práce se soubory a náhledy
+*   **Nahrávání technické dokumentace:** Do systému by se měly ke každé položce nahrávat nejen PDF s grafikou, ale i **CAD soubory (planety)**, aby k nim měli přístup všichni oprávnění uživatelé.
+*   **Zobrazení softproofů:** Umožnit zobrazení a stažení tzv. **softproofu** (náhledu s kótami a rozpisem barev) přímo z detailu etikety.
+*   **Historie verzí:** Systém by měl uchovávat historii souborů (až 10 verzí) s tím, že aktivní je vždy poslední, ale starší jsou dostupné v archivu. Pro stahování z archivu by mělo být zavedeno extra potvrzení nebo povolení.
+
+### 4. Import a zpracování objednávek
+*   **Povinné údaje při importu:** Při importu objednávky (z PDF/Excelu) by měl systém vyžadovat zadání **čísla zakázky** a klienta hned v prvním kroku.
+*   **Validace před exportem:** Číslo zakázky musí být povinné nejpozději ve fázi exportu dat pro výrobu.
+*   **Blokování nehotových dat:** Pokud je položka ve stavu „rozpracováno grafikem“ nebo „deaktivováno/stopnuto“, systém nesmí dovolit její export do zakázky a musí zobrazit varování.
+
+### 5. Schvalovací proces (Workflow)
+*   **Interní polygrafické schválení:** Zavést mezikrok mezi grafickým návrhem a odesláním klientovi. Data musí nejdříve schválit **prepress/odborník** z polygrafického hlediska (kontrola barev, přetisků, spadů).
+*   **Notifikace:** Implementovat automatické workflow, které po nahrání dat grafikem pošle notifikaci dalšímu člověku v řetězci k revizi.
+*   **Archivace schválení:** Umožnit do systému uložit nebo „přetáhnout“ schvalovací e-mail od klienta nebo certifikát ze systému Switch, aby bylo prokazatelné, kdo a kdy data odsouhlasil.
+
+### 6. Technické detaily produktů
+*   **Doplnění parametrů:** Do databáze je třeba u všech položek doplnit:
+    *   Hmotnost 1000 kusů.
+    *   Typy krabic a počty kusů v krabici.
+    *   Hmotnost barev (gramy na barvu).
+*   **Export pro Fenix:** Upravit exportní CSV tabulku tak, aby obsahovala rozměry (šířku a výšku) v samostatných sloupcích, což je nezbytné pro automatickou montáž v programu Fenix.
+
+
 
 
 

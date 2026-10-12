@@ -25,6 +25,7 @@ export type EditMaketyInitial = {
   customer_id?: number | null;
   product_id?: number | null;
   die_cut_id?: number | null;
+  shape_id?: number | null;
   label_code?: string | null;
   product_name?: string | null;
   job_number?: string | null;
@@ -63,6 +64,7 @@ export function EditMaketyWorkForm({
     customer_id: initial.customer_id ?? null,
     product_id: initial.product_id ?? null,
     die_cut_id: initial.die_cut_id ?? null,
+    shape_id: initial.shape_id ?? null,
     label_code: initial.label_code ?? null,
     product_name: initial.product_name ?? null,
     job_number: initial.job_number ?? null,
@@ -90,6 +92,7 @@ export function EditMaketyWorkForm({
       payload.customer_id = String(fd.get("customer_id") ?? "").trim() || null;
       payload.product_id = String(fd.get("product_id") ?? "").trim() || null;
       payload.die_cut_id = String(fd.get("die_cut_id") ?? "").trim() || null;
+      payload.shape_id = String(fd.get("shape_id") ?? "").trim() || null;
       payload.label_code = String(fd.get("label_code") ?? "").trim() || null;
       payload.product_name = String(fd.get("product_name") ?? "").trim() || null;
       payload.job_number = String(fd.get("job_number") ?? "").trim() || null;

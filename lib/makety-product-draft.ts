@@ -7,6 +7,7 @@ export type MaketyProductDraft = {
   product_id: number | null;
   customer_id: number | null;
   die_cut_id: number | null;
+  shape_id: number | null;
   ig_code: string | null;
   client_code: string | null;
   ig_short_name: string | null;
@@ -27,6 +28,7 @@ export type ExistingProductForSupplement = {
   ig_short_name: string | null;
   production_notes: string | null;
   die_cut_id: number | null;
+  shape_id: number | null;
   customer_id: number | null;
 };
 
@@ -69,6 +71,9 @@ export function supplementProductFromDraft(
   if (existing.die_cut_id == null && draft.die_cut_id != null) {
     data.iml_die_cuts = { connect: { id: draft.die_cut_id } };
   }
+  if (existing.shape_id == null && draft.shape_id != null) {
+    data.iml_shape_catalog = { connect: { id: draft.shape_id } };
+  }
   if (existing.customer_id == null && draft.customer_id != null) {
     data.iml_customers = { connect: { id: draft.customer_id } };
   }
@@ -80,6 +85,7 @@ export function buildMaketyProductDraft(input: {
   customer_id: number | null;
   product_id: number | null;
   die_cut_id: number | null;
+  shape_id?: number | null;
   label_code: string | null;
   product_name?: string | null;
   body: string;
@@ -110,12 +116,14 @@ export function buildMaketyProductDraft(input: {
   const missing_fields: string[] = [];
   if (input.customer_id == null) missing_fields.push("customer_id");
   if (!ig_code) missing_fields.push("ig_code");
+  if (input.shape_id == null) missing_fields.push("shape_id");
 
   return {
     mode,
     product_id: input.product_id,
     customer_id: input.customer_id,
     die_cut_id: input.die_cut_id,
+    shape_id: input.shape_id ?? null,
     ig_code,
     client_code,
     ig_short_name,
@@ -147,6 +155,9 @@ export function draftToProductCreateScalars(
     ...(draft.die_cut_id != null
       ? { iml_die_cuts: { connect: { id: draft.die_cut_id } } }
       : {}),
+    ...(draft.shape_id != null
+      ? { iml_shape_catalog: { connect: { id: draft.shape_id } } }
+      : {}),
   };
 }
 
@@ -164,6 +175,9 @@ export function draftToProductUpdateScalars(
     is_active: true,
     ...(draft.die_cut_id != null
       ? { iml_die_cuts: { connect: { id: draft.die_cut_id } } }
+      : {}),
+    ...(draft.shape_id != null
+      ? { iml_shape_catalog: { connect: { id: draft.shape_id } } }
       : {}),
   };
 }

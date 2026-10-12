@@ -92,6 +92,7 @@ export async function POST(
           customer_id: maketa.customer_id,
           product_id: maketa.product_id,
           die_cut_id: maketa.die_cut_id,
+          shape_id: maketa.shape_id,
           label_code: maketa.label_code,
           product_name: maketa.product_name,
           body: maketa.body,
@@ -103,11 +104,13 @@ export async function POST(
     ...base,
     ...overrides,
     mode: overrides.mode === "update" || overrides.mode === "create" ? overrides.mode : base.mode,
+    shape_id: overrides.shape_id ?? base.shape_id ?? maketa.shape_id,
     missing_fields: [],
   };
 
   if (draft.customer_id == null) draft.missing_fields.push("customer_id");
   if (!draft.ig_code?.trim()) draft.missing_fields.push("ig_code");
+  if (draft.shape_id == null) draft.missing_fields.push("shape_id");
 
   if (!draft.client_name?.trim() && maketa.product_name?.trim()) {
     draft.client_name = maketa.product_name.trim();
@@ -117,9 +120,12 @@ export async function POST(
   }
 
   if (draft.missing_fields.length > 0) {
+    const shapeHint = draft.missing_fields.includes("shape_id")
+      ? " Před překlopením do IML musí být vybrán kód tvaru etikety (číselník tvarů)."
+      : "";
     return NextResponse.json(
       {
-        error: "Doplňte povinná pole před uložením produktu",
+        error: `Doplňte povinná pole před uložením produktu.${shapeHint}`,
         missing_fields: draft.missing_fields,
         draft,
       },
@@ -295,6 +301,23 @@ export async function POST(
           maketa_id: maketaId,
           source: "makety_grafika",
         },
+      });
+    }
+
+    if (draft.shape_id != null) {
+      const {
+        buildProductUpdateFromShapeSelection,
+        resolveDefaultToolAndImposition,
+      } = await import("@/lib/iml/product-shape-sync");
+      const { toolId, impositionId } = await resolveDefaultToolAndImposition(draft.shape_id);
+      const shapeUpdate = await buildProductUpdateFromShapeSelection({
+        shapeId: draft.shape_id,
+        toolId,
+        impositionId,
+      });
+      await prisma.iml_products.update({
+        where: { id: productId },
+        data: shapeUpdate,
       });
     }
 

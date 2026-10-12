@@ -5,7 +5,23 @@ const CMYK_MIGRATION_HINT =
 
 function messageMentionsCmykColumns(msg: string): boolean {
   const lower = msg.toLowerCase();
-  return lower.includes("cmyk_c_enabled") || lower.includes("cmyk_m_enabled");
+  return (
+    lower.includes("cmyk_c_enabled") ||
+    lower.includes("cmyk_m_enabled") ||
+    lower.includes("cmyk_y_enabled") ||
+    lower.includes("cmyk_k_enabled")
+  );
+}
+
+function unknownColumnMessage(msg: string): string | null {
+  const m = msg.match(/Unknown column '([^']+)'/i);
+  if (m?.[1]) {
+    return `Chybí sloupec „${m[1]}“ v databázi. Spusťte: npx prisma migrate deploy`;
+  }
+  if (msg.includes("Unknown column")) {
+    return "Schéma databáze neodpovídá aplikaci. Spusťte: npx prisma migrate deploy";
+  }
+  return null;
 }
 
 /** Čitelná chyba z Prisma / transakce při ukládání produktu. */
@@ -16,12 +32,13 @@ export function imlProductSaveErrorResponse(
   if (e && typeof e === "object" && "code" in e) {
     const code = String((e as { code: string }).code);
     const metaMsg = (e as { meta?: { message?: string } }).meta?.message ?? "";
-    if (
-      typeof metaMsg === "string" &&
-      (metaMsg.includes("Unknown column") || messageMentionsCmykColumns(metaMsg))
-    ) {
+    if (typeof metaMsg === "string") {
       if (messageMentionsCmykColumns(metaMsg)) {
         return { status: 503, error: CMYK_MIGRATION_HINT };
+      }
+      const unknownCol = unknownColumnMessage(metaMsg);
+      if (unknownCol) {
+        return { status: 503, error: unknownCol };
       }
     }
     if (code === "P2002") {
@@ -42,8 +59,12 @@ export function imlProductSaveErrorResponse(
 
   if (e instanceof Error) {
     const msg = e.message;
-    if (messageMentionsCmykColumns(msg) || msg.includes("Unknown column")) {
+    if (messageMentionsCmykColumns(msg)) {
       return { status: 503, error: CMYK_MIGRATION_HINT };
+    }
+    const unknownCol = unknownColumnMessage(msg);
+    if (unknownCol) {
+      return { status: 503, error: unknownCol };
     }
     if (msg.includes("Foreign key constraint") && msg.toLowerCase().includes("pantone_id")) {
       return {
