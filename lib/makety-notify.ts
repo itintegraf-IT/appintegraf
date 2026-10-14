@@ -383,9 +383,10 @@ export async function notifySpravaVzorkuUpravaDat(params: {
   if (userIds.length === 0) return;
 
   const resolved = await getMaketaProductNotifyDetails(params.maketaId);
-  const labelCode = resolved.labelCode ?? params.labelCode ?? null;
-  const productName = resolved.productName ?? params.productName ?? null;
-  const jobNumber = resolved.jobNumber ?? params.jobNumber ?? null;
+  // Explicitní hodnoty z právě uložené zakázky mají přednost před DB/katalogem.
+  const labelCode = params.labelCode ?? resolved.labelCode ?? null;
+  const productName = params.productName ?? resolved.productName ?? null;
+  const jobNumber = params.jobNumber ?? resolved.jobNumber ?? null;
   const productId = resolved.productId;
 
   const template = await loadSpravaVzorkuNotifyTemplate();

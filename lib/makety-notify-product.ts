@@ -7,14 +7,50 @@ export type MaketaProductNotifyDetails = {
   jobNumber: string | null;
 };
 
+export type MaketaProductNotifySource = {
+  product_id: number | null;
+  label_code: string | null;
+  product_name: string | null;
+  job_number: string | null;
+  iml_products: {
+    id: number;
+    ig_code: string | null;
+    client_name: string | null;
+    ig_short_name: string | null;
+  } | null;
+};
+
 function trimOrNull(value: string | null | undefined): string | null {
   const s = value?.trim();
   return s ? s : null;
 }
 
 /**
+ * Sestaví údaje o produktu pro notifikace.
+ * Preferuje pole zakázky (makety); IML katalog jen jako fallback.
+ */
+export function resolveMaketaProductNotifyDetails(
+  maketa: MaketaProductNotifySource
+): MaketaProductNotifyDetails {
+  const product = maketa.iml_products;
+  const labelCode =
+    trimOrNull(maketa.label_code) ?? trimOrNull(product?.ig_code);
+  const productName =
+    trimOrNull(maketa.product_name) ??
+    trimOrNull(product?.client_name) ??
+    trimOrNull(product?.ig_short_name);
+
+  return {
+    labelCode,
+    productName,
+    productId: maketa.product_id ?? product?.id ?? null,
+    jobNumber: trimOrNull(maketa.job_number),
+  };
+}
+
+/**
  * Kanonické údaje o produktu pro e-mailové / in-app notifikace makety.
- * Preferuje IML katalog (ig_code, client_name) a doplní z polí makety.
+ * Preferuje pole zakázky (label_code, product_name); katalog jen doplní chybějící.
  */
 export async function getMaketaProductNotifyDetails(
   maketaId: number
@@ -46,18 +82,5 @@ export async function getMaketaProductNotifyDetails(
     };
   }
 
-  const product = maketa.iml_products;
-  const labelCode =
-    trimOrNull(product?.ig_code) ?? trimOrNull(maketa.label_code);
-  const productName =
-    trimOrNull(maketa.product_name) ??
-    trimOrNull(product?.client_name) ??
-    trimOrNull(product?.ig_short_name);
-
-  return {
-    labelCode,
-    productName,
-    productId: maketa.product_id ?? product?.id ?? null,
-    jobNumber: trimOrNull(maketa.job_number),
-  };
+  return resolveMaketaProductNotifyDetails(maketa);
 }
