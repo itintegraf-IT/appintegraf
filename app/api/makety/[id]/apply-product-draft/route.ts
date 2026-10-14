@@ -319,6 +319,9 @@ export async function POST(
 
     const files = await transferMaketyFilesToImlProduct(maketaId, productId, userId);
 
+    const { unlockImlProductAfterApply } = await import("@/lib/iml-product-lock");
+    await unlockImlProductAfterApply(productId);
+
     const fileParts: string[] = [];
     if (files.softproofAttached) fileParts.push("softproof");
     if (files.printDataAttached) fileParts.push("tisková data");

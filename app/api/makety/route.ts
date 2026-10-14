@@ -128,6 +128,12 @@ export async function POST(req: NextRequest) {
     if ("error" in imlFields) {
       return NextResponse.json({ error: imlFields.error }, { status: 400 });
     }
+    if (work_type === "grafika" && data_kind === "uprava_dat" && imlFields.product_id == null) {
+      return NextResponse.json(
+        { error: "Při úpravě dat je povinný výběr položky z IML katalogu." },
+        { status: 400 }
+      );
+    }
 
     const prepressRaw = String(formData.get("prepress_user_id") ?? "").trim();
     const finalRaw = String(formData.get("final_approver_user_id") ?? "").trim();
@@ -188,6 +194,10 @@ export async function POST(req: NextRequest) {
         excludeUserId: userId,
       });
       if (data_kind === "uprava_dat") {
+        if (imlFields.product_id != null) {
+          const { lockImlProductForMaketa } = await import("@/lib/iml-product-lock");
+          await lockImlProductForMaketa(imlFields.product_id, created.id);
+        }
         await notifySpravaVzorkuUpravaDat({
           maketaId: created.id,
           orderNumber: order_number,

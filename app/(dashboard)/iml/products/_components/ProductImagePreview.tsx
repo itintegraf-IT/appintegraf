@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ExternalLink, ImageOff, Minus, Plus, RotateCcw, X } from "lucide-react";
 import { ProductPdfThumbnail } from "./ProductPdfThumbnail";
+import { LockedPdfDownload } from "./LockedPdfDownload";
 
 const LIGHTBOX_PDF_MAX_HEIGHT = 1200;
 
@@ -16,12 +17,14 @@ export default function ProductImagePreview({
   productId,
   hasImage,
   hasPdf = false,
+  isLocked = false,
   className = "",
   imgClassName = "h-full w-full object-contain",
 }: {
   productId: number;
   hasImage: boolean;
   hasPdf?: boolean;
+  isLocked?: boolean;
   className?: string;
   imgClassName?: string;
 }) {
@@ -137,26 +140,24 @@ export default function ProductImagePreview({
             </div>
             <div className="flex items-center gap-2">
               {hasPdf && (
-                <>
-                  <a
-                    href={`/api/iml/products/${productId}/pdf`}
+                <span className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <LockedPdfDownload
+                    productId={productId}
+                    isLocked={isLocked}
                     download
                     className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20"
-                    onClick={(e) => e.stopPropagation()}
                   >
                     Stáhnout tisková data
-                  </a>
-                  <a
-                    href={`/api/iml/products/${productId}/pdf`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  </LockedPdfDownload>
+                  <LockedPdfDownload
+                    productId={productId}
+                    isLocked={isLocked}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20"
-                    onClick={(e) => e.stopPropagation()}
                   >
                     <ExternalLink className="h-4 w-4" />
                     Otevřít PDF
-                  </a>
-                </>
+                  </LockedPdfDownload>
+                </span>
               )}
               <button
                 type="button"

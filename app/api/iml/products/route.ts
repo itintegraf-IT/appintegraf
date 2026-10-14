@@ -55,6 +55,8 @@ const productListSelect = {
   internal_note: true,
   last_edited_by: true,
   item_status: true,
+  is_locked: true,
+  locked_maketa_id: true,
   print_data_version: true,
   stock_quantity: true,
   sku: true,

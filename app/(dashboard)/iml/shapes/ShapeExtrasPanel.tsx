@@ -5,6 +5,7 @@ import {
   SHAPE_PACKAGING_MATERIALS,
   shapePackagingMaterialLabel,
 } from "@/lib/iml/die-cut-constants";
+import { CatalogAttachments } from "../_components/CatalogAttachments";
 
 type CustomerOpt = { id: number; name: string };
 type BoxTypeOpt = { id: number; code: string; name: string };
@@ -201,8 +202,14 @@ export function ShapeExtrasPanel({ shapeId, shapeCode, onError }: Props) {
   return (
     <div className="mt-3 space-y-4 rounded-lg border border-violet-100 bg-violet-50/40 p-3">
       <p className="text-xs font-medium text-violet-900">
-        Detail tvaru {shapeCode}: zákazníci a materiálová matice
+        Detail tvaru {shapeCode}: přílohy, zákazníci a materiálová matice
       </p>
+
+      <CatalogAttachments
+        kind="shape"
+        recordId={shapeId}
+        title="Přílohy kontury (PDF / JPG / CAD)"
+      />
 
       <div>
         <h4 className="mb-2 text-xs font-semibold uppercase text-gray-600">

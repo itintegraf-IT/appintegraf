@@ -10,6 +10,7 @@ import {
   CircleCheckBig,
   Droplets,
   Layers,
+  Lock,
   Package,
   Printer,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import ProductImagePreview from "../_components/ProductImagePreview";
 import ProductPdfHistory from "../_components/ProductPdfHistory";
 import { ProductArchiveBanner } from "../_components/ProductArchiveBanner";
 import { ShapePackagingReadonly } from "../_components/ShapePackagingReadonly";
+import { LockedPdfDownload } from "../_components/LockedPdfDownload";
 import { consumptionKg } from "@/lib/iml-color-consumption";
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
@@ -140,6 +142,7 @@ export default async function ImlProductDetailPage({
                 productId={product.id}
                 hasImage={hasImage}
                 hasPdf={hasPdf}
+                isLocked={!!product.is_locked}
                 className="h-60 w-full md:w-60"
               />
               <p className="mt-1 text-center text-xs text-gray-400">
@@ -348,6 +351,7 @@ export default async function ImlProductDetailPage({
                     productId={product.id}
                     hasImage={hasImage}
                     hasPdf={hasPdf}
+                    isLocked={!!product.is_locked}
                     className="h-60 w-full"
                   />
                   <p className="mt-1 text-center text-xs text-gray-400">
@@ -356,21 +360,21 @@ export default async function ImlProductDetailPage({
                   </p>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <a
-                    href={`/api/iml/products/${product.id}/pdf`}
+                  <LockedPdfDownload
+                    productId={product.id}
+                    isLocked={!!product.is_locked}
                     download
                     className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
                   >
                     Stáhnout aktuální PDF
-                  </a>
-                  <a
-                    href={`/api/iml/products/${product.id}/pdf`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  </LockedPdfDownload>
+                  <LockedPdfDownload
+                    productId={product.id}
+                    isLocked={!!product.is_locked}
                     className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                   >
                     Otevřít v novém okně
-                  </a>
+                  </LockedPdfDownload>
                 </div>
               </div>
             ) : (
@@ -381,7 +385,11 @@ export default async function ImlProductDetailPage({
             <h4 className="mb-2 text-sm font-semibold text-gray-700">
               Historie verzí PDF
             </h4>
-            <ProductPdfHistory productId={product.id} canWrite={canWrite} />
+            <ProductPdfHistory
+              productId={product.id}
+              canWrite={canWrite}
+              isLocked={!!product.is_locked}
+            />
           </div>
         </div>
       ),
@@ -391,10 +399,16 @@ export default async function ImlProductDetailPage({
   const title =
     product.client_name ?? product.ig_short_name ?? product.ig_code ?? `Produkt #${id}`;
   const subtitle = (
-    <>
+    <span className="inline-flex flex-wrap items-center gap-2">
       {product.ig_code && <span className="font-mono">{product.ig_code}</span>}
-      {product.iml_customers && ` • ${product.iml_customers.name}`}
-    </>
+      {product.iml_customers && <span>• {product.iml_customers.name}</span>}
+      {product.is_locked ? (
+        <span className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+          <Lock className="h-3 w-3" />
+          V úpravě grafikem
+        </span>
+      ) : null}
+    </span>
   );
 
   return (
@@ -413,6 +427,7 @@ export default async function ImlProductDetailPage({
           productId={product.id}
           canWrite={canWrite}
           hasPdf={hasPdf}
+          isLocked={!!product.is_locked}
           sections={sections}
         />
       </>

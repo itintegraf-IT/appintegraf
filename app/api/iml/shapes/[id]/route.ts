@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { canManageImlShapes } from "@/lib/iml-permissions";
 import { parseShapeBody } from "@/lib/iml/shape-tool-parse";
+import { deleteAllCatalogAttachments } from "@/lib/iml-catalog-attachments";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -99,6 +100,7 @@ export async function DELETE(_req: NextRequest, ctx: Ctx) {
   }
 
   try {
+    await deleteAllCatalogAttachments("shape", id);
     await prisma.iml_shape_catalog.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (e) {

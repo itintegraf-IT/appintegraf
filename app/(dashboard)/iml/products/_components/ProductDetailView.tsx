@@ -10,6 +10,7 @@ import {
   useViewMode,
   ViewToggle,
 } from "../../_components/ViewToggle";
+import { LockedPdfDownload } from "./LockedPdfDownload";
 
 export type ProductDetailSection = {
   id: string;
@@ -38,6 +39,7 @@ export default function ProductDetailView({
   productId,
   canWrite,
   hasPdf,
+  isLocked = false,
   sections,
 }: {
   title: string;
@@ -45,6 +47,7 @@ export default function ProductDetailView({
   productId: number;
   canWrite: boolean;
   hasPdf: boolean;
+  isLocked?: boolean;
   sections: ProductDetailSection[];
 }) {
   const [mode, setMode] = useViewMode("productDetail");
@@ -77,16 +80,14 @@ export default function ProductDetailView({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {hasPdf && (
-            <a
-              href={`/api/iml/products/${productId}/pdf`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <LockedPdfDownload
+              productId={productId}
+              isLocked={isLocked}
               className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-700 hover:bg-red-100"
-              title="Otevřít PDF v novém okně"
             >
               <FileText className="h-4 w-4" />
               Tisková data
-            </a>
+            </LockedPdfDownload>
           )}
           <ViewToggle mode={mode} onChange={setMode} />
           {canWrite && (

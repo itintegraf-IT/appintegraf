@@ -237,6 +237,12 @@ export async function PUT(
         }
         imlUpdate = imlFields;
       }
+      if (nextDataKind === "uprava_dat" && imlUpdate.product_id == null) {
+        return NextResponse.json(
+          { error: "Při úpravě dat je povinný výběr položky z IML katalogu." },
+          { status: 400 }
+        );
+      }
     }
 
     let workflowUpdate: {
@@ -296,6 +302,24 @@ export async function PUT(
         ...(workType === "grafika" ? { ...imlUpdate, ...workflowUpdate } : {}),
       },
     });
+
+    if (workType === "grafika") {
+      const {
+        lockImlProductForMaketa,
+        unlockImlProductForMaketa,
+      } = await import("@/lib/iml-product-lock");
+      const prevProductId = existing.product_id;
+      const nextProductId = imlUpdate.product_id;
+      const wasUprava = existing.data_kind === "uprava_dat";
+      const isUprava = nextDataKind === "uprava_dat";
+
+      if (wasUprava && prevProductId != null && (!isUprava || prevProductId !== nextProductId)) {
+        await unlockImlProductForMaketa(prevProductId, id);
+      }
+      if (isUprava && nextProductId != null) {
+        await lockImlProductForMaketa(nextProductId, id);
+      }
+    }
 
     // Kopie: creation notify až při prvním uložení (aktuální čísla). Nové zakázky už mají notify z POST.
     const alreadyNotified = await hasMaketyCreationNotify(id);

@@ -38,6 +38,8 @@ type ShapeOpt = {
 
 type Props = {
   initial?: GrafikaImlInitial;
+  /** Při úpravě dat je výběr etikety z IML povinný. */
+  requireProduct?: boolean;
 };
 
 const EMPTY_CUSTOMER_LABEL = "— bez klienta —";
@@ -55,7 +57,7 @@ function dieCutLabel(d: DieCutOpt): string {
   return parts.join(" · ");
 }
 
-export function GrafikaImlFields({ initial }: Props) {
+export function GrafikaImlFields({ initial, requireProduct = false }: Props) {
   const [allCustomers, setAllCustomers] = useState<CustomerOpt[]>([]);
   const [products, setProducts] = useState<ProductOpt[]>([]);
   const [dieCuts, setDieCuts] = useState<DieCutOpt[]>([]);
@@ -330,21 +332,32 @@ export function GrafikaImlFields({ initial }: Props) {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium text-gray-700">Etiketa (katalog)</label>
+          <label className="mb-1 block text-sm font-medium text-gray-700">
+            Etiketa (katalog)
+            {requireProduct && <span className="text-red-600"> *</span>}
+          </label>
           <select
             name="product_id"
             value={productId}
             onChange={(e) => onProductChange(e.target.value)}
             disabled={!customerId}
+            required={requireProduct}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
           >
-            <option value="">— volitelné —</option>
+            <option value="">
+              {requireProduct ? "— Vyberte etiketu —" : "— volitelné —"}
+            </option>
             {products.map((p) => (
               <option key={p.id} value={p.id}>
                 {productLabel(p)}
               </option>
             ))}
           </select>
+          {requireProduct && (
+            <p className="mt-1 text-xs text-amber-700">
+              U úpravy dat je vazba na existující položku IML povinná (produkt se zamkne).
+            </p>
+          )}
         </div>
 
         <div>

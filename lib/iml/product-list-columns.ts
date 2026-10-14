@@ -74,6 +74,8 @@ export type ProductListRow = {
   sku: string | null;
   product_kind: string | null;
   item_status: string | null;
+  is_locked?: boolean | null;
+  locked_maketa_id?: number | null;
   archived_at?: string | Date | null;
   updated_at: string | Date | null;
   iml_customers?: { id: number; name: string } | null;

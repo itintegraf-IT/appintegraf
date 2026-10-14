@@ -19,9 +19,29 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const q = (url.searchParams.get("q") ?? "").trim();
   const shapeType = (url.searchParams.get("shape_type") ?? "").trim();
+  const widthRaw = (url.searchParams.get("width_mm") ?? "").trim();
+  const heightRaw = (url.searchParams.get("height_mm") ?? "").trim();
+  const sortParam = (url.searchParams.get("sort") ?? "shape_code").trim();
+  const dirParam = (url.searchParams.get("dir") ?? "asc").toLowerCase();
+  const dir: Prisma.SortOrder = dirParam === "desc" ? "desc" : "asc";
+
+  const sortMap: Record<string, Prisma.iml_shape_catalogOrderByWithRelationInput> = {
+    shape_code: { shape_code: dir },
+    shape_type: { shape_type: dir },
+    width_mm: { width_mm: dir },
+    height_mm: { height_mm: dir },
+    internal_note: { internal_note: dir },
+  };
+  const orderBy = sortMap[sortParam] ?? { shape_code: dir };
+
+  const widthMm = widthRaw !== "" && !Number.isNaN(Number(widthRaw)) ? Number(widthRaw) : null;
+  const heightMm =
+    heightRaw !== "" && !Number.isNaN(Number(heightRaw)) ? Number(heightRaw) : null;
 
   const where: Prisma.iml_shape_catalogWhereInput = {
     ...(shapeType ? { shape_type: shapeType } : {}),
+    ...(widthMm != null ? { width_mm: widthMm } : {}),
+    ...(heightMm != null ? { height_mm: heightMm } : {}),
     ...(q
       ? {
           OR: [
@@ -34,7 +54,7 @@ export async function GET(req: NextRequest) {
 
   const shapes = await prisma.iml_shape_catalog.findMany({
     where,
-    orderBy: { shape_code: "asc" },
+    orderBy,
     take: 1000,
     include: {
       tool_assignments: {

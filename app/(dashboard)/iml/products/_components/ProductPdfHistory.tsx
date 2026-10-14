@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Check, Download, FileText, RotateCcw, Trash2 } from "lucide-react";
+import { LockedPdfDownload } from "./LockedPdfDownload";
 
 /**
  * Přehled historie verzí PDF pro produkt + akce:
@@ -27,9 +28,11 @@ type PdfVersion = {
 export default function ProductPdfHistory({
   productId,
   canWrite,
+  isLocked = false,
 }: {
   productId: number;
   canWrite: boolean;
+  isLocked?: boolean;
 }) {
   const [versions, setVersions] = useState<PdfVersion[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -168,15 +171,14 @@ export default function ProductPdfHistory({
               </td>
               <td className="px-3 py-2">
                 <div className="flex items-center justify-end gap-1">
-                  <a
-                    href={`/api/iml/products/${productId}/pdf?version=${v.version}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <LockedPdfDownload
+                    productId={productId}
+                    isLocked={isLocked}
+                    version={v.version}
                     className="rounded p-1.5 text-gray-600 hover:bg-gray-100"
-                    title="Stáhnout / otevřít"
                   >
-                    <Download className="h-4 w-4" />
-                  </a>
+                    <Download className="h-4 w-4" aria-label="Stáhnout / otevřít" />
+                  </LockedPdfDownload>
                   {canWrite && !v.is_primary && (
                     <>
                       <button

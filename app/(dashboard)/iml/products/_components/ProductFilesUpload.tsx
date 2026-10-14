@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Image, FileText, Trash2, Upload } from "lucide-react";
 import { ProductPdfThumbnail } from "./ProductPdfThumbnail";
+import { LockedPdfDownload } from "./LockedPdfDownload";
 import { pdfFileToJpegPreviewBlob } from "@/lib/iml-product-preview-from-pdf";
 import {
   MAX_PREVIEW_SOURCE_PDF_BYTES,
@@ -18,6 +19,7 @@ type Props = {
   productId: number;
   hasImage: boolean;
   hasPdf: boolean;
+  isLocked?: boolean;
   onImageChange?: () => void;
   onPdfChange?: () => void;
   onImageDelete?: () => void;
@@ -28,6 +30,7 @@ export function ProductFilesUpload({
   productId,
   hasImage,
   hasPdf,
+  isLocked = false,
   onImageChange,
   onPdfChange,
   onImageDelete,
@@ -304,14 +307,13 @@ export function ProductFilesUpload({
                 )}
               </div>
               <div className="flex flex-col gap-1">
-                <a
-                  href={`/api/iml/products/${productId}/pdf`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <LockedPdfDownload
+                  productId={productId}
+                  isLocked={isLocked}
                   className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 hover:bg-gray-50"
                 >
                   Zobrazit PDF
-                </a>
+                </LockedPdfDownload>
                 <button
                   type="button"
                   onClick={handlePdfDelete}

@@ -47,6 +47,29 @@ export async function GET(
     return new NextResponse("Neplatné ID", { status: 400 });
   }
 
+  const productLock = await prisma.iml_products.findUnique({
+    where: { id },
+    select: { is_locked: true, item_status: true },
+  });
+  if (!productLock) {
+    return new NextResponse("Produkt nenalezen", { status: 404 });
+  }
+
+  const confirmLocked = req.nextUrl.searchParams.get("confirm_locked") === "1";
+  /** Interní náhled (miniatura) — bez varování a bez audit záznamu. */
+  const previewOnly = req.nextUrl.searchParams.get("preview") === "1";
+  if (productLock.is_locked && !confirmLocked && !previewOnly) {
+    return NextResponse.json(
+      {
+        error:
+          "Upozornění: Tato položka je aktuálně v úpravě grafikem. Opravdu chcete stáhnout a použít stávající data pro výrobu?",
+        code: "PRODUCT_LOCKED",
+        is_locked: true,
+      },
+      { status: 409 }
+    );
+  }
+
   const versionParam = req.nextUrl.searchParams.get("version");
   const versionNum =
     versionParam && /^\d+$/.test(versionParam) ? parseInt(versionParam, 10) : null;
@@ -54,6 +77,20 @@ export async function GET(
   const resolved = await resolveProductPdfBuffer(id, { version: versionNum });
   if (!resolved) {
     return new NextResponse("PDF nenalezeno", { status: 404 });
+  }
+
+  if (productLock.is_locked && confirmLocked) {
+    await logImlAudit({
+      userId,
+      action: "update",
+      tableName: "iml_products",
+      recordId: id,
+      newValues: {
+        audit_action: "DOWNLOAD_LOCKED_DATA",
+        version: resolved.version,
+        item_status: productLock.item_status,
+      },
+    });
   }
 
   return new NextResponse(new Uint8Array(resolved.buffer), {

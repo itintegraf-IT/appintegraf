@@ -9,7 +9,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Zvyšte po změně prisma/schema.prisma, aby dev server načetl nový klient */
-const PRISMA_CACHE_KEY = "20261008-iml-makety-shape-v2";
+const PRISMA_CACHE_KEY = "20261014-iml-product-lock";
 
 function parseDatabaseUrl(url: string): mariadb.PoolConfig | string {
   try {

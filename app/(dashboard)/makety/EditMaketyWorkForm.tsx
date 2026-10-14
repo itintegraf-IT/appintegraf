@@ -55,6 +55,9 @@ export function EditMaketyWorkForm({
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [dataKind, setDataKind] = useState<"nova_data" | "uprava_dat">(
+    initial.data_kind === "uprava_dat" ? "uprava_dat" : "nova_data"
+  );
 
   const typeLabel = maketyWorkTypeLabel(workType);
   const roleLabel = maketyAssigneeRoleLabel(workType);
@@ -170,7 +173,10 @@ export function EditMaketyWorkForm({
             <label className="mb-1 block text-sm font-medium text-gray-700">Typ dat</label>
             <select
               name="data_kind"
-              defaultValue={initial.data_kind ?? "nova_data"}
+              value={dataKind}
+              onChange={(e) =>
+                setDataKind(e.target.value === "uprava_dat" ? "uprava_dat" : "nova_data")
+              }
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
             >
               <option value="nova_data">nová data</option>
@@ -195,7 +201,9 @@ export function EditMaketyWorkForm({
         />
       )}
 
-      {isGrafika && <GrafikaImlFields initial={imlInitial} />}
+      {isGrafika && (
+        <GrafikaImlFields initial={imlInitial} requireProduct={dataKind === "uprava_dat"} />
+      )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
         <label className="mb-1 block text-sm font-medium text-gray-700">

@@ -50,8 +50,9 @@ export function ProductPdfThumbnail({
 
         pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-        const q = cacheBust != null ? `?t=${encodeURIComponent(String(cacheBust))}` : "";
-        const res = await fetch(`/api/iml/products/${productId}/pdf${q}`, {
+        const params = new URLSearchParams({ preview: "1" });
+        if (cacheBust != null) params.set("t", String(cacheBust));
+        const res = await fetch(`/api/iml/products/${productId}/pdf?${params}`, {
           credentials: "same-origin",
         });
         if (!res.ok) throw new Error("pdf_fetch");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   IML_TOOL_STATUSES,
@@ -10,6 +10,7 @@ import {
   type ImlToolStatus,
   type ImlToolTechnology,
 } from "@/lib/iml/shape-tool-constants";
+import { CatalogAttachments } from "../_components/CatalogAttachments";
 
 type ToolRow = {
   id: number;
@@ -46,6 +47,7 @@ export function ToolsClient() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [detailToolId, setDetailToolId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     const params = new URLSearchParams();
@@ -244,51 +246,73 @@ export function ToolsClient() {
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-100">
-                <td className="px-3 py-2 font-medium">{row.tool_code_new}</td>
-                <td className="px-3 py-2">{row.tool_code_orig}</td>
-                <td className="px-3 py-2">
-                  {IML_TOOL_TECHNOLOGY_LABELS[row.technology as ImlToolTechnology] ??
-                    row.technology}
-                </td>
-                <td className="px-3 py-2">{row.primary_machine ?? "—"}</td>
-                <td className="px-3 py-2">
-                  {IML_TOOL_STATUS_LABELS[row.status as ImlToolStatus] ?? row.status}
-                </td>
-                <td className="px-3 py-2 text-xs">
-                  {row.impositions.length === 0
-                    ? "—"
-                    : row.impositions
-                        .map((i) => `${i.imposition_code} (${i.positions_count})`)
-                        .join(", ")}
-                </td>
-                <td className="px-3 py-2 space-x-2 whitespace-nowrap">
-                  <button
-                    type="button"
-                    className="text-violet-700 hover:underline"
-                    onClick={() => {
-                      setEditingId(row.id);
-                      setForm({
-                        tool_code_new: row.tool_code_new,
-                        tool_code_orig: row.tool_code_orig,
-                        technology: row.technology as ImlToolTechnology,
-                        primary_machine: row.primary_machine ?? "",
-                        status: row.status as ImlToolStatus,
-                        note: row.note ?? "",
-                      });
-                    }}
-                  >
-                    Upravit
-                  </button>
-                  <button
-                    type="button"
-                    className="text-red-600 hover:underline"
-                    onClick={() => void remove(row.id)}
-                  >
-                    Smazat
-                  </button>
-                </td>
-              </tr>
+              <Fragment key={row.id}>
+                <tr className="border-b border-gray-100">
+                  <td className="px-3 py-2 font-medium">{row.tool_code_new}</td>
+                  <td className="px-3 py-2">{row.tool_code_orig}</td>
+                  <td className="px-3 py-2">
+                    {IML_TOOL_TECHNOLOGY_LABELS[row.technology as ImlToolTechnology] ??
+                      row.technology}
+                  </td>
+                  <td className="px-3 py-2">{row.primary_machine ?? "—"}</td>
+                  <td className="px-3 py-2">
+                    {IML_TOOL_STATUS_LABELS[row.status as ImlToolStatus] ?? row.status}
+                  </td>
+                  <td className="px-3 py-2 text-xs">
+                    {row.impositions.length === 0
+                      ? "—"
+                      : row.impositions
+                          .map((i) => `${i.imposition_code} (${i.positions_count})`)
+                          .join(", ")}
+                  </td>
+                  <td className="px-3 py-2 space-x-2 whitespace-nowrap">
+                    <button
+                      type="button"
+                      className="text-violet-700 hover:underline"
+                      onClick={() => {
+                        setEditingId(row.id);
+                        setForm({
+                          tool_code_new: row.tool_code_new,
+                          tool_code_orig: row.tool_code_orig,
+                          technology: row.technology as ImlToolTechnology,
+                          primary_machine: row.primary_machine ?? "",
+                          status: row.status as ImlToolStatus,
+                          note: row.note ?? "",
+                        });
+                      }}
+                    >
+                      Upravit
+                    </button>
+                    <button
+                      type="button"
+                      className="text-violet-700 hover:underline"
+                      onClick={() =>
+                        setDetailToolId((id) => (id === row.id ? null : row.id))
+                      }
+                    >
+                      {detailToolId === row.id ? "Skrýt" : "Přílohy"}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-red-600 hover:underline"
+                      onClick={() => void remove(row.id)}
+                    >
+                      Smazat
+                    </button>
+                  </td>
+                </tr>
+                {detailToolId === row.id && (
+                  <tr className="border-b border-gray-100">
+                    <td colSpan={7} className="bg-violet-50/40 px-3 py-3">
+                      <CatalogAttachments
+                        kind="tool"
+                        recordId={row.id}
+                        title="Přílohy výkresu archu (PDF / JPG / CAD)"
+                      />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
             {rows.length === 0 && (
               <tr>

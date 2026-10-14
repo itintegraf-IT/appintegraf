@@ -52,6 +52,7 @@ export default function ImlProductEditPage() {
   const [cmykFlags, setCmykFlags] = useState<ProductCmykFlags>(defaultProductCmykFlags);
   const [hasImage, setHasImage] = useState(false);
   const [hasPdf, setHasPdf] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);
 
   const setField = <K extends keyof ProductFormState>(k: K, v: ProductFormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -137,6 +138,7 @@ export default function ImlProductEditPage() {
           });
           setHasImage(!!p.has_image);
           setHasPdf(!!p.has_pdf);
+          setIsLocked(!!p.is_locked);
           const dbColorRows: ProductColorRow[] = Array.isArray(p.iml_product_colors)
             ? (p.iml_product_colors as ProductColorResp[]).map((r, i) => ({
                 pantone_id: r.pantone_id,
@@ -320,6 +322,7 @@ export default function ImlProductEditPage() {
           productId={parseInt(id, 10)}
           hasImage={hasImage}
           hasPdf={hasPdf}
+          isLocked={isLocked}
           onImageChange={() => setHasImage(true)}
           onPdfChange={() => setHasPdf(true)}
           onImageDelete={() => setHasImage(false)}

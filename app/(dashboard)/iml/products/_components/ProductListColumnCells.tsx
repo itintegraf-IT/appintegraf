@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Eye, Pencil, Trash2, FileText, ImageOff } from "lucide-react";
+import { Eye, Pencil, Trash2, FileText, ImageOff, Lock } from "lucide-react";
 import { withReturnTo } from "@/lib/navigation/return-to";
 import {
   formatProductListDate,
@@ -11,6 +11,7 @@ import {
   type ProductListRow,
 } from "@/lib/iml/product-list-columns";
 import { imlProductKindLabel } from "@/lib/iml-constants";
+import { LockedPdfDownload } from "./LockedPdfDownload";
 
 export type ProductListCellContext = {
   canWrite: boolean;
@@ -83,6 +84,15 @@ export function renderProductListCell(
           <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">
             {product.item_status?.trim() || "bez stavu"}
           </span>
+          {product.is_locked ? (
+            <span
+              className="inline-flex items-center gap-1 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900"
+              title="Položka je uzamčena — probíhá úprava grafikem"
+            >
+              <Lock className="h-3 w-3" />
+              V úpravě grafikem
+            </span>
+          ) : null}
           {product.archived_at ? (
             <span
               className="rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800"
@@ -95,16 +105,15 @@ export function renderProductListCell(
       );
     case "pdf":
       return product.has_pdf ? (
-        <a
-          href={`/api/iml/products/${product.id}/pdf`}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50"
-          title="Otevřít PDF tisková data"
-        >
-          <FileText className="h-5 w-5" />
-        </a>
+        <span onClick={(e) => e.stopPropagation()}>
+          <LockedPdfDownload
+            productId={product.id}
+            isLocked={!!product.is_locked}
+            className="inline-flex h-8 w-8 items-center justify-center rounded text-red-600 hover:bg-red-50"
+          >
+            <FileText className="h-5 w-5" aria-label="Otevřít PDF tisková data" />
+          </LockedPdfDownload>
+        </span>
       ) : (
         <span className="text-gray-300" title="Bez tiskových dat">
           <FileText className="mx-auto h-5 w-5 opacity-30" />

@@ -455,6 +455,7 @@ model makety {
   makety_status_log      makety_status_log[]
   makety_file_events     makety_file_events[]
   makety_softproof_links makety_softproof_links[]
+  iml_products_locked    iml_products[]     @relation("iml_product_locked_by_maketa")
 
   @@index([assignee_user_id], map: "idx_makety_assignee")
   @@index([created_by], map: "idx_makety_creator")
@@ -1831,6 +1832,9 @@ model iml_products {
   archived_at          DateTime? @db.DateTime(0)
   /// Cesta k legacy `pdf_data` na disku (relativní vůči IML_ARCHIVE_DIR).
   pdf_archive_path     String?   @db.VarChar(500)
+  /// Zámek při úpravě grafiky (makety data_kind=uprava_dat).
+  is_locked            Boolean   @default(false)
+  locked_maketa_id     Int?
 
   created_at DateTime @default(now()) @db.DateTime(0)
   updated_at DateTime @updatedAt @db.DateTime(0)
@@ -1851,6 +1855,7 @@ model iml_products {
   paper_material        materials?           @relation("ImlProductPaper", fields: [paper_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   lacquer_material      materials?           @relation("ImlProductLacquer", fields: [lacquer_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   makety                makety[]
+  locked_by_maketa      makety?              @relation("iml_product_locked_by_maketa", fields: [locked_maketa_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
 
   @@index([customer_id])
   @@index([ig_code])
@@ -1868,6 +1873,8 @@ model iml_products {
   @@index([paper_material_id], map: "idx_iml_products_paper_material")
   @@index([lacquer_material_id], map: "idx_iml_products_lacquer_material")
   @@index([archived_at], map: "idx_iml_products_archived_at")
+  @@index([is_locked], map: "idx_iml_products_is_locked")
+  @@index([locked_maketa_id], map: "idx_iml_products_locked_maketa")
   @@map("iml_products")
 }
 

@@ -48,6 +48,13 @@ export function ShapesClient() {
   const [tools, setTools] = useState<ToolOpt[]>([]);
   const [shapeTypes, setShapeTypes] = useState<ShapeTypeOpt[]>([]);
   const [q, setQ] = useState("");
+  const [filterType, setFilterType] = useState("");
+  const [filterWidth, setFilterWidth] = useState("");
+  const [filterHeight, setFilterHeight] = useState("");
+  const [sort, setSort] = useState<"shape_code" | "shape_type" | "width_mm" | "height_mm">(
+    "shape_code"
+  );
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -71,6 +78,11 @@ export function ShapesClient() {
   const load = useCallback(async () => {
     const params = new URLSearchParams();
     if (q.trim()) params.set("q", q.trim());
+    if (filterType) params.set("shape_type", filterType);
+    if (filterWidth.trim()) params.set("width_mm", filterWidth.trim());
+    if (filterHeight.trim()) params.set("height_mm", filterHeight.trim());
+    params.set("sort", sort);
+    params.set("dir", sortDir);
     const [shapesRes, toolsRes] = await Promise.all([
       fetch(`/api/iml/shapes?${params}`),
       fetch("/api/iml/tools"),
@@ -84,7 +96,21 @@ export function ShapesClient() {
     setRows(shapesData.shapes ?? []);
     setTools(toolsData.tools ?? []);
     setError(null);
-  }, [q]);
+  }, [q, filterType, filterWidth, filterHeight, sort, sortDir]);
+
+  const toggleSort = (column: typeof sort) => {
+    if (sort === column) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSort(column);
+      setSortDir("asc");
+    }
+  };
+
+  const sortIndicator = (column: typeof sort) => {
+    if (sort !== column) return "";
+    return sortDir === "asc" ? " ↑" : " ↓";
+  };
 
   useEffect(() => {
     void load();
@@ -198,12 +224,67 @@ export function ShapesClient() {
             </Link>
           </p>
         </div>
-        <input
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-          placeholder="Hledat kód / poznámku…"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-        />
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+        <label className="text-sm">
+          <span className="mb-1 block text-gray-600">Hledat</span>
+          <input
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            placeholder="Kód / poznámka…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-gray-600">Typ</span>
+          <select
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            value={filterType}
+            onChange={(e) => setFilterType(e.target.value)}
+          >
+            <option value="">Všechny typy</option>
+            {shapeTypes.map((t) => (
+              <option key={t.id} value={t.code}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-gray-600">Šířka mm</span>
+          <input
+            className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            inputMode="decimal"
+            placeholder="např. 100"
+            value={filterWidth}
+            onChange={(e) => setFilterWidth(e.target.value)}
+          />
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block text-gray-600">Výška mm</span>
+          <input
+            className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm"
+            inputMode="decimal"
+            placeholder="např. 100"
+            value={filterHeight}
+            onChange={(e) => setFilterHeight(e.target.value)}
+          />
+        </label>
+        {(filterType || filterWidth || filterHeight || q) && (
+          <button
+            type="button"
+            className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50"
+            onClick={() => {
+              setQ("");
+              setFilterType("");
+              setFilterWidth("");
+              setFilterHeight("");
+            }}
+          >
+            Zrušit filtry
+          </button>
+        )}
       </div>
 
       {error && (
@@ -339,9 +420,41 @@ export function ShapesClient() {
         <table className="min-w-full text-left text-sm">
           <thead className="border-b bg-gray-50 text-xs uppercase text-gray-500">
             <tr>
-              <th className="px-3 py-2">Kód</th>
-              <th className="px-3 py-2">Typ</th>
-              <th className="px-3 py-2">Rozměr</th>
+              <th className="px-3 py-2">
+                <button
+                  type="button"
+                  className="hover:text-gray-800"
+                  onClick={() => toggleSort("shape_code")}
+                >
+                  Kód{sortIndicator("shape_code")}
+                </button>
+              </th>
+              <th className="px-3 py-2">
+                <button
+                  type="button"
+                  className="hover:text-gray-800"
+                  onClick={() => toggleSort("shape_type")}
+                >
+                  Typ{sortIndicator("shape_type")}
+                </button>
+              </th>
+              <th className="px-3 py-2">
+                <button
+                  type="button"
+                  className="hover:text-gray-800"
+                  onClick={() => toggleSort("width_mm")}
+                >
+                  Šířka{sortIndicator("width_mm")}
+                </button>
+                {" × "}
+                <button
+                  type="button"
+                  className="hover:text-gray-800"
+                  onClick={() => toggleSort("height_mm")}
+                >
+                  Výška{sortIndicator("height_mm")}
+                </button>
+              </th>
               <th className="px-3 py-2">Nástroje</th>
               <th className="px-3 py-2">Prod.</th>
               <th className="px-3 py-2">Akce</th>
@@ -449,7 +562,7 @@ export function ShapesClient() {
                         setDetailShapeId((id) => (id === row.id ? null : row.id))
                       }
                     >
-                      {detailShapeId === row.id ? "Skrýt" : "Matice"}
+                      {detailShapeId === row.id ? "Skrýt" : "Detail"}
                     </button>
                     <button
                       type="button"
