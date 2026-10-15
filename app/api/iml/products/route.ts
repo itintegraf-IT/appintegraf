@@ -17,6 +17,7 @@ import {
   imlProductSaveErrorResponse,
 } from "@/lib/iml-product-save-errors";
 import { toImlProductCreateData } from "@/lib/iml/product-prisma-payload";
+import { buildProductListOrderBy } from "@/lib/iml/product-list-sort";
 
 const productListSelect = {
   id: true,
@@ -143,12 +144,8 @@ export async function GET(req: NextRequest) {
   }
 
   const sortParam = (searchParams.get("sort") ?? "").trim();
-  const orderBy: Prisma.iml_productsOrderByWithRelationInput[] =
-    sortParam === "format"
-      ? [{ format_width_mm: "asc" }, { format_height_mm: "asc" }, { id: "desc" }]
-      : sortParam === "format_desc"
-        ? [{ format_width_mm: "desc" }, { format_height_mm: "desc" }, { id: "desc" }]
-        : [{ id: "desc" }];
+  const dirParam = (searchParams.get("dir") ?? "").trim();
+  const orderBy = buildProductListOrderBy(sortParam, dirParam);
 
   const pageParam = searchParams.get("page");
   const perPageParam = searchParams.get("per_page");

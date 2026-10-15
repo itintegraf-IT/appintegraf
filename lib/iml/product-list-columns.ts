@@ -96,6 +96,8 @@ export type ProductListColumnMeta = {
   maxWidthPx?: number;
   resizable?: boolean;
   locked?: boolean;
+  /** Lze řadit kliknutím na záhlaví (server-side). */
+  sortable?: boolean;
   truncate?: boolean;
   headerClassName?: string;
   cellClassName?: string;
@@ -121,33 +123,33 @@ export const PRODUCT_LIST_COLUMN_GROUPS: Array<{
 ];
 
 export const PRODUCT_LIST_COLUMNS: ProductListColumnMeta[] = [
-  { id: "ig_code", label: "Kód IG", group: "základ", defaultVisible: true, locked: true, defaultWidthPx: 110 },
-  { id: "name", label: "Název / Klient", group: "základ", defaultVisible: true, locked: true, defaultWidthPx: 220, truncate: true },
-  { id: "customer", label: "Zákazník", group: "základ", defaultVisible: true, defaultWidthPx: 180, truncate: true },
-  { id: "product_kind", label: "Druh", group: "identifikace", defaultVisible: false, defaultWidthPx: 110 },
-  { id: "status", label: "Stav", group: "základ", defaultVisible: true, defaultWidthPx: 90 },
-  { id: "pdf", label: "PDF", group: "základ", defaultVisible: true, align: "center", defaultWidthPx: 56, minWidthPx: 48, maxWidthPx: 80, cellClassName: "text-center" },
-  { id: "actions", label: "Akce", group: "základ", defaultVisible: true, locked: true, align: "right", defaultWidthPx: 120, minWidthPx: 96, maxWidthPx: 160 },
-  { id: "thumbnail", label: "Náhled", group: "ostatní", defaultVisible: false, defaultWidthPx: 56, minWidthPx: 48, maxWidthPx: 80, cellClassName: "px-3 py-2" },
-  { id: "sku", label: "SKU", group: "identifikace", defaultVisible: false, defaultWidthPx: 120, truncate: true },
-  { id: "client_code", label: "Kód u klienta", group: "identifikace", defaultVisible: false, defaultWidthPx: 130, truncate: true },
-  { id: "ig_short_name", label: "Zkrácený název IG", group: "identifikace", defaultVisible: false, defaultWidthPx: 160, truncate: true },
-  { id: "requester", label: "Zadavatel", group: "identifikace", defaultVisible: false, defaultWidthPx: 140, truncate: true },
-  { id: "ean_code", label: "EAN", group: "identifikace", defaultVisible: false, defaultWidthPx: 130, cellClassName: "font-mono text-sm" },
-  { id: "die_cut_tool_code", label: "Výsekový nástroj", group: "výseky", defaultVisible: false, defaultWidthPx: 160, truncate: true },
-  { id: "label_shape_code", label: "Kód tvaru etikety", group: "výseky", defaultVisible: false, defaultWidthPx: 140, truncate: true },
-  { id: "assembly_code", label: "Montážní kód", group: "výseky", defaultVisible: false, defaultWidthPx: 130, truncate: true },
-  { id: "positions_on_sheet", label: "Pozic na archu", group: "výseky", defaultVisible: false, align: "right", defaultWidthPx: 100 },
-  { id: "labels_per_sheet", label: "Etiket na arch", group: "výseky", defaultVisible: false, align: "right", defaultWidthPx: 110 },
-  { id: "format", label: "Formát", group: "výseky", defaultVisible: false, defaultWidthPx: 120 },
-  { id: "print_colors_text", label: "Barvy (text)", group: "barvy", defaultVisible: false, defaultWidthPx: 180, truncate: true, cellClassName: "text-sm" },
-  { id: "color_count", label: "Počet barev", group: "barvy", defaultVisible: false, align: "right", defaultWidthPx: 100 },
-  { id: "color_coverage", label: "Pokrytí barev", group: "barvy", defaultVisible: false, defaultWidthPx: 120, truncate: true },
-  { id: "foil", label: "Fólie", group: "barvy", defaultVisible: false, defaultWidthPx: 140, truncate: true },
-  { id: "stock_quantity", label: "Sklad", group: "ostatní", defaultVisible: false, align: "right", defaultWidthPx: 80 },
-  { id: "approval_status", label: "Schválení", group: "ostatní", defaultVisible: false, defaultWidthPx: 120, truncate: true },
-  { id: "approval_date", label: "Datum schválení", group: "ostatní", defaultVisible: false, defaultWidthPx: 120 },
-  { id: "updated_at", label: "Upraveno", group: "ostatní", defaultVisible: false, defaultWidthPx: 110, cellClassName: "text-sm text-gray-600 whitespace-nowrap" },
+  { id: "ig_code", label: "Kód IG", group: "základ", defaultVisible: true, locked: true, sortable: true, defaultWidthPx: 110 },
+  { id: "name", label: "Název / Klient", group: "základ", defaultVisible: true, locked: true, sortable: true, defaultWidthPx: 220, truncate: true },
+  { id: "customer", label: "Zákazník", group: "základ", defaultVisible: true, sortable: true, defaultWidthPx: 180, truncate: true },
+  { id: "product_kind", label: "Druh", group: "identifikace", defaultVisible: false, sortable: true, defaultWidthPx: 110 },
+  { id: "status", label: "Stav", group: "základ", defaultVisible: true, sortable: true, defaultWidthPx: 90 },
+  { id: "pdf", label: "PDF", group: "základ", defaultVisible: true, sortable: false, align: "center", defaultWidthPx: 56, minWidthPx: 48, maxWidthPx: 80, cellClassName: "text-center" },
+  { id: "actions", label: "Akce", group: "základ", defaultVisible: true, locked: true, sortable: false, align: "right", defaultWidthPx: 120, minWidthPx: 96, maxWidthPx: 160 },
+  { id: "thumbnail", label: "Náhled", group: "ostatní", defaultVisible: false, sortable: false, defaultWidthPx: 56, minWidthPx: 48, maxWidthPx: 80, cellClassName: "px-3 py-2" },
+  { id: "sku", label: "SKU", group: "identifikace", defaultVisible: false, sortable: true, defaultWidthPx: 120, truncate: true },
+  { id: "client_code", label: "Kód u klienta", group: "identifikace", defaultVisible: false, sortable: true, defaultWidthPx: 130, truncate: true },
+  { id: "ig_short_name", label: "Zkrácený název IG", group: "identifikace", defaultVisible: false, sortable: true, defaultWidthPx: 160, truncate: true },
+  { id: "requester", label: "Zadavatel", group: "identifikace", defaultVisible: false, sortable: true, defaultWidthPx: 140, truncate: true },
+  { id: "ean_code", label: "EAN", group: "identifikace", defaultVisible: false, sortable: true, defaultWidthPx: 130, cellClassName: "font-mono text-sm" },
+  { id: "die_cut_tool_code", label: "Výsekový nástroj", group: "výseky", defaultVisible: false, sortable: true, defaultWidthPx: 160, truncate: true },
+  { id: "label_shape_code", label: "Kód tvaru etikety", group: "výseky", defaultVisible: false, sortable: true, defaultWidthPx: 140, truncate: true },
+  { id: "assembly_code", label: "Montážní kód", group: "výseky", defaultVisible: false, sortable: true, defaultWidthPx: 130, truncate: true },
+  { id: "positions_on_sheet", label: "Pozic na archu", group: "výseky", defaultVisible: false, sortable: true, align: "right", defaultWidthPx: 100 },
+  { id: "labels_per_sheet", label: "Etiket na arch", group: "výseky", defaultVisible: false, sortable: true, align: "right", defaultWidthPx: 110 },
+  { id: "format", label: "Formát", group: "výseky", defaultVisible: false, sortable: true, defaultWidthPx: 120 },
+  { id: "print_colors_text", label: "Barvy (text)", group: "barvy", defaultVisible: false, sortable: true, defaultWidthPx: 180, truncate: true, cellClassName: "text-sm" },
+  { id: "color_count", label: "Počet barev", group: "barvy", defaultVisible: false, sortable: true, align: "right", defaultWidthPx: 100 },
+  { id: "color_coverage", label: "Pokrytí barev", group: "barvy", defaultVisible: false, sortable: true, defaultWidthPx: 120, truncate: true },
+  { id: "foil", label: "Fólie", group: "barvy", defaultVisible: false, sortable: true, defaultWidthPx: 140, truncate: true },
+  { id: "stock_quantity", label: "Sklad", group: "ostatní", defaultVisible: false, sortable: true, align: "right", defaultWidthPx: 80 },
+  { id: "approval_status", label: "Schválení", group: "ostatní", defaultVisible: false, sortable: true, defaultWidthPx: 120, truncate: true },
+  { id: "approval_date", label: "Datum schválení", group: "ostatní", defaultVisible: false, sortable: true, defaultWidthPx: 120 },
+  { id: "updated_at", label: "Upraveno", group: "ostatní", defaultVisible: false, sortable: true, defaultWidthPx: 110, cellClassName: "text-sm text-gray-600 whitespace-nowrap" },
 ];
 
 const columnById = new Map(PRODUCT_LIST_COLUMNS.map((c) => [c.id, c]));
@@ -254,27 +256,64 @@ export function formatProductListFoil(row: ProductListRow): string {
   return row.foil_type?.trim() || "-";
 }
 
-/** Sestaví pořadí sloupců podle definice + uložené preference. */
+/**
+ * Sestaví viditelné sloupce a zachová pořadí z preference (pro drag-reorder).
+ * Chybějící locked sloupce doplní (ig_code/name na začátek, actions na konec).
+ */
 export function resolveVisibleColumnIds(storedIds: ProductListColumnId[] | null): ProductListColumnId[] {
-  const defaultSet = new Set(DEFAULT_VISIBLE_COLUMN_IDS);
-  const chosen = new Set<ProductListColumnId>();
-
-  for (const id of LOCKED_COLUMN_IDS) {
-    chosen.add(id);
-  }
-
   const source = storedIds && storedIds.length > 0 ? storedIds : DEFAULT_VISIBLE_COLUMN_IDS;
+  const result: ProductListColumnId[] = [];
+  const seen = new Set<ProductListColumnId>();
+
   for (const id of source) {
-    if (isKnownProductListColumnId(id)) {
-      chosen.add(id);
+    if (isKnownProductListColumnId(id) && !seen.has(id)) {
+      result.push(id);
+      seen.add(id);
     }
   }
 
-  if (!storedIds) {
-    for (const id of defaultSet) chosen.add(id);
+  for (const id of LOCKED_COLUMN_IDS) {
+    if (seen.has(id)) continue;
+    if (id === "actions") {
+      result.push(id);
+    } else if (id === "ig_code") {
+      result.unshift(id);
+    } else if (id === "name") {
+      const igIdx = result.indexOf("ig_code");
+      result.splice(igIdx >= 0 ? igIdx + 1 : 0, 0, id);
+    } else {
+      result.push(id);
+    }
+    seen.add(id);
   }
 
-  return PRODUCT_LIST_COLUMNS.filter((c) => chosen.has(c.id)).map((c) => c.id);
+  return result;
+}
+
+export function isProductListColumnDraggable(id: ProductListColumnId): boolean {
+  const meta = getProductListColumnMeta(id);
+  return !!meta && !meta.locked;
+}
+
+export function isProductListColumnSortable(id: ProductListColumnId): boolean {
+  return getProductListColumnMeta(id)?.sortable === true;
+}
+
+export function reorderVisibleColumnIds(
+  ids: ProductListColumnId[],
+  activeId: ProductListColumnId,
+  overId: ProductListColumnId
+): ProductListColumnId[] {
+  const resolved = resolveVisibleColumnIds(ids);
+  if (!isProductListColumnDraggable(activeId) || !isProductListColumnDraggable(overId)) {
+    return resolved;
+  }
+  const oldIndex = resolved.indexOf(activeId);
+  const newIndex = resolved.indexOf(overId);
+  if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return resolved;
+  const next = [...resolved];
+  next.splice(newIndex, 0, next.splice(oldIndex, 1)[0]!);
+  return resolveVisibleColumnIds(next);
 }
 
 export function columnPrefsFromIds(ids: ProductListColumnId[]): ProductListColumnPrefs {

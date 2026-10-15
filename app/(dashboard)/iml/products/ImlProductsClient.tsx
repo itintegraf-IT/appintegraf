@@ -4,9 +4,14 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Loader2, Search, Download } from "lucide-react";
 import { IML_ITEM_STATUSES, imlItemStatusLabel } from "@/lib/iml-constants";
 import { useListFilters } from "@/lib/navigation/use-list-filters";
-import { type ProductListRow } from "@/lib/iml/product-list-columns";
+import {
+  isProductListColumnSortable,
+  type ProductListColumnId,
+  type ProductListRow,
+} from "@/lib/iml/product-list-columns";
 import { useProductListColumns } from "@/lib/iml/use-product-list-columns";
 import { useProductListColumnWidths } from "@/lib/iml/use-product-list-column-widths";
+import type { ProductListSortDir } from "@/lib/iml/product-list-sort";
 import { ProductListColumnPicker } from "./_components/ProductListColumnPicker";
 import { ResizableProductListTable } from "./_components/ResizableProductListTable";
 
@@ -23,6 +28,7 @@ const PRODUCT_LIST_FILTER_DEFAULTS = {
   format_width_mm: "",
   format_height_mm: "",
   sort: "",
+  dir: "",
   missing_shape: "",
   page: "1",
   per_page: "",
@@ -70,6 +76,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
       "format_width_mm",
       "format_height_mm",
       "sort",
+      "dir",
       "missing_shape",
       "per_page",
     ],
@@ -83,13 +90,22 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const filterWidth = filters.format_width_mm;
   const filterHeight = filters.format_height_mm;
   const filterSort = filters.sort;
+  const filterDir = (filters.dir === "asc" || filters.dir === "desc" ? filters.dir : "") as
+    | ProductListSortDir
+    | "";
   const filterMissingShape = filters.missing_shape;
   const page = parseInt(filters.page || "1", 10) || 1;
   const perPage = (filters.per_page || "25") as PerPageOption;
   const isInfiniteMode = perPage === "all";
 
-  const { visibleColumns, visibleColumnIds, toggleColumn, resetToDefaults, ready: columnsReady } =
-    useProductListColumns();
+  const {
+    visibleColumns,
+    visibleColumnIds,
+    toggleColumn,
+    reorderColumns,
+    resetToDefaults,
+    ready: columnsReady,
+  } = useProductListColumns();
   const {
     columnWidths,
     setWidth,
@@ -187,7 +203,10 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
       if (filterArchive && filterArchive !== "active") params.set("archive", filterArchive);
       if (filterWidth) params.set("format_width_mm", filterWidth);
       if (filterHeight) params.set("format_height_mm", filterHeight);
-      if (filterSort) params.set("sort", filterSort);
+      if (filterSort) {
+        params.set("sort", filterSort);
+        if (filterDir) params.set("dir", filterDir);
+      }
       if (filterMissingShape === "1") params.set("missing_shape", "1");
       params.set("page", String(pageNum));
       params.set("per_page", isInfiniteMode ? String(INFINITE_CHUNK_SIZE) : perPage);
@@ -203,10 +222,31 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
       filterWidth,
       filterHeight,
       filterSort,
+      filterDir,
       filterMissingShape,
       perPage,
       isInfiniteMode,
     ]
+  );
+
+  const cycleSort = useCallback(
+    (columnId: ProductListColumnId) => {
+      if (!isProductListColumnSortable(columnId)) return;
+      if (filterSort !== columnId) {
+        setFilters({ sort: columnId, dir: "asc", page: "1" });
+        return;
+      }
+      if (filterDir === "asc") {
+        setFilters({ sort: columnId, dir: "desc", page: "1" });
+        return;
+      }
+      if (filterDir === "desc") {
+        setFilters({ sort: "", dir: "", page: "1" });
+        return;
+      }
+      setFilters({ sort: columnId, dir: "asc", page: "1" });
+    },
+    [filterSort, filterDir, setFilters]
   );
 
   const fetchProductsPage = useCallback(
@@ -670,15 +710,6 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
               className="w-24 rounded-lg border border-gray-300 px-2 py-2 text-sm"
               title="Filtr formátu – výška"
             />
-            <select
-              value={filterSort}
-              onChange={(e) => setFilter("sort", e.target.value)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
-            >
-              <option value="">Řazení: ID</option>
-              <option value="format">Řazení: formát ↑</option>
-              <option value="format_desc">Řazení: formát ↓</option>
-            </select>
             <label className="flex items-center gap-1.5 text-sm text-gray-700">
               <input
                 type="checkbox"
@@ -737,6 +768,10 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           onToggleSelectAllPage={toggleSelectAllPage}
+          sortColumn={filterSort}
+          sortDir={filterDir}
+          onCycleSort={cycleSort}
+          onReorderColumns={reorderColumns}
           footer={
             isInfiniteMode && !loading && products.length > 0 ? (
               <div ref={sentinelRef} className="h-1 w-full" aria-hidden />

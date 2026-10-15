@@ -3,6 +3,7 @@ import {
   DEFAULT_VISIBLE_COLUMN_IDS,
   LOCKED_COLUMN_IDS,
   resolveVisibleColumnIds,
+  reorderVisibleColumnIds,
   parseStoredColumnPrefs,
   columnPrefsFromIds,
   clampColumnWidth,
@@ -10,6 +11,7 @@ import {
   parseStoredColumnWidths,
   getDefaultColumnWidth,
 } from "./product-list-columns";
+import { buildProductListOrderBy } from "./product-list-sort";
 
 describe("resolveVisibleColumnIds", () => {
   it("vrátí výchozí sloupce bez uložené preference", () => {
@@ -23,10 +25,51 @@ describe("resolveVisibleColumnIds", () => {
     }
   });
 
+  it("zachová pořadí volitelných sloupců", () => {
+    const ids = resolveVisibleColumnIds(["format", "sku", "customer"]);
+    expect(ids.indexOf("format")).toBeLessThan(ids.indexOf("sku"));
+    expect(ids.indexOf("sku")).toBeLessThan(ids.indexOf("customer"));
+  });
+
   it("ignoruje neznámá ID", () => {
     const ids = resolveVisibleColumnIds(["sku", "unknown_col" as never]);
     expect(ids).toContain("sku");
     expect(ids).not.toContain("unknown_col" as never);
+  });
+});
+
+describe("reorderVisibleColumnIds", () => {
+  it("přesune volitelný sloupec", () => {
+    const base = resolveVisibleColumnIds(["customer", "status", "sku"]);
+    const next = reorderVisibleColumnIds(base, "sku", "customer");
+    expect(next.indexOf("sku")).toBeLessThan(next.indexOf("customer"));
+  });
+
+  it("neposune zamčený sloupec", () => {
+    const base = resolveVisibleColumnIds(["customer", "status"]);
+    const next = reorderVisibleColumnIds(base, "ig_code", "customer");
+    expect(next).toEqual(base);
+  });
+});
+
+describe("buildProductListOrderBy", () => {
+  it("default id desc", () => {
+    expect(buildProductListOrderBy("", "")).toEqual([{ id: "desc" }]);
+  });
+
+  it("řadí ig_code asc", () => {
+    expect(buildProductListOrderBy("ig_code", "asc")).toEqual([
+      { ig_code: "asc" },
+      { id: "desc" },
+    ]);
+  });
+
+  it("legacy format_desc", () => {
+    expect(buildProductListOrderBy("format_desc", null)).toEqual([
+      { format_width_mm: "desc" },
+      { format_height_mm: "desc" },
+      { id: "desc" },
+    ]);
   });
 });
 

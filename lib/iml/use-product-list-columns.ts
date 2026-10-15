@@ -10,6 +10,7 @@ import {
   getProductListColumnMeta,
   isKnownProductListColumnId,
   parseStoredColumnPrefs,
+  reorderVisibleColumnIds,
   resolveVisibleColumnIds,
   serializeColumnPrefs,
   type ProductListColumnId,
@@ -23,6 +24,7 @@ export type UseProductListColumnsResult = {
   isColumnVisible: (id: ProductListColumnId) => boolean;
   toggleColumn: (id: ProductListColumnId) => void;
   setVisibleColumnIds: (ids: ProductListColumnId[]) => void;
+  reorderColumns: (activeId: ProductListColumnId, overId: ProductListColumnId) => void;
   resetToDefaults: () => void;
   /** Pro budoucí sync do API – stejný tvar jako localStorage. */
   prefs: ProductListColumnPrefs;
@@ -60,15 +62,23 @@ export function useProductListColumns(): UseProductListColumnsResult {
     persistColumnIds(resolved);
   }, []);
 
-  const toggleColumn = useCallback(
-    (id: ProductListColumnId) => {
-      if (LOCKED_COLUMN_IDS.includes(id)) return;
+  const toggleColumn = useCallback((id: ProductListColumnId) => {
+    if (LOCKED_COLUMN_IDS.includes(id)) return;
+    setVisibleColumnIdsState((prev) => {
+      const has = prev.includes(id);
+      const next = has ? prev.filter((x) => x !== id) : [...prev, id];
+      const resolved = resolveVisibleColumnIds(next);
+      persistColumnIds(resolved);
+      return resolved;
+    });
+  }, []);
+
+  const reorderColumns = useCallback(
+    (activeId: ProductListColumnId, overId: ProductListColumnId) => {
       setVisibleColumnIdsState((prev) => {
-        const has = prev.includes(id);
-        const next = has ? prev.filter((x) => x !== id) : [...prev, id];
-        const resolved = resolveVisibleColumnIds(next);
-        persistColumnIds(resolved);
-        return resolved;
+        const next = reorderVisibleColumnIds(prev, activeId, overId);
+        persistColumnIds(next);
+        return next;
       });
     },
     []
@@ -105,10 +115,11 @@ export function useProductListColumns(): UseProductListColumnsResult {
     isColumnVisible,
     toggleColumn,
     setVisibleColumnIds,
+    reorderColumns,
     resetToDefaults,
     prefs,
     ready,
   };
 }
 
-export { isKnownProductListColumnId };
+export { isKnownProductListColumnId, PRODUCT_LIST_COLUMNS };
