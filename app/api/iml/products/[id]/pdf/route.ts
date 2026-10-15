@@ -12,6 +12,10 @@ import {
   MAX_PRODUCT_PDF_BYTES,
   MAX_PRODUCT_PDF_MB,
 } from "@/lib/iml-product-upload-limits";
+import {
+  buildImlProductPdfFilename,
+  contentDispositionForPdf,
+} from "@/lib/iml-product-pdf-filename";
 
 /**
  * Verzovaný PDF endpoint pro iml_product_files.
@@ -47,18 +51,25 @@ export async function GET(
     return new NextResponse("Neplatné ID", { status: 400 });
   }
 
-  const productLock = await prisma.iml_products.findUnique({
+  const product = await prisma.iml_products.findUnique({
     where: { id },
-    select: { is_locked: true, item_status: true },
+    select: {
+      is_locked: true,
+      item_status: true,
+      ig_code: true,
+      client_name: true,
+      product_kind: true,
+    },
   });
-  if (!productLock) {
+  if (!product) {
     return new NextResponse("Produkt nenalezen", { status: 404 });
   }
 
   const confirmLocked = req.nextUrl.searchParams.get("confirm_locked") === "1";
   /** Interní náhled (miniatura) — bez varování a bez audit záznamu. */
   const previewOnly = req.nextUrl.searchParams.get("preview") === "1";
-  if (productLock.is_locked && !confirmLocked && !previewOnly) {
+  const asDownload = req.nextUrl.searchParams.get("download") === "1";
+  if (product.is_locked && !confirmLocked && !previewOnly) {
     return NextResponse.json(
       {
         error:
@@ -79,7 +90,7 @@ export async function GET(
     return new NextResponse("PDF nenalezeno", { status: 404 });
   }
 
-  if (productLock.is_locked && confirmLocked) {
+  if (product.is_locked && confirmLocked) {
     await logImlAudit({
       userId,
       action: "update",
@@ -88,18 +99,29 @@ export async function GET(
       newValues: {
         audit_action: "DOWNLOAD_LOCKED_DATA",
         version: resolved.version,
-        item_status: productLock.item_status,
+        item_status: product.item_status,
       },
     });
   }
 
+  const downloadName = buildImlProductPdfFilename({
+    id,
+    ig_code: product.ig_code,
+    client_name: product.client_name,
+    product_kind: product.product_kind,
+  });
+
   return new NextResponse(new Uint8Array(resolved.buffer), {
     headers: {
       "Content-Type": resolved.mimeType || "application/pdf",
-      "Content-Disposition": `inline; filename="${sanitizeFilename(resolved.filename)}"`,
+      "Content-Disposition": contentDispositionForPdf(
+        downloadName,
+        asDownload || confirmLocked ? "attachment" : "inline"
+      ),
       "Cache-Control": "private, max-age=3600",
       "X-PDF-Version": String(resolved.version),
       "X-PDF-Source": resolved.source,
+      "X-Filename": downloadName,
     },
   });
 }

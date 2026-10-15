@@ -11,6 +11,10 @@ import {
   type MaketyFileKind,
 } from "@/lib/makety-file-kind";
 import { MAKETY_MAX_MB } from "@/lib/makety-files";
+import {
+  downloadBlobAsFile,
+  filenameFromContentDisposition,
+} from "@/lib/download-blob-as-file";
 
 const ACCEPT =
   ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.eml,.msg,.mht,.mhtml,application/pdf,image/*,message/rfc822";
@@ -241,12 +245,10 @@ export function MaketaFilesPanel({
       const res = await fetch(fileApiUrl(maketaId, f.id, true), { credentials: "same-origin" });
       if (!res.ok) throw new Error("download failed");
       const blob = await res.blob();
-      const objectUrl = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = objectUrl;
-      anchor.download = f.original_filename;
-      anchor.click();
-      URL.revokeObjectURL(objectUrl);
+      const fromHeader = filenameFromContentDisposition(
+        res.headers.get("Content-Disposition")
+      );
+      downloadBlobAsFile(blob, fromHeader || f.original_filename || `soubor-${f.id}`);
     } catch {
       setError("Stažení se nezdařilo");
     } finally {

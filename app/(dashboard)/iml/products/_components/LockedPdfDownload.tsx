@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import {
+  downloadBlobAsFile,
+  filenameFromContentDisposition,
+} from "@/lib/download-blob-as-file";
 
 type Props = {
   productId: number;
@@ -8,7 +12,7 @@ type Props = {
   version?: number | null;
   className?: string;
   children: React.ReactNode;
-  /** download vs inline open */
+  /** Preferovat stažení (attachment) vs. pojmenovaný download po otevření */
   download?: boolean;
 };
 
@@ -17,6 +21,7 @@ type Step = 0 | 1 | 2;
 /**
  * Stažení / otevření výrobního PDF.
  * U zamčeného produktu vyžaduje dvě po sobě jdoucí potvrzení.
+ * Vždy pojmenovaný download (ne window.open blob → UUID.pdf).
  */
 export function LockedPdfDownload({
   productId,
@@ -24,15 +29,18 @@ export function LockedPdfDownload({
   version = null,
   className,
   children,
-  download = false,
+  download: _preferDownload = false,
 }: Props) {
   const [step, setStep] = useState<Step>(0);
   const [busy, setBusy] = useState(false);
+  void _preferDownload;
 
   const buildUrl = (confirm: boolean) => {
     const params = new URLSearchParams();
     if (version != null) params.set("version", String(version));
     if (confirm) params.set("confirm_locked", "1");
+    // Vždy pojmenované stažení — zabrání UUID z blob: URL
+    params.set("download", "1");
     const q = params.toString();
     return `/api/iml/products/${productId}/pdf${q ? `?${q}` : ""}`;
   };
@@ -53,16 +61,11 @@ export function LockedPdfDownload({
         return;
       }
       const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      if (download) {
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `produkt-${productId}.pdf`;
-        a.click();
-      } else {
-        window.open(url, "_blank", "noopener,noreferrer");
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      const fromHeader =
+        filenameFromContentDisposition(res.headers.get("Content-Disposition")) ||
+        res.headers.get("X-Filename");
+      const filename = fromHeader?.trim() || `produkt-${productId}.pdf`;
+      downloadBlobAsFile(blob, filename);
       close();
     } finally {
       setBusy(false);

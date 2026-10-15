@@ -5,6 +5,10 @@ import {
   getSoftproofPublicChrome,
   type SoftproofPublicChrome,
 } from "@/lib/makety-softproof-templates";
+import {
+  downloadBlobAsFile,
+  filenameFromContentDisposition,
+} from "@/lib/download-blob-as-file";
 
 type Texts = SoftproofPublicChrome & {
   pageTitle: string;
@@ -160,6 +164,20 @@ export function PublicSoftproofClient({ token }: { token: string }) {
   const previewUrl = `${apiBase}?file=1`;
   const downloadUrl = `${apiBase}?download=1`;
 
+  const onDownload = async () => {
+    try {
+      const res = await fetch(downloadUrl);
+      if (!res.ok) throw new Error("download failed");
+      const blob = await res.blob();
+      const fromHeader = filenameFromContentDisposition(
+        res.headers.get("Content-Disposition")
+      );
+      downloadBlobAsFile(blob, fromHeader || meta.fileName || "softproof.pdf");
+    } catch {
+      setError(ui.networkError);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -192,12 +210,13 @@ export function PublicSoftproofClient({ token }: { token: string }) {
       )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-        <a
-          href={downloadUrl}
+        <button
+          type="button"
+          onClick={() => void onDownload()}
           className="inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
         >
           {meta.texts.downloadLabel}
-        </a>
+        </button>
 
         <div className="mt-6 space-y-3 border-t border-gray-100 pt-4">
           {error && !rejectOpen && <p className="text-sm text-red-600">{error}</p>}
