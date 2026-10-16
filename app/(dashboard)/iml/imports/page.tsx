@@ -53,6 +53,13 @@ export default async function ImlImportsPage() {
       needsWrite: true,
     },
     {
+      href: "/iml/shapes/import",
+      icon: Scissors,
+      label: "Import tvarů a nástrojů",
+      description: "Excel CUP/LID – tvary, PRIMARY vazby, zákazníci (EPIC 1)",
+      needsWrite: true,
+    },
+    {
       href: "/iml/die-cuts/import",
       icon: Scissors,
       label: "Import výseků (legacy)",

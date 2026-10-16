@@ -38,9 +38,17 @@ Tento dokument slouží jako strukturované technické zadání (backlog) pro ag
    * Generování podrobného error logu pro řádky s nevalidními hodnotami.
 
 ### Akceptační kritéria:
-- [ ] Jednorázový běh skriptu korektně založí 150–160 tvarů v databázi.
-- [ ] Všechny importované tvary mají správně přiřazené rozměry, navázané nástroje a balicí předpisy.
-- [ ] V administraci se záznamy zobrazují s korektními vazbami.
+- [x] Jednorázový běh / UI import korektně založí tvary v databázi (Excel CUP/LID).
+- [x] Importované tvary mají rozměry a PRIMARY vazbu na nástroj; zákazníci dle match jména.
+- [ ] Balicí předpisy (matice) — v aktuálním Excelu prázdné; doplnit později.
+- [x] V administraci se záznamy zobrazují s korektními vazbami.
+
+### Implementace (UI)
+
+- Cesta: **`/iml/shapes/import`** (také odkaz z Výseky a Import/Export IML).
+- API: `POST /api/iml/shapes/import` (preview + upsert).
+- Očekávaný Excel (list typu Oprava CUP/LID): `kód`, `nástroj`, `fórmát` (Š×V), `Sloupec 9` (technologie), `Sloupec 10` (zákazníci), `typ` (vanička/víčko).
+- Upsert tvarů podle `shape_code`, nástrojů podle kódu (new/orig), PRIMARY vazba, match zákazníků podle jména; prázdná balicí matice se přeskočí. Chybějící rozměry se zkusí vytáhnout z poznámky (mm).
 
 ---
 

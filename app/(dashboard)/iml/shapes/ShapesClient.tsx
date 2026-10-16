@@ -222,6 +222,10 @@ export function ShapesClient() {
             <Link href="/iml/vyseky" className="text-violet-700 hover:underline">
               ← Výseky
             </Link>
+            {" · "}
+            <Link href="/iml/shapes/import" className="text-violet-700 hover:underline">
+              Import
+            </Link>
           </p>
         </div>
       </div>

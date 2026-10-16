@@ -63,6 +63,20 @@ export default async function ImVysekyHubPage() {
         <p className="mt-1 text-gray-600">
           Tříúrovňový katalog: tvar → nástroj → montáž
         </p>
+        <div className="mt-3 flex flex-wrap gap-3 text-sm">
+          <Link
+            href="/iml/shapes/import"
+            className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 font-medium text-violet-900 hover:bg-violet-100"
+          >
+            Import tvarů a nástrojů
+          </Link>
+          <Link
+            href="/iml/tools/import"
+            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-gray-800 hover:bg-gray-50"
+          >
+            Import jen nástrojů
+          </Link>
+        </div>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
