@@ -5,7 +5,11 @@ import {
   supplementProductFromDraft,
 } from "@/lib/makety-product-draft";
 import { matchProductByIgCode } from "@/lib/makety-iml-product-lookup";
-import { pickLatestMaketyFileByKind } from "@/lib/makety-transfer-product-files";
+import {
+  isMaketyImlFilesIncomplete,
+  pickLatestMaketyFileByKind,
+  summarizeTransferForUser,
+} from "@/lib/makety-transfer-product-files";
 
 describe("buildMaketyProductDraft client_name", () => {
   it("product_name má prioritu před názvem klienta", () => {
@@ -201,5 +205,43 @@ describe("pickLatestMaketyFileByKind", () => {
       },
     ];
     expect(pickLatestMaketyFileByKind(files, "softproof")).toBeNull();
+  });
+});
+
+describe("isMaketyImlFilesIncomplete", () => {
+  it("je incomplete když print_data u makety nepřenesla", () => {
+    expect(
+      isMaketyImlFilesIncomplete({
+        hadPrintDataOnMaketa: true,
+        printDataAttached: false,
+        hadSoftproofOnMaketa: true,
+        softproofAttached: true,
+      })
+    ).toBe(true);
+  });
+
+  it("není incomplete když softproof i print_data OK", () => {
+    expect(
+      isMaketyImlFilesIncomplete({
+        hadPrintDataOnMaketa: true,
+        printDataAttached: true,
+        hadSoftproofOnMaketa: true,
+        softproofAttached: true,
+      })
+    ).toBe(false);
+  });
+
+  it("summarize obsahuje varování", () => {
+    const { summary, incomplete } = summarizeTransferForUser({
+      softproofAttached: true,
+      printDataAttached: false,
+      hadSoftproofOnMaketa: true,
+      hadPrintDataOnMaketa: true,
+      filesIncomplete: true,
+      warnings: ["Tisková data: Soubor není platné PDF."],
+    });
+    expect(incomplete).toBe(true);
+    expect(summary).toContain("softproof");
+    expect(summary).toContain("platné PDF");
   });
 });

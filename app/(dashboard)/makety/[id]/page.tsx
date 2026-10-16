@@ -48,6 +48,7 @@ import { GrafikaAutomationPanel } from "./GrafikaAutomationPanel";
 import { MaketyFileEventsPanel } from "./MaketyFileEventsPanel";
 import { GrafikaWorkflowPicker } from "../GrafikaWorkflowPicker";
 import { buildMaketyCommentParticipants } from "@/lib/makety-comment-participants";
+import { getMaketyImlFileTransferStatus } from "@/lib/makety-transfer-product-files";
 
 export const dynamic = "force-dynamic";
 
@@ -140,6 +141,10 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
       ? await userCanOperateGrafikaAutomation(userId, id)
       : { allowed: false, viaOverride: false };
   const canGrafikaAutomation = grafikaAutomation.allowed;
+  const imlFileTransferStatus =
+    workType === "grafika" && maketa.iml_applied_at != null
+      ? await getMaketyImlFileTransferStatus(id, maketa.product_id)
+      : null;
   const softproofDefaultEmail =
     maketa.iml_customers?.email?.trim() ||
     maketa.iml_customers?.iml_customer_emails[0]?.email?.trim() ||
@@ -511,6 +516,11 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
           hasCustomer={maketa.customer_id != null}
           hasProduct={maketa.product_id != null}
           imlApplied={maketa.iml_applied_at != null}
+          filesIncomplete={imlFileTransferStatus?.filesIncomplete ?? false}
+          printDataOnProduct={imlFileTransferStatus?.printDataOnProduct ?? false}
+          softproofOnProduct={imlFileTransferStatus?.softproofOnProduct ?? false}
+          hadPrintDataOnMaketa={imlFileTransferStatus?.hadPrintDataOnMaketa ?? false}
+          hadSoftproofOnMaketa={imlFileTransferStatus?.hadSoftproofOnMaketa ?? false}
         />
       )}
 

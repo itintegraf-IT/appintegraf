@@ -5,6 +5,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { MaketyProductDraft } from "@/lib/makety-product-draft";
 import type { MaketyImlProductConflict } from "@/lib/makety-iml-product-lookup";
 
+type FileTransferInfo = {
+  softproofAttached?: boolean;
+  printDataAttached?: boolean;
+  hadSoftproofOnMaketa?: boolean;
+  hadPrintDataOnMaketa?: boolean;
+  filesIncomplete?: boolean;
+  warnings?: string[];
+};
+
 type Props = {
   maketaId: number;
   canOperate: boolean;
@@ -13,7 +22,61 @@ type Props = {
   hasCustomer: boolean;
   hasProduct: boolean;
   imlApplied: boolean;
+  /** Po překlopení: chybí ostrá data / softproof v IML oproti maketě. */
+  filesIncomplete?: boolean;
+  printDataOnProduct?: boolean;
+  softproofOnProduct?: boolean;
+  hadPrintDataOnMaketa?: boolean;
+  hadSoftproofOnMaketa?: boolean;
 };
+
+function formatTransferMessage(
+  data: {
+    files?: FileTransferInfo;
+    filesIncomplete?: boolean;
+    transferSummary?: string;
+    mode?: string;
+    replacedExisting?: boolean;
+    productId?: number;
+  },
+  kind: "apply" | "retransfer"
+): { text: string; incomplete: boolean } {
+  const incomplete = Boolean(data.filesIncomplete ?? data.files?.filesIncomplete);
+  const summary =
+    (typeof data.transferSummary === "string" && data.transferSummary) ||
+    (() => {
+      const f = data.files;
+      const parts: string[] = [];
+      if (f?.softproofAttached) parts.push("softproof");
+      if (f?.printDataAttached) parts.push("tisková data");
+      let s = parts.length > 0 ? `Přeneseno: ${parts.join(", ")}.` : "Žádný soubor se nepřenesl.";
+      if (f?.warnings?.length) s += ` ${f.warnings.join(" ")}`;
+      return s;
+    })();
+
+  if (kind === "retransfer") {
+    return {
+      incomplete,
+      text: incomplete
+        ? `Přenos neúplný. ${summary}`
+        : `Soubory znovu přeneseny. ${summary}`,
+    };
+  }
+
+  const base =
+    data.mode === "replace" || data.replacedExisting
+      ? `Produkt #${data.productId} aktualizován (existující Kód IG). Zakázka je v archivu.`
+      : data.mode === "update"
+        ? `Produkt #${data.productId} aktualizován. Zakázka je v archivu.`
+        : `Produkt #${data.productId} založen. Zakázka je v archivu.`;
+
+  return {
+    incomplete,
+    text: incomplete
+      ? `${base} Pozor: soubory do IML nejsou kompletní. ${summary}`
+      : `${base} ${summary}`,
+  };
+}
 
 export function GrafikaAutomationPanel({
   maketaId,
@@ -22,11 +85,17 @@ export function GrafikaAutomationPanel({
   hasCustomer,
   hasProduct,
   imlApplied,
+  filesIncomplete: filesIncompleteProp = false,
+  printDataOnProduct = false,
+  softproofOnProduct = false,
+  hadPrintDataOnMaketa = false,
+  hadSoftproofOnMaketa = false,
 }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [incomplete, setIncomplete] = useState(filesIncompleteProp);
 
   const [draft, setDraft] = useState<MaketyProductDraft | null>(null);
   const [draftOpen, setDraftOpen] = useState(false);
@@ -36,6 +105,10 @@ export function GrafikaAutomationPanel({
   } | null>(null);
   const [conflict, setConflict] = useState<MaketyImlProductConflict | null>(null);
   const autoOpened = useRef(false);
+
+  useEffect(() => {
+    setIncomplete(filesIncompleteProp);
+  }, [filesIncompleteProp]);
 
   const normalizeIgCode = (code: string | null | undefined) =>
     code?.trim().toUpperCase() ?? "";
@@ -81,6 +154,36 @@ export function GrafikaAutomationPanel({
     void onPrepareDraft();
   }, [pendingIml, hasCustomer, onPrepareDraft]);
 
+  const onRetransfer = async () => {
+    setBusy("retransfer");
+    setError(null);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/makety/${maketaId}/retransfer-product-files`, {
+        method: "POST",
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof data.error === "string" ? data.error : "Přenos selhal");
+        setBusy(null);
+        return;
+      }
+      const formatted = formatTransferMessage(data, "retransfer");
+      setIncomplete(formatted.incomplete);
+      if (formatted.incomplete) {
+        setError(formatted.text);
+        setMessage(null);
+      } else {
+        setMessage(formatted.text);
+        setError(null);
+      }
+      router.refresh();
+    } catch {
+      setError("Síťová chyba");
+    }
+    setBusy(null);
+  };
+
   if (!canOperate || status !== "approved") return null;
 
   const onApplyDraft = async () => {
@@ -118,31 +221,15 @@ export function GrafikaAutomationPanel({
       setDraftOpen(false);
       setDraft(null);
       setConflict(null);
-      const fileInfo = data.files as
-        | {
-            softproofAttached?: boolean;
-            printDataAttached?: boolean;
-            warnings?: string[];
-          }
-        | undefined;
-      const transferred: string[] = [];
-      if (fileInfo?.softproofAttached) transferred.push("softproof");
-      if (fileInfo?.printDataAttached) transferred.push("tisková data");
-      const transferNote =
-        transferred.length > 0 ? ` Přeneseno: ${transferred.join(", ")}.` : "";
-      const warnNote =
-        fileInfo?.warnings?.length && transferred.length === 0
-          ? ` Varování: ${fileInfo.warnings.join("; ")}`
-          : fileInfo?.warnings?.length
-            ? ` ${fileInfo.warnings.join("; ")}`
-            : "";
-      const baseMsg =
-        data.mode === "replace" || data.replacedExisting
-          ? `Produkt #${data.productId} aktualizován (existující Kód IG). Soubory nahrazeny. Zakázka je v archivu.`
-          : data.mode === "update"
-            ? `Produkt #${data.productId} aktualizován. Zakázka je v archivu.`
-            : `Produkt #${data.productId} založen. Zakázka je v archivu.`;
-      setMessage(baseMsg + transferNote + warnNote);
+      const formatted = formatTransferMessage(data, "apply");
+      setIncomplete(formatted.incomplete);
+      if (formatted.incomplete) {
+        setError(formatted.text);
+        setMessage(null);
+      } else {
+        setMessage(formatted.text);
+        setError(null);
+      }
       router.refresh();
     } catch {
       setError("Síťová chyba");
@@ -151,12 +238,75 @@ export function GrafikaAutomationPanel({
   };
 
   if (imlApplied) {
+    const showMissingPrint =
+      incomplete || (hadPrintDataOnMaketa && !printDataOnProduct);
+    const showMissingSoftproof =
+      hadSoftproofOnMaketa && !softproofOnProduct && !hadPrintDataOnMaketa;
+
     return (
-      <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/40">
-        <h3 className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">Produkt v IML</h3>
-        <p className="mt-1 text-xs text-emerald-800 dark:text-emerald-200">
-          Záznam v IML je potvrzený, zakázka je v archivu.
+      <div
+        className={
+          showMissingPrint || showMissingSoftproof
+            ? "rounded-xl border border-amber-400 bg-amber-50 p-5 shadow-sm dark:border-amber-700 dark:bg-amber-950/40"
+            : "rounded-xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/40"
+        }
+      >
+        <h3
+          className={
+            showMissingPrint || showMissingSoftproof
+              ? "text-sm font-semibold text-amber-950 dark:text-amber-100"
+              : "text-sm font-semibold text-emerald-900 dark:text-emerald-100"
+          }
+        >
+          {showMissingPrint || showMissingSoftproof
+            ? "Produkt v IML — soubory neúplné"
+            : "Produkt v IML"}
+        </h3>
+        <p
+          className={
+            showMissingPrint || showMissingSoftproof
+              ? "mt-1 text-xs text-amber-900 dark:text-amber-200"
+              : "mt-1 text-xs text-emerald-800 dark:text-emerald-200"
+          }
+        >
+          {showMissingPrint
+            ? "Záznam v IML je založený, ale ostrá tisková data se nepropsala. Zkontrolujte typ souboru (PDF) u zakázky a zkuste znovu přenést."
+            : showMissingSoftproof
+              ? "Záznam v IML je založený, ale softproof / náhled chybí."
+              : "Záznam v IML je potvrzený, zakázka je v archivu."}
         </p>
+        <ul className="mt-3 space-y-1 text-xs text-gray-700 dark:text-gray-300">
+          <li>
+            Softproof / náhled:{" "}
+            {softproofOnProduct ? "ano" : hadSoftproofOnMaketa ? "chybí v IML" : "u zakázky nebyl"}
+          </li>
+          <li>
+            Ostrá tisková data:{" "}
+            {printDataOnProduct
+              ? "ano"
+              : hadPrintDataOnMaketa
+                ? "chybí v IML"
+                : "u zakázky nebyla"}
+          </li>
+        </ul>
+        {error && (
+          <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950/50 dark:text-red-200">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p className="mt-3 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200">
+            {message}
+          </p>
+        )}
+        <button
+          type="button"
+          onClick={() => void onRetransfer()}
+          disabled={busy != null}
+          className="mt-4 rounded-lg border border-amber-500 bg-white px-4 py-2 text-sm font-medium text-amber-950 hover:bg-amber-100 disabled:opacity-50 dark:border-amber-600 dark:bg-amber-900/40 dark:text-amber-50"
+        >
+          {busy === "retransfer" ? "Přenáším…" : "Znovu přenést soubory do IML"}
+        </button>
       </div>
     );
   }

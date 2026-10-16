@@ -73,8 +73,101 @@ async function attachSoftproofFromBuffer(
 export type TransferMaketyFilesResult = {
   softproofAttached: boolean;
   printDataAttached: boolean;
+  /** U makety existuje soubor typu softproof. */
+  hadSoftproofOnMaketa: boolean;
+  /** U makety existuje soubor typu print_data. */
+  hadPrintDataOnMaketa: boolean;
+  /**
+   * True, pokud se očekávaný soubor nepropsal (zejména ostrá data, když u makety jsou).
+   * Softproof chybějící u makety = warning, ale ne incomplete (ostrá data mají prioritu).
+   */
+  filesIncomplete: boolean;
   warnings: string[];
 };
+
+/** Odvození filesIncomplete z výsledku transferu. */
+export function isMaketyImlFilesIncomplete(
+  result: Pick<
+    TransferMaketyFilesResult,
+    "hadPrintDataOnMaketa" | "printDataAttached" | "hadSoftproofOnMaketa" | "softproofAttached"
+  >
+): boolean {
+  if (result.hadPrintDataOnMaketa && !result.printDataAttached) return true;
+  if (result.hadSoftproofOnMaketa && !result.softproofAttached) return true;
+  return false;
+}
+
+/**
+ * Stav souborů po překlopení (pro UI bez nutnosti znovu transferovat).
+ * Incomplete = u makety je print_data, ale produkt nemá PDF v iml_product_files;
+ * nebo je jen softproof a na produktu chybí náhled.
+ */
+export async function getMaketyImlFileTransferStatus(
+  maketaId: number,
+  productId: number | null
+): Promise<{
+  hadSoftproofOnMaketa: boolean;
+  hadPrintDataOnMaketa: boolean;
+  softproofOnProduct: boolean;
+  printDataOnProduct: boolean;
+  filesIncomplete: boolean;
+}> {
+  const files = await prisma.file_uploads.findMany({
+    where: {
+      module: MAKETY_FILE_MODULE,
+      record_id: maketaId,
+      document_type: { in: ["softproof", "print_data"] },
+    },
+    select: { document_type: true },
+  });
+  const hadSoftproofOnMaketa = files.some((f) => f.document_type === "softproof");
+  const hadPrintDataOnMaketa = files.some((f) => f.document_type === "print_data");
+
+  let softproofOnProduct = false;
+  let printDataOnProduct = false;
+  if (productId != null) {
+    const [blobFlags, fileCount] = await Promise.all([
+      prisma.$queryRaw<Array<{ has_preview: number | boolean }>>`
+        SELECT (image_data IS NOT NULL) AS has_preview
+        FROM iml_products WHERE id = ${productId}
+      `,
+      prisma.iml_product_files.count({ where: { product_id: productId } }),
+    ]);
+    softproofOnProduct = Boolean(blobFlags[0]?.has_preview);
+    printDataOnProduct = fileCount > 0;
+  }
+
+  const filesIncomplete =
+    (hadPrintDataOnMaketa && !printDataOnProduct) ||
+    (hadSoftproofOnMaketa && !hadPrintDataOnMaketa && !softproofOnProduct);
+
+  return {
+    hadSoftproofOnMaketa,
+    hadPrintDataOnMaketa,
+    softproofOnProduct,
+    printDataOnProduct,
+    filesIncomplete,
+  };
+}
+
+/** Jednoznačnější incomplete: chybí ostrá data, když je měla maketa; nebo chybí softproof když byl jediný soubor. */
+export function summarizeTransferForUser(files: TransferMaketyFilesResult): {
+  summary: string;
+  incomplete: boolean;
+} {
+  const parts: string[] = [];
+  if (files.softproofAttached) parts.push("softproof");
+  if (files.printDataAttached) parts.push("tisková data");
+  const incomplete = isMaketyImlFilesIncomplete(files);
+  let summary =
+    parts.length > 0
+      ? `Přeneseno: ${parts.join(", ")}.`
+      : "Do IML se nepřenesl žádný soubor.";
+  if (files.warnings.length > 0) {
+    summary += ` ${files.warnings.join(" ")}`;
+  }
+  return { summary: summary.trim(), incomplete };
+}
 
 export async function transferMaketyFilesToImlProduct(
   maketaId: number,
@@ -84,6 +177,9 @@ export async function transferMaketyFilesToImlProduct(
   const result: TransferMaketyFilesResult = {
     softproofAttached: false,
     printDataAttached: false,
+    hadSoftproofOnMaketa: false,
+    hadPrintDataOnMaketa: false,
+    filesIncomplete: false,
     warnings: [],
   };
 
@@ -104,11 +200,13 @@ export async function transferMaketyFilesToImlProduct(
 
   const softproof = pickLatestMaketyFileByKind(files, "softproof");
   const printData = pickLatestMaketyFileByKind(files, "print_data");
+  result.hadSoftproofOnMaketa = softproof != null;
+  result.hadPrintDataOnMaketa = printData != null;
 
   if (softproof) {
     const buffer = await readMaketyFileBuffer(softproof);
     if (!buffer) {
-      result.warnings.push("Softproof: soubor na disku nenalezen");
+      result.warnings.push("Softproof: soubor na disku nenalezen.");
     } else {
       try {
         await attachSoftproofFromBuffer(
@@ -120,18 +218,16 @@ export async function transferMaketyFilesToImlProduct(
         result.softproofAttached = true;
       } catch (e) {
         result.warnings.push(
-          `Softproof: ${e instanceof Error ? e.message : "Chyba při nahrání"}`
+          `Softproof: ${e instanceof Error ? e.message : "Chyba při nahrání"}.`
         );
       }
     }
-  } else {
-    result.warnings.push("Softproof: u zakázky není nahraný soubor");
   }
 
   if (printData) {
     const buffer = await readMaketyFileBuffer(printData);
     if (!buffer) {
-      result.warnings.push("Tisková data: soubor na disku nenalezen");
+      result.warnings.push("Tisková data: soubor na disku nenalezen.");
     } else {
       try {
         await attachProductPdf(
@@ -150,13 +246,16 @@ export async function transferMaketyFilesToImlProduct(
         }
       } catch (e) {
         result.warnings.push(
-          `Tisková data: ${e instanceof Error ? e.message : "Chyba při nahrání"}`
+          `Tisková data: ${e instanceof Error ? e.message : "Chyba při nahrání"}.`
         );
       }
     }
-  } else {
-    result.warnings.push("Tisková data: u zakázky není nahraný soubor");
   }
 
+  if (!softproof && !printData) {
+    result.warnings.push("U zakázky není softproof ani tisková data.");
+  }
+
+  result.filesIncomplete = isMaketyImlFilesIncomplete(result);
   return result;
 }

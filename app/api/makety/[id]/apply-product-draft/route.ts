@@ -21,7 +21,11 @@ import {
   findImlProductByIgCode,
   toMaketyImlProductConflict,
 } from "@/lib/makety-iml-product-lookup";
-import { transferMaketyFilesToImlProduct } from "@/lib/makety-transfer-product-files";
+import { imlProductSaveErrorResponse } from "@/lib/iml-product-save-errors";
+import {
+  summarizeTransferForUser,
+  transferMaketyFilesToImlProduct,
+} from "@/lib/makety-transfer-product-files";
 
 function isDraft(val: unknown): val is MaketyProductDraft {
   if (!val || typeof val !== "object") return false;
@@ -136,10 +140,8 @@ export async function POST(
     : null;
   const conflict = igConflictProduct ? toMaketyImlProductConflict(igConflictProduct) : null;
 
-  const isConflictReplace =
-    confirmReplace &&
-    conflict != null &&
-    (draft.mode === "create" || draft.product_id !== conflict.product_id);
+  /** Při potvrzeném konfliktu IG vždy soft-replace (soubory + doplnění prázdných polí). */
+  const isConflictReplace = confirmReplace && conflict != null;
 
   if (
     requiresIgCodeReplaceConfirmation({
@@ -318,22 +320,25 @@ export async function POST(
     }
 
     const files = await transferMaketyFilesToImlProduct(maketaId, productId, userId);
+    const transferSummary = summarizeTransferForUser(files);
 
-    const { unlockImlProductAfterApply } = await import("@/lib/iml-product-lock");
-    await unlockImlProductAfterApply(productId);
-
-    const fileParts: string[] = [];
-    if (files.softproofAttached) fileParts.push("softproof");
-    if (files.printDataAttached) fileParts.push("tisková data");
-    if (fileParts.length > 0) {
-      await prisma.makety_comments.create({
-        data: {
-          maketa_id: maketaId,
-          user_id: userId,
-          body: `Do IML produktu #${productId} přeneseno: ${fileParts.join(", ")}`,
-        },
-      });
+    try {
+      const { unlockImlProductAfterApply } = await import("@/lib/iml-product-lock");
+      await unlockImlProductAfterApply(productId);
+    } catch (unlockErr) {
+      console.error("apply-product-draft unlock", unlockErr);
     }
+
+    const commentBody = files.filesIncomplete
+      ? `Zápis do IML produktu #${productId}: soubory neúplné. ${transferSummary.summary}`
+      : `Do IML produktu #${productId}: ${transferSummary.summary}`;
+    await prisma.makety_comments.create({
+      data: {
+        maketa_id: maketaId,
+        user_id: userId,
+        body: commentBody,
+      },
+    });
 
     return NextResponse.json({
       success: true,
@@ -341,9 +346,12 @@ export async function POST(
       productId,
       replacedExisting,
       files,
+      filesIncomplete: files.filesIncomplete,
+      transferSummary: transferSummary.summary,
     });
   } catch (e) {
     console.error("apply-product-draft", e);
-    return NextResponse.json({ error: "Uložení produktu selhalo" }, { status: 500 });
+    const mapped = imlProductSaveErrorResponse(e, "Uložení produktu selhalo");
+    return NextResponse.json({ error: mapped.error }, { status: mapped.status });
   }
 }
