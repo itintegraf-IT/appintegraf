@@ -19,8 +19,18 @@ export { MAX_IMAGE_SIZE, MAX_PDF_SIZE, MAX_PRODUCT_IMAGE_BYTES };
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 
+/**
+ * Zachová původní název (včetně diakritiky a mezer).
+ * Odstraní jen cestu, řídicí znaky a znaky zakázané ve FS.
+ */
 export function sanitizeFilename(name: string): string {
-  return name.replace(/[^\w.\-()+\s]/g, "_").slice(0, 200) || "soubor";
+  const base = name.split(/[\\/]/).pop() ?? "soubor";
+  const cleaned = base
+    .replace(/[\r\n\0"]+/g, "_")
+    .replace(/[\\/:*?<>|]+/g, "_")
+    .trim()
+    .slice(0, 255);
+  return cleaned || "soubor";
 }
 
 export function isPdfBuffer(buffer: Buffer): boolean {
@@ -43,17 +53,24 @@ export function getImageContentType(buffer: Buffer): string {
   return "image/jpeg";
 }
 
+export type AttachProductPdfOptions = {
+  /** Default true — softproof z grafiky ukládá s false, aby print_data zůstala primary. */
+  setPrimary?: boolean;
+};
+
 export async function attachProductPdf(
   productId: number,
   buffer: Buffer,
   filename: string,
-  userId: number
+  userId: number,
+  options?: AttachProductPdfOptions
 ): Promise<void> {
   validateProductPdfSize(buffer.length);
   if (!isPdfBuffer(buffer)) {
     throw new Error("Soubor není platné PDF");
   }
 
+  const setPrimary = options?.setPrimary !== false;
   const safeName = sanitizeFilename(filename);
 
   await prisma.$transaction(async (tx) => {
@@ -63,10 +80,12 @@ export async function attachProductPdf(
     });
     const nextVersion = (latest._max.version ?? 0) + 1;
 
-    await tx.iml_product_files.updateMany({
-      where: { product_id: productId, is_primary: true },
-      data: { is_primary: false },
-    });
+    if (setPrimary) {
+      await tx.iml_product_files.updateMany({
+        where: { product_id: productId, is_primary: true },
+        data: { is_primary: false },
+      });
+    }
 
     const created = await tx.iml_product_files.create({
       data: {
@@ -76,7 +95,7 @@ export async function attachProductPdf(
         file_size: buffer.length,
         mime_type: "application/pdf",
         pdf_data: Buffer.from(buffer),
-        is_primary: true,
+        is_primary: setPrimary,
         uploaded_by: userId,
       },
     });
@@ -90,6 +109,7 @@ export async function attachProductPdf(
         product_id: productId,
         version: nextVersion,
         filename: safeName,
+        is_primary: setPrimary,
         import: true,
       },
     });

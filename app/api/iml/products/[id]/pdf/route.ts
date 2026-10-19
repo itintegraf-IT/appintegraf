@@ -13,9 +13,10 @@ import {
   MAX_PRODUCT_PDF_MB,
 } from "@/lib/iml-product-upload-limits";
 import {
-  buildImlProductPdfFilename,
   contentDispositionForPdf,
+  preferStoredPdfDownloadName,
 } from "@/lib/iml-product-pdf-filename";
+import { sanitizeFilename } from "@/lib/iml-product-import-files";
 
 /**
  * Verzovaný PDF endpoint pro iml_product_files.
@@ -104,7 +105,7 @@ export async function GET(
     });
   }
 
-  const downloadName = buildImlProductPdfFilename({
+  const downloadName = preferStoredPdfDownloadName(resolved.filename, {
     id,
     ig_code: product.ig_code,
     client_name: product.client_name,
@@ -386,17 +387,3 @@ export async function DELETE(
   }
 }
 
-/**
- * Bezpečné filename – bez cesty, max 255 znaků, jen ASCII alfanumerika
- * + pár povolených znaků. Prohlížeče akceptují v Content-Disposition různé věci,
- * ale chceme minimum pro konzistentní uložení i stažení.
- */
-function sanitizeFilename(name: string): string {
-  const base = name.split(/[\\/]/).pop() ?? "tiskova-data.pdf";
-  const cleaned = base
-    .replace(/[^\w.\-() ]+/g, "_")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 255);
-  return cleaned || "tiskova-data.pdf";
-}

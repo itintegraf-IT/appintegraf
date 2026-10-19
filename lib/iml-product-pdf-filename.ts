@@ -42,6 +42,26 @@ export function buildImlProductPdfFilename(product: {
   return sliced.toLowerCase().endsWith(".pdf") ? sliced : `${sliced}.pdf`;
 }
 
+/**
+ * Preferuje uložený název souboru (kontinuita Grafika → IML).
+ * Generovaný název jen pro legacy placeholder `tiskova-data.pdf`.
+ */
+export function preferStoredPdfDownloadName(
+  storedFilename: string | null | undefined,
+  product: {
+    id: number;
+    ig_code?: string | null;
+    client_name?: string | null;
+    product_kind?: string | null;
+  }
+): string {
+  const stored = storedFilename?.trim();
+  if (stored && stored.toLowerCase() !== "tiskova-data.pdf") {
+    return stored;
+  }
+  return buildImlProductPdfFilename(product);
+}
+
 /** ASCII-only pro Content-Disposition filename= */
 export function asciiFilenameForDisposition(name: string): string {
   const base = name.split(/[\\/]/).pop() ?? "tiskova-data.pdf";

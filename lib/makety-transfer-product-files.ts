@@ -46,17 +46,18 @@ async function readMaketyFileBuffer(file: MaketyFileRow): Promise<Buffer | null>
   }
 }
 
-async function attachSoftproofFromBuffer(
+async function attachSoftproofPreviewFromBuffer(
   productId: number,
   buffer: Buffer,
   originalFilename: string,
   userId: number
-): Promise<void> {
+): Promise<{ isPdf: boolean }> {
   const ext = path.extname(originalFilename).toLowerCase();
+  const isPdf = isPdfBuffer(buffer) || ext === ".pdf";
   let previewBuffer: Buffer;
   if (IMAGE_EXT.has(ext) && !isPdfBuffer(buffer)) {
     previewBuffer = buffer;
-  } else if (isPdfBuffer(buffer) || ext === ".pdf") {
+  } else if (isPdf) {
     const jpeg = await pdfBufferToJpeg(buffer);
     if (!jpeg) {
       throw new Error(
@@ -68,6 +69,7 @@ async function attachSoftproofFromBuffer(
     throw new Error(`Nepodporovaný formát softproofu: ${ext || "neznámý"}`);
   }
   await attachProductPreviewImage(productId, previewBuffer, userId);
+  return { isPdf };
 }
 
 export type TransferMaketyFilesResult = {
@@ -209,13 +211,28 @@ export async function transferMaketyFilesToImlProduct(
       result.warnings.push("Softproof: soubor na disku nenalezen.");
     } else {
       try {
-        await attachSoftproofFromBuffer(
+        const { isPdf } = await attachSoftproofPreviewFromBuffer(
           productId,
           buffer,
           softproof.original_filename,
           userId
         );
         result.softproofAttached = true;
+        if (isPdf) {
+          try {
+            await attachProductPdf(
+              productId,
+              buffer,
+              softproof.original_filename,
+              userId,
+              { setPrimary: printData == null }
+            );
+          } catch (e) {
+            result.warnings.push(
+              `Softproof PDF: ${e instanceof Error ? e.message : "Chyba při uložení PDF"}.`
+            );
+          }
+        }
       } catch (e) {
         result.warnings.push(
           `Softproof: ${e instanceof Error ? e.message : "Chyba při nahrání"}.`
@@ -234,7 +251,8 @@ export async function transferMaketyFilesToImlProduct(
           productId,
           buffer,
           printData.original_filename,
-          userId
+          userId,
+          { setPrimary: true }
         );
         result.printDataAttached = true;
         try {
