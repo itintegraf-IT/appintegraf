@@ -25,7 +25,11 @@ import { LockedPdfDownload } from "../_components/LockedPdfDownload";
 import { consumptionKg } from "@/lib/iml-color-consumption";
 import { imlProductHasPdfInFilesTable } from "@/lib/iml-product-pdf-flag";
 import { productMaterialIncludes } from "@/lib/iml/product-materials";
-import { imlLabelTypeLabel, imlProductKindLabel } from "@/lib/iml-constants";
+import {
+  IML_ITEM_STATUS_DATA_CHANGE,
+  imlLabelTypeLabel,
+  imlProductKindLabel,
+} from "@/lib/iml-constants";
 import { formatProductFormatFromMm } from "@/lib/iml/product-format";
 import { formatPrintColorsSummaryForDisplay } from "@/lib/iml-print-colors-summary";
 import { normalizePantoneCode, resolvePantoneSwatchHex } from "@/lib/iml-pantone";
@@ -311,6 +315,12 @@ export default async function ImlProductDetailPage({
       icon: <Printer className="h-4 w-4" />,
       content: (
         <div className="space-y-6">
+          {product.item_status === IML_ITEM_STATUS_DATA_CHANGE && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+              Stav <strong>Změna dat</strong> — tisková data (PDF) byla změněna, smazána nebo
+              nahrazena. Produkt se chová jako neaktivní, dokud stav nepřenastavíte.
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <InfoField label="Stav schválení" value={fmt(product.approval_status)} />
             <InfoField label="Datum schválení" value={fmtDate(product.approval_date)} />

@@ -10,6 +10,7 @@ import {
 } from "@/lib/iml-product-import-files";
 import { pdfBufferToJpeg } from "@/lib/iml-product-preview-pdf-server";
 import { ensureProductThumbnailFromPdf } from "@/lib/iml-product-thumbnail";
+import { markImlProductDataChanged } from "@/lib/iml-product-data-change";
 
 const IMAGE_EXT = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 
@@ -261,6 +262,15 @@ export async function transferMaketyFilesToImlProduct(
           });
         } catch {
           /* miniatura není kritická */
+        }
+        try {
+          await markImlProductDataChanged({
+            productId,
+            actorUserId: userId,
+            reason: "transfer",
+          });
+        } catch (markErr) {
+          console.error("markImlProductDataChanged after makety transfer", markErr);
         }
       } catch (e) {
         result.warnings.push(

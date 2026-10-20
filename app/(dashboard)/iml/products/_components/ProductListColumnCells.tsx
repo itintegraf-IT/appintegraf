@@ -10,7 +10,7 @@ import {
   type ProductListColumnId,
   type ProductListRow,
 } from "@/lib/iml/product-list-columns";
-import { imlProductKindLabel } from "@/lib/iml-constants";
+import { IML_ITEM_STATUS_DATA_CHANGE, imlProductKindLabel } from "@/lib/iml-constants";
 import { LockedPdfDownload } from "./LockedPdfDownload";
 
 export type ProductListCellContext = {
@@ -81,7 +81,13 @@ export function renderProductListCell(
     case "status":
       return (
         <span className="inline-flex flex-wrap items-center gap-1">
-          <span className="rounded bg-gray-100 px-2 py-0.5 text-sm">
+          <span
+            className={
+              product.item_status === IML_ITEM_STATUS_DATA_CHANGE
+                ? "rounded bg-red-100 px-2 py-0.5 text-sm font-medium text-red-800"
+                : "rounded bg-gray-100 px-2 py-0.5 text-sm"
+            }
+          >
             {product.item_status?.trim() || "bez stavu"}
           </span>
           {product.is_locked ? (

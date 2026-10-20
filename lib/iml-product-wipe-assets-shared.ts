@@ -4,6 +4,7 @@ import { imlItemStatusLabel } from "@/lib/iml-constants";
 export const IML_WIPE_ASSET_STATUSES = [
   "zablokovaná",
   "neaktivní",
+  "Změna dat",
   "chyba",
 ] as const;
 

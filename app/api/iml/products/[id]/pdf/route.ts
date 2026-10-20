@@ -17,6 +17,7 @@ import {
   preferStoredPdfDownloadName,
 } from "@/lib/iml-product-pdf-filename";
 import { sanitizeFilename } from "@/lib/iml-product-import-files";
+import { markImlProductDataChanged } from "@/lib/iml-product-data-change";
 
 /**
  * Verzovaný PDF endpoint pro iml_product_files.
@@ -253,6 +254,16 @@ export async function POST(
       console.warn("IML product PDF thumbnail generation failed:", thumbErr);
     }
 
+    try {
+      await markImlProductDataChanged({
+        productId: id,
+        actorUserId: userId,
+        reason: "upload",
+      });
+    } catch (markErr) {
+      console.error("markImlProductDataChanged after PDF upload", markErr);
+    }
+
     return NextResponse.json({ success: true, file: result });
   } catch (e) {
     const err = e as Error & { code?: string; meta?: { code?: string } };
@@ -375,6 +386,16 @@ export async function DELETE(
       oldValues: { deleted_version: result.deleted_version },
       newValues: { promoted_version: result.promoted_version },
     });
+
+    try {
+      await markImlProductDataChanged({
+        productId: id,
+        actorUserId: userId,
+        reason: "delete",
+      });
+    } catch (markErr) {
+      console.error("markImlProductDataChanged after PDF delete", markErr);
+    }
 
     return NextResponse.json({
       success: true,

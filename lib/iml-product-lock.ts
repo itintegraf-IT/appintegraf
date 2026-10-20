@@ -51,18 +51,28 @@ export async function unlockImlProductForMaketa(
   });
 }
 
-/** Po úspěšném překlopení do IML — vždy odemknout cílový produkt. */
+/**
+ * Po úspěšném překlopení do IML — odemknout cílový produkt.
+ * Stav „aktivní“ nastaví jen pokud byl „rozpracováno grafikem“;
+ * „Změna dat“ (po přenosu PDF) se nepřepisuje.
+ */
 export async function unlockImlProductAfterApply(
   productId: number,
   tx?: Prisma.TransactionClient
 ): Promise<void> {
   const db = tx ?? prisma;
+  const product = await db.iml_products.findUnique({
+    where: { id: productId },
+    select: { item_status: true },
+  });
   await db.iml_products.update({
     where: { id: productId },
     data: {
       is_locked: false,
       locked_maketa_id: null,
-      item_status: IML_ITEM_STATUS_ACTIVE,
+      ...(product?.item_status === IML_ITEM_STATUS_GRAPHIC_REVISION
+        ? { item_status: IML_ITEM_STATUS_ACTIVE }
+        : {}),
     },
   });
 }

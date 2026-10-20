@@ -25,6 +25,7 @@ import {
   type ProductListRow,
 } from "@/lib/iml/product-list-columns";
 import type { ProductListSortDir } from "@/lib/iml/product-list-sort";
+import { IML_ITEM_STATUS_DATA_CHANGE } from "@/lib/iml-constants";
 import {
   renderProductListCell,
   type ProductListCellContext,
@@ -305,7 +306,14 @@ export function ResizableProductListTable({
             </tr>
           ) : (
             products.map((p) => (
-              <tr key={p.id} className="border-b border-gray-100 hover:bg-gray-50">
+              <tr
+                key={p.id}
+                className={
+                  p.item_status === IML_ITEM_STATUS_DATA_CHANGE
+                    ? "border-b border-red-100 bg-red-50 hover:bg-red-100/80"
+                    : "border-b border-gray-100 hover:bg-gray-50"
+                }
+              >
                 {selectionEnabled && (
                   <td className="px-2 py-3">
                     <input

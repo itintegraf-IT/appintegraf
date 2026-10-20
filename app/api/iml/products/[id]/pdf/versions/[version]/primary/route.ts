@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
+import { markImlProductDataChanged } from "@/lib/iml-product-data-change";
 
 /**
  * Obnovení starší verze jako primary.
@@ -62,6 +63,16 @@ export async function PATCH(
     recordId: id,
     newValues: { promoted_version: versionNum },
   });
+
+  try {
+    await markImlProductDataChanged({
+      productId: id,
+      actorUserId: userId,
+      reason: "restore",
+    });
+  } catch (markErr) {
+    console.error("markImlProductDataChanged after PDF restore", markErr);
+  }
 
   return NextResponse.json({ success: true, primary_version: versionNum });
 }

@@ -14,11 +14,15 @@ export const IML_ITEM_STATUSES = [
   "testovací",
   "zablokovaná",
   "neaktivní",
+  "Změna dat",
   "rozpracováno grafikem",
   "chyba",
 ] as const;
 
 export type ImlItemStatus = (typeof IML_ITEM_STATUSES)[number];
+
+/** Po změně / smazání / nahrazení tiskových PDF (chování jako neaktivní pro objednávky). */
+export const IML_ITEM_STATUS_DATA_CHANGE: ImlItemStatus = "Změna dat";
 
 /**
  * Label pro <option> – v tuto chvíli jen capitalized value, ale necháváme
