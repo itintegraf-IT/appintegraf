@@ -249,9 +249,18 @@ export async function POST(
       },
     });
 
+    let preview_updated = false;
     try {
-      // Nahrazení tiskových dat → vždy přegenerovat náhled z nového PDF
-      await ensureProductThumbnailFromPdf(id, buffer, userId, { onlyIfMissing: false });
+      // Nahrazení tiskových dat → vždy přegenerovat softproof (image_data) z nového PDF
+      preview_updated = await ensureProductThumbnailFromPdf(id, buffer, userId, {
+        onlyIfMissing: false,
+      });
+      if (!preview_updated) {
+        console.warn(
+          "IML product PDF thumbnail not updated after upload (server jpeg null)",
+          id
+        );
+      }
     } catch (thumbErr) {
       console.warn("IML product PDF thumbnail generation failed:", thumbErr);
     }
@@ -270,6 +279,7 @@ export async function POST(
       success: true,
       file: result,
       item_status: IML_ITEM_STATUS_DATA_CHANGE,
+      preview_updated,
     });
   } catch (e) {
     const err = e as Error & { code?: string; meta?: { code?: string } };

@@ -5,6 +5,10 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { markImlProductDataChanged } from "@/lib/iml-product-data-change";
 import { IML_ITEM_STATUS_DATA_CHANGE } from "@/lib/iml-constants";
+import {
+  ensureProductThumbnailFromPdf,
+  loadPrimaryPdfBuffer,
+} from "@/lib/iml-product-thumbnail";
 
 /**
  * Obnovení starší verze jako primary.
@@ -65,6 +69,18 @@ export async function PATCH(
     newValues: { promoted_version: versionNum },
   });
 
+  let preview_updated = false;
+  try {
+    const pdf = await loadPrimaryPdfBuffer(id);
+    if (pdf) {
+      preview_updated = await ensureProductThumbnailFromPdf(id, pdf, userId, {
+        onlyIfMissing: false,
+      });
+    }
+  } catch (thumbErr) {
+    console.warn("IML product PDF thumbnail after restore failed:", thumbErr);
+  }
+
   try {
     await markImlProductDataChanged({
       productId: id,
@@ -79,5 +95,6 @@ export async function PATCH(
     success: true,
     primary_version: versionNum,
     item_status: IML_ITEM_STATUS_DATA_CHANGE,
+    preview_updated,
   });
 }

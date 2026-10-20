@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Check, Download, FileText, RotateCcw, Trash2 } from "lucide-react";
 import { LockedPdfDownload } from "./LockedPdfDownload";
 
@@ -34,6 +35,7 @@ export default function ProductPdfHistory({
   canWrite: boolean;
   isLocked?: boolean;
 }) {
+  const router = useRouter();
   const [versions, setVersions] = useState<PdfVersion[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -78,6 +80,8 @@ export default function ProductPdfHistory({
         return;
       }
       await load();
+      // Softproof (image_data) se přegeneruje na serveru → obnovit náhledy na stránce.
+      router.refresh();
     } finally {
       setBusy(false);
     }

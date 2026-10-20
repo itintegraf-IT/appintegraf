@@ -20,6 +20,8 @@ export default function ProductImagePreview({
   isLocked = false,
   className = "",
   imgClassName = "h-full w-full object-contain",
+  /** Invalidace cache softproofu (např. product.updated_at). */
+  cacheBust,
 }: {
   productId: number;
   hasImage: boolean;
@@ -27,6 +29,7 @@ export default function ProductImagePreview({
   isLocked?: boolean;
   className?: string;
   imgClassName?: string;
+  cacheBust?: string | number | Date | null;
 }) {
   const [open, setOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
@@ -57,6 +60,17 @@ export default function ProductImagePreview({
 
   const canPreview = hasImage || hasPdf;
 
+  const bustValue =
+    cacheBust instanceof Date
+      ? cacheBust.getTime()
+      : cacheBust != null && cacheBust !== ""
+        ? String(cacheBust)
+        : null;
+  const imageSrc =
+    bustValue != null
+      ? `/api/iml/products/${productId}/image?t=${encodeURIComponent(bustValue)}`
+      : `/api/iml/products/${productId}/image`;
+
   if (!canPreview) {
     return (
       <div
@@ -74,12 +88,17 @@ export default function ProductImagePreview({
   const thumbnail = hasImage ? (
     /* eslint-disable-next-line @next/next/no-img-element */
     <img
-      src={`/api/iml/products/${productId}/image`}
+      src={imageSrc}
       alt="Softproof produktu"
       className={imgClassName}
     />
   ) : (
-    <ProductPdfThumbnail productId={productId} maxHeight={240} className="mx-auto" />
+    <ProductPdfThumbnail
+      productId={productId}
+      maxHeight={240}
+      className="mx-auto"
+      cacheBust={bustValue ?? undefined}
+    />
   );
 
   return (
@@ -182,7 +201,7 @@ export default function ProductImagePreview({
               {lightboxShowsSoftproof ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img
-                  src={`/api/iml/products/${productId}/image`}
+                  src={imageSrc}
                   alt="Softproof produktu"
                   className="max-h-[85vh] max-w-[95vw] rounded-lg bg-white object-contain shadow-2xl"
                 />
@@ -191,6 +210,7 @@ export default function ProductImagePreview({
                   productId={productId}
                   maxHeight={lightboxPdfHeight}
                   className="shadow-2xl"
+                  cacheBust={bustValue ?? undefined}
                 />
               ) : null}
             </div>

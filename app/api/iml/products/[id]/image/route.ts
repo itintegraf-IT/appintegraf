@@ -43,7 +43,8 @@ export async function GET(
   return new NextResponse(new Uint8Array(body), {
     headers: {
       "Content-Type": contentType,
-      "Cache-Control": "private, max-age=3600",
+      // Softproof se mění při nahrání/nahrazení PDF — nesmí se cachovat hodinu.
+      "Cache-Control": "private, no-cache, must-revalidate",
     },
   });
 }
@@ -96,7 +97,7 @@ export async function POST(
 
     await prisma.iml_products.update({
       where: { id },
-      data: { image_data: buffer },
+      data: { image_data: buffer, updated_at: new Date() },
     });
 
     await logImlAudit({

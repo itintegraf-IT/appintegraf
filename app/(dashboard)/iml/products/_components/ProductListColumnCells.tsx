@@ -19,12 +19,20 @@ export type ProductListCellContext = {
   onDelete: (id: number, name: string) => void;
 };
 
+function productImageCacheBust(product: ProductListRow): string {
+  const u = product.updated_at;
+  if (u instanceof Date) return String(u.getTime());
+  if (typeof u === "string" && u.length > 0) return u;
+  return String(product.id);
+}
+
 function ProductListThumbnail({ product }: { product: ProductListRow }) {
   if (product.has_image) {
+    const t = encodeURIComponent(productImageCacheBust(product));
     return (
       /* eslint-disable-next-line @next/next/no-img-element */
       <img
-        src={`/api/iml/products/${product.id}/image`}
+        src={`/api/iml/products/${product.id}/image?t=${t}`}
         alt=""
         className="h-10 w-10 rounded border border-gray-200 bg-white object-contain"
         loading="lazy"

@@ -51,6 +51,7 @@ export function ProductFilesUpload({
   const [localHasImage, setLocalHasImage] = useState(hasImage);
   const [localHasPdf, setLocalHasPdf] = useState(hasPdf);
   const [imageCacheBust, setImageCacheBust] = useState(() => Date.now());
+  const [pdfCacheBust, setPdfCacheBust] = useState(() => Date.now());
 
   useEffect(() => {
     setLocalHasImage(hasImage);
@@ -63,6 +64,26 @@ export function ProductFilesUpload({
   const pickImage = () => imageInputRef.current?.click();
   const pickPdf = () => pdfInputRef.current?.click();
   const fileInputClass = "sr-only";
+
+  /** Softproof (image_data) z první stránky PDF — spolehlivější než server canvas. */
+  const uploadSoftproofFromPdfFile = async (file: File): Promise<boolean> => {
+    if (file.size > MAX_PREVIEW_SOURCE_PDF_BYTES) return false;
+    try {
+      const blob = await pdfFileToJpegPreviewBlob(file);
+      const formData = new FormData();
+      formData.append(
+        "file",
+        new File([blob], "nahled-z-pdf.jpg", { type: "image/jpeg" })
+      );
+      const res = await fetch(`/api/iml/products/${productId}/image`, {
+        method: "POST",
+        body: formData,
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -151,6 +172,7 @@ export function ProductFilesUpload({
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         item_status?: string;
+        preview_updated?: boolean;
       };
       if (!res.ok) {
         if (res.status === 413) {
@@ -166,13 +188,25 @@ export function ProductFilesUpload({
         );
         return;
       }
+
+      // Softproof (image_data) musí odpovídat novému PDF všude — klientský PDF.js je spolehlivější než server canvas.
+      const clientPreviewOk = await uploadSoftproofFromPdfFile(file);
+      const previewOk = clientPreviewOk || data.preview_updated === true;
+
       setLocalHasPdf(true);
-      setLocalHasImage(true);
-      setImageCacheBust(Date.now());
-      setPdfSuccess("PDF bylo nahráno. Náhled a stav položky byly aktualizovány.");
+      if (previewOk) setLocalHasImage(true);
+      const bust = Date.now();
+      setImageCacheBust(bust);
+      setPdfCacheBust(bust);
+      setPdfSuccess(
+        previewOk
+          ? "PDF bylo nahráno. Náhled a stav položky byly aktualizovány."
+          : "PDF bylo nahráno a stav položky změněn. Softproof se nepodařilo přegenerovat — nahrajte náhled vlevo ručně (nebo PDF ≤ 15 MB)."
+      );
       onPdfChange?.(
         data.item_status ? { itemStatus: data.item_status } : undefined
       );
+      if (previewOk) onImageChange?.();
     } catch {
       setPdfError("Chyba při nahrávání");
     } finally {
@@ -261,7 +295,12 @@ export function ProductFilesUpload({
             </div>
           ) : localHasPdf ? (
             <div className="flex items-center gap-2">
-              <ProductPdfThumbnail productId={productId} maxHeight={96} className="shrink-0" />
+              <ProductPdfThumbnail
+                productId={productId}
+                maxHeight={96}
+                className="shrink-0"
+                cacheBust={pdfCacheBust}
+              />
               <div className="flex flex-col gap-1">
                 <button
                   type="button"
@@ -316,11 +355,12 @@ export function ProductFilesUpload({
           {localHasPdf ? (
             <div className="flex items-center gap-2">
               <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-gray-100">
-                {localHasImage ? (
-                  <ProductPdfThumbnail productId={productId} maxHeight={96} className="max-h-24 max-w-24" />
-                ) : (
-                  <FileText className="h-10 w-10 text-gray-500" />
-                )}
+                <ProductPdfThumbnail
+                  productId={productId}
+                  maxHeight={96}
+                  className="max-h-24 max-w-24"
+                  cacheBust={pdfCacheBust}
+                />
               </div>
               <div className="flex flex-col gap-1">
                 <LockedPdfDownload

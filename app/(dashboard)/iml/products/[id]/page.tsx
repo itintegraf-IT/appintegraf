@@ -148,6 +148,7 @@ export default async function ImlProductDetailPage({
                 hasPdf={hasPdf}
                 isLocked={!!product.is_locked}
                 className="h-60 w-full md:w-60"
+                cacheBust={product.updated_at}
               />
               <p className="mt-1 text-center text-xs text-gray-400">
                 Kliknutím zvětšit
@@ -363,6 +364,7 @@ export default async function ImlProductDetailPage({
                     hasPdf={hasPdf}
                     isLocked={!!product.is_locked}
                     className="h-60 w-full"
+                    cacheBust={product.updated_at}
                   />
                   <p className="mt-1 text-center text-xs text-gray-400">
                     Kliknutím zvětšit

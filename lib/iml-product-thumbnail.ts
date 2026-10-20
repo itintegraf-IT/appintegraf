@@ -33,7 +33,10 @@ export async function saveProductPreviewImage(
 
   await prisma.iml_products.update({
     where: { id: productId },
-    data: { image_data: Buffer.from(buffer) },
+    data: {
+      image_data: Buffer.from(buffer),
+      updated_at: new Date(),
+    },
   });
 
   await logImlAudit({

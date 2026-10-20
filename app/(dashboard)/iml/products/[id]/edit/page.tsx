@@ -298,7 +298,6 @@ export default function ImlProductEditPage() {
 
   const onPdfDataChanged = (info?: { itemStatus?: string }) => {
     setHasPdf(true);
-    setHasImage(true);
     setField(
       "item_status",
       info?.itemStatus ?? IML_ITEM_STATUS_DATA_CHANGE
