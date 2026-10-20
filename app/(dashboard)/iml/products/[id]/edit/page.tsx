@@ -20,6 +20,7 @@ import {
 } from "@/lib/iml-print-colors-summary";
 import { pantoneRowsFromPrintColorsText } from "@/lib/iml-print-colors-from-text";
 import { parseProductFormatToMm } from "@/lib/iml/product-format";
+import { IML_ITEM_STATUS_DATA_CHANGE } from "@/lib/iml-constants";
 
 type ProductColorResp = {
   id: number;
@@ -293,8 +294,41 @@ export default function ImlProductEditPage() {
     );
   }
 
+  const dataChangeHighlight = form.item_status === IML_ITEM_STATUS_DATA_CHANGE;
+
+  const onPdfDataChanged = (info?: { itemStatus?: string }) => {
+    setHasPdf(true);
+    setHasImage(true);
+    setField(
+      "item_status",
+      info?.itemStatus ?? IML_ITEM_STATUS_DATA_CHANGE
+    );
+    router.refresh();
+  };
+
+  const onPdfDataDeleted = (info?: { itemStatus?: string }) => {
+    setHasPdf(false);
+    setField(
+      "item_status",
+      info?.itemStatus ?? IML_ITEM_STATUS_DATA_CHANGE
+    );
+    router.refresh();
+  };
+
   return (
-    <>
+    <div
+      className={
+        dataChangeHighlight
+          ? "-m-2 space-y-6 rounded-xl border border-red-200 bg-red-50 p-2 sm:p-4"
+          : "space-y-6"
+      }
+    >
+      {dataChangeHighlight && (
+        <div className="rounded-lg border border-red-300 bg-red-100/80 px-3 py-2 text-sm text-red-900">
+          Stav <strong>Změna dat</strong> — tisková data byla změněna. Při uložení formuláře
+          tento stav zůstane, dokud ho sami nepřepnete.
+        </div>
+      )}
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Upravit produkt</h1>
@@ -324,9 +358,9 @@ export default function ImlProductEditPage() {
           hasPdf={hasPdf}
           isLocked={isLocked}
           onImageChange={() => setHasImage(true)}
-          onPdfChange={() => setHasPdf(true)}
+          onPdfChange={onPdfDataChanged}
           onImageDelete={() => setHasImage(false)}
-          onPdfDelete={() => setHasPdf(false)}
+          onPdfDelete={onPdfDataDeleted}
         />
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -364,6 +398,6 @@ export default function ImlProductEditPage() {
           </div>
         </form>
       </div>
-    </>
+    </div>
   );
 }

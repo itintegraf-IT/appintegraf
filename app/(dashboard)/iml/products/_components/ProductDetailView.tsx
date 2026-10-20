@@ -40,6 +40,7 @@ export default function ProductDetailView({
   canWrite,
   hasPdf,
   isLocked = false,
+  dataChangeHighlight = false,
   sections,
 }: {
   title: string;
@@ -48,11 +49,17 @@ export default function ProductDetailView({
   canWrite: boolean;
   hasPdf: boolean;
   isLocked?: boolean;
+  /** Stav „Změna dat“ — světle červené pozadí detailu. */
+  dataChangeHighlight?: boolean;
   sections: ProductDetailSection[];
 }) {
   const [mode, setMode] = useViewMode("productDetail");
   const { backHref: listBackHref, withPreservedReturnTo } = useReturnTo("/iml/products");
   const visible = sections.filter((s) => !s.hidden);
+
+  const cardClass = dataChangeHighlight
+    ? "rounded-xl border border-red-200 bg-white/90 p-6 shadow-sm"
+    : "rounded-xl border border-gray-200 bg-white p-6 shadow-sm";
 
   const tabDefs: TabDef[] = visible.map((s) => ({
     id: s.id,
@@ -60,7 +67,7 @@ export default function ProductDetailView({
     icon: s.icon,
     badge: s.badge,
     content: (
-      <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+      <div className={cardClass}>
         {s.subtitle && (
           <p className="mb-4 border-b border-gray-100 pb-3 text-sm text-gray-500">
             {s.subtitle}
@@ -72,7 +79,19 @@ export default function ProductDetailView({
   }));
 
   return (
-    <>
+    <div
+      className={
+        dataChangeHighlight
+          ? "-m-2 rounded-xl border border-red-200 bg-red-50 p-2 sm:p-4"
+          : undefined
+      }
+    >
+      {dataChangeHighlight && (
+        <div className="mb-4 rounded-lg border border-red-300 bg-red-100/80 px-3 py-2 text-sm text-red-900">
+          Stav <strong>Změna dat</strong> — tisková data (PDF) byla změněna, smazána nebo
+          nahrazena. Produkt se chová jako neaktivní, dokud stav nepřenastavíte.
+        </div>
+      )}
       <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
@@ -124,7 +143,6 @@ export default function ProductDetailView({
           ))}
         </div>
       )}
-
-    </>
+    </div>
   );
 }

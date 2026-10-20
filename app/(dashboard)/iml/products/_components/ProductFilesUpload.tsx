@@ -15,15 +15,19 @@ import {
 const PREVIEW_FILE_ACCEPT =
   "image/jpeg,image/png,image/webp,image/gif,application/pdf,.pdf";
 
+export type ProductPdfChangeInfo = {
+  itemStatus?: string;
+};
+
 type Props = {
   productId: number;
   hasImage: boolean;
   hasPdf: boolean;
   isLocked?: boolean;
   onImageChange?: () => void;
-  onPdfChange?: () => void;
+  onPdfChange?: (info?: ProductPdfChangeInfo) => void;
   onImageDelete?: () => void;
-  onPdfDelete?: () => void;
+  onPdfDelete?: (info?: ProductPdfChangeInfo) => void;
 };
 
 export function ProductFilesUpload({
@@ -144,7 +148,10 @@ export function ProductFilesUpload({
         method: "POST",
         body: formData,
       });
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        item_status?: string;
+      };
       if (!res.ok) {
         if (res.status === 413) {
           setPdfError(
@@ -160,8 +167,12 @@ export function ProductFilesUpload({
         return;
       }
       setLocalHasPdf(true);
-      setPdfSuccess("PDF bylo nahráno.");
-      onPdfChange?.();
+      setLocalHasImage(true);
+      setImageCacheBust(Date.now());
+      setPdfSuccess("PDF bylo nahráno. Náhled a stav položky byly aktualizovány.");
+      onPdfChange?.(
+        data.item_status ? { itemStatus: data.item_status } : undefined
+      );
     } catch {
       setPdfError("Chyba při nahrávání");
     } finally {
@@ -177,14 +188,19 @@ export function ProductFilesUpload({
     setPdfLoading(true);
     try {
       const res = await fetch(`/api/iml/products/${productId}/pdf`, { method: "DELETE" });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        item_status?: string;
+      };
       if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
         setPdfError(data.error ?? "Chyba při mazání");
         return;
       }
       setLocalHasPdf(false);
       setPdfSuccess("PDF bylo smazáno.");
-      onPdfDelete?.();
+      onPdfDelete?.(
+        data.item_status ? { itemStatus: data.item_status } : undefined
+      );
     } catch {
       setPdfError("Chyba při mazání");
     } finally {

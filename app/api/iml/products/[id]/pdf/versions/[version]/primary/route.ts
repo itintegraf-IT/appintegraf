@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { markImlProductDataChanged } from "@/lib/iml-product-data-change";
+import { IML_ITEM_STATUS_DATA_CHANGE } from "@/lib/iml-constants";
 
 /**
  * Obnovení starší verze jako primary.
@@ -74,5 +75,9 @@ export async function PATCH(
     console.error("markImlProductDataChanged after PDF restore", markErr);
   }
 
-  return NextResponse.json({ success: true, primary_version: versionNum });
+  return NextResponse.json({
+    success: true,
+    primary_version: versionNum,
+    item_status: IML_ITEM_STATUS_DATA_CHANGE,
+  });
 }

@@ -438,6 +438,7 @@ export default async function ImlProductDetailPage({
           canWrite={canWrite}
           hasPdf={hasPdf}
           isLocked={!!product.is_locked}
+          dataChangeHighlight={product.item_status === IML_ITEM_STATUS_DATA_CHANGE}
           sections={sections}
         />
       </>
