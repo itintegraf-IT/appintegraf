@@ -1,9 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { ExternalLink, ImageOff, Minus, Plus, RotateCcw, X } from "lucide-react";
+import { Download, ExternalLink, ImageOff, Minus, Plus, RotateCcw, X } from "lucide-react";
 import { ProductPdfThumbnail } from "./ProductPdfThumbnail";
 import { LockedPdfDownload } from "./LockedPdfDownload";
+import {
+  downloadBlobAsFile,
+  filenameFromContentDisposition,
+} from "@/lib/download-blob-as-file";
 
 const LIGHTBOX_PDF_MAX_HEIGHT = 1200;
 
@@ -34,6 +38,7 @@ export default function ProductImagePreview({
   const [open, setOpen] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [lightboxPdfHeight, setLightboxPdfHeight] = useState(LIGHTBOX_PDF_MAX_HEIGHT);
+  const [softproofDownloading, setSoftproofDownloading] = useState(false);
 
   /** Softproof (náhled) má přednost před ostrými tiskovými daty (PDF). */
   const lightboxShowsSoftproof = hasImage;
@@ -70,6 +75,30 @@ export default function ProductImagePreview({
     bustValue != null
       ? `/api/iml/products/${productId}/image?t=${encodeURIComponent(bustValue)}`
       : `/api/iml/products/${productId}/image`;
+
+  const downloadSoftproof = useCallback(async () => {
+    setSoftproofDownloading(true);
+    try {
+      const params = new URLSearchParams({ download: "1" });
+      if (bustValue != null) params.set("t", String(bustValue));
+      const res = await fetch(`/api/iml/products/${productId}/image?${params}`, {
+        credentials: "same-origin",
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        alert(text || `Stažení softproofu selhalo (${res.status})`);
+        return;
+      }
+      const blob = await res.blob();
+      const fromHeader =
+        filenameFromContentDisposition(res.headers.get("Content-Disposition")) ||
+        res.headers.get("X-Filename");
+      const filename = fromHeader?.trim() || `produkt-${productId}-softproof.jpg`;
+      downloadBlobAsFile(blob, filename);
+    } finally {
+      setSoftproofDownloading(false);
+    }
+  }, [productId, bustValue]);
 
   if (!canPreview) {
     return (
@@ -158,26 +187,39 @@ export default function ProductImagePreview({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              {hasPdf && (
-                <span className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                  <LockedPdfDownload
-                    productId={productId}
-                    isLocked={isLocked}
-                    download
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20"
+              <span className="flex flex-wrap items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                {lightboxShowsSoftproof && (
+                  <button
+                    type="button"
+                    onClick={downloadSoftproof}
+                    disabled={softproofDownloading}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20 disabled:opacity-50"
                   >
-                    Stáhnout tisková data
-                  </LockedPdfDownload>
-                  <LockedPdfDownload
-                    productId={productId}
-                    isLocked={isLocked}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    Otevřít PDF
-                  </LockedPdfDownload>
-                </span>
-              )}
+                    <Download className="h-4 w-4" />
+                    {softproofDownloading ? "Stahuji…" : "Stáhnout softproof"}
+                  </button>
+                )}
+                {hasPdf && (
+                  <>
+                    <LockedPdfDownload
+                      productId={productId}
+                      isLocked={isLocked}
+                      download
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20"
+                    >
+                      Stáhnout tisková data
+                    </LockedPdfDownload>
+                    <LockedPdfDownload
+                      productId={productId}
+                      isLocked={isLocked}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-sm text-white hover:bg-white/20"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                      Otevřít PDF
+                    </LockedPdfDownload>
+                  </>
+                )}
+              </span>
               <button
                 type="button"
                 onClick={() => setOpen(false)}

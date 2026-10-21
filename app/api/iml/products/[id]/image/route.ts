@@ -7,10 +7,26 @@ import {
   MAX_PRODUCT_IMAGE_BYTES,
   MAX_PRODUCT_IMAGE_MB,
 } from "@/lib/iml-product-upload-limits";
+import { asciiFilenameForDisposition } from "@/lib/iml-product-pdf-filename";
+
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
+function extensionForContentType(contentType: string): string {
+  if (contentType === "image/png") return "png";
+  if (contentType === "image/webp") return "webp";
+  if (contentType === "image/gif") return "gif";
+  return "jpg";
+}
+
+function contentDispositionForImage(filename: string): string {
+  const name =
+    (filename || "softproof.jpg").replace(/[\r\n"]/g, "_").trim() || "softproof.jpg";
+  const ascii = asciiFilenameForDisposition(name);
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+}
+
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -28,9 +44,11 @@ export async function GET(
     return new NextResponse("Neplatné ID", { status: 400 });
   }
 
+  const asDownload = req.nextUrl.searchParams.get("download") === "1";
+
   const product = await prisma.iml_products.findUnique({
     where: { id },
-    select: { image_data: true },
+    select: { image_data: true, ig_code: true },
   });
 
   if (!product?.image_data || product.image_data.length === 0) {
@@ -40,13 +58,21 @@ export async function GET(
   const contentType = getImageContentType(product.image_data);
   const body = Buffer.isBuffer(product.image_data) ? product.image_data : Buffer.from(product.image_data);
 
-  return new NextResponse(new Uint8Array(body), {
-    headers: {
-      "Content-Type": contentType,
-      // Softproof se mění při nahrání/nahrazení PDF — nesmí se cachovat hodinu.
-      "Cache-Control": "private, no-cache, must-revalidate",
-    },
-  });
+  const headers: Record<string, string> = {
+    "Content-Type": contentType,
+    // Softproof se mění při nahrání/nahrazení PDF — nesmí se cachovat hodinu.
+    "Cache-Control": "private, no-cache, must-revalidate",
+  };
+
+  if (asDownload) {
+    const code = product.ig_code?.trim() || `produkt-${id}`;
+    const ext = extensionForContentType(contentType);
+    const downloadName = `${code}-softproof.${ext}`;
+    headers["Content-Disposition"] = contentDispositionForImage(downloadName);
+    headers["X-Filename"] = downloadName;
+  }
+
+  return new NextResponse(new Uint8Array(body), { headers });
 }
 
 export async function POST(
