@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Layers, Pencil, Plus, Search, Settings2, Trash2 } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Layers,
+  Pencil,
+  Plus,
+  Search,
+  Settings2,
+  Trash2,
+} from "lucide-react";
 import { MachineSelectOptions } from "@/components/shared-machines/MachineSelectOptions";
 
 type SheetType = { id: number; name: string };
@@ -22,10 +32,61 @@ type Item = {
   shared_machines: { id: number; name: string; machine_group?: string } | null;
 };
 
+const SORT_KEYS = [
+  "code",
+  "name",
+  "type",
+  "format",
+  "sheet_size",
+  "machine",
+  "note",
+] as const;
+type SortKey = (typeof SORT_KEYS)[number];
+type SortDir = "asc" | "desc";
+
+function isSortKey(value: string): value is SortKey {
+  return (SORT_KEYS as readonly string[]).includes(value);
+}
+
+function isSortDir(value: string): value is SortDir {
+  return value === "asc" || value === "desc";
+}
+
 function truncateNote(note: string | null, max = 48): string {
   const t = note?.trim() ?? "";
   if (!t) return "—";
   return t.length > max ? `${t.slice(0, max)}…` : t;
+}
+
+function sortValue(item: Item, key: SortKey): string {
+  switch (key) {
+    case "code":
+      return item.code ?? "";
+    case "name":
+      return item.name ?? "";
+    case "type":
+      return item.technologie_sheet_types?.name ?? "";
+    case "format":
+      return item.format_text ?? "";
+    case "sheet_size":
+      return item.technologie_sheet_sizes?.name ?? "";
+    case "machine":
+      return item.shared_machines?.name ?? "";
+    case "note":
+      return item.note?.trim() ?? "";
+  }
+}
+
+function compareItems(a: Item, b: Item, key: SortKey, dir: SortDir): number {
+  const av = sortValue(a, key);
+  const bv = sortValue(b, key);
+  const aEmpty = !av;
+  const bEmpty = !bv;
+  if (aEmpty && bEmpty) return 0;
+  if (aEmpty) return 1;
+  if (bEmpty) return -1;
+  const cmp = av.localeCompare(bv, "cs", { numeric: true, sensitivity: "base" });
+  return dir === "asc" ? cmp : -cmp;
 }
 
 function TechnologiePreviewThumb({ id, updatedAt }: { id: number; updatedAt: string | null }) {
@@ -49,6 +110,46 @@ function TechnologiePreviewThumb({ id, updatedAt }: { id: number; updatedAt: str
   );
 }
 
+function SortableTh({
+  label,
+  column,
+  sortKey,
+  sortDir,
+  onCycle,
+}: {
+  label: string;
+  column: SortKey;
+  sortKey: SortKey | null;
+  sortDir: SortDir | null;
+  onCycle: (column: SortKey) => void;
+}) {
+  const active = sortKey === column ? sortDir : null;
+  const SortIcon = active === "asc" ? ArrowUp : active === "desc" ? ArrowDown : ArrowUpDown;
+  const title =
+    active === "asc"
+      ? "Řazení: vzestupně (kliknutím sestupně)"
+      : active === "desc"
+        ? "Řazení: sestupně (kliknutím vypnout)"
+        : "Řadit vzestupně";
+
+  return (
+    <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">
+      <button
+        type="button"
+        onClick={() => onCycle(column)}
+        className={`inline-flex items-center gap-1 hover:text-red-700 ${
+          active ? "text-red-700" : "text-gray-700"
+        }`}
+        title={title}
+        aria-label={`${label}: ${title}`}
+      >
+        {label}
+        <SortIcon className={`h-3.5 w-3.5 ${active ? "text-red-700" : "text-gray-400"}`} />
+      </button>
+    </th>
+  );
+}
+
 export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -67,7 +168,16 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
     searchParams.get("print_machine_id") ?? ""
   );
 
-  const queryString = useMemo(() => {
+  const sortParam = searchParams.get("sort") ?? "";
+  const dirParam = searchParams.get("dir") ?? "";
+  const [sortKey, setSortKey] = useState<SortKey | null>(
+    isSortKey(sortParam) ? sortParam : null
+  );
+  const [sortDir, setSortDir] = useState<SortDir | null>(
+    isSortKey(sortParam) && isSortDir(dirParam) ? dirParam : null
+  );
+
+  const filterQueryString = useMemo(() => {
     const sp = new URLSearchParams();
     if (q.trim()) sp.set("q", q.trim());
     if (sheetTypeId) sp.set("sheet_type_id", sheetTypeId);
@@ -76,12 +186,21 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
     return sp.toString();
   }, [q, sheetTypeId, sheetSizeId, printMachineId]);
 
+  const urlQueryString = useMemo(() => {
+    const sp = new URLSearchParams(filterQueryString);
+    if (sortKey && sortDir) {
+      sp.set("sort", sortKey);
+      sp.set("dir", sortDir);
+    }
+    return sp.toString();
+  }, [filterQueryString, sortKey, sortDir]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const [rItems, rTypes, rSizes, rMach] = await Promise.all([
-        fetch(`/api/technologie${queryString ? `?${queryString}` : ""}`),
+        fetch(`/api/technologie${filterQueryString ? `?${filterQueryString}` : ""}`),
         fetch("/api/technologie/sheet-types"),
         fetch("/api/technologie/sheet-sizes"),
         fetch("/api/shared-machines"),
@@ -115,16 +234,35 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [queryString]);
+  }, [filterQueryString]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   useEffect(() => {
-    const next = queryString ? `?${queryString}` : "";
+    const next = urlQueryString ? `?${urlQueryString}` : "";
     router.replace(`/technologie${next}`, { scroll: false });
-  }, [queryString, router]);
+  }, [urlQueryString, router]);
+
+  const displayedItems = useMemo(() => {
+    if (!sortKey || !sortDir) return items;
+    return [...items].sort((a, b) => compareItems(a, b, sortKey, sortDir));
+  }, [items, sortKey, sortDir]);
+
+  const onCycleSort = (column: SortKey) => {
+    if (sortKey !== column) {
+      setSortKey(column);
+      setSortDir("asc");
+      return;
+    }
+    if (sortDir === "asc") {
+      setSortDir("desc");
+      return;
+    }
+    setSortKey(null);
+    setSortDir(null);
+  };
 
   const onDelete = async (item: Item) => {
     if (!confirm(`Trvale smazat rozkres „${item.code} – ${item.name}“ včetně PDF?`)) {
@@ -255,17 +393,55 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
           <table className="w-full min-w-[960px]">
             <thead className="border-b border-gray-200 bg-gray-50">
               <tr>
-                <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">Kód</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">Název</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">Typ</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">Formát</th>
-                <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">
-                  Velikost archu
-                </th>
-                <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">
-                  Tisk. stroj
-                </th>
-                <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">Poznámka</th>
+                <SortableTh
+                  label="Kód"
+                  column="code"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onCycle={onCycleSort}
+                />
+                <SortableTh
+                  label="Název"
+                  column="name"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onCycle={onCycleSort}
+                />
+                <SortableTh
+                  label="Typ"
+                  column="type"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onCycle={onCycleSort}
+                />
+                <SortableTh
+                  label="Formát"
+                  column="format"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onCycle={onCycleSort}
+                />
+                <SortableTh
+                  label="Velikost archu"
+                  column="sheet_size"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onCycle={onCycleSort}
+                />
+                <SortableTh
+                  label="Tisk. stroj"
+                  column="machine"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onCycle={onCycleSort}
+                />
+                <SortableTh
+                  label="Poznámka"
+                  column="note"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onCycle={onCycleSort}
+                />
                 <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700">Náhled</th>
                 {canWrite && (
                   <th className="px-3 py-3 text-right text-sm font-semibold text-gray-700">Akce</th>
@@ -279,14 +455,14 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
                     Načítání…
                   </td>
                 </tr>
-              ) : items.length === 0 ? (
+              ) : displayedItems.length === 0 ? (
                 <tr>
                   <td colSpan={colSpan} className="px-4 py-8 text-center text-gray-500">
                     Žádné záznamy
                   </td>
                 </tr>
               ) : (
-                items.map((item) => (
+                displayedItems.map((item) => (
                   <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="px-3 py-3 text-sm font-mono">
                       <Link
