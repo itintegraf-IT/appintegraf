@@ -73,7 +73,9 @@ export async function attachProductPdf(
   const setPrimary = options?.setPrimary !== false;
   const safeName = sanitizeFilename(filename);
 
-  await prisma.$transaction(async (tx) => {
+  // Stejný vzor jako POST /api/iml/products/[id]/pdf:
+  // create s select bez LongBlob (MariaDB adapter jinak často vrátí null) + audit mimo TX.
+  const created = await prisma.$transaction(async (tx) => {
     const latest = await tx.iml_product_files.aggregate({
       where: { product_id: productId },
       _max: { version: true },
@@ -87,7 +89,7 @@ export async function attachProductPdf(
       });
     }
 
-    const created = await tx.iml_product_files.create({
+    const row = await tx.iml_product_files.create({
       data: {
         product_id: productId,
         version: nextVersion,
@@ -97,22 +99,50 @@ export async function attachProductPdf(
         pdf_data: Buffer.from(buffer),
         is_primary: setPrimary,
         uploaded_by: userId,
+        last_accessed_at: new Date(),
+      },
+      select: {
+        id: true,
+        version: true,
+        filename: true,
+        file_size: true,
+        is_primary: true,
       },
     });
 
-    await logImlAudit({
-      userId,
-      action: "update",
-      tableName: "iml_product_files",
-      recordId: created.id,
-      newValues: {
-        product_id: productId,
-        version: nextVersion,
-        filename: safeName,
-        is_primary: setPrimary,
-        import: true,
-      },
+    const product = await tx.iml_products.findUnique({
+      where: { id: productId },
+      select: { archived_at: true },
     });
+    if (product?.archived_at) {
+      await tx.iml_products.update({
+        where: { id: productId },
+        data: { archived_at: null, is_active: true },
+      });
+    }
+
+    return row;
+  });
+
+  if (!created?.id) {
+    throw new Error(
+      "Nepodařilo se uložit verzi PDF do IML (prázdná odpověď DB po insertu)."
+    );
+  }
+
+  await logImlAudit({
+    userId,
+    action: "update",
+    tableName: "iml_product_files",
+    recordId: created.id,
+    newValues: {
+      product_id: productId,
+      version: created.version,
+      filename: created.filename,
+      file_size: created.file_size,
+      is_primary: created.is_primary,
+      import: true,
+    },
   });
 }
 
