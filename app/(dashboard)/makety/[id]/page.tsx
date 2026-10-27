@@ -18,6 +18,9 @@ import {
   userCanApproveMaketaQuote,
   userCanOperateGrafikaAutomation,
   userCanCopyMaketa,
+  userCanTransferMaketaOwnership,
+  userCanForceClaimMaketaOwnership,
+  getUsersWhoCanZadatMaketyWork,
   canManageMaketyQueue,
   userCanDeleteMaketyFile,
   isMaketyProhlizecKlientaOnly,
@@ -28,6 +31,8 @@ import { MaketyDetailPrioritySelect } from "./MaketyDetailPrioritySelect";
 import { MaketyDetailDataKindSelect } from "./MaketyDetailDataKindSelect";
 import { DeleteMaketaButton } from "./DeleteMaketaButton";
 import { CopyMaketaButton } from "./CopyMaketaButton";
+import { TransferOwnershipButton } from "./TransferOwnershipButton";
+import { ForceClaimOwnershipButton } from "./ForceClaimOwnershipButton";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import {
   maketaPriorityBadgeClass,
@@ -120,6 +125,11 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
   const canEdit = await userCanEditMaketa(userId, id);
   const canDelete = await userCanDeleteMaketa(userId, id);
   const canCopy = await userCanCopyMaketa(userId, id);
+  const canTransferOwnership = await userCanTransferMaketaOwnership(userId, id);
+  const transferCandidates = canTransferOwnership
+    ? await getUsersWhoCanZadatMaketyWork(workType)
+    : [];
+  const canForceClaimOwnership = await userCanForceClaimMaketaOwnership(userId, id);
   const canComplete = await userCanCompleteMaketa(userId, id);
   const canSubmitQuote = await userCanSubmitMaketaQuote(userId, id);
   const canApproveQuote = await userCanApproveMaketaQuote(userId, id);
@@ -224,6 +234,16 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
               </div>
               <div className="flex flex-wrap gap-2">
                 {canCopy && <CopyMaketaButton id={maketa.id} />}
+                {canTransferOwnership && (
+                  <TransferOwnershipButton
+                    maketaId={maketa.id}
+                    currentOwnerId={maketa.created_by}
+                    candidates={transferCandidates}
+                  />
+                )}
+                {canForceClaimOwnership && (
+                  <ForceClaimOwnershipButton maketaId={maketa.id} />
+                )}
                 {canEdit && (
                   <Link
                     href={`/makety/${maketa.id}/edit`}

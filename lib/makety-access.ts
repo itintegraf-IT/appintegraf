@@ -321,6 +321,58 @@ export async function userCanDeleteMaketa(userId: number, maketaId: number): Pro
   return row != null;
 }
 
+/**
+ * Předání vlastnictví (`created_by`) jinému uživateli.
+ * Smí tvůrce nebo admin modulu / globální admin.
+ */
+export async function userCanTransferMaketaOwnership(
+  userId: number,
+  maketaId: number
+): Promise<boolean> {
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId },
+    select: { id: true, created_by: true },
+  });
+  if (!row) return false;
+  if (row.created_by === userId) return true;
+  return canViewAllMaketyTypes(userId);
+}
+
+/**
+ * Nucené přebrání řízení na sebe (admin).
+ * Smí globální admin / admin modulu Makety, pokud ještě není zadavatelem.
+ */
+export async function userCanForceClaimMaketaOwnership(
+  userId: number,
+  maketaId: number
+): Promise<boolean> {
+  const row = await prisma.makety.findFirst({
+    where: { id: maketaId },
+    select: { id: true, created_by: true },
+  });
+  if (!row) return false;
+  if (row.created_by === userId) return false;
+  return canViewAllMaketyTypes(userId);
+}
+
+/** Aktivní uživatelé, kteří smí zadávat daný typ práce (kandidáti pro předání řízení). */
+export async function getUsersWhoCanZadatMaketyWork(
+  workType: MaketyWorkType
+): Promise<Array<{ id: number; first_name: string; last_name: string }>> {
+  const users = await prisma.users.findMany({
+    where: { OR: [{ is_active: true }, { is_active: null }] },
+    orderBy: [{ last_name: "asc" }, { first_name: "asc" }],
+    select: { id: true, first_name: true, last_name: true },
+  });
+  const result: Array<{ id: number; first_name: string; last_name: string }> = [];
+  for (const u of users) {
+    if (await canZadatMaketyWork(u.id, workType)) {
+      result.push(u);
+    }
+  }
+  return result;
+}
+
 export async function userCanCompleteMaketa(userId: number, maketaId: number): Promise<boolean> {
   const row = await prisma.makety.findFirst({
     where: { id: maketaId, status: { notIn: ["done", "cancelled"] } },
