@@ -492,10 +492,10 @@ export function MaketyActiveTableClient({
                   }
                 }}
                 className={
-                  "cursor-pointer border-b border-gray-100 hover:bg-gray-50/80 " +
+                  "cursor-pointer border-b border-gray-100 transition-colors " +
                   (row.needs_attention
-                    ? "border-l-4 border-l-amber-400 bg-amber-50 hover:bg-amber-100/80"
-                    : "")
+                    ? "border-l-4 border-l-amber-400 bg-amber-50 hover:bg-amber-100"
+                    : "hover:bg-violet-50 hover:shadow-[inset_4px_0_0_0_rgb(139,92,246)]")
                 }
               >
                 {visibleColumns.map((col) => (
