@@ -191,14 +191,6 @@ export async function POST(
         },
       });
 
-      await prisma.makety_comments.create({
-        data: {
-          maketa_id: maketaId,
-          user_id: userId,
-          body: `Nahrazeny soubory (softproof, tisková data) u existujícího produktu IML #${productId} (${draft.ig_code}) z grafické zakázky. Metadata doplněna jen do prázdných polí.`,
-        },
-      });
-
       await logImlAudit({
         userId,
         action: "update",
@@ -239,14 +231,6 @@ export async function POST(
         },
       });
 
-      await prisma.makety_comments.create({
-        data: {
-          maketa_id: maketaId,
-          user_id: userId,
-          body: `Aktualizován produkt IML #${draft.product_id} (${draft.ig_code})`,
-        },
-      });
-
       await logImlAudit({
         userId,
         action: "update",
@@ -277,14 +261,6 @@ export async function POST(
           product_name: draft.client_name,
           product_draft: Prisma.DbNull,
           iml_applied_at: new Date(),
-        },
-      });
-
-      await prisma.makety_comments.create({
-        data: {
-          maketa_id: maketaId,
-          user_id: userId,
-          body: `Založen produkt IML #${created.id} (${draft.ig_code})`,
         },
       });
 
@@ -329,14 +305,20 @@ export async function POST(
       console.error("apply-product-draft unlock", unlockErr);
     }
 
-    const commentBody = files.filesIncomplete
-      ? `Zápis do IML produktu #${productId}: soubory neúplné. ${transferSummary.summary}`
-      : `Do IML produktu #${productId}: ${transferSummary.summary}`;
+    const modeLabel =
+      replacedExisting
+        ? "Nahrazeny soubory u existujícího produktu IML"
+        : mode === "update"
+          ? "Aktualizován produkt IML"
+          : "Založen produkt IML";
+    const transferPart = files.filesIncomplete
+      ? `soubory neúplné. ${transferSummary.summary}`
+      : transferSummary.summary;
     await prisma.makety_comments.create({
       data: {
         maketa_id: maketaId,
         user_id: userId,
-        body: commentBody,
+        body: `${modeLabel} #${productId} (${draft.ig_code}). ${transferPart}`,
       },
     });
 

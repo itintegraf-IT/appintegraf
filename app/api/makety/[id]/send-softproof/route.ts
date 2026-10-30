@@ -222,9 +222,6 @@ export async function POST(
   }
 
   let status = maketa.status;
-  const commentBody = message
-    ? `Softproof (${fileRow.original_filename}) odeslán na ${toEmail}\n\nDoprovodný text:\n${message}`
-    : `Softproof (${fileRow.original_filename}) odeslán na ${toEmail}`;
 
   if (maketa.status === "prepress_approved") {
     try {
@@ -247,13 +244,7 @@ export async function POST(
             comment: `Softproof odeslán na ${toEmail}`,
           },
         });
-        await tx.makety_comments.create({
-          data: {
-            maketa_id: maketaId,
-            user_id: userId,
-            body: commentBody,
-          },
-        });
+        // Jen softproof_sent (ne komentář ani workflow_transition — stav je ve status_log).
         await recordMaketyFileEvent({
           tx,
           maketaId,
@@ -267,14 +258,6 @@ export async function POST(
             message: message || null,
             attached: Boolean(attach),
             reminder_enabled: reminderEnabled,
-          },
-        });
-        await recordMaketyFileEvent({
-          tx,
-          maketaId,
-          eventType: "workflow_transition",
-          userId,
-          meta: {
             from_status: maketa.status,
             to_status: "sent_for_approval",
             via: "softproof_email",
@@ -290,28 +273,19 @@ export async function POST(
       );
     }
   } else {
-    await prisma.makety_comments.create({
-      data: {
-        maketa_id: maketaId,
-        user_id: userId,
-        body: message
-          ? `Softproof (${fileRow.original_filename}) znovu odeslán na ${toEmail}\n\nDoprovodný text:\n${message}`
-          : `Softproof (${fileRow.original_filename}) znovu odeslán na ${toEmail}`,
-      },
-    });
     await recordMaketyFileEvent({
       maketaId,
       fileId: fileRow.id,
       eventType: "softproof_sent",
       userId,
       meta: {
-            filename: fileRow.original_filename,
-            to_email: toEmail,
-            locale,
-            message: message || null,
-            attached: Boolean(attach),
-            reminder_enabled: reminderEnabled,
-            resend: true,
+        filename: fileRow.original_filename,
+        to_email: toEmail,
+        locale,
+        message: message || null,
+        attached: Boolean(attach),
+        reminder_enabled: reminderEnabled,
+        resend: true,
       },
     });
   }

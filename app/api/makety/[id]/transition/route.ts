@@ -170,16 +170,7 @@ export async function POST(
       },
     });
 
-    if (comment) {
-      await tx.makety_comments.create({
-        data: {
-          maketa_id: id,
-          user_id: userId,
-          body: comment,
-        },
-      });
-    }
-
+    // Bez duplicitního makety_comments — důvod je ve status_log + file_event meta.
     await recordMaketyFileEvent({
       tx,
       maketaId: id,

@@ -145,13 +145,6 @@ export async function runMaketySoftproofReminders(): Promise<SoftproofReminderRu
         continue;
       }
 
-      await prisma.makety_comments.create({
-        data: {
-          maketa_id: link.maketa_id,
-          user_id: link.created_by,
-          body: `Automatická připomínka softproofu (${fileRow.original_filename}) odeslána na ${link.sent_to_email}`,
-        },
-      });
       await recordMaketyFileEvent({
         maketaId: link.maketa_id,
         fileId: link.file_id,

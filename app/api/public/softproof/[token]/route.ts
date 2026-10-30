@@ -116,13 +116,16 @@ export async function GET(
         where: { id: fileRow.id },
         data: { last_accessed_at: new Date() },
       });
-      await recordMaketyFileEvent({
-        maketaId: maketa.id,
-        fileId: fileRow.id,
-        eventType: "softproof_downloaded",
-        userId: null,
-        meta: { filename: fileRow.original_filename, locale: link.locale },
-      });
+      // Logovat jen explicitní stažení, ne inline náhled (?file=1).
+      if (asDownload) {
+        await recordMaketyFileEvent({
+          maketaId: maketa.id,
+          fileId: fileRow.id,
+          eventType: "softproof_downloaded",
+          userId: null,
+          meta: { filename: fileRow.original_filename, locale: link.locale },
+        });
+      }
 
       return new NextResponse(new Uint8Array(buf), {
         headers: {
@@ -198,18 +201,10 @@ export async function POST(
       );
     }
 
-    const commentBody =
+    const notifyPreview =
       decision.action === "approved"
         ? `Klient schválil softproof (${fileRow.original_filename}) z odkazu odeslaného na ${link.sent_to_email}.`
         : `Klient zamítl softproof (${fileRow.original_filename}) z odkazu odeslaného na ${link.sent_to_email}.\n\nDůvod:\n${decision.reason}`;
-
-    await prisma.makety_comments.create({
-      data: {
-        maketa_id: maketa.id,
-        user_id: link.created_by,
-        body: commentBody,
-      },
-    });
 
     if (decision.action === "rejected") {
       await prisma.makety.update({
@@ -243,7 +238,7 @@ export async function POST(
       await notifyMaketaUsers({
         maketaId: maketa.id,
         userIds: [maketa.created_by],
-        bodyPreview: commentBody,
+        bodyPreview: notifyPreview,
         orderNumber: maketa.order_number,
         kind: "client_approved",
         workType: "grafika",
@@ -252,7 +247,7 @@ export async function POST(
       await notifyMaketaUsers({
         maketaId: maketa.id,
         userIds: [maketa.assignee_user_id, maketa.created_by],
-        bodyPreview: commentBody,
+        bodyPreview: notifyPreview,
         orderNumber: maketa.order_number,
         kind: "client_rejected",
         workType: "grafika",

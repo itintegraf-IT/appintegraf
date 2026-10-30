@@ -64,20 +64,25 @@ export async function GET(
       );
     }
 
-    await recordMaketyFileEvent({
-      maketaId,
-      fileId: fileRow.id,
-      eventType: "downloaded",
-      userId,
-      meta: { filename: fileRow.original_filename, document_type: fileRow.document_type },
-    });
-
     await prisma.file_uploads.update({
       where: { id: fileRow.id },
       data: { last_accessed_at: new Date() },
     });
 
     const asDownload = req.nextUrl.searchParams.get("download") === "1";
+    // Logovat jen explicitní stažení, ne inline náhled.
+    if (asDownload) {
+      await recordMaketyFileEvent({
+        maketaId,
+        fileId: fileRow.id,
+        eventType: "downloaded",
+        userId,
+        meta: {
+          filename: fileRow.original_filename,
+          document_type: fileRow.document_type,
+        },
+      });
+    }
 
     return new NextResponse(new Uint8Array(buf), {
       headers: {
