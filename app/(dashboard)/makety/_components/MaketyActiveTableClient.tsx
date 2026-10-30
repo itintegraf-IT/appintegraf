@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ArrowUpDown, Filter } from "lucide-react";
 import {
@@ -141,12 +142,24 @@ function renderCell(
       );
     }
     case "id":
-      return <span className="font-mono text-sm">#{row.id}</span>;
+      return (
+        <Link
+          href={`/makety/${row.id}`}
+          className="font-mono text-sm font-medium text-violet-600 hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          #{row.id}
+        </Link>
+      );
     case "order_number":
       return dash(row.order_number);
     case "body":
       return (
-        <Link href={`/makety/${row.id}`} className="font-medium text-violet-600 hover:underline">
+        <Link
+          href={`/makety/${row.id}`}
+          className="font-medium text-violet-600 hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
           {row.body.replace(/\s+/g, " ").trim().slice(0, 80)}
           {row.body.length > 80 ? "…" : ""}
         </Link>
@@ -190,7 +203,11 @@ function renderCell(
       return <span className="font-mono text-sm">{dash(row.job_number)}</span>;
     case "actions":
       return (
-        <div className="flex flex-wrap items-center gap-2">
+        <div
+          className="flex flex-wrap items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           {row.can_copy && <CopyMaketaButton id={row.id} variant="link" />}
           {row.can_edit && (
             <Link
@@ -218,6 +235,7 @@ export function MaketyActiveTableClient({
   rows,
   canModuleAdmin,
 }: Props) {
+  const router = useRouter();
   const { visibleColumnIds, visibleColumns, toggleColumn, reorderColumns, resetToDefaults, ready } =
     useMaketyListColumns(canModuleAdmin);
 
@@ -461,7 +479,25 @@ export function MaketyActiveTableClient({
             </tr>
           ) : (
             displayedRows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50/80">
+              <tr
+                key={row.id}
+                role="link"
+                tabIndex={0}
+                title="Otevřít detail"
+                onClick={() => router.push(`/makety/${row.id}`)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    router.push(`/makety/${row.id}`);
+                  }
+                }}
+                className={
+                  "cursor-pointer border-b border-gray-100 hover:bg-gray-50/80 " +
+                  (row.needs_attention
+                    ? "border-l-4 border-l-amber-400 bg-amber-50 hover:bg-amber-100/80"
+                    : "")
+                }
+              >
                 {visibleColumns.map((col) => (
                   <td
                     key={col.id}

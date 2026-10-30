@@ -56,7 +56,29 @@ export type MaketyListRow = {
   created_by: number;
   can_edit: boolean;
   can_copy: boolean;
+  /** Pozastaveno / vráceno grafikovi — zvýraznit řádek. */
+  needs_attention: boolean;
 };
+
+/**
+ * Zvýraznění v seznamu: pozastavení (data_problem) nebo
+ * poslední přechod sent_for_approval → in_progress (vrácení grafikovi / softproof reject).
+ */
+export function maketyListNeedsAttention(
+  status: string,
+  lastFrom: string | null | undefined,
+  lastTo: string | null | undefined
+): boolean {
+  if (status === "data_problem") return true;
+  if (
+    status === "in_progress" &&
+    lastFrom === "sent_for_approval" &&
+    lastTo === "in_progress"
+  ) {
+    return true;
+  }
+  return false;
+}
 
 export const MAKETY_LIST_COLUMN_GROUPS: Array<{
   id: MaketyListColumnGroup;

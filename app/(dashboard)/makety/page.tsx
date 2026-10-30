@@ -22,6 +22,7 @@ import {
   type MaketaPriority,
 } from "@/lib/makety-status";
 import type { MaketyListRow } from "@/lib/makety/makety-list-columns";
+import { loadMaketyListNeedsAttentionMap } from "@/lib/makety/makety-list-attention";
 import { MaketyActiveTableClient } from "./_components/MaketyActiveTableClient";
 
 export const dynamic = "force-dynamic";
@@ -190,6 +191,10 @@ export default async function MaketyListPage({
         return true;
       });
 
+  const attentionMap = await loadMaketyListNeedsAttentionMap(
+    rows.map((r) => ({ id: r.id, status: r.status }))
+  );
+
   const tableRows: MaketyListRow[] = rows.map((r) => {
     const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
     const canEditRow =
@@ -220,6 +225,7 @@ export default async function MaketyListPage({
       created_by: r.created_by,
       can_edit: canEditRow,
       can_copy: canCopyRow,
+      needs_attention: attentionMap.get(r.id) === true,
     };
   });
 
