@@ -126,6 +126,33 @@ Packaging: 75.000 EURO single use x \t1pcs (Non-Stackable)`;
     expect(r.items[0].deliveryDate).toBe("2025-11-13");
     expect(r.items[1].quantity).toBe(75000);
   });
+
+  it("parsuje italský SFA PURCHASE ORDER ODA* (jeden sloupec kódu)", () => {
+    const text = `SFA Packaging Italia S.r.l.
+PURCHASE ORDER
+Page : 1 / 1
+ODA26258
+1805
+03-11-2026
+EUR
+Product \tDescription \tQuantity \tUnit \tDelivery
+403434 \tIML cup 400ml Yogurt Bianco \t125.000 \tPcs \t30-11-2026
+Packaging: 125.000 EURO single use x \t1pcs (Non-Stackable)
+403435 \tIML lid 400ml Yogurt Bianco \t125.000 \tPcs \t30-11-2026
+Packaging: 125.000 EURO single use x \t1pcs (Non-Stackable)`;
+
+    const r = parseSfaOrderText(text);
+    expect(r.orderNumber).toBe("ODA26258");
+    expect(r.orderDate).toBe("2026-11-03");
+    expect(r.currency).toBe("EUR");
+    expect(r.items).toHaveLength(2);
+    expect(r.items[0].customerMaterialNo).toBe("403434");
+    expect(r.items[0].yourMaterialNo).toBe("403434");
+    expect(r.items[0].quantity).toBe(125000);
+    expect(r.items[0].deliveryDate).toBe("2026-11-30");
+    expect(r.items[1].customerMaterialNo).toBe("403435");
+    expect(r.warnings).toEqual([]);
+  });
 });
 
 describe("parseJepaOrderText", () => {
@@ -196,6 +223,9 @@ describe("detectOrderPdfTemplate", () => {
     expect(detectOrderPdfTemplate("OBJEDNÁVKA VO-2025-001969\nPS PLASTY")?.key).toBe("psplasty");
     expect(detectOrderPdfTemplate("Prosím poslat do PS EUROPLAST")?.key).toBe("psplasty");
     expect(detectOrderPdfTemplate("SFA Packaging B.V.\nPURCHASE ORDER\nIK251631")?.key).toBe("sfa");
+    expect(detectOrderPdfTemplate("SFA Packaging Italia S.r.l.\nPURCHASE ORDER\nODA26258")?.key).toBe(
+      "sfa"
+    );
     expect(detectOrderPdfTemplate("OBJEDNÁVKA č.: 25096\nJEPA Plastics")?.key).toBe("jepa");
     expect(detectOrderPdfTemplate("Request Nr. AN121853\nJokey Praha")?.key).toBe("jokey");
     expect(
