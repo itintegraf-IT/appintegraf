@@ -3,6 +3,11 @@
  * TODO: upřesnit elementy a atributy dle finální specifikace rozhraní od dodavatele.
  */
 
+import {
+  imlProductPrintSafeFlag,
+  imlProductPrintWarning,
+} from "@/lib/iml-product-print-safe";
+
 export function escapeXml(s: string): string {
   return String(s)
     .replace(/&/g, "&amp;")
@@ -16,6 +21,8 @@ export type ImlOrderXmlProduct = {
   ig_code: string | null;
   ig_short_name: string | null;
   client_name: string | null;
+  item_status: string | null;
+  approval_status: string | null;
 };
 
 export type ImlOrderXmlItem = {
@@ -85,6 +92,14 @@ export function buildImlOrderXml(order: ImlOrderXmlPayload): string {
     const p = it.iml_products;
     const code = p?.ig_code ?? "";
     const name = p?.client_name ?? p?.ig_short_name ?? "";
+    const itemStatus = p?.item_status ?? null;
+    const approvalStatus = p?.approval_status ?? null;
+    const printSafe = p
+      ? imlProductPrintSafeFlag(itemStatus)
+      : "false";
+    const printWarning = imlProductPrintWarning(itemStatus, {
+      productMissing: !p,
+    });
     lines.push("    <Item>");
     lines.push(`      <ProductCode>${escapeXml(code)}</ProductCode>`);
     lines.push(`      <ProductName>${escapeXml(name)}</ProductName>`);
@@ -95,6 +110,12 @@ export function buildImlOrderXml(order: ImlOrderXmlPayload): string {
     lines.push(
       `      <Subtotal>${it.subtotal != null ? escapeXml(String(it.subtotal)) : ""}</Subtotal>`
     );
+    lines.push(`      <ItemStatus>${escapeXml(itemStatus ?? "")}</ItemStatus>`);
+    lines.push(
+      `      <ApprovalStatus>${escapeXml(approvalStatus ?? "")}</ApprovalStatus>`
+    );
+    lines.push(`      <PrintSafe>${printSafe}</PrintSafe>`);
+    lines.push(`      <PrintWarning>${escapeXml(printWarning)}</PrintWarning>`);
     lines.push("    </Item>");
   }
   lines.push("  </Items>");

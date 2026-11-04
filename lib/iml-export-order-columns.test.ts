@@ -7,8 +7,10 @@ import {
   buildOrderLineExportCsv,
   buildOrderLineExportCsvWithAssetPaths,
   buildOrderLineExportXml,
+  ensureOrderExportStatusColumns,
   sanitizeOrderExportColumns,
   sanitizeOrderExportFilters,
+  serializeOrderLineExportValue,
   type OrderLineExportSourceRow,
 } from "@/lib/iml-export-order-columns";
 import { getExportedOrderIds } from "@/lib/iml-export-orders-run";
@@ -89,6 +91,57 @@ describe("iml-export-order-columns", () => {
         includePrint: true,
       })
     ).toEqual({});
+  });
+
+  it("ensureOrderExportStatusColumns doplní chybějící status sloupce", () => {
+    const cols = ensureOrderExportStatusColumns(
+      sanitizeOrderExportColumns(["order_number", "quantity"])
+    );
+    expect(cols.map((c) => c.key)).toEqual([
+      "order_number",
+      "quantity",
+      "item_status",
+      "approval_status",
+      "print_safe",
+      "print_warning",
+    ]);
+  });
+
+  it("ensureOrderExportStatusColumns neduplikuje existující sloupce", () => {
+    const cols = ensureOrderExportStatusColumns(
+      sanitizeOrderExportColumns([
+        "order_number",
+        "item_status",
+        "print_safe",
+      ])
+    );
+    expect(cols.map((c) => c.key)).toEqual([
+      "order_number",
+      "item_status",
+      "print_safe",
+      "approval_status",
+      "print_warning",
+    ]);
+  });
+
+  it("serializuje print_safe a print_warning", () => {
+    const active = sampleRow();
+    expect(serializeOrderLineExportValue(active, "print_safe")).toBe("true");
+    expect(serializeOrderLineExportValue(active, "print_warning")).toBe("");
+
+    const changed = sampleRow({
+      product_data: sampleProduct({ item_status: "Změna dat" }),
+    });
+    expect(serializeOrderLineExportValue(changed, "print_safe")).toBe("false");
+    expect(serializeOrderLineExportValue(changed, "print_warning")).toBe(
+      "POZOR: produkt není aktivní (stav: Změna dat)"
+    );
+
+    const missing = sampleRow({ product_id: null, product_data: null });
+    expect(serializeOrderLineExportValue(missing, "print_safe")).toBe("false");
+    expect(serializeOrderLineExportValue(missing, "print_warning")).toBe(
+      "POZOR: chybí produkt"
+    );
   });
 
   it("builds CSV with one row per line", () => {

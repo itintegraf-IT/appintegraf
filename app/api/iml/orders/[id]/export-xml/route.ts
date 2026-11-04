@@ -30,7 +30,13 @@ export async function GET(
       iml_order_items: {
         include: {
           iml_products: {
-            select: { ig_code: true, ig_short_name: true, client_name: true },
+            select: {
+              ig_code: true,
+              ig_short_name: true,
+              client_name: true,
+              item_status: true,
+              approval_status: true,
+            },
           },
         },
       },

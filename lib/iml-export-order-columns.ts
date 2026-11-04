@@ -7,8 +7,20 @@ import {
   serializeProductFieldValue,
   type ProductExportSourceRow,
 } from "@/lib/iml-export-product-field-catalog";
+import {
+  imlProductPrintSafeFlag,
+  imlProductPrintWarning,
+} from "@/lib/iml-product-print-safe";
 
 export type OrderExportColumnGroup = "order" | "line" | "product";
+
+/** Sloupce stavu tisku — vždy doplněny do exportu (i u starých šablon). */
+export const ORDER_EXPORT_STATUS_COLUMN_KEYS = [
+  "item_status",
+  "approval_status",
+  "print_safe",
+  "print_warning",
+] as const;
 
 const ORDER_HEADER_COLUMNS = [
   { key: "order_id", label: "ID objednávky", defaultSelected: false },
@@ -36,6 +48,12 @@ const LINE_COLUMNS = [
   { key: "subtotal", label: "Mezisoučet", defaultSelected: true },
 ] as const;
 
+/** Odvozené příznaky bezpečnosti tisku (ne z DB přímo). */
+const PRINT_SAFE_COLUMNS = [
+  { key: "print_safe", label: "PrintSafe", defaultSelected: true },
+  { key: "print_warning", label: "Varování tisku", defaultSelected: true },
+] as const;
+
 const PRODUCT_COLUMNS_FROM_CATALOG = PRODUCT_EXPORT_FIELD_DEFS.map((def) => ({
   key: productFieldOrderKey(def.key),
   label: def.key === "id" ? "ID produktu" : def.label,
@@ -51,6 +69,7 @@ export const ORDER_LINE_EXPORT_COLUMNS: Array<{
   ...ORDER_HEADER_COLUMNS.map((c) => ({ ...c, group: "order" as const })),
   ...LINE_COLUMNS.map((c) => ({ ...c, group: "line" as const })),
   ...PRODUCT_COLUMNS_FROM_CATALOG.map((c) => ({ ...c, group: "product" as const })),
+  ...PRINT_SAFE_COLUMNS.map((c) => ({ ...c, group: "product" as const })),
 ];
 
 export const ORDER_LINE_EXPORT_COLUMN_KEYS = ORDER_LINE_EXPORT_COLUMNS.map(
@@ -112,6 +131,23 @@ export function sanitizeOrderExportColumns(
     }
   }
   return out.length > 0 ? out : DEFAULT_ORDER_LINE_EXPORT_COLUMNS.map((key) => ({ key }));
+}
+
+/**
+ * Doplní povinné status/PrintSafe sloupce, pokud v šabloně chybí.
+ * Pořadí: původní sloupce, pak chybějící status klíče na konci.
+ */
+export function ensureOrderExportStatusColumns(
+  columns: Array<{ key: OrderLineExportColumnKey; header?: string }>
+): Array<{ key: OrderLineExportColumnKey; header?: string }> {
+  const seen = new Set(columns.map((c) => c.key));
+  const out = [...columns];
+  for (const key of ORDER_EXPORT_STATUS_COLUMN_KEYS) {
+    if (!isOrderLineExportColumnKey(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key });
+  }
+  return out;
 }
 
 export type OrderExportFilters = {
@@ -249,6 +285,15 @@ export function serializeOrderLineExportValue(
       return fmtDecimal(row.subtotal);
     case "product_id":
       return row.product_id != null ? String(row.product_id) : "";
+    case "print_safe": {
+      if (!row.product_data) return "false";
+      return imlProductPrintSafeFlag(row.product_data.item_status);
+    }
+    case "print_warning": {
+      return imlProductPrintWarning(row.product_data?.item_status, {
+        productMissing: !row.product_data,
+      });
+    }
     default: {
       const productKey = productFieldFromOrderKey(key);
       if (productKey) {

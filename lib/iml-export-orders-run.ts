@@ -9,6 +9,7 @@ import {
   buildOrderLineExportCsvWithAssetPaths,
   buildOrderLineExportXml,
   buildOrderLineExportXmlWithAssetPaths,
+  ensureOrderExportStatusColumns,
   sanitizeOrderExportColumns,
   sanitizeOrderExportFilters,
   type OrderExportFilters,
@@ -39,7 +40,9 @@ export async function loadOrderLinesForExport(
   columns: Array<{ key: OrderLineExportColumnKey; header?: string }>;
   filters: OrderExportFilters;
 }> {
-  const columns = sanitizeOrderExportColumns(columnsInput);
+  const columns = ensureOrderExportStatusColumns(
+    sanitizeOrderExportColumns(columnsInput)
+  );
   const filters = sanitizeOrderExportFilters(filtersInput);
   const withAssets = loadOpts?.withAssets === true;
 
