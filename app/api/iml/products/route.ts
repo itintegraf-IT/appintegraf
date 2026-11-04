@@ -18,6 +18,7 @@ import {
 } from "@/lib/iml-product-save-errors";
 import { toImlProductCreateData } from "@/lib/iml/product-prisma-payload";
 import { buildProductListOrderBy } from "@/lib/iml/product-list-sort";
+import { findConflictingProductByIgCode } from "@/lib/makety-iml-product-lookup";
 
 const productListSelect = {
   id: true,
@@ -291,6 +292,14 @@ export async function POST(req: NextRequest) {
       if (existing) {
         return NextResponse.json({ error: "Produkt s tímto SKU již existuje" }, { status: 400 });
       }
+    }
+
+    const igConflict = await findConflictingProductByIgCode(data.ig_code);
+    if (igConflict) {
+      return NextResponse.json(
+        { error: "Produkt s tímto Kódem IG již existuje" },
+        { status: 400 }
+      );
     }
 
     const customDataForPrisma = data.custom_data;

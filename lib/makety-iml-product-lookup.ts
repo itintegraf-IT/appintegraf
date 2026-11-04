@@ -56,14 +56,23 @@ const productSelectForLookup = {
   shape_id: true,
 } as const;
 
+export type FindImlProductByIgCodeOptions = {
+  /** Při update/importu přeskočí produkt s tímto id. */
+  excludeId?: number;
+};
+
 export async function findImlProductByIgCode(
-  igCode: string
+  igCode: string,
+  options?: FindImlProductByIgCodeOptions
 ): Promise<ImlProductIgMatch | null> {
   const normalized = normalizeProductCode(igCode);
   if (!normalized) return null;
 
+  const excludeId = options?.excludeId;
+  const notSelf = excludeId != null ? { NOT: { id: excludeId } } : {};
+
   const exact = await prisma.iml_products.findFirst({
-    where: { ig_code: igCode.trim() },
+    where: { ig_code: igCode.trim(), ...notSelf },
     select: productSelectForLookup,
   });
   if (exact && matchProductByIgCode(exact.ig_code, igCode)) {
@@ -71,10 +80,22 @@ export async function findImlProductByIgCode(
   }
 
   const candidates = await prisma.iml_products.findMany({
-    where: { ig_code: { not: null } },
+    where: { ig_code: { not: null }, ...notSelf },
     select: productSelectForLookup,
     take: 5000,
   });
 
   return candidates.find((p) => matchProductByIgCode(p.ig_code, igCode)) ?? null;
+}
+
+/**
+ * Vrátí konfliktní produkt, pokud je `igCode` neprázdný a už existuje
+ * (normalizace trim + uppercase). Jinak null.
+ */
+export async function findConflictingProductByIgCode(
+  igCode: string | null | undefined,
+  excludeId?: number
+): Promise<ImlProductIgMatch | null> {
+  if (!igCode?.trim()) return null;
+  return findImlProductByIgCode(igCode, { excludeId });
 }

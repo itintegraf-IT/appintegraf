@@ -6,6 +6,7 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { logImlAudit } from "@/lib/iml-audit";
 import { enrichProductMaterialFields } from "@/lib/iml/product-materials";
 import { parseProductKind } from "@/lib/iml/parse-product-body";
+import { findConflictingProductByIgCode } from "@/lib/makety-iml-product-lookup";
 
 function parseCsvLine(line: string, delimiter: string): string[] {
   const result: string[] = [];
@@ -118,6 +119,14 @@ export async function POST(req: NextRequest) {
         const existing = await prisma.iml_products.findFirst({ where: { sku } });
         if (existing) {
           errors.push(`Řádek ${i + 2}: Produkt se SKU ${sku} již existuje`);
+          continue;
+        }
+      }
+
+      if (igCode) {
+        const igConflict = await findConflictingProductByIgCode(igCode);
+        if (igConflict) {
+          errors.push(`Řádek ${i + 2}: Produkt s Kódem IG ${igCode} již existuje`);
           continue;
         }
       }
