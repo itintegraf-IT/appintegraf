@@ -28,11 +28,20 @@ export async function GET(req: NextRequest) {
   const entity = parseEntity(req.nextUrl.searchParams.get("entity"));
 
   const templates = await prisma.iml_export_templates.findMany({
-    where: { user_id: userId, entity },
+    where: {
+      entity,
+      OR: [{ user_id: userId }, { is_shared: true }],
+    },
     orderBy: { updated_at: "desc" },
   });
 
-  return NextResponse.json({ templates, entity });
+  return NextResponse.json({
+    templates: templates.map((t) => ({
+      ...t,
+      is_owner: t.user_id === userId,
+    })),
+    entity,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -66,6 +75,8 @@ export async function POST(req: NextRequest) {
       ? sanitizeOrderExportFilters(body.filters)
       : sanitizeProductExportFilters(body.filters);
 
+  const isShared = body.is_shared === true;
+
   const created = await prisma.iml_export_templates.create({
     data: {
       user_id: userId,
@@ -74,8 +85,12 @@ export async function POST(req: NextRequest) {
       format,
       columns,
       filters,
+      is_shared: isShared,
     },
   });
 
-  return NextResponse.json({ success: true, template: created });
+  return NextResponse.json({
+    success: true,
+    template: { ...created, is_owner: true },
+  });
 }

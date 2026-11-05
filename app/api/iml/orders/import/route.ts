@@ -9,6 +9,22 @@ import {
   parseConfirmedWithoutJobNumber,
   requireJobNumberOrConfirm,
 } from "@/lib/iml/order-job-number";
+import {
+  buildCustomerByNameMap,
+  normalizeCustomerNameKey,
+} from "@/lib/iml-product-import-parse";
+import { parseCzDate, parseDashDate } from "@/lib/iml/order-pdf/parse-utils";
+
+/** CZ `dd.mm.yyyy`, `dd-mm-yyyy`, nebo ISO / Date-parsovatelné. */
+function parseImportOrderDate(raw: string): Date | null {
+  const cz = parseCzDate(raw) ?? parseDashDate(raw);
+  if (cz) {
+    const d = new Date(`${cz}T00:00:00`);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const d = new Date(raw);
+  return isNaN(d.getTime()) ? null : d;
+}
 
 function parseCsvLine(line: string, delimiter: string): string[] {
   const result: string[] = [];
@@ -105,8 +121,7 @@ export async function POST(req: NextRequest) {
     const dataRows = rows.slice(1).filter((r: RowType) => r.some((c: string) => c && String(c).trim()));
 
     const customers = await prisma.iml_customers.findMany({ select: { id: true, name: true } });
-    type CustomerRow = (typeof customers)[number];
-    const customerByName = new Map(customers.map((c: CustomerRow) => [c.name.toLowerCase().trim(), c.id]));
+    const customerByName = buildCustomerByNameMap(customers);
 
     const products = await prisma.iml_products.findMany({
       select: { id: true, ig_code: true, sku: true, client_name: true },
@@ -131,7 +146,7 @@ export async function POST(req: NextRequest) {
     const orderItems = new Map<
       OrderKey,
       {
-        customerName: string;
+        customerId: number;
         orderDate: string;
         status: string;
         notes: string;
@@ -160,7 +175,7 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const customerId = customerByName.get(customerName);
+      const customerId = customerByName.get(normalizeCustomerNameKey(customerName));
       if (!customerId) {
         errors.push(`Řádek ${i + 2}: Zákazník "${customerName}" nenalezen`);
         continue;
@@ -180,10 +195,10 @@ export async function POST(req: NextRequest) {
 
       const unitPrice = unitPriceStr ? parseFloat(unitPriceStr.replace(",", ".")) : null;
 
-      const key: OrderKey = `${orderNumber}|${customerName}|${orderDate}`;
+      const key: OrderKey = `${orderNumber}|${customerId}|${orderDate}`;
       if (!orderItems.has(key)) {
         orderItems.set(key, {
-          customerName,
+          customerId,
           orderDate,
           status,
           notes,
@@ -226,9 +241,9 @@ export async function POST(req: NextRequest) {
         continue;
       }
 
-      const customerId = customerByName.get(ord.customerName)!;
-      const orderDate = new Date(ord.orderDate);
-      if (isNaN(orderDate.getTime())) {
+      const customerId = ord.customerId;
+      const orderDate = parseImportOrderDate(ord.orderDate);
+      if (!orderDate) {
         errors.push(`Objednávka "${orderNumber}": Neplatné datum`);
         continue;
       }

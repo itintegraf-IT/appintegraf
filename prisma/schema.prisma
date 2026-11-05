@@ -2249,12 +2249,15 @@ model iml_export_templates {
   format     String   @default("csv") @db.VarChar(10)
   columns    Json     @db.Json
   filters    Json?    @db.Json
+  /// Viditelná pro všechny uživatele s přístupem k IML (nejen vlastník).
+  is_shared  Boolean  @default(false)
   created_at DateTime @default(now()) @db.DateTime(0)
   updated_at DateTime @updatedAt @db.DateTime(0)
 
   users users @relation("iml_export_templates_owner", fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([user_id, entity], map: "idx_iml_export_templates_user_entity")
+  @@index([entity, is_shared], map: "idx_iml_export_templates_entity_shared")
   @@map("iml_export_templates")
 }
 

@@ -42,7 +42,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Neplatné ID šablony" }, { status: 400 });
     }
     const template = await prisma.iml_export_templates.findFirst({
-      where: { id: templateId, user_id: userId, entity: "orders" },
+      where: {
+        id: templateId,
+        entity: "orders",
+        OR: [{ user_id: userId }, { is_shared: true }],
+      },
     });
     if (!template) {
       return NextResponse.json({ error: "Šablona nenalezena" }, { status: 404 });

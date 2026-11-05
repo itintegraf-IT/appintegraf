@@ -32,6 +32,9 @@ type Template = {
   filters: unknown;
   updated_at: string;
   entity?: string;
+  is_shared?: boolean;
+  is_owner?: boolean;
+  user_id?: number;
 };
 
 type Customer = { id: number; name: string };
@@ -80,6 +83,8 @@ export function ImlExportsClient({ canWrite }: Props) {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState("Moje šablona");
   const [format, setFormat] = useState<"csv" | "xml">("csv");
+  const [isShared, setIsShared] = useState(false);
+  const [editingIsOwner, setEditingIsOwner] = useState(true);
 
   const [productSelected, setProductSelected] = useState<Set<ProductExportColumnKey>>(
     () => new Set(DEFAULT_PRODUCT_EXPORT_COLUMNS)
@@ -126,6 +131,8 @@ export function ImlExportsClient({ canWrite }: Props) {
     setEditingId(null);
     setName(entity === "orders" ? "Šablona objednávek" : "Moje šablona");
     setFormat("csv");
+    setIsShared(false);
+    setEditingIsOwner(true);
     setProductSelected(new Set(DEFAULT_PRODUCT_EXPORT_COLUMNS));
     setOrderSelected(new Set(DEFAULT_ORDER_LINE_EXPORT_COLUMNS));
     setSearch("");
@@ -150,6 +157,8 @@ export function ImlExportsClient({ canWrite }: Props) {
     setEditingId(t.id);
     setName(t.name);
     setFormat(t.format === "xml" ? "xml" : "csv");
+    setIsShared(t.is_shared === true);
+    setEditingIsOwner(t.is_owner !== false);
     setError(null);
     const f =
       t.filters && typeof t.filters === "object" ? (t.filters as Record<string, unknown>) : {};
@@ -215,8 +224,10 @@ export function ImlExportsClient({ canWrite }: Props) {
 
   const selectedCount = entity === "orders" ? orderSelected.size : productSelected.size;
 
+  const canEditTemplate = canWrite && (!editingId || editingIsOwner);
+
   const saveTemplate = async () => {
-    if (!canWrite) return;
+    if (!canEditTemplate) return;
     if (selectedCount === 0) {
       setError("Vyberte alespoň jeden sloupec");
       return;
@@ -230,6 +241,7 @@ export function ImlExportsClient({ canWrite }: Props) {
         format,
         columns: columnsPayload(),
         filters: filtersPayload(),
+        is_shared: isShared,
       };
       const res = await fetch(
         editingId ? `/api/iml/export-templates/${editingId}` : "/api/iml/export-templates",
@@ -375,7 +387,15 @@ export function ImlExportsClient({ canWrite }: Props) {
                       onClick={() => loadTemplate(t)}
                     >
                       <span className="block truncate font-medium text-gray-900">{t.name}</span>
-                      <span className="text-xs uppercase text-gray-500">{t.format}</span>
+                      <span className="text-xs text-gray-500">
+                        <span className="uppercase">{t.format}</span>
+                        {t.is_shared ? (
+                          <span className="ml-1.5 normal-case text-red-700">· sdílená</span>
+                        ) : null}
+                        {t.is_owner === false ? (
+                          <span className="ml-1.5 normal-case">· jen ke čtení</span>
+                        ) : null}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -386,7 +406,7 @@ export function ImlExportsClient({ canWrite }: Props) {
                     >
                       <Play className="h-4 w-4" />
                     </button>
-                    {canWrite && (
+                    {canWrite && t.is_owner !== false && (
                       <button
                         type="button"
                         title="Smazat"
@@ -429,7 +449,7 @@ export function ImlExportsClient({ canWrite }: Props) {
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                disabled={!canWrite}
+                disabled={!canEditTemplate}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2"
               />
             </label>
@@ -438,12 +458,29 @@ export function ImlExportsClient({ canWrite }: Props) {
               <select
                 value={format}
                 onChange={(e) => setFormat(e.target.value === "xml" ? "xml" : "csv")}
+                disabled={!canEditTemplate}
                 className="rounded-lg border border-gray-300 px-3 py-2"
               >
                 <option value="csv">CSV</option>
                 <option value="xml">XML</option>
               </select>
             </label>
+            {canEditTemplate && (
+              <label className="flex items-center gap-2 pb-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={isShared}
+                  onChange={(e) => setIsShared(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Viditelné pro všechny uživatele IML
+              </label>
+            )}
+            {editingId && !editingIsOwner && (
+              <p className="pb-2 text-sm text-gray-500">
+                Sdílená šablona — můžete ji spustit, úpravy má jen vlastník.
+              </p>
+            )}
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -669,7 +706,7 @@ export function ImlExportsClient({ canWrite }: Props) {
               <Download className="h-4 w-4" />
               Spustit export
             </button>
-            {canWrite && (
+            {canEditTemplate && (
               <button
                 type="button"
                 disabled={busy}

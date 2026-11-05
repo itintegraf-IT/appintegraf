@@ -66,13 +66,19 @@ export async function PATCH(
         : sanitizeProductExportFilters(body.filters);
     data.filters = Object.keys(filters).length > 0 ? filters : Prisma.JsonNull;
   }
+  if (typeof body.is_shared === "boolean") {
+    data.is_shared = body.is_shared;
+  }
 
   const updated = await prisma.iml_export_templates.update({
     where: { id },
     data,
   });
 
-  return NextResponse.json({ success: true, template: updated });
+  return NextResponse.json({
+    success: true,
+    template: { ...updated, is_owner: true },
+  });
 }
 
 export async function DELETE(
