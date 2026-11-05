@@ -1,9 +1,13 @@
 import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
+import {
+  isEmailNotificationEnabled,
+  parseEmailNotifications,
+} from "@/lib/user-email-notifications";
 
 /**
- * In-app notifikace uživatelům s právem zápisu do IML (bez aktéra).
- * Best-effort — selhání nesmí shodit hlavní akci.
+ * In-app notifikace uživatelům s IML write, kteří mají zapnutý opt-in „IML – změna dat“.
+ * Globální admin bez opt-inu notifikaci nedostane. Best-effort — selhání nesmí shodit akci.
  */
 export async function notifyImlProductDataChanged(params: {
   productId: number;
@@ -17,14 +21,15 @@ export async function notifyImlProductDataChanged(params: {
         OR: [{ is_active: true }, { is_active: null }],
         id: { not: params.actorUserId },
       },
-      select: { id: true },
+      select: { id: true, email_notifications: true },
     });
 
     const recipientIds: number[] = [];
     for (const u of candidates) {
-      if (await hasModuleAccess(u.id, "iml", "write")) {
-        recipientIds.push(u.id);
-      }
+      const prefs = parseEmailNotifications(u.email_notifications);
+      if (!isEmailNotificationEnabled(prefs, "iml")) continue;
+      if (!(await hasModuleAccess(u.id, "iml", "write"))) continue;
+      recipientIds.push(u.id);
     }
     if (recipientIds.length === 0) return;
 

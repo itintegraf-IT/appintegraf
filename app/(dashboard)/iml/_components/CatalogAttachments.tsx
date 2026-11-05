@@ -25,6 +25,8 @@ type Props = {
   recordId: number;
   canUpload?: boolean;
   title?: string;
+  /** Po uploadu/smazání (např. obnova countu v seznamu). */
+  onChanged?: () => void;
 };
 
 function formatSize(n: number): string {
@@ -81,6 +83,7 @@ export function CatalogAttachments({
   recordId,
   canUpload = true,
   title = "Přílohy (PDF / JPG / CAD)",
+  onChanged,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [files, setFiles] = useState<CatalogAttachmentRow[]>([]);
@@ -129,6 +132,7 @@ export function CatalogAttachments({
         remaining -= 1;
       }
       await loadFiles();
+      onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chyba při nahrávání");
     } finally {
@@ -147,6 +151,7 @@ export function CatalogAttachments({
       if (!res.ok) throw new Error(data.error ?? "Smazání se nezdařilo");
       setFiles((prev) => prev.filter((f) => f.id !== id));
       if (preview?.id === id) setPreview(null);
+      onChanged?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chyba");
     } finally {

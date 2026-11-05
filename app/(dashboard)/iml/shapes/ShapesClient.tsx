@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { FileText, X } from "lucide-react";
 import {
   IML_SHAPE_TOOL_PRIORITIES,
   IML_TOOL_TECHNOLOGY_LABELS,
@@ -33,6 +34,17 @@ type ShapeRow = {
   internal_note: string | null;
   products_count: number;
   tool_assignments: Assignment[];
+  attachments_count?: number;
+  preview_file_id?: number | null;
+  preview_mime_type?: string | null;
+  preview_filename?: string | null;
+};
+
+type AttachmentPreview = {
+  shapeId: number;
+  fileId: number;
+  mime_type: string;
+  filename: string;
 };
 
 const emptyForm = {
@@ -62,6 +74,7 @@ export function ShapesClient() {
   const [assignToolId, setAssignToolId] = useState("");
   const [assignPriority, setAssignPriority] = useState("PRIMARY");
   const [detailShapeId, setDetailShapeId] = useState<number | null>(null);
+  const [attachmentPreview, setAttachmentPreview] = useState<AttachmentPreview | null>(null);
   const [newTypeCode, setNewTypeCode] = useState("");
   const [newTypeName, setNewTypeName] = useState("");
   const [showAddType, setShowAddType] = useState(false);
@@ -460,6 +473,7 @@ export function ShapesClient() {
                 </button>
               </th>
               <th className="px-3 py-2">Nástroje</th>
+              <th className="px-3 py-2">Příloha</th>
               <th className="px-3 py-2">Prod.</th>
               <th className="px-3 py-2">Akce</th>
             </tr>
@@ -541,6 +555,42 @@ export function ShapesClient() {
                       </button>
                     )}
                   </td>
+                  <td className="px-3 py-2">
+                    {(row.attachments_count ?? 0) > 0 ? (
+                      <button
+                        type="button"
+                        title={
+                          row.preview_file_id
+                            ? "Náhled přílohy"
+                            : "Otevřít detail příloh (CAD bez náhledu)"
+                        }
+                        className="inline-flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-violet-700 hover:bg-violet-50"
+                        onClick={() => {
+                          if (
+                            row.preview_file_id &&
+                            row.preview_mime_type &&
+                            row.preview_filename
+                          ) {
+                            setAttachmentPreview({
+                              shapeId: row.id,
+                              fileId: row.preview_file_id,
+                              mime_type: row.preview_mime_type,
+                              filename: row.preview_filename,
+                            });
+                          } else {
+                            setDetailShapeId(row.id);
+                          }
+                        }}
+                      >
+                        <FileText className="h-4 w-4" />
+                        {(row.attachments_count ?? 0) > 1 ? (
+                          <span className="text-xs">{row.attachments_count}</span>
+                        ) : null}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-400">—</span>
+                    )}
+                  </td>
                   <td className="px-3 py-2">{row.products_count}</td>
                   <td className="px-3 py-2 space-x-2 whitespace-nowrap">
                     <button
@@ -579,11 +629,12 @@ export function ShapesClient() {
                 </tr>
                 {detailShapeId === row.id && (
                   <tr className="border-b border-gray-100">
-                    <td colSpan={6} className="px-3 py-2">
+                    <td colSpan={7} className="px-3 py-2">
                       <ShapeExtrasPanel
                         shapeId={row.id}
                         shapeCode={row.shape_code}
                         onError={setError}
+                        onAttachmentsChanged={() => void load()}
                       />
                     </td>
                   </tr>
@@ -592,7 +643,7 @@ export function ShapesClient() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={7} className="px-3 py-8 text-center text-gray-500">
                   Žádné tvary
                 </td>
               </tr>
@@ -600,6 +651,41 @@ export function ShapesClient() {
           </tbody>
         </table>
       </div>
+
+      {attachmentPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <p className="truncate text-sm font-medium text-gray-900">
+                {attachmentPreview.filename}
+              </p>
+              <button
+                type="button"
+                onClick={() => setAttachmentPreview(null)}
+                className="rounded p-1.5 text-gray-500 hover:bg-gray-100"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-auto bg-gray-100 p-2">
+              {attachmentPreview.mime_type.toLowerCase().includes("pdf") ? (
+                <iframe
+                  title={attachmentPreview.filename}
+                  src={`/api/iml/shapes/${attachmentPreview.shapeId}/files/${attachmentPreview.fileId}`}
+                  className="h-[70vh] w-full rounded border border-gray-200 bg-white"
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/api/iml/shapes/${attachmentPreview.shapeId}/files/${attachmentPreview.fileId}`}
+                  alt={attachmentPreview.filename}
+                  className="mx-auto max-h-[70vh] max-w-full object-contain"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

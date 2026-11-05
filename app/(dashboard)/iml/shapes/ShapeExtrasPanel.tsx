@@ -30,9 +30,15 @@ type Props = {
   shapeId: number;
   shapeCode: string;
   onError: (msg: string) => void;
+  onAttachmentsChanged?: () => void;
 };
 
-export function ShapeExtrasPanel({ shapeId, shapeCode, onError }: Props) {
+export function ShapeExtrasPanel({
+  shapeId,
+  shapeCode,
+  onError,
+  onAttachmentsChanged,
+}: Props) {
   const [customers, setCustomers] = useState<CustomerOpt[]>([]);
   const [boxTypes, setBoxTypes] = useState<BoxTypeOpt[]>([]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -209,6 +215,7 @@ export function ShapeExtrasPanel({ shapeId, shapeCode, onError }: Props) {
         kind="shape"
         recordId={shapeId}
         title="Přílohy kontury (PDF / JPG / CAD)"
+        onChanged={onAttachmentsChanged}
       />
 
       <div>

@@ -4,6 +4,11 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { canManageImlShapes } from "@/lib/iml-permissions";
 import { parseShapeBody } from "@/lib/iml/shape-tool-parse";
+import {
+  IML_CATALOG_ATTACHMENT_DOC_TYPE,
+  IML_SHAPE_UPLOAD_MODULE,
+  isInlinePreviewableMime,
+} from "@/lib/iml-catalog-attachment-constants";
 import type { Prisma } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
@@ -75,11 +80,70 @@ export async function GET(req: NextRequest) {
     },
   });
 
+  const ids = shapes.map((s) => s.id);
+  const fileCounts =
+    ids.length === 0
+      ? []
+      : await prisma.file_uploads.groupBy({
+          by: ["record_id"],
+          where: {
+            module: IML_SHAPE_UPLOAD_MODULE,
+            document_type: IML_CATALOG_ATTACHMENT_DOC_TYPE,
+            record_id: { in: ids },
+          },
+          _count: { id: true },
+        });
+  const attachmentsById = new Map(
+    fileCounts
+      .filter((c) => c.record_id != null)
+      .map((c) => [c.record_id as number, c._count.id])
+  );
+
+  const attachmentFiles =
+    ids.length === 0
+      ? []
+      : await prisma.file_uploads.findMany({
+          where: {
+            module: IML_SHAPE_UPLOAD_MODULE,
+            document_type: IML_CATALOG_ATTACHMENT_DOC_TYPE,
+            record_id: { in: ids },
+          },
+          select: {
+            id: true,
+            record_id: true,
+            mime_type: true,
+            original_filename: true,
+          },
+          orderBy: { id: "asc" },
+        });
+
+  const previewById = new Map<
+    number,
+    { id: number; mime_type: string; original_filename: string }
+  >();
+  for (const f of attachmentFiles) {
+    if (f.record_id == null) continue;
+    if (previewById.has(f.record_id)) continue;
+    if (!isInlinePreviewableMime(f.mime_type)) continue;
+    previewById.set(f.record_id, {
+      id: f.id,
+      mime_type: f.mime_type,
+      original_filename: f.original_filename,
+    });
+  }
+
   return NextResponse.json({
-    shapes: shapes.map(({ _count, ...row }) => ({
-      ...row,
-      products_count: _count.iml_products,
-    })),
+    shapes: shapes.map(({ _count, ...row }) => {
+      const preview = previewById.get(row.id) ?? null;
+      return {
+        ...row,
+        products_count: _count.iml_products,
+        attachments_count: attachmentsById.get(row.id) ?? 0,
+        preview_file_id: preview?.id ?? null,
+        preview_mime_type: preview?.mime_type ?? null,
+        preview_filename: preview?.original_filename ?? null,
+      };
+    }),
   });
 }
 

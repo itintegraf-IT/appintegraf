@@ -1,10 +1,12 @@
-/** Moduly, které dnes odesílají e-mailové notifikace (ne auth e-maily). */
+/** Moduly, které dnes odesílají e-mailové notifikace (ne auth e-maily).
+ * `iml` = opt-in in-app notifikace „Změna dat“ (ne e-mail). */
 export const EMAIL_NOTIFICATION_MODULES = [
   "calendar",
   "ukoly",
   "makety",
   "stitky",
   "equipment",
+  "iml",
 ] as const;
 
 export type EmailNotificationModule = (typeof EMAIL_NOTIFICATION_MODULES)[number];
@@ -17,13 +19,14 @@ export const EMAIL_NOTIFICATION_MODULE_LABELS: Record<EmailNotificationModule, s
   makety: "Makety a grafika",
   stitky: "Štítky výroba",
   equipment: "Majetek",
+  iml: "IML – změna tiskových dat (v aplikaci)",
 };
 
 function isEmailNotificationModule(key: string): key is EmailNotificationModule {
   return (EMAIL_NOTIFICATION_MODULES as readonly string[]).includes(key);
 }
 
-/** Všechny e-mailové notifikace zapnuté (výchozí / legacy). */
+/** E-mailové notifikace zapnuté (legacy); IML změna dat = opt-in (default vypnuto). */
 export function defaultEmailNotifications(): EmailNotificationsMap {
   return {
     calendar: true,
@@ -31,6 +34,7 @@ export function defaultEmailNotifications(): EmailNotificationsMap {
     makety: true,
     stitky: true,
     equipment: true,
+    iml: false,
   };
 }
 

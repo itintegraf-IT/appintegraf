@@ -737,11 +737,11 @@ export function AdminUserForm({
             E-mailové notifikace
           </label>
           <p className="mb-3 text-xs text-gray-500">
-            Vypne pouze e-mail; notifikace v aplikaci zůstanou. Auth e-maily (aktivace, reset hesla)
-            nejsou ovlivněny.
+            Vypne pouze e-mail; notifikace v aplikaci zůstanou (kromě IML „změna dat“ níže). Auth
+            e-maily (aktivace, reset hesla) nejsou ovlivněny.
           </p>
           <ul className="grid gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-3">
-            {EMAIL_NOTIFICATION_MODULES.map((mod) => {
+            {EMAIL_NOTIFICATION_MODULES.filter((mod) => mod !== "iml").map((mod) => {
               const checked = form.email_notifications[mod] !== false;
               return (
                 <li key={mod} className="flex items-start gap-2">
@@ -771,6 +771,35 @@ export function AdminUserForm({
               );
             })}
           </ul>
+          {Boolean(form.module_access.iml) && (
+            <div className="mt-4 border-t border-gray-200 pt-3">
+              <p className="mb-2 text-xs font-medium text-gray-700">IML – notifikace v aplikaci</p>
+              <label className="flex items-start gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  id="email-notif-iml"
+                  checked={form.email_notifications.iml === true}
+                  onChange={(e) => {
+                    const enabled = e.target.checked;
+                    setForm((prev) => ({
+                      ...prev,
+                      email_notifications: {
+                        ...prev.email_notifications,
+                        iml: enabled,
+                      },
+                    }));
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-gray-300"
+                />
+                <span>
+                  {EMAIL_NOTIFICATION_MODULE_LABELS.iml}
+                  <span className="mt-0.5 block text-xs text-gray-500">
+                    Default vypnuto. Zapne in-app upozornění při změně tiskového PDF produktu.
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">Role *</label>
