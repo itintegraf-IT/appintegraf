@@ -6,6 +6,7 @@ import {
   getTechnologieListAccess,
 } from "@/lib/technologie/access";
 import {
+  parseOptionalDieCutDeviceId,
   parseOptionalPrintMachineId,
   parseOptionalSheetSizeId,
   parseOptionalSheetTypeId,
@@ -16,6 +17,7 @@ const listInclude = {
   technologie_sheet_types: { select: { id: true, name: true } },
   technologie_sheet_sizes: { select: { id: true, name: true } },
   shared_machines: { select: { id: true, name: true, machine_group: true } },
+  technologie_die_cut_devices: { select: { id: true, name: true } },
   users_created_by: { select: { id: true, first_name: true, last_name: true } },
 } as const;
 
@@ -118,6 +120,10 @@ export async function POST(req: NextRequest) {
     if (!printMachine.ok) {
       return NextResponse.json({ error: printMachine.error }, { status: 400 });
     }
+    const dieCutDevice = await parseOptionalDieCutDeviceId(body.die_cut_device_id);
+    if (!dieCutDevice.ok) {
+      return NextResponse.json({ error: dieCutDevice.error }, { status: 400 });
+    }
 
     const format_text =
       typeof body.format_text === "string" ? body.format_text.trim().slice(0, 64) || null : null;
@@ -131,6 +137,7 @@ export async function POST(req: NextRequest) {
         sheet_type_id: sheetType.value,
         sheet_size_id: sheetSize.value,
         print_machine_id: printMachine.value,
+        die_cut_device_id: dieCutDevice.value,
         format_text,
         is_iml,
         note,

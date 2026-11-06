@@ -26,6 +26,7 @@ type Item = {
   technologie_sheet_types: { id: number; name: string } | null;
   technologie_sheet_sizes: { id: number; name: string } | null;
   shared_machines: { id: number; name: string; machine_group?: string } | null;
+  technologie_die_cut_devices?: { id: number; name: string } | null;
   users_created_by: { first_name: string; last_name: string };
 };
 
@@ -253,6 +254,12 @@ export function TechnologieDetailClient({
             <dt className="text-gray-500">Velikost archu</dt>
             <dd className="font-medium text-gray-900">
               {item.technologie_sheet_sizes?.name ?? "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Výsekové zařízení</dt>
+            <dd className="font-medium text-gray-900">
+              {item.technologie_die_cut_devices?.name ?? "—"}
             </dd>
           </div>
           <div>

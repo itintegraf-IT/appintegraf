@@ -41,3 +41,19 @@ export async function parseOptionalPrintMachineId(
   if (!machine) return { ok: false, error: "Tiskový stroj nenalezen." };
   return { ok: true, value: m };
 }
+
+export async function parseOptionalDieCutDeviceId(
+  raw: unknown
+): Promise<{ ok: true; value: number | null } | { ok: false; error: string }> {
+  if (raw == null || raw === "") return { ok: true, value: null };
+  const d = parseInt(String(raw), 10);
+  if (!Number.isFinite(d) || d <= 0) {
+    return { ok: false, error: "Neplatné výsekové zařízení." };
+  }
+  const row = await prisma.technologie_die_cut_devices.findUnique({
+    where: { id: d },
+    select: { id: true },
+  });
+  if (!row) return { ok: false, error: "Výsekové zařízení nenalezeno." };
+  return { ok: true, value: d };
+}

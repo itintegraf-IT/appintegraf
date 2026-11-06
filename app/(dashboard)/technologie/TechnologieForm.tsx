@@ -9,6 +9,7 @@ import { MachineSelectOptions } from "@/components/shared-machines/MachineSelect
 type SheetType = { id: number; name: string };
 type SheetSize = { id: number; name: string };
 type PrintMachine = { id: number; name: string; machine_group?: string };
+type DieCutDevice = { id: number; name: string };
 
 type FormState = {
   code: string;
@@ -17,6 +18,7 @@ type FormState = {
   format_text: string;
   sheet_size_id: string;
   print_machine_id: string;
+  die_cut_device_id: string;
   is_iml: boolean;
   note: string;
 };
@@ -28,6 +30,7 @@ const emptyForm: FormState = {
   format_text: "",
   sheet_size_id: "",
   print_machine_id: "",
+  die_cut_device_id: "",
   is_iml: false,
   note: "",
 };
@@ -46,6 +49,7 @@ export function TechnologieForm({
   const [sheetTypes, setSheetTypes] = useState<SheetType[]>([]);
   const [sheetSizes, setSheetSizes] = useState<SheetSize[]>([]);
   const [printMachines, setPrintMachines] = useState<PrintMachine[]>([]);
+  const [dieCutDevices, setDieCutDevices] = useState<DieCutDevice[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -68,6 +72,12 @@ export function TechnologieForm({
         setPrintMachines(Array.isArray(data.machines) ? data.machines : []);
       })
       .catch(() => {});
+    fetch("/api/technologie/die-cut-devices")
+      .then((r) => r.json())
+      .then((data: { items?: DieCutDevice[] }) => {
+        setDieCutDevices(Array.isArray(data.items) ? data.items : []);
+      })
+      .catch(() => {});
   }, []);
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -82,6 +92,7 @@ export function TechnologieForm({
         format_text: form.format_text,
         sheet_size_id: form.sheet_size_id || null,
         print_machine_id: form.print_machine_id || null,
+        die_cut_device_id: form.die_cut_device_id || null,
         is_iml: form.is_iml,
         note: form.note,
       };
@@ -204,6 +215,21 @@ export function TechnologieForm({
             {sheetSizes.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm sm:col-span-2">
+          <span className="mb-1 block font-medium text-gray-700">Výsekové zařízení</span>
+          <select
+            value={form.die_cut_device_id}
+            onChange={(e) => setForm((f) => ({ ...f, die_cut_device_id: e.target.value }))}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2"
+          >
+            <option value="">—</option>
+            {dieCutDevices.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
               </option>
             ))}
           </select>

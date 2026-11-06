@@ -31,6 +31,7 @@ type Item = {
   technologie_sheet_types: { id: number; name: string } | null;
   technologie_sheet_sizes: { id: number; name: string } | null;
   shared_machines: { id: number; name: string; machine_group?: string } | null;
+  technologie_die_cut_devices?: { id: number; name: string } | null;
 };
 
 const SORT_KEYS = [
@@ -40,6 +41,7 @@ const SORT_KEYS = [
   "format",
   "sheet_size",
   "machine",
+  "die_cut",
   "note",
 ] as const;
 type SortKey = (typeof SORT_KEYS)[number];
@@ -73,6 +75,8 @@ function sortValue(item: Item, key: SortKey): string {
       return item.technologie_sheet_sizes?.name ?? "";
     case "machine":
       return item.shared_machines?.name ?? "";
+    case "die_cut":
+      return item.technologie_die_cut_devices?.name ?? "";
     case "note":
       return item.note?.trim() ?? "";
   }
@@ -292,7 +296,7 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
     }
   };
 
-  const colSpan = canWrite ? 9 : 8;
+  const colSpan = canWrite ? 10 : 9;
 
   return (
     <>
@@ -451,6 +455,13 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
                   onCycle={onCycleSort}
                 />
                 <SortableTh
+                  label="Výsek"
+                  column="die_cut"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onCycle={onCycleSort}
+                />
+                <SortableTh
                   label="Poznámka"
                   column="note"
                   sortKey={sortKey}
@@ -509,6 +520,9 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-600">
                       {item.shared_machines?.name ?? "—"}
+                    </td>
+                    <td className="px-3 py-3 text-sm text-gray-600">
+                      {item.technologie_die_cut_devices?.name ?? "—"}
                     </td>
                     <td className="max-w-[160px] px-3 py-3 text-sm text-gray-500">
                       {truncateNote(item.note)}
