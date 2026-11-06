@@ -358,6 +358,7 @@ export function EmployeeForm({
       </div>
 
       {sectionTab === "personal" && (
+        <div className="space-y-4">
         <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-semibold text-gray-900">Personální údaje</h3>
           <p className="mt-1 text-xs text-gray-500">
@@ -505,6 +506,43 @@ export function EmployeeForm({
             </div>
           </div>
         </section>
+
+        {!isNew && (
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-900">Přidělený majetek</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Aktivní přiřazení z evidence majetku — jen přehled.
+            </p>
+            {equipment.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-500">Žádný aktivně přidělený majetek.</p>
+            ) : (
+              <ul className="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-100">
+                {equipment.map((eq) => (
+                  <li
+                    key={eq.assignment_id}
+                    className="flex items-center justify-between gap-2 px-3 py-2.5 text-sm"
+                  >
+                    <div>
+                      <div className="font-medium text-gray-900">{eq.name}</div>
+                      <div className="text-xs text-gray-500">
+                        {[eq.category_name, eq.asset_tag, eq.serial_number]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
+                      </div>
+                    </div>
+                    <Link
+                      href={`/equipment/${eq.equipment_id}`}
+                      className="shrink-0 text-xs font-medium text-red-700 hover:underline"
+                    >
+                      Majetek
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+        </div>
       )}
 
       {sectionTab === "onboarding" && (
