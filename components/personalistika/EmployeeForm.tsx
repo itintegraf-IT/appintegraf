@@ -603,16 +603,62 @@ export function EmployeeForm({
       )}
 
       {sectionTab === "offboarding" && (
-        <ChecklistCard
-          title="Ukončení pracovního poměru"
-          description="Potvrzení, že bylo vše odebráno a vráceno. Stejné položky jako u nástupu."
-          keys={OFFBOARDING_KEYS}
-          values={form.offboarding}
-          canWrite={canWrite}
-          onChange={(offboarding) => setForm((f) => ({ ...f, offboarding }))}
-          phonePcEquipment={isNew ? [] : phonePcEquipment}
-          companyEmail={form.email}
-        />
+        <div className="space-y-4">
+          <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-gray-900">Datum ukončení PP</h3>
+            <p className="mt-1 text-xs text-gray-500">
+              Ke kterému dni je pracovní poměr ukončen. Při vyplnění data se stav přepne na ukončený.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className={labelCls}>Datum ukončení *</label>
+                <input
+                  type="date"
+                  className={inputCls}
+                  value={form.end_date}
+                  disabled={!canWrite}
+                  onChange={(e) => {
+                    const end_date = e.target.value;
+                    setForm((f) => ({
+                      ...f,
+                      end_date,
+                      status: end_date ? "terminated" : f.status,
+                    }));
+                  }}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Stav</label>
+                <select
+                  className={inputCls}
+                  value={form.status}
+                  disabled={!canWrite}
+                  onChange={(e) =>
+                    setForm((f) => ({
+                      ...f,
+                      status: e.target.value === "terminated" ? "terminated" : "active",
+                      end_date:
+                        e.target.value === "active" ? "" : f.end_date,
+                    }))
+                  }
+                >
+                  <option value="active">Aktivní</option>
+                  <option value="terminated">Ukončený PP</option>
+                </select>
+              </div>
+            </div>
+          </section>
+          <ChecklistCard
+            title="Ukončení pracovního poměru"
+            description="Potvrzení, že bylo vše odebráno a vráceno. Stejné položky jako u nástupu."
+            keys={OFFBOARDING_KEYS}
+            values={form.offboarding}
+            canWrite={canWrite}
+            onChange={(offboarding) => setForm((f) => ({ ...f, offboarding }))}
+            phonePcEquipment={isNew ? [] : phonePcEquipment}
+            companyEmail={form.email}
+          />
+        </div>
       )}
     </div>
   );
