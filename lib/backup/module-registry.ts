@@ -104,6 +104,7 @@ export const BACKUP_MODULES: Record<BackupModuleId, BackupModuleDef> = {
       raw("hr_positions"),
       raw("hr_candidate_applications"),
       raw("hr_part_timers"),
+      raw("hr_employees"),
       prisma("file_uploads"),
     ],
     fileUploadModules: [{ module: "personalistika", uploadSubdir: "personalistika" }],

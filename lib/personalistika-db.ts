@@ -85,6 +85,24 @@ export function normalizePartTimerStatus(input: unknown): PartTimerStatus {
     : "jine";
 }
 
+export {
+  EMPLOYMENT_TYPES,
+  EMPLOYEE_STATUSES,
+  ONBOARDING_HR_KEYS,
+  ONBOARDING_IT_KEYS,
+  OFFBOARDING_KEYS,
+  normalizeEmploymentType,
+  normalizeEmployeeStatus,
+  parseChecklistJson,
+  serializeChecklistJson,
+  type EmploymentType,
+  type EmployeeStatus,
+  type ChecklistItemKey,
+  type ChecklistItem,
+  type ChecklistMap,
+  type EmployeeRow,
+} from "@/lib/personalistika-employee-types";
+
 export async function ensurePersonalistikaTables(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
@@ -157,6 +175,39 @@ export async function ensurePersonalistikaTables(): Promise<void> {
           PRIMARY KEY (id),
           KEY idx_hr_part_timers_status (status),
           KEY idx_hr_part_timers_name (last_name, first_name)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+      `);
+
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS hr_employees (
+          id INT NOT NULL AUTO_INCREMENT,
+          user_id INT NOT NULL,
+          application_id INT NULL,
+          first_name VARCHAR(100) NOT NULL,
+          last_name VARCHAR(100) NOT NULL,
+          email VARCHAR(150) NOT NULL,
+          phone VARCHAR(40) NULL,
+          personal_phone VARCHAR(40) NULL,
+          personal_email VARCHAR(150) NULL,
+          position_title VARCHAR(150) NULL,
+          department_id INT NULL,
+          employment_type VARCHAR(20) NOT NULL DEFAULT 'thp',
+          start_date DATE NULL,
+          end_date DATE NULL,
+          status VARCHAR(20) NOT NULL DEFAULT 'active',
+          notes TEXT NULL,
+          onboarding_json LONGTEXT NULL,
+          offboarding_json LONGTEXT NULL,
+          created_by INT NULL,
+          updated_by INT NULL,
+          created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          PRIMARY KEY (id),
+          UNIQUE KEY uq_hr_employees_user_id (user_id),
+          KEY idx_hr_employees_status (status),
+          KEY idx_hr_employees_type (employment_type),
+          KEY idx_hr_employees_name (last_name, first_name),
+          KEY idx_hr_employees_application (application_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
       `);
     })();

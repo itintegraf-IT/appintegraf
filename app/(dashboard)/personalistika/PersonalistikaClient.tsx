@@ -1,8 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BriefcaseBusiness, Save, Plus, Trash2, Pencil, X } from "lucide-react";
+import { BriefcaseBusiness, Save, Plus, Trash2, Pencil, X, Eye, Printer } from "lucide-react";
+import Link from "next/link";
 import { PersonalistikaQuestionnaireForm } from "@/components/personalistika/PersonalistikaQuestionnaireForm";
+import {
+  EmployeeForm,
+  EMPTY_EMPLOYEE_FORM,
+  type EmployeeEquipment,
+  type EmployeeFormState,
+} from "@/components/personalistika/EmployeeForm";
+import type { ChecklistMap, EmploymentType, EmployeeStatus } from "@/lib/personalistika-employee-types";
 
 type Application = {
   id: number;
@@ -109,6 +117,35 @@ const EMPTY_PART_TIMER: PartTimerForm = {
   notes: "",
 };
 
+type EmployeeListItem = {
+  id: number;
+  user_id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  personal_phone: string | null;
+  personal_email: string | null;
+  position_title: string | null;
+  employment_type: EmploymentType;
+  start_date: string | null;
+  end_date: string | null;
+  status: EmployeeStatus;
+  notes: string | null;
+  onboarding?: ChecklistMap;
+  offboarding?: ChecklistMap;
+};
+
+const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {
+  thp: "THP",
+  delnik: "Dělnická",
+};
+
+const EMPLOYEE_STATUS_LABELS: Record<EmployeeStatus, string> = {
+  active: "Aktivní",
+  terminated: "Ukončený",
+};
+
 type Attachment = {
   id: number;
   original_filename: string;
@@ -165,7 +202,7 @@ type FilterOptions = {
 };
 
 export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
-  const [tab, setTab] = useState<"applications" | "questionnaire" | "positions" | "part_timers">("applications");
+  const [tab, setTab] = useState<"applications" | "questionnaire" | "positions" | "part_timers" | "employees">("employees");
   const [applications, setApplications] = useState<Application[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
   const [draftFilters, setDraftFilters] = useState<ApplicationFilters>(EMPTY_FILTERS);
@@ -189,6 +226,16 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
   const [partTimerQuery, setPartTimerQuery] = useState("");
   const [editingPartTimerId, setEditingPartTimerId] = useState<number | "new" | null>(null);
   const [partTimerForm, setPartTimerForm] = useState<PartTimerForm>(EMPTY_PART_TIMER);
+
+  const [employees, setEmployees] = useState<EmployeeListItem[]>([]);
+  const [employeeQuery, setEmployeeQuery] = useState("");
+  const [employeeStatusFilter, setEmployeeStatusFilter] = useState<"all" | EmployeeStatus>("active");
+  const [editingEmployeeId, setEditingEmployeeId] = useState<number | "new" | null>(null);
+  const [employeePanelMode, setEmployeePanelMode] = useState<"view" | "edit" | "new">("view");
+  const [employeeForm, setEmployeeForm] = useState<EmployeeFormState>(EMPTY_EMPLOYEE_FORM);
+  const [employeeUserId, setEmployeeUserId] = useState<number | null>(null);
+  const [employeeEquipment, setEmployeeEquipment] = useState<EmployeeEquipment[]>([]);
+  const [savingEmployee, setSavingEmployee] = useState(false);
 
   const loadApplications = useCallback(async (filters: ApplicationFilters = appliedFilters) => {
     const params = new URLSearchParams();
@@ -231,6 +278,20 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
     setPartTimers(data.partTimers ?? []);
   };
 
+  const loadEmployees = async () => {
+    const params = new URLSearchParams();
+    if (employeeQuery) params.set("q", employeeQuery);
+    if (employeeStatusFilter !== "all") params.set("status", employeeStatusFilter);
+    const res = await fetch(`/api/personalistika/employees?${params}`);
+    const data = await res.json().catch(() => ({}));
+    setEmployees(data.employees ?? []);
+    if (data.bootstrap && Number(data.bootstrap.created) > 0) {
+      setSuccess(
+        `Evidence zaměstnanců byla jednorázově naplněna z aktivních uživatelů (${data.bootstrap.created}).`
+      );
+    }
+  };
+
   useEffect(() => {
     loadApplications(appliedFilters);
   }, [appliedFilters, loadApplications]);
@@ -245,6 +306,12 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
       loadPartTimers();
     }
   }, [tab, partTimerQuery]);
+
+  useEffect(() => {
+    if (tab === "employees") {
+      loadEmployees();
+    }
+  }, [tab, employeeQuery, employeeStatusFilter]);
 
   useEffect(() => {
     const loadAttachments = async () => {
@@ -436,6 +503,147 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
     await loadPartTimers();
   };
 
+  const startNewEmployee = () => {
+    setEditingEmployeeId("new");
+    setEmployeePanelMode("new");
+    setEmployeeForm(EMPTY_EMPLOYEE_FORM);
+    setEmployeeUserId(null);
+    setEmployeeEquipment([]);
+    setError("");
+    setSuccess("");
+  };
+
+  const openEmployeePanel = async (emp: EmployeeListItem, mode: "view" | "edit") => {
+    setEditingEmployeeId(emp.id);
+    setEmployeePanelMode(mode);
+    setEmployeeUserId(emp.user_id);
+    setEmployeeForm({
+      first_name: emp.first_name,
+      last_name: emp.last_name,
+      email: emp.email,
+      phone: emp.phone ?? "",
+      personal_phone: emp.personal_phone ?? "",
+      personal_email: emp.personal_email ?? "",
+      position_title: emp.position_title ?? "",
+      employment_type: emp.employment_type,
+      start_date: emp.start_date ?? "",
+      end_date: emp.end_date ?? "",
+      status: emp.status,
+      notes: emp.notes ?? "",
+      onboarding: emp.onboarding ?? {},
+      offboarding: emp.offboarding ?? {},
+    });
+    setEmployeeEquipment([]);
+    setError("");
+    setSuccess("");
+    const res = await fetch(`/api/personalistika/employees/${emp.id}`);
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.employee) {
+      const e = data.employee as EmployeeListItem;
+      setEmployeeUserId(e.user_id);
+      setEmployeeForm({
+        first_name: e.first_name,
+        last_name: e.last_name,
+        email: e.email,
+        phone: e.phone ?? "",
+        personal_phone: e.personal_phone ?? "",
+        personal_email: e.personal_email ?? "",
+        position_title: e.position_title ?? "",
+        employment_type: e.employment_type,
+        start_date: e.start_date ?? "",
+        end_date: e.end_date ?? "",
+        status: e.status,
+        notes: e.notes ?? "",
+        onboarding: e.onboarding ?? {},
+        offboarding: e.offboarding ?? {},
+      });
+      setEmployeeEquipment(data.equipment ?? []);
+    }
+  };
+
+  const cancelEmployeeEdit = () => {
+    setEditingEmployeeId(null);
+    setEmployeePanelMode("view");
+    setEmployeeForm(EMPTY_EMPLOYEE_FORM);
+    setEmployeeUserId(null);
+    setEmployeeEquipment([]);
+  };
+
+  const saveEmployee = async () => {
+    if (editingEmployeeId === null) return;
+    setError("");
+    setSuccess("");
+    setSavingEmployee(true);
+
+    const isNew = editingEmployeeId === "new";
+    const url = isNew
+      ? "/api/personalistika/employees"
+      : `/api/personalistika/employees/${editingEmployeeId}`;
+    const method = isNew ? "POST" : "PATCH";
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(employeeForm),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? "Zaměstnance se nepodařilo uložit.");
+        return;
+      }
+      setSuccess(
+        isNew
+          ? data.user_created
+            ? "Zaměstnanec byl založen včetně uživatelského účtu."
+            : "Zaměstnanec byl založen a napojen na existující účet."
+          : "Zaměstnanec byl uložen."
+      );
+      if (isNew) {
+        cancelEmployeeEdit();
+      } else if (data.employee) {
+        const e = data.employee as EmployeeListItem;
+        setEmployeeUserId(e.user_id);
+        setEmployeeForm({
+          first_name: e.first_name,
+          last_name: e.last_name,
+          email: e.email,
+          phone: e.phone ?? "",
+          personal_phone: e.personal_phone ?? "",
+          personal_email: e.personal_email ?? "",
+          position_title: e.position_title ?? "",
+          employment_type: e.employment_type,
+          start_date: e.start_date ?? "",
+          end_date: e.end_date ?? "",
+          status: e.status,
+          notes: e.notes ?? "",
+          onboarding: e.onboarding ?? {},
+          offboarding: e.offboarding ?? {},
+        });
+        setEmployeeEquipment(data.equipment ?? []);
+      }
+      await loadEmployees();
+    } finally {
+      setSavingEmployee(false);
+    }
+  };
+
+  const removeEmployee = async (id: number) => {
+    if (!confirm("Smazat evidenci zaměstnance? Uživatelský účet zůstane zachován.")) return;
+    setError("");
+    setSuccess("");
+    const res = await fetch(`/api/personalistika/employees/${id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setError(data.error ?? "Smazání se nezdařilo.");
+      return;
+    }
+    if (editingEmployeeId === id) cancelEmployeeEdit();
+    await loadEmployees();
+  };
+
+  const employeeFormWritable = canWrite && employeePanelMode !== "view";
+
   return (
     <>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -444,7 +652,7 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
             <BriefcaseBusiness className="h-7 w-7 text-red-600" />
             Personalistika
           </h1>
-          <p className="mt-1 text-gray-600">Přijaté dotazníky uchazečů a správa pracovních pozic.</p>
+          <p className="mt-1 text-gray-600">Dotazníky, zaměstnanci, brigádníci a pracovní pozice.</p>
         </div>
       </div>
 
@@ -452,6 +660,7 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
       {success && <div className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">{success}</div>}
 
       <div className="mb-4 flex flex-wrap rounded-lg border border-gray-200 bg-white p-1 w-fit gap-1">
+        <button type="button" onClick={() => setTab("employees")} className={`rounded-md px-4 py-2 text-sm ${tab === "employees" ? "bg-gray-100 font-medium" : ""}`}>Zaměstnanci</button>
         <button type="button" onClick={() => setTab("applications")} className={`rounded-md px-4 py-2 text-sm ${tab === "applications" ? "bg-gray-100 font-medium" : ""}`}>Dotazníky</button>
         {canWrite && (
           <button type="button" onClick={() => setTab("questionnaire")} className={`rounded-md px-4 py-2 text-sm ${tab === "questionnaire" ? "bg-gray-100 font-medium" : ""}`}>Vyplnit dotazník</button>
@@ -732,6 +941,207 @@ export function PersonalistikaClient({ canWrite }: { canWrite: boolean }) {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      ) : tab === "employees" ? (
+        <div className="space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-wrap gap-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">Hledat</label>
+                <input
+                  value={employeeQuery}
+                  onChange={(e) => setEmployeeQuery(e.target.value)}
+                  placeholder="Jméno, e-mail…"
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">Stav</label>
+                <select
+                  value={employeeStatusFilter}
+                  onChange={(e) =>
+                    setEmployeeStatusFilter(
+                      e.target.value === "terminated"
+                        ? "terminated"
+                        : e.target.value === "all"
+                          ? "all"
+                          : "active"
+                    )
+                  }
+                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="active">Aktivní</option>
+                  <option value="terminated">Ukončení</option>
+                  <option value="all">Všichni</option>
+                </select>
+              </div>
+            </div>
+            {canWrite && (
+              <button
+                type="button"
+                onClick={startNewEmployee}
+                className="inline-flex items-center gap-1 rounded-lg bg-red-600 px-3 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                <Plus className="h-4 w-4" />
+                Nový zaměstnanec
+              </button>
+            )}
+          </div>
+
+          {editingEmployeeId !== null && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-4">
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <h2 className="text-base font-semibold text-gray-900">
+                  {editingEmployeeId === "new"
+                    ? "Nový zaměstnanec"
+                    : employeePanelMode === "view"
+                      ? "Prohlížení zaměstnance"
+                      : "Úprava zaměstnance"}
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {editingEmployeeId !== "new" && typeof editingEmployeeId === "number" && (
+                    <>
+                      <Link
+                        href={`/personalistika/protokol/nastup?employeeId=${editingEmployeeId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                      >
+                        <Printer className="h-4 w-4" />
+                        Nástupní protokol
+                      </Link>
+                      <Link
+                        href={`/personalistika/protokol/vystup?employeeId=${editingEmployeeId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                      >
+                        <Printer className="h-4 w-4" />
+                        Výstupní protokol
+                      </Link>
+                    </>
+                  )}
+                  {employeePanelMode === "view" && canWrite && (
+                    <button
+                      type="button"
+                      onClick={() => setEmployeePanelMode("edit")}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50"
+                    >
+                      <Pencil className="h-4 w-4" />
+                      Upravit
+                    </button>
+                  )}
+                  {employeeFormWritable && (
+                    <button
+                      type="button"
+                      onClick={saveEmployee}
+                      disabled={savingEmployee}
+                      className="inline-flex items-center gap-1 rounded-lg bg-gray-800 px-3 py-2 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60"
+                    >
+                      <Save className="h-4 w-4" />
+                      {savingEmployee ? "Ukládám…" : "Uložit"}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={cancelEmployeeEdit}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"
+                  >
+                    <X className="h-4 w-4" />
+                    Zavřít
+                  </button>
+                </div>
+              </div>
+              <EmployeeForm
+                form={employeeForm}
+                setForm={setEmployeeForm}
+                canWrite={employeeFormWritable}
+                equipment={employeeEquipment}
+                userId={employeeUserId}
+                isNew={editingEmployeeId === "new"}
+              />
+            </div>
+          )}
+
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+            <table className="w-full">
+              <thead className="border-b border-gray-200 bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Zaměstnanec</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Typ</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Pozice</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Nástup</th>
+                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Stav</th>
+                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Akce</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      Zatím žádní zaměstnanci
+                    </td>
+                  </tr>
+                ) : (
+                  employees.map((emp) => (
+                    <tr
+                      key={emp.id}
+                      className={`border-b border-gray-100 hover:bg-gray-50 ${
+                        editingEmployeeId === emp.id ? "bg-red-50/40" : ""
+                      }`}
+                    >
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => openEmployeePanel(emp, "view")}
+                          className="text-left font-medium text-gray-900 hover:underline"
+                        >
+                          {emp.last_name} {emp.first_name}
+                        </button>
+                        <div className="text-xs text-gray-500">{emp.email}</div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{EMPLOYMENT_TYPE_LABELS[emp.employment_type]}</td>
+                      <td className="px-4 py-3 text-sm">{emp.position_title || "-"}</td>
+                      <td className="px-4 py-3 text-sm">{emp.start_date || "-"}</td>
+                      <td className="px-4 py-3 text-sm">{EMPLOYEE_STATUS_LABELS[emp.status]}</td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => openEmployeePanel(emp, "view")}
+                            className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                            Prohlížet
+                          </button>
+                          {canWrite && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEmployeePanel(emp, "edit")}
+                                className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                                Upravit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeEmployee(emp.id)}
+                                className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2 py-1 text-xs text-red-700"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Smazat
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       ) : tab === "positions" ? (
