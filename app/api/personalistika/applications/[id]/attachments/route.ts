@@ -39,6 +39,34 @@ export async function GET(
     include: { users: { select: { first_name: true, last_name: true } } },
   });
 
+  type AttachmentDto = {
+    id: number;
+    module: string;
+    record_id: number | null;
+    filename: string;
+    original_filename: string;
+    file_path: string;
+    file_size: number;
+    mime_type: string;
+    uploaded_by: number;
+    created_at: Date;
+    users: { first_name: string; last_name: string } | null;
+  };
+
+  const unified: AttachmentDto[] = files.map((f) => ({
+    id: f.id,
+    module: f.module,
+    record_id: f.record_id,
+    filename: f.filename,
+    original_filename: f.original_filename,
+    file_path: f.file_path,
+    file_size: f.file_size,
+    mime_type: f.mime_type,
+    uploaded_by: f.uploaded_by,
+    created_at: f.created_at,
+    users: f.users,
+  }));
+
   // Sjednocení: veřejná CV příloha (inline na aplikaci) se zobrazí vedle file_uploads.
   const publicRows = (await prisma.$queryRawUnsafe(
     `SELECT attachment_path, attachment_original_name, attachment_mime, attachment_size, created_at
@@ -52,9 +80,8 @@ export async function GET(
     created_at: Date;
   }>;
   const pub = publicRows[0];
-  const unified = [...files];
   if (pub?.attachment_path) {
-    const already = files.some(
+    const already = unified.some(
       (f) =>
         f.file_path === pub.attachment_path ||
         f.original_filename === pub.attachment_original_name
@@ -74,7 +101,7 @@ export async function GET(
         uploaded_by: 0,
         created_at: pub.created_at,
         users: null,
-      } as (typeof files)[number]);
+      });
     }
   }
 
