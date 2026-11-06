@@ -18,6 +18,28 @@ async function addColumnIfMissing(table: string, column: string, ddl: string): P
   }
 }
 
+async function addIndexIfMissing(
+  table: string,
+  indexName: string,
+  createSql: string
+): Promise<void> {
+  const rows = (await prisma.$queryRawUnsafe(
+    `SELECT COUNT(*) as cnt
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = ?
+       AND INDEX_NAME = ?`,
+    table,
+    indexName
+  )) as { cnt: number | bigint }[];
+  if (Number(rows[0]?.cnt ?? 0) > 0) return;
+  try {
+    await prisma.$executeRawUnsafe(createSql);
+  } catch {
+    // duplicitní data / engine omezení — index přeskočit
+  }
+}
+
 export type CandidateApplicationStatus =
   | "new"
   | "in_review"
@@ -74,6 +96,9 @@ export type PartTimerRow = {
   email: string | null;
   status: PartTimerStatus;
   notes: string | null;
+  valid_from: Date | string | null;
+  valid_to: Date | string | null;
+  position_id: number | null;
   created_at: Date;
   updated_at: Date;
 };
@@ -190,6 +215,7 @@ export async function ensurePersonalistikaTables(): Promise<void> {
           personal_phone VARCHAR(40) NULL,
           personal_email VARCHAR(150) NULL,
           position_title VARCHAR(150) NULL,
+          position_id INT NULL,
           department_id INT NULL,
           employment_type VARCHAR(20) NOT NULL DEFAULT 'thp',
           start_date DATE NULL,
@@ -207,9 +233,26 @@ export async function ensurePersonalistikaTables(): Promise<void> {
           KEY idx_hr_employees_status (status),
           KEY idx_hr_employees_type (employment_type),
           KEY idx_hr_employees_name (last_name, first_name),
-          KEY idx_hr_employees_application (application_id)
+          KEY idx_hr_employees_application (application_id),
+          KEY idx_hr_employees_position (position_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
       `);
+
+      await addColumnIfMissing("hr_employees", "position_id", "position_id INT NULL");
+      await addColumnIfMissing(
+        "hr_part_timers",
+        "valid_from",
+        "valid_from DATE NULL"
+      );
+      await addColumnIfMissing("hr_part_timers", "valid_to", "valid_to DATE NULL");
+      await addColumnIfMissing("hr_part_timers", "position_id", "position_id INT NULL");
+
+      // Konzistence: jeden uchazeč → max. jeden zaměstnanec (NULL povolené vícekrát).
+      await addIndexIfMissing(
+        "hr_employees",
+        "uq_hr_employees_application_id",
+        `CREATE UNIQUE INDEX uq_hr_employees_application_id ON hr_employees (application_id)`
+      );
     })();
   }
   await initPromise;

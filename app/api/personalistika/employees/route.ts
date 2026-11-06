@@ -7,13 +7,12 @@ import {
   normalizeEmployeeStatus,
   normalizeEmploymentType,
   parseChecklistJson,
-  serializeChecklistJson,
   type EmployeeRow,
 } from "@/lib/personalistika-db";
 import { logPersonalistikaAudit } from "@/lib/personalistika-audit";
 import {
-  ensureEmployeeUser,
-  mergeChecklistInput,
+  computeOnboardingProgress,
+  createEmployeeRecord,
   syncEmployeesFromActiveUsers,
 } from "@/lib/personalistika-employees";
 
@@ -27,10 +26,13 @@ function toIsoDate(value: unknown): string | null {
 }
 
 function mapEmployee(row: EmployeeRow) {
+  const onboarding = parseChecklistJson(row.onboarding_json);
+  const progress = computeOnboardingProgress(onboarding);
   return {
     ...row,
-    onboarding: parseChecklistJson(row.onboarding_json),
+    onboarding,
     offboarding: parseChecklistJson(row.offboarding_json),
+    onboarding_progress: progress,
     start_date: row.start_date
       ? typeof row.start_date === "string"
         ? row.start_date.slice(0, 10)
@@ -54,7 +56,6 @@ export async function GET(req: NextRequest) {
 
   await ensurePersonalistikaTables();
 
-  // Jednorázový bootstrap: když je evidence prázdná, naplní se z aktivních users.
   let bootstrap: { created: number; skipped: number } | null = null;
   const countRows = (await prisma.$queryRawUnsafe(
     `SELECT COUNT(*) AS cnt FROM hr_employees`
@@ -75,11 +76,16 @@ export async function GET(req: NextRequest) {
   const q = String(searchParams.get("q") ?? "").trim();
   const status = String(searchParams.get("status") ?? "").trim();
   const employmentType = String(searchParams.get("employment_type") ?? "").trim();
+  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+  const pageSize = Math.min(100, Math.max(10, parseInt(searchParams.get("pageSize") ?? "50", 10) || 50));
+  const offset = (page - 1) * pageSize;
 
   const params: unknown[] = [];
   const where: string[] = [];
   if (q) {
-    where.push(`(first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ? OR position_title LIKE ?)`);
+    where.push(
+      `(first_name LIKE ? OR last_name LIKE ? OR email LIKE ? OR phone LIKE ? OR position_title LIKE ?)`
+    );
     const like = `%${q}%`;
     params.push(like, like, like, like, like);
   }
@@ -93,17 +99,24 @@ export async function GET(req: NextRequest) {
   }
 
   const whereSql = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const countFiltered = (await prisma.$queryRawUnsafe(
+    `SELECT COUNT(*) AS cnt FROM hr_employees ${whereSql}`,
+    ...params
+  )) as { cnt: number | bigint }[];
+  const totalFiltered = Number(countFiltered[0]?.cnt ?? 0);
+
   const rows = (await prisma.$queryRawUnsafe(
     `SELECT *
      FROM hr_employees
      ${whereSql}
      ORDER BY status ASC, last_name ASC, first_name ASC
-     LIMIT 500`,
+     LIMIT ${pageSize} OFFSET ${offset}`,
     ...params
   )) as EmployeeRow[];
 
   return NextResponse.json({
     employees: rows.map(mapEmployee),
+    pagination: { page, pageSize, total: totalFiltered },
     ...(bootstrap ? { bootstrap } : {}),
   });
 }
@@ -126,6 +139,11 @@ export async function POST(req: NextRequest) {
   const personalPhone = String(body.personal_phone ?? "").trim();
   const personalEmail = String(body.personal_email ?? "").trim();
   const positionTitle = String(body.position_title ?? "").trim();
+  const positionIdRaw = body.position_id;
+  const positionId =
+    positionIdRaw === null || positionIdRaw === "" || positionIdRaw === undefined
+      ? null
+      : Number(positionIdRaw);
   const departmentIdRaw = body.department_id;
   const departmentId =
     departmentIdRaw === null || departmentIdRaw === "" || departmentIdRaw === undefined
@@ -133,8 +151,6 @@ export async function POST(req: NextRequest) {
       : Number(departmentIdRaw);
   const employmentType = normalizeEmploymentType(body.employment_type);
   const startDate = toIsoDate(body.start_date);
-  const endDate = toIsoDate(body.end_date);
-  let status = normalizeEmployeeStatus(body.status);
   const notes = String(body.notes ?? "").trim();
   const applicationIdRaw = body.application_id;
   const applicationId =
@@ -151,98 +167,56 @@ export async function POST(req: NextRequest) {
   if (personalEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(personalEmail)) {
     return NextResponse.json({ error: "Neplatný osobní e-mail." }, { status: 400 });
   }
-  if (endDate) status = "terminated";
 
   try {
-    const { userId, created: userCreated } = await ensureEmployeeUser({
-      email,
+    const result = await createEmployeeRecord({
+      actorUserId: actorId,
       firstName,
       lastName,
+      email,
       phone,
       personalPhone,
       personalEmail,
       positionTitle,
+      positionId: Number.isFinite(positionId as number) ? (positionId as number) : null,
       departmentId: Number.isFinite(departmentId as number) ? (departmentId as number) : null,
-    });
-
-    const existingEmp = (await prisma.$queryRawUnsafe(
-      `SELECT id FROM hr_employees WHERE user_id = ? LIMIT 1`,
-      userId
-    )) as { id: number }[];
-    if (existingEmp[0]) {
-      return NextResponse.json(
-        { error: "Pro tohoto uživatele už evidence zaměstnance existuje.", id: existingEmp[0].id },
-        { status: 409 }
-      );
-    }
-
-    const onboarding = mergeChecklistInput(body.onboarding, {}, actorId);
-    const offboarding = mergeChecklistInput(body.offboarding, {}, actorId);
-
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO hr_employees (
-        user_id, application_id, first_name, last_name, email, phone, personal_phone, personal_email,
-        position_title, department_id, employment_type, start_date, end_date, status, notes,
-        onboarding_json, offboarding_json, created_by, updated_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      userId,
-      Number.isFinite(applicationId as number) ? applicationId : null,
-      firstName,
-      lastName,
-      email,
-      phone || null,
-      personalPhone || null,
-      personalEmail || null,
-      positionTitle || null,
-      Number.isFinite(departmentId as number) ? departmentId : null,
       employmentType,
       startDate,
-      endDate,
-      status,
-      notes || null,
-      serializeChecklistJson(onboarding),
-      serializeChecklistJson(offboarding),
-      actorId,
-      actorId
-    );
+      applicationId: Number.isFinite(applicationId as number) ? (applicationId as number) : null,
+      notes,
+      sendActivationEmail: true,
+    });
 
     const createdRows = (await prisma.$queryRawUnsafe(
-      `SELECT * FROM hr_employees WHERE user_id = ? ORDER BY id DESC LIMIT 1`,
-      userId
+      `SELECT * FROM hr_employees WHERE id = ? LIMIT 1`,
+      result.employeeId
     )) as EmployeeRow[];
     const created = createdRows[0];
-    if (!created) {
-      return NextResponse.json({ error: "Zaměstnance se nepodařilo vytvořit." }, { status: 500 });
-    }
-
-    if (status === "terminated") {
-      await prisma.users.update({
-        where: { id: userId },
-        data: { is_active: false, display_in_list: false },
-      });
-    }
 
     await logPersonalistikaAudit({
       userId: actorId,
       action: "create:employee",
       tableName: "hr_employees",
-      recordId: created.id,
+      recordId: result.employeeId,
       newValues: {
-        ...mapEmployee(created),
-        user_created: userCreated,
+        ...(created ? mapEmployee(created) : {}),
+        user_created: result.userCreated,
+        activation_emailed: result.activationEmailed,
       },
     });
 
     return NextResponse.json({
       success: true,
-      id: created.id,
-      user_id: userId,
-      user_created: userCreated,
-      employee: mapEmployee(created),
+      id: result.employeeId,
+      user_id: result.userId,
+      user_created: result.userCreated,
+      activation_emailed: result.activationEmailed,
+      employee: created ? mapEmployee(created) : null,
     });
   } catch (e) {
     console.error("Employees POST error:", e);
     const msg = e instanceof Error ? e.message : "Chyba při vytváření zaměstnance.";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const status = msg.includes("už") ? 409 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

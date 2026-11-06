@@ -9,6 +9,31 @@ import {
 } from "@/lib/personalistika-db";
 import { logPersonalistikaAudit } from "@/lib/personalistika-audit";
 
+function toIsoDate(value: unknown): string | null {
+  const s = String(value ?? "").trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function mapPartTimer(row: PartTimerRow) {
+  return {
+    ...row,
+    valid_from: row.valid_from
+      ? typeof row.valid_from === "string"
+        ? row.valid_from.slice(0, 10)
+        : row.valid_from.toISOString().slice(0, 10)
+      : null,
+    valid_to: row.valid_to
+      ? typeof row.valid_to === "string"
+        ? row.valid_to.slice(0, 10)
+        : row.valid_to.toISOString().slice(0, 10)
+      : null,
+  };
+}
+
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
@@ -31,7 +56,7 @@ export async function GET(req: NextRequest) {
   }
 
   const rows = (await prisma.$queryRawUnsafe(
-    `SELECT id, first_name, last_name, phone, email, status, notes, created_at, updated_at
+    `SELECT id, first_name, last_name, phone, email, status, notes, valid_from, valid_to, position_id, created_at, updated_at
      FROM hr_part_timers
      ${whereSql}
      ORDER BY last_name ASC, first_name ASC
@@ -39,7 +64,7 @@ export async function GET(req: NextRequest) {
     ...params
   )) as PartTimerRow[];
 
-  return NextResponse.json({ partTimers: rows });
+  return NextResponse.json({ partTimers: rows.map(mapPartTimer) });
 }
 
 export async function POST(req: NextRequest) {
@@ -59,6 +84,13 @@ export async function POST(req: NextRequest) {
   const email = String(body.email ?? "").trim();
   const status = normalizePartTimerStatus(body.status);
   const notes = String(body.notes ?? "").trim();
+  const validFrom = toIsoDate(body.valid_from);
+  const validTo = toIsoDate(body.valid_to);
+  const positionIdRaw = body.position_id;
+  const positionId =
+    positionIdRaw === null || positionIdRaw === "" || positionIdRaw === undefined
+      ? null
+      : Number(positionIdRaw);
 
   if (!firstName || !lastName) {
     return NextResponse.json({ error: "Jméno a příjmení jsou povinné." }, { status: 400 });
@@ -68,14 +100,17 @@ export async function POST(req: NextRequest) {
   }
 
   await prisma.$executeRawUnsafe(
-    `INSERT INTO hr_part_timers (first_name, last_name, phone, email, status, notes)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO hr_part_timers (first_name, last_name, phone, email, status, notes, valid_from, valid_to, position_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     firstName,
     lastName,
     phone || null,
     email || null,
     status,
-    notes || null
+    notes || null,
+    validFrom,
+    validTo,
+    Number.isFinite(positionId as number) ? positionId : null
   );
 
   const createdRows = (await prisma.$queryRawUnsafe(
@@ -100,6 +135,9 @@ export async function POST(req: NextRequest) {
         email: email || null,
         status,
         notes: notes || null,
+        valid_from: validFrom,
+        valid_to: validTo,
+        position_id: Number.isFinite(positionId as number) ? positionId : null,
       },
     });
   }

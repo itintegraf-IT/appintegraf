@@ -39,7 +39,46 @@ export async function GET(
     include: { users: { select: { first_name: true, last_name: true } } },
   });
 
-  return NextResponse.json({ files });
+  // Sjednocení: veřejná CV příloha (inline na aplikaci) se zobrazí vedle file_uploads.
+  const publicRows = (await prisma.$queryRawUnsafe(
+    `SELECT attachment_path, attachment_original_name, attachment_mime, attachment_size, created_at
+     FROM hr_candidate_applications WHERE id = ? LIMIT 1`,
+    applicationId
+  )) as Array<{
+    attachment_path: string | null;
+    attachment_original_name: string | null;
+    attachment_mime: string | null;
+    attachment_size: number | null;
+    created_at: Date;
+  }>;
+  const pub = publicRows[0];
+  const unified = [...files];
+  if (pub?.attachment_path) {
+    const already = files.some(
+      (f) =>
+        f.file_path === pub.attachment_path ||
+        f.original_filename === pub.attachment_original_name
+    );
+    if (!already) {
+      unified.unshift({
+        id: -applicationId,
+        module: MODULE,
+        record_id: applicationId,
+        filename: pub.attachment_original_name || "cv",
+        original_filename: pub.attachment_original_name || "CV (veřejný formulář)",
+        file_path: pub.attachment_path.startsWith("/")
+          ? pub.attachment_path
+          : `/${pub.attachment_path}`,
+        file_size: pub.attachment_size ?? 0,
+        mime_type: pub.attachment_mime || "application/octet-stream",
+        uploaded_by: 0,
+        created_at: pub.created_at,
+        users: null,
+      } as (typeof files)[number]);
+    }
+  }
+
+  return NextResponse.json({ files: unified });
 }
 
 export async function POST(

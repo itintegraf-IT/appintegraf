@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import {
@@ -9,19 +10,17 @@ import {
   type ChecklistItemKey,
   type EmployeeRow,
 } from "@/lib/personalistika-db";
-import { OFFBOARDING_KEYS } from "@/lib/personalistika-employee-types";
-
-const CHECKLIST_LABELS: Record<ChecklistItemKey, string> = {
-  attendance: "Docházkový systém",
-  locker: "Šatní skříňka",
-  keys: "Klíče",
-  building_access: "Přístupy v budově",
-  chip_is: "Čip / přístupy IS (Cicero, Logica)",
-  phone_pc: "Telefon / počítač",
-  company_email: "Firemní e-mail",
-  vpn: "VPN",
-  it_other: "Ostatní IT",
-};
+import {
+  CHECKLIST_LABELS,
+  OFFBOARDING_KEYS,
+  ONBOARDING_HR_KEYS,
+  ONBOARDING_IT_KEYS,
+  type EmploymentType,
+} from "@/lib/personalistika-employee-types";
+import { createUserToken } from "@/lib/tokens";
+import { sendAccountActivationEmail } from "@/lib/email";
+import { getRequestIp, logAuthAudit } from "@/lib/auth-audit";
+import { getUsersWithModuleAccess } from "@/lib/auth-utils";
 
 export function checklistItemLabel(key: ChecklistItemKey): string {
   return CHECKLIST_LABELS[key] ?? key;
@@ -96,7 +95,10 @@ export async function ensureEmployeeUser(params: {
   personalEmail?: string | null;
   positionTitle?: string | null;
   departmentId?: number | null;
-}): Promise<{ userId: number; created: boolean }> {
+  /** Pošle aktivační e-mail (default true u nového účtu). */
+  sendActivationEmail?: boolean;
+  invitedByUserId?: number | null;
+}): Promise<{ userId: number; created: boolean; activationEmailed: boolean | null }> {
   const email = params.email.trim().toLowerCase();
   const existing = await prisma.users.findFirst({
     where: { email },
@@ -116,12 +118,22 @@ export async function ensureEmployeeUser(params: {
         is_active: true,
       },
     });
-    return { userId: existing.id, created: false };
+    return { userId: existing.id, created: false, activationEmailed: null };
   }
 
   const username = await allocateUsername(email, params.firstName, params.lastName);
-  const passwordHash = await bcrypt.hash("heslo123", 10);
+  // Náhodné heslo — přihlášení až po aktivaci / nastavení hesla.
+  const passwordHash = await bcrypt.hash(crypto.randomBytes(32).toString("hex"), 10);
   const qrCode = String(Math.floor(Math.random() * 1e12)).padStart(12, "0");
+
+  let departmentName: string | null = null;
+  if (params.departmentId) {
+    const dept = await prisma.departments.findUnique({
+      where: { id: params.departmentId },
+      select: { name: true },
+    });
+    departmentName = dept?.name ?? null;
+  }
 
   const user = await prisma.users.create({
     data: {
@@ -135,6 +147,7 @@ export async function ensureEmployeeUser(params: {
       personal_email: params.personalEmail?.trim() || null,
       position: params.positionTitle?.trim() || null,
       department_id: params.departmentId ?? null,
+      department_name: departmentName,
       role_id: 1,
       display_in_list: false,
       qr_code: qrCode,
@@ -150,7 +163,184 @@ export async function ensureEmployeeUser(params: {
     // already exists
   }
 
-  return { userId: user.id, created: true };
+  let activationEmailed: boolean | null = null;
+  if (params.sendActivationEmail !== false) {
+    try {
+      const ip = await getRequestIp();
+      const { token, expiresAt } = await createUserToken({
+        userId: user.id,
+        purpose: "account_activation",
+        ip,
+      });
+      let invitedBy: string | null = null;
+      if (params.invitedByUserId) {
+        const admin = await prisma.users.findUnique({
+          where: { id: params.invitedByUserId },
+          select: { first_name: true, last_name: true },
+        });
+        invitedBy = admin ? `${admin.first_name} ${admin.last_name}`.trim() : null;
+      }
+      const sendRes = await sendAccountActivationEmail({
+        toEmail: user.email,
+        toName: `${user.first_name} ${user.last_name}`.trim() || user.username,
+        username: user.username,
+        token,
+        expiresAt,
+        invitedBy,
+      });
+      activationEmailed = sendRes.success;
+      await logAuthAudit({
+        userId: params.invitedByUserId ?? null,
+        targetUserId: user.id,
+        action: "account_activation_sent",
+        details: { by_personalistika: true, on_create: true, emailed: sendRes.success },
+      });
+    } catch (e) {
+      console.error("personalistika activation email failed:", e);
+      activationEmailed = false;
+    }
+  }
+
+  return { userId: user.id, created: true, activationEmailed };
+}
+
+export function computeOnboardingProgress(onboarding: ChecklistMap | null | undefined): {
+  done: number;
+  total: number;
+} {
+  const keys = [...ONBOARDING_HR_KEYS, ...ONBOARDING_IT_KEYS];
+  const map = onboarding ?? {};
+  const done = keys.filter((k) => !!map[k]?.done).length;
+  return { done, total: keys.length };
+}
+
+export async function notifyItAboutNewThpEmployee(params: {
+  actorUserId: number;
+  employeeId: number;
+  displayName: string;
+}): Promise<void> {
+  const recipients = await getUsersWithModuleAccess("equipment", "write");
+  const filtered = recipients.filter((u) => u.id !== params.actorUserId);
+  if (filtered.length === 0) return;
+  await prisma.notifications.createMany({
+    data: filtered.map((u) => ({
+      user_id: u.id,
+      title: "Nový THP zaměstnanec",
+      message: `Personalistika založila THP: ${params.displayName}. Doplňte přístupy / majetek.`,
+      link: `/personalistika`,
+      type: "personalistika",
+    })),
+  });
+}
+
+export async function createEmployeeRecord(params: {
+  actorUserId: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string | null;
+  personalPhone?: string | null;
+  personalEmail?: string | null;
+  positionTitle?: string | null;
+  positionId?: number | null;
+  departmentId?: number | null;
+  employmentType?: EmploymentType;
+  startDate?: string | null;
+  applicationId?: number | null;
+  notes?: string | null;
+  sendActivationEmail?: boolean;
+}): Promise<{
+  employeeId: number;
+  userId: number;
+  userCreated: boolean;
+  activationEmailed: boolean | null;
+}> {
+  await ensurePersonalistikaTables();
+
+  const employmentType = params.employmentType === "delnik" ? "delnik" : "thp";
+  let positionTitle = params.positionTitle?.trim() || null;
+  if (params.positionId && !positionTitle) {
+    const rows = (await prisma.$queryRawUnsafe(
+      `SELECT name FROM hr_positions WHERE id = ? LIMIT 1`,
+      params.positionId
+    )) as { name: string }[];
+    positionTitle = rows[0]?.name ?? null;
+  }
+
+  const { userId, created, activationEmailed } = await ensureEmployeeUser({
+    email: params.email,
+    firstName: params.firstName,
+    lastName: params.lastName,
+    phone: params.phone,
+    personalPhone: params.personalPhone,
+    personalEmail: params.personalEmail,
+    positionTitle,
+    departmentId: params.departmentId ?? null,
+    sendActivationEmail: params.sendActivationEmail,
+    invitedByUserId: params.actorUserId,
+  });
+
+  const existingEmp = (await prisma.$queryRawUnsafe(
+    `SELECT id FROM hr_employees WHERE user_id = ? LIMIT 1`,
+    userId
+  )) as { id: number }[];
+  if (existingEmp[0]) {
+    throw new Error("Pro tohoto uživatele už evidence zaměstnance existuje.");
+  }
+
+  if (params.applicationId) {
+    const linked = (await prisma.$queryRawUnsafe(
+      `SELECT id FROM hr_employees WHERE application_id = ? LIMIT 1`,
+      params.applicationId
+    )) as { id: number }[];
+    if (linked[0]) {
+      throw new Error("Tento uchazeč už byl přijat jako zaměstnanec.");
+    }
+  }
+
+  const emptyJson = serializeChecklistJson({});
+  await prisma.$executeRawUnsafe(
+    `INSERT INTO hr_employees (
+      user_id, application_id, first_name, last_name, email, phone, personal_phone, personal_email,
+      position_title, position_id, department_id, employment_type, start_date, end_date, status, notes,
+      onboarding_json, offboarding_json, created_by, updated_by
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, 'active', ?, ?, ?, ?, ?)`,
+    userId,
+    params.applicationId ?? null,
+    params.firstName.trim(),
+    params.lastName.trim(),
+    params.email.trim().toLowerCase(),
+    params.phone?.trim() || null,
+    params.personalPhone?.trim() || null,
+    params.personalEmail?.trim() || null,
+    positionTitle,
+    params.positionId ?? null,
+    params.departmentId ?? null,
+    employmentType,
+    params.startDate || null,
+    params.notes?.trim() || null,
+    emptyJson,
+    emptyJson,
+    params.actorUserId,
+    params.actorUserId
+  );
+
+  const createdRows = (await prisma.$queryRawUnsafe(
+    `SELECT id FROM hr_employees WHERE user_id = ? ORDER BY id DESC LIMIT 1`,
+    userId
+  )) as { id: number }[];
+  const employeeId = createdRows[0]?.id;
+  if (!employeeId) throw new Error("Zaměstnance se nepodařilo vytvořit.");
+
+  if (employmentType === "thp") {
+    await notifyItAboutNewThpEmployee({
+      actorUserId: params.actorUserId,
+      employeeId,
+      displayName: `${params.lastName.trim()} ${params.firstName.trim()}`.trim(),
+    });
+  }
+
+  return { employeeId, userId, userCreated: created, activationEmailed };
 }
 
 export async function syncEmployeeToUser(params: {

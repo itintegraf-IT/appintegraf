@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
+  CHECKLIST_LABELS,
+  CHECKLIST_PLACEHOLDERS,
   ONBOARDING_HR_KEYS,
   ONBOARDING_IT_KEYS,
   OFFBOARDING_KEYS,
@@ -33,6 +35,8 @@ export type EmployeeFormState = {
   personal_phone: string;
   personal_email: string;
   position_title: string;
+  position_id: number | null;
+  department_id: number | null;
   employment_type: EmploymentType;
   start_date: string;
   end_date: string;
@@ -50,6 +54,8 @@ export const EMPTY_EMPLOYEE_FORM: EmployeeFormState = {
   personal_phone: "",
   personal_email: "",
   position_title: "",
+  position_id: null,
+  department_id: null,
   employment_type: "thp",
   start_date: "",
   end_date: "",
@@ -59,29 +65,7 @@ export const EMPTY_EMPLOYEE_FORM: EmployeeFormState = {
   offboarding: {},
 };
 
-const CHECKLIST_LABELS: Record<ChecklistItemKey, string> = {
-  attendance: "Docházkový systém",
-  locker: "Šatní skříňka",
-  keys: "Klíče",
-  building_access: "Přístupy v budově",
-  chip_is: "Čip / přístupy IS (Cicero, Logica)",
-  phone_pc: "Telefon / počítač",
-  company_email: "Firemní e-mail",
-  vpn: "VPN",
-  it_other: "Ostatní IT",
-};
-
-const CHECKLIST_PLACEHOLDERS: Record<ChecklistItemKey, string> = {
-  attendance: "Poznámka",
-  locker: "Poznámka — číslo skříňky",
-  keys: "Poznámka — které klíče",
-  building_access: "Poznámka — rozsah přístupů",
-  chip_is: "Poznámka — Cicero / Logica",
-  phone_pc: "Poznámka — telefon / PC",
-  company_email: "Poznámka — adresa e-mailu",
-  vpn: "Poznámka",
-  it_other: "Poznámka",
-};
+export type EmployeeFormOption = { id: number; name: string };
 
 const inputCls = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm";
 const labelCls = "mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500";
@@ -239,6 +223,8 @@ export function EmployeeForm({
   equipment,
   userId,
   isNew,
+  positions = [],
+  departments = [],
 }: {
   form: EmployeeFormState;
   setForm: React.Dispatch<React.SetStateAction<EmployeeFormState>>;
@@ -246,6 +232,8 @@ export function EmployeeForm({
   equipment: EmployeeEquipment[];
   userId?: number | null;
   isNew: boolean;
+  positions?: EmployeeFormOption[];
+  departments?: EmployeeFormOption[];
 }) {
   const phonePcEquipment = useMemo(
     () => equipment.filter(isPhoneOrComputerEquipment),
@@ -426,13 +414,59 @@ export function EmployeeForm({
               />
             </div>
             <div>
+              <label className={labelCls}>Pozice (katalog)</label>
+              <select
+                className={inputCls}
+                value={form.position_id ?? ""}
+                disabled={!canWrite}
+                onChange={(e) => {
+                  const id = e.target.value ? parseInt(e.target.value, 10) : null;
+                  const name = id ? positions.find((p) => p.id === id)?.name ?? "" : "";
+                  setForm((f) => ({
+                    ...f,
+                    position_id: id,
+                    position_title: name || f.position_title,
+                  }));
+                }}
+              >
+                <option value="">— Bez katalogové pozice —</option>
+                {positions.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
               <label className={labelCls}>Pozice / pracovní zařazení</label>
               <input
                 className={inputCls}
                 value={form.position_title}
                 disabled={!canWrite}
                 onChange={(e) => setForm((f) => ({ ...f, position_title: e.target.value }))}
+                placeholder="Volný text, pokud není v katalogu"
               />
+            </div>
+            <div>
+              <label className={labelCls}>Oddělení</label>
+              <select
+                className={inputCls}
+                value={form.department_id ?? ""}
+                disabled={!canWrite}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    department_id: e.target.value ? parseInt(e.target.value, 10) : null,
+                  }))
+                }
+              >
+                <option value="">— Bez oddělení —</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <div>
               <label className={labelCls}>Typ pozice *</label>

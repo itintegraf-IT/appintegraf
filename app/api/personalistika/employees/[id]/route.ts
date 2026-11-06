@@ -99,7 +99,19 @@ export async function PATCH(
   const phone = String(body.phone ?? prev.phone ?? "").trim();
   const personalPhone = String(body.personal_phone ?? prev.personal_phone ?? "").trim();
   const personalEmail = String(body.personal_email ?? prev.personal_email ?? "").trim();
-  const positionTitle = String(body.position_title ?? prev.position_title ?? "").trim();
+  let positionTitle = String(body.position_title ?? prev.position_title ?? "").trim();
+  const positionIdRaw = body.position_id !== undefined ? body.position_id : prev.position_id;
+  const positionId =
+    positionIdRaw === null || positionIdRaw === "" || positionIdRaw === undefined
+      ? null
+      : Number(positionIdRaw);
+  if (Number.isFinite(positionId as number) && positionId) {
+    const posRows = (await prisma.$queryRawUnsafe(
+      `SELECT name FROM hr_positions WHERE id = ? LIMIT 1`,
+      positionId
+    )) as { name: string }[];
+    if (posRows[0]?.name) positionTitle = posRows[0].name;
+  }
   const departmentIdRaw = body.department_id !== undefined ? body.department_id : prev.department_id;
   const departmentId =
     departmentIdRaw === null || departmentIdRaw === "" || departmentIdRaw === undefined
@@ -152,7 +164,7 @@ export async function PATCH(
     await prisma.$executeRawUnsafe(
       `UPDATE hr_employees SET
         first_name = ?, last_name = ?, email = ?, phone = ?, personal_phone = ?, personal_email = ?,
-        position_title = ?, department_id = ?, employment_type = ?, start_date = ?, end_date = ?,
+        position_title = ?, position_id = ?, department_id = ?, employment_type = ?, start_date = ?, end_date = ?,
         status = ?, notes = ?, onboarding_json = ?, offboarding_json = ?, updated_by = ?
        WHERE id = ?`,
       firstName,
@@ -162,6 +174,7 @@ export async function PATCH(
       personalPhone || null,
       personalEmail || null,
       positionTitle || null,
+      Number.isFinite(positionId as number) ? positionId : null,
       Number.isFinite(departmentId as number) ? departmentId : null,
       employmentType,
       startDate,

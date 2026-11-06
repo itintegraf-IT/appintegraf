@@ -56,11 +56,18 @@ export async function GET(
       details = null;
     }
   }
+
+  const linked = (await prisma.$queryRawUnsafe(
+    `SELECT id FROM hr_employees WHERE application_id = ? LIMIT 1`,
+    id
+  )) as { id: number }[];
+
   return NextResponse.json({
     application: {
       ...rows[0],
       details,
     },
+    employee_id: linked[0]?.id ?? null,
   });
 }
 

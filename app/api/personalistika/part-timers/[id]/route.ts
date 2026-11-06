@@ -9,6 +9,31 @@ import {
 } from "@/lib/personalistika-db";
 import { logPersonalistikaAudit } from "@/lib/personalistika-audit";
 
+function toIsoDate(value: unknown): string | null {
+  const s = String(value ?? "").trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function mapPartTimer(row: PartTimerRow) {
+  return {
+    ...row,
+    valid_from: row.valid_from
+      ? typeof row.valid_from === "string"
+        ? row.valid_from.slice(0, 10)
+        : row.valid_from.toISOString().slice(0, 10)
+      : null,
+    valid_to: row.valid_to
+      ? typeof row.valid_to === "string"
+        ? row.valid_to.slice(0, 10)
+        : row.valid_to.toISOString().slice(0, 10)
+      : null,
+  };
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -25,13 +50,13 @@ export async function GET(
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Neplatné ID." }, { status: 400 });
 
   const rows = (await prisma.$queryRawUnsafe(
-    `SELECT id, first_name, last_name, phone, email, status, notes, created_at, updated_at
+    `SELECT id, first_name, last_name, phone, email, status, notes, valid_from, valid_to, position_id, created_at, updated_at
      FROM hr_part_timers WHERE id = ? LIMIT 1`,
     id
   )) as PartTimerRow[];
 
   if (!rows[0]) return NextResponse.json({ error: "Brigádník nebyl nalezen." }, { status: 404 });
-  return NextResponse.json({ partTimer: rows[0] });
+  return NextResponse.json({ partTimer: mapPartTimer(rows[0]) });
 }
 
 export async function PUT(
@@ -56,6 +81,13 @@ export async function PUT(
   const email = String(body.email ?? "").trim();
   const status = normalizePartTimerStatus(body.status);
   const notes = String(body.notes ?? "").trim();
+  const validFrom = toIsoDate(body.valid_from);
+  const validTo = toIsoDate(body.valid_to);
+  const positionIdRaw = body.position_id;
+  const positionId =
+    positionIdRaw === null || positionIdRaw === "" || positionIdRaw === undefined
+      ? null
+      : Number(positionIdRaw);
 
   if (!firstName || !lastName) {
     return NextResponse.json({ error: "Jméno a příjmení jsou povinné." }, { status: 400 });
@@ -65,7 +97,7 @@ export async function PUT(
   }
 
   const prevRows = (await prisma.$queryRawUnsafe(
-    `SELECT first_name, last_name, phone, email, status, notes
+    `SELECT first_name, last_name, phone, email, status, notes, valid_from, valid_to, position_id
      FROM hr_part_timers WHERE id = ? LIMIT 1`,
     id
   )) as Array<Record<string, unknown>>;
@@ -74,7 +106,8 @@ export async function PUT(
 
   await prisma.$executeRawUnsafe(
     `UPDATE hr_part_timers
-     SET first_name = ?, last_name = ?, phone = ?, email = ?, status = ?, notes = ?
+     SET first_name = ?, last_name = ?, phone = ?, email = ?, status = ?, notes = ?,
+         valid_from = ?, valid_to = ?, position_id = ?
      WHERE id = ?`,
     firstName,
     lastName,
@@ -82,6 +115,9 @@ export async function PUT(
     email || null,
     status,
     notes || null,
+    validFrom,
+    validTo,
+    Number.isFinite(positionId as number) ? positionId : null,
     id
   );
 
@@ -98,6 +134,9 @@ export async function PUT(
       email: email || null,
       status,
       notes: notes || null,
+      valid_from: validFrom,
+      valid_to: validTo,
+      position_id: Number.isFinite(positionId as number) ? positionId : null,
     },
   });
 
@@ -120,7 +159,7 @@ export async function DELETE(
   if (!Number.isFinite(id)) return NextResponse.json({ error: "Neplatné ID." }, { status: 400 });
 
   const prevRows = (await prisma.$queryRawUnsafe(
-    `SELECT first_name, last_name, phone, email, status, notes
+    `SELECT first_name, last_name, phone, email, status, notes, valid_from, valid_to, position_id
      FROM hr_part_timers WHERE id = ? LIMIT 1`,
     id
   )) as Array<Record<string, unknown>>;

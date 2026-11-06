@@ -30,6 +30,31 @@ export type ChecklistItemKey =
   | (typeof ONBOARDING_HR_KEYS)[number]
   | (typeof ONBOARDING_IT_KEYS)[number];
 
+/** Jedna pravda pro labely checklistu (HR + IT + výstup). */
+export const CHECKLIST_LABELS: Record<ChecklistItemKey, string> = {
+  attendance: "Docházkový systém",
+  locker: "Šatní skříňka",
+  keys: "Klíče",
+  building_access: "Přístupy v budově",
+  chip_is: "Čip / přístupy IS (Cicero, Logica)",
+  phone_pc: "Telefon / počítač",
+  company_email: "Firemní e-mail",
+  vpn: "VPN",
+  it_other: "Ostatní IT",
+};
+
+export const CHECKLIST_PLACEHOLDERS: Record<ChecklistItemKey, string> = {
+  attendance: "Poznámka",
+  locker: "Poznámka — číslo skříňky",
+  keys: "Poznámka — které klíče",
+  building_access: "Poznámka — rozsah přístupů",
+  chip_is: "Poznámka — Cicero / Logica",
+  phone_pc: "Poznámka — telefon / PC",
+  company_email: "Poznámka — adresa e-mailu",
+  vpn: "Poznámka",
+  it_other: "Poznámka",
+};
+
 export type ChecklistItem = {
   done: boolean;
   note?: string;
@@ -50,6 +75,7 @@ export type EmployeeRow = {
   personal_phone: string | null;
   personal_email: string | null;
   position_title: string | null;
+  position_id: number | null;
   department_id: number | null;
   employment_type: EmploymentType;
   start_date: Date | string | null;
