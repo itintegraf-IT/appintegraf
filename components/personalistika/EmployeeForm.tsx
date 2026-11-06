@@ -240,80 +240,45 @@ export function EmployeeForm({
     [equipment]
   );
 
-  const phonePcDone =
-    !!form.onboarding.phone_pc?.done && !!form.offboarding.phone_pc?.done;
-  const companyEmailDone =
-    !!form.onboarding.company_email?.done && !!form.offboarding.company_email?.done;
+  const onboardingPhonePcDone = !!form.onboarding.phone_pc?.done;
+  const onboardingCompanyEmailDone = !!form.onboarding.company_email?.done;
 
-  // Telefon/PC z majetku: zaškrtnout; duplicitní text v poznámce (stejný jako náhled) smazat.
+  // Telefon/PC z majetku: auto jen u nástupu (výstup = ruční vrácení, nesmí se přepisovat).
   useEffect(() => {
-    if (isNew || phonePcEquipment.length === 0) return;
+    if (isNew || phonePcEquipment.length === 0 || onboardingPhonePcDone) return;
     const names = phonePcEquipment.map((e) => e.name).join(", ");
     setForm((f) => {
       const onItem = f.onboarding.phone_pc ?? { done: false, note: "" };
-      const offItem = f.offboarding.phone_pc ?? { done: false, note: "" };
-      const clearDup = (note: string | undefined) =>
-        note?.trim() === names ? "" : note ?? "";
-      const nextOn = {
-        ...onItem,
-        done: true,
-        note: clearDup(onItem.note),
-      };
-      const nextOff = {
-        ...offItem,
-        done: true,
-        note: clearDup(offItem.note),
-      };
-      if (
-        nextOn.done === onItem.done &&
-        nextOn.note === (onItem.note ?? "") &&
-        nextOff.done === offItem.done &&
-        nextOff.note === (offItem.note ?? "")
-      ) {
-        return f;
-      }
+      if (onItem.done) return f;
+      const note = onItem.note?.trim() === names ? "" : onItem.note ?? "";
       return {
         ...f,
-        onboarding: { ...f.onboarding, phone_pc: nextOn },
-        offboarding: { ...f.offboarding, phone_pc: nextOff },
+        onboarding: {
+          ...f.onboarding,
+          phone_pc: { ...onItem, done: true, note },
+        },
       };
     });
-  }, [isNew, phonePcEquipment, phonePcDone, setForm]);
+  }, [isNew, phonePcEquipment, onboardingPhonePcDone, setForm]);
 
-  // E-mail z kontaktu: zaškrtnout; duplicitní adresa v poznámce smazat (je v náhledu).
+  // E-mail z kontaktu: auto jen u nástupu; zrušení mailu při výstupu zůstává ruční.
   useEffect(() => {
     const email = form.email.trim();
-    if (isNew || !email) return;
+    if (isNew || !email || onboardingCompanyEmailDone) return;
     setForm((f) => {
       const onItem = f.onboarding.company_email ?? { done: false, note: "" };
-      const offItem = f.offboarding.company_email ?? { done: false, note: "" };
-      const clearDup = (note: string | undefined) =>
-        note?.trim().toLowerCase() === email.toLowerCase() ? "" : note ?? "";
-      const nextOn = {
-        ...onItem,
-        done: true,
-        note: clearDup(onItem.note),
-      };
-      const nextOff = {
-        ...offItem,
-        done: true,
-        note: clearDup(offItem.note),
-      };
-      if (
-        nextOn.done === onItem.done &&
-        nextOn.note === (onItem.note ?? "") &&
-        nextOff.done === offItem.done &&
-        nextOff.note === (offItem.note ?? "")
-      ) {
-        return f;
-      }
+      if (onItem.done) return f;
+      const note =
+        onItem.note?.trim().toLowerCase() === email.toLowerCase() ? "" : onItem.note ?? "";
       return {
         ...f,
-        onboarding: { ...f.onboarding, company_email: nextOn },
-        offboarding: { ...f.offboarding, company_email: nextOff },
+        onboarding: {
+          ...f.onboarding,
+          company_email: { ...onItem, done: true, note },
+        },
       };
     });
-  }, [isNew, form.email, companyEmailDone, setForm]);
+  }, [isNew, form.email, onboardingCompanyEmailDone, setForm]);
 
   const [sectionTab, setSectionTab] = useState<"personal" | "onboarding" | "offboarding">(
     "personal"
