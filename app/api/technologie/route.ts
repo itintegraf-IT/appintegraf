@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { canReadTechnologie, canWriteTechnologie } from "@/lib/technologie/access";
+import {
+  canWriteTechnologie,
+  getTechnologieListAccess,
+} from "@/lib/technologie/access";
 import {
   parseOptionalPrintMachineId,
   parseOptionalSheetSizeId,
@@ -23,7 +26,8 @@ export async function GET(req: NextRequest) {
   }
 
   const userId = parseInt(session.user.id, 10);
-  if (!(await canReadTechnologie(userId))) {
+  const listAccess = await getTechnologieListAccess(userId);
+  if (!listAccess.ok) {
     return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
@@ -31,6 +35,7 @@ export async function GET(req: NextRequest) {
   const sheetTypeId = parseInt(req.nextUrl.searchParams.get("sheet_type_id") ?? "", 10);
   const sheetSizeId = parseInt(req.nextUrl.searchParams.get("sheet_size_id") ?? "", 10);
   const printMachineId = parseInt(req.nextUrl.searchParams.get("print_machine_id") ?? "", 10);
+  const isImlRaw = (req.nextUrl.searchParams.get("is_iml") ?? "").trim().toLowerCase();
 
   const where: Prisma.technologieWhereInput = {};
   if (q) {
@@ -48,6 +53,13 @@ export async function GET(req: NextRequest) {
   }
   if (Number.isFinite(printMachineId) && printMachineId > 0) {
     where.print_machine_id = printMachineId;
+  }
+  if (listAccess.forceImlOnly) {
+    where.is_iml = true;
+  } else if (isImlRaw === "1" || isImlRaw === "true") {
+    where.is_iml = true;
+  } else if (isImlRaw === "0" || isImlRaw === "false") {
+    where.is_iml = false;
   }
 
   try {
@@ -110,6 +122,7 @@ export async function POST(req: NextRequest) {
     const format_text =
       typeof body.format_text === "string" ? body.format_text.trim().slice(0, 64) || null : null;
     const note = typeof body.note === "string" ? body.note.trim() || null : null;
+    const is_iml = body.is_iml === true || body.is_iml === 1 || body.is_iml === "1";
 
     const item = await prisma.technologie.create({
       data: {
@@ -119,6 +132,7 @@ export async function POST(req: NextRequest) {
         sheet_size_id: sheetSize.value,
         print_machine_id: printMachine.value,
         format_text,
+        is_iml,
         note,
         created_by: userId,
       },

@@ -5,7 +5,7 @@ import { createReadStream } from "fs";
 import { access } from "fs/promises";
 import path from "path";
 import { Readable } from "stream";
-import { canReadTechnologie, canWriteTechnologie } from "@/lib/technologie/access";
+import { canReadTechnologieRecord, canWriteTechnologie } from "@/lib/technologie/access";
 import {
   mimeTypeForTechnologieFilename,
   TECHNOLOGIE_DOC_PDF,
@@ -23,14 +23,22 @@ export async function GET(
   }
 
   const userId = parseInt(session.user.id, 10);
-  if (!(await canReadTechnologie(userId))) {
-    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
-  }
 
   const recordId = parseInt((await params).id, 10);
   const fileId = parseInt((await params).fileId, 10);
   if (Number.isNaN(recordId) || Number.isNaN(fileId)) {
     return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
+  }
+
+  const record = await prisma.technologie.findUnique({
+    where: { id: recordId },
+    select: { id: true, is_iml: true },
+  });
+  if (!record) {
+    return NextResponse.json({ error: "Záznam nenalezen" }, { status: 404 });
+  }
+  if (!(await canReadTechnologieRecord(userId, record))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
   const fileRow = await prisma.file_uploads.findFirst({

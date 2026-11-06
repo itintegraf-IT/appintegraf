@@ -32,6 +32,7 @@ export default async function TechnologieEditPage({
         format_text: row.format_text ?? "",
         sheet_size_id: row.sheet_size_id != null ? String(row.sheet_size_id) : "",
         print_machine_id: row.print_machine_id != null ? String(row.print_machine_id) : "",
+        is_iml: row.is_iml === true,
         note: row.note ?? "",
       }}
     />

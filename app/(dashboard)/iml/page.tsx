@@ -14,6 +14,7 @@ import {
   Upload,
   FileQuestion,
   Layers,
+  Wrench,
 } from "lucide-react";
 import { subMonths } from "date-fns";
 
@@ -45,6 +46,7 @@ export default async function ImlPage() {
     ordersLast12Months,
     inquiriesLast12Months,
     inquiriesConvertedLast12,
+    technologieImlCount,
   ] = await Promise.all([
     prisma.iml_customers.count(),
     prisma.iml_products.count({ where: { is_active: true } }),
@@ -90,6 +92,7 @@ export default async function ImlPage() {
         converted_order_id: { not: null },
       },
     }),
+    prisma.technologie.count({ where: { is_iml: true } }),
   ]);
 
   const inquiryConversionPct =
@@ -174,6 +177,13 @@ export default async function ImlPage() {
       hint: "Vlastní pole • Fólie • Pantone • Archiv",
     });
   }
+  cards.push({
+    href: "/iml/technologie",
+    icon: Wrench,
+    value: technologieImlCount,
+    label: "Technologie",
+    hint: "Technologie označené IML",
+  });
 
   return (
     <>

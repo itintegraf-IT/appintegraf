@@ -24,6 +24,7 @@ type Item = {
   code: string;
   name: string;
   format_text: string | null;
+  is_iml?: boolean;
   note: string | null;
   preview_updated_at: string | null;
   updated_at: string;
@@ -167,6 +168,10 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
   const [printMachineId, setPrintMachineId] = useState(
     searchParams.get("print_machine_id") ?? ""
   );
+  const isImlParam = (searchParams.get("is_iml") ?? "").trim().toLowerCase();
+  const [onlyIml, setOnlyIml] = useState(
+    isImlParam === "1" || isImlParam === "true"
+  );
 
   const sortParam = searchParams.get("sort") ?? "";
   const dirParam = searchParams.get("dir") ?? "";
@@ -183,8 +188,9 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
     if (sheetTypeId) sp.set("sheet_type_id", sheetTypeId);
     if (sheetSizeId) sp.set("sheet_size_id", sheetSizeId);
     if (printMachineId) sp.set("print_machine_id", printMachineId);
+    if (onlyIml) sp.set("is_iml", "1");
     return sp.toString();
-  }, [q, sheetTypeId, sheetSizeId, printMachineId]);
+  }, [q, sheetTypeId, sheetSizeId, printMachineId, onlyIml]);
 
   const urlQueryString = useMemo(() => {
     const sp = new URLSearchParams(filterQueryString);
@@ -380,6 +386,15 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
             <MachineSelectOptions machines={printMachines} />
           </select>
         </label>
+        <label className="flex items-end gap-2 pb-2 text-sm sm:col-span-2 lg:col-span-1">
+          <input
+            type="checkbox"
+            checked={onlyIml}
+            onChange={(e) => setOnlyIml(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
+          />
+          <span className="text-gray-700">Jen IML</span>
+        </label>
       </form>
 
       {error && (
@@ -479,6 +494,11 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
                       >
                         {item.name}
                       </Link>
+                      {item.is_iml ? (
+                        <span className="ml-2 inline-block rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
+                          IML
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-700">
                       {item.technologie_sheet_types?.name ?? "—"}

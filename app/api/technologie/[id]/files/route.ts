@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import path from "path";
-import { canReadTechnologie, canWriteTechnologie } from "@/lib/technologie/access";
+import { canReadTechnologieRecord, canWriteTechnologie } from "@/lib/technologie/access";
 import {
   TECHNOLOGIE_ALLOWED_EXTENSIONS,
   TECHNOLOGIE_DOC_PDF,
@@ -21,9 +21,6 @@ export async function GET(
   }
 
   const userId = parseInt(session.user.id, 10);
-  if (!(await canReadTechnologie(userId))) {
-    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
-  }
 
   const recordId = parseInt((await params).id, 10);
   if (Number.isNaN(recordId)) {
@@ -32,10 +29,13 @@ export async function GET(
 
   const exists = await prisma.technologie.findUnique({
     where: { id: recordId },
-    select: { id: true },
+    select: { id: true, is_iml: true },
   });
   if (!exists) {
     return NextResponse.json({ error: "Záznam nenalezen" }, { status: 404 });
+  }
+  if (!(await canReadTechnologieRecord(userId, exists))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
   const files = await prisma.file_uploads.findMany({

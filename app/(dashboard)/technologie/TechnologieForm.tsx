@@ -17,6 +17,7 @@ type FormState = {
   format_text: string;
   sheet_size_id: string;
   print_machine_id: string;
+  is_iml: boolean;
   note: string;
 };
 
@@ -27,6 +28,7 @@ const emptyForm: FormState = {
   format_text: "",
   sheet_size_id: "",
   print_machine_id: "",
+  is_iml: false,
   note: "",
 };
 
@@ -80,6 +82,7 @@ export function TechnologieForm({
         format_text: form.format_text,
         sheet_size_id: form.sheet_size_id || null,
         print_machine_id: form.print_machine_id || null,
+        is_iml: form.is_iml,
         note: form.note,
       };
       const url = mode === "create" ? "/api/technologie" : `/api/technologie/${id}`;
@@ -206,6 +209,21 @@ export function TechnologieForm({
           </select>
         </label>
       </div>
+
+      <label className="flex items-start gap-2 text-sm text-gray-800">
+        <input
+          type="checkbox"
+          checked={form.is_iml}
+          onChange={(e) => setForm((f) => ({ ...f, is_iml: e.target.checked }))}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300"
+        />
+        <span>
+          <span className="font-medium">Technologie IML</span>
+          <span className="mt-0.5 block text-xs text-gray-500">
+            Označí rozkres jako technologii pro IML výrobu.
+          </span>
+        </span>
+      </label>
 
       <label className="block text-sm">
         <span className="mb-1 block font-medium text-gray-700">Poznámka</span>

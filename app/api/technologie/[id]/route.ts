@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { canReadTechnologie, canWriteTechnologie } from "@/lib/technologie/access";
+import { canReadTechnologieRecord, canWriteTechnologie } from "@/lib/technologie/access";
 import { deleteTechnologieRecord } from "@/lib/technologie/delete-record";
 import {
   parseOptionalPrintMachineId,
@@ -26,9 +26,6 @@ export async function GET(
   }
 
   const userId = parseInt(session.user.id, 10);
-  if (!(await canReadTechnologie(userId))) {
-    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
-  }
 
   const id = parseInt((await params).id, 10);
   if (Number.isNaN(id)) {
@@ -41,6 +38,9 @@ export async function GET(
   });
   if (!item) {
     return NextResponse.json({ error: "Záznam nenalezen" }, { status: 404 });
+  }
+  if (!(await canReadTechnologieRecord(userId, item))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
   return NextResponse.json({ item });
@@ -105,6 +105,7 @@ export async function PUT(
     const format_text =
       typeof body.format_text === "string" ? body.format_text.trim().slice(0, 64) || null : null;
     const note = typeof body.note === "string" ? body.note.trim() || null : null;
+    const is_iml = body.is_iml === true || body.is_iml === 1 || body.is_iml === "1";
 
     const item = await prisma.technologie.update({
       where: { id },
@@ -115,6 +116,7 @@ export async function PUT(
         sheet_size_id: sheetSize.value,
         print_machine_id: printMachine.value,
         format_text,
+        is_iml,
         note,
         updated_at: new Date(),
       },

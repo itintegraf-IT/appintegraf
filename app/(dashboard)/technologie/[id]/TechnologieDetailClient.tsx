@@ -19,6 +19,7 @@ type Item = {
   code: string;
   name: string;
   format_text: string | null;
+  is_iml?: boolean;
   note: string | null;
   preview_updated_at: string | null;
   updated_at: string;
@@ -194,6 +195,11 @@ export function TechnologieDetailClient({
             <span className="font-mono text-lg text-gray-600">{item.code}</span>
             <span className="mx-2 text-gray-300">·</span>
             {item.name}
+            {item.is_iml ? (
+              <span className="ml-2 align-middle rounded bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
+                IML
+              </span>
+            ) : null}
           </h1>
         </div>
         {canWrite && (
@@ -254,6 +260,10 @@ export function TechnologieDetailClient({
             <dd className="font-medium text-gray-900">
               {item.users_created_by.first_name} {item.users_created_by.last_name}
             </dd>
+          </div>
+          <div>
+            <dt className="text-gray-500">Technologie IML</dt>
+            <dd className="font-medium text-gray-900">{item.is_iml ? "Ano" : "Ne"}</dd>
           </div>
           <div className="sm:col-span-2">
             <dt className="text-gray-500">Poznámka</dt>

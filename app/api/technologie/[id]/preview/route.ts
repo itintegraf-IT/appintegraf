@@ -5,7 +5,7 @@ import { createReadStream } from "fs";
 import { access } from "fs/promises";
 import path from "path";
 import { Readable } from "stream";
-import { canReadTechnologie } from "@/lib/technologie/access";
+import { canReadTechnologieRecord } from "@/lib/technologie/access";
 import { TECHNOLOGIE_DOC_THUMBNAIL, TECHNOLOGIE_MODULE } from "@/lib/technologie/constants";
 
 export async function GET(
@@ -18,9 +18,6 @@ export async function GET(
   }
 
   const userId = parseInt(session.user.id, 10);
-  if (!(await canReadTechnologie(userId))) {
-    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
-  }
 
   const recordId = parseInt((await params).id, 10);
   if (Number.isNaN(recordId)) {
@@ -29,10 +26,13 @@ export async function GET(
 
   const record = await prisma.technologie.findUnique({
     where: { id: recordId },
-    select: { id: true, preview_updated_at: true },
+    select: { id: true, preview_updated_at: true, is_iml: true },
   });
   if (!record) {
     return NextResponse.json({ error: "Záznam nenalezen" }, { status: 404 });
+  }
+  if (!(await canReadTechnologieRecord(userId, record))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
   }
 
   const fileRow = await prisma.file_uploads.findFirst({

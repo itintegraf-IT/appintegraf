@@ -1467,6 +1467,8 @@ model technologie {
   format_text             String?                   @db.VarChar(64)
   sheet_size_id           Int?
   print_machine_id        Int?
+  /// Technologie určená pro IML výrobu.
+  is_iml                  Boolean                   @default(false)
   note                    String?                   @db.Text
   preview_updated_at      DateTime?                 @db.Timestamp(0)
   created_by              Int
@@ -1482,6 +1484,7 @@ model technologie {
   @@index([sheet_type_id], map: "idx_technologie_sheet_type")
   @@index([sheet_size_id], map: "idx_technologie_sheet_size")
   @@index([print_machine_id], map: "idx_technologie_print_machine")
+  @@index([is_iml], map: "idx_technologie_is_iml")
   @@index([created_by], map: "idx_technologie_created_by")
   @@index([created_at], map: "idx_technologie_created_at")
   @@index([updated_at], map: "idx_technologie_updated_at")
