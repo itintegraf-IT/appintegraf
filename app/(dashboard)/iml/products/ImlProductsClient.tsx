@@ -83,6 +83,8 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   });
 
   const search = filters.search;
+  /** Lokální hodnota inputu — URL/API se aktualizuje až po debounce. */
+  const [searchInput, setSearchInput] = useState(search);
   const filterCustomer = filters.customer_id;
   const filterStatus = filters.status;
   const filterProductKind = filters.product_kind;
@@ -142,6 +144,20 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const tableReady = columnsReady && widthsReady;
+
+  // Sync z URL (zpět/dopředu v historii, sdílený odkaz)
+  useEffect(() => {
+    setSearchInput(search);
+  }, [search]);
+
+  // Debounce zápisu hledání do URL → méně requestů při psaní
+  useEffect(() => {
+    if (searchInput === search) return;
+    const t = setTimeout(() => {
+      setFilter("search", searchInput);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchInput, search, setFilter]);
 
   const filterKey = useMemo(
     () =>
@@ -644,7 +660,9 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              setFilter("page", "1");
+              // Enter: hned hledat, nečekat na debounce
+              if (searchInput !== search) setFilter("search", searchInput);
+              else setFilter("page", "1");
             }}
             className="flex flex-wrap gap-3"
           >
@@ -653,8 +671,8 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
               <input
                 type="text"
                 placeholder="Hledat podle kódu, názvu, SKU, formátu, výseku, barev…"
-                value={search}
-                onChange={(e) => setFilter("search", e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3"
               />
             </div>
