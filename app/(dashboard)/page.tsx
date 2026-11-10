@@ -4,7 +4,8 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess, isAdmin } from "@/lib/auth-utils";
 import { countMyContractsExpiringWithin } from "@/lib/contracts/expiry-reminders";
 import { formatCalendarEventTitleWithDuration } from "@/app/(dashboard)/calendar/lib/event-types";
-import { NotificationLink } from "./NotificationLink";
+import { DashboardNotifications } from "./DashboardNotifications";
+import { splitNotificationsByGroup } from "@/lib/notification-groups";
 import {
   LayoutDashboard,
   Users,
@@ -22,7 +23,6 @@ import {
   ClipboardList,
   Clock,
   ChevronRight,
-  Bell,
   Package,
   Tags,
 } from "lucide-react";
@@ -95,13 +95,21 @@ export default async function DashboardPage() {
         return prisma.notifications.findMany({
           where: { user_id: userId, read_at: null },
           orderBy: { created_at: "desc" },
-          take: 10,
+          take: 30,
         });
       })(),
       userId > 0 ? countMyContractsExpiringWithin(userId, 90) : Promise.resolve(0),
     ]);
 
-  type NotificationRow = { id: number; title: string; message: string | null; link: string | null; read_at: Date | null; created_at: Date };
+  type NotificationRow = {
+    id: number;
+    title: string;
+    message: string | null;
+    type: string | null;
+    link: string | null;
+    read_at: Date | null;
+    created_at: Date;
+  };
   type PendingEventRow = {
     id: number;
     title: string;
@@ -115,6 +123,8 @@ export default async function DashboardPage() {
     calendar_approvals?: Array<{ approval_type: string }>;
   };
   const notificationsTyped = notifications as NotificationRow[];
+  const { calendar: calendarNotifications, app: appNotifications } =
+    splitNotificationsByGroup(notificationsTyped);
   const pendingEventsTyped = pendingEvents as PendingEventRow[];
 
   const statCards = [
@@ -157,28 +167,11 @@ export default async function DashboardPage() {
         <p className="mt-1 text-gray-600">Vítejte v systému IGIS new</p>
       </div>
 
-      {/* Notifikace */}
-      {notificationsTyped.length > 0 && (
-        <div className="mb-8 rounded-xl border border-gray-200 bg-white p-6 shadow-elevated">
-          <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-gray-900">
-            <Bell className="h-5 w-5 text-gray-600" />
-            Notifikace ({notificationsTyped.length})
-          </h2>
-          <div className="space-y-2">
-            {notificationsTyped.map((n) => (
-              <NotificationLink
-                key={n.id}
-                id={n.id}
-                title={n.title}
-                message={n.message}
-                link={n.link}
-                readAt={n.read_at}
-                createdAt={n.created_at}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Notifikace – Kalendář / Aplikace */}
+      <DashboardNotifications
+        calendar={calendarNotifications}
+        app={appNotifications}
+      />
 
       {/* Smlouvy – končící platnost */}
       {contractsExpiring90 > 0 && (
