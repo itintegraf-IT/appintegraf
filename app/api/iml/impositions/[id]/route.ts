@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canManageImlImpositions } from "@/lib/iml-permissions";
 import { parseImpositionBody } from "@/lib/iml/shape-tool-parse";
+import { resyncProductsForImposition } from "@/lib/iml/product-shape-sync";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -32,7 +33,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       where: { id },
       data: parsed,
     });
-    return NextResponse.json({ success: true, imposition });
+    const updatedProducts = await resyncProductsForImposition(id);
+    return NextResponse.json({ success: true, imposition, updatedProducts });
   } catch (e) {
     console.error("PUT /api/iml/impositions/[id]", e);
     return NextResponse.json({ error: "Uložení selhalo" }, { status: 500 });

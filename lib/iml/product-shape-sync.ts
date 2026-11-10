@@ -142,3 +142,117 @@ export async function resolveDefaultToolAndImposition(shapeId: number): Promise<
   const impositionId = await resolveFirstImpositionForTool(toolId);
   return { toolId, impositionId };
 }
+
+/**
+ * Přepočítá denormalizovaná výseková pole na produktech napojených na tvar.
+ * Existující selected_tool_id / selected_imposition_id nepřepisuje — jen doplní null
+ * z PRIMARY + první montáže.
+ */
+export async function resyncProductsForShape(shapeId: number): Promise<number> {
+  const products = await prisma.iml_products.findMany({
+    where: { shape_id: shapeId },
+    select: {
+      id: true,
+      selected_tool_id: true,
+      selected_imposition_id: true,
+    },
+  });
+  if (products.length === 0) return 0;
+
+  const defaults = await resolveDefaultToolAndImposition(shapeId);
+  let updated = 0;
+
+  for (const product of products) {
+    const toolId = product.selected_tool_id ?? defaults.toolId;
+    let impositionId = product.selected_imposition_id;
+    if (impositionId == null && toolId != null) {
+      impositionId =
+        product.selected_tool_id != null
+          ? await resolveFirstImpositionForTool(toolId)
+          : defaults.impositionId;
+    }
+
+    const scalars = await buildProductFieldsFromShapeSelection({
+      shapeId,
+      toolId,
+      impositionId,
+    });
+
+    const data: Prisma.iml_productsUpdateInput = { ...scalars };
+    if (product.selected_tool_id == null && toolId != null) {
+      data.iml_tool_catalog = { connect: { id: toolId } };
+    }
+    if (product.selected_imposition_id == null && impositionId != null) {
+      data.iml_imposition_catalog = { connect: { id: impositionId } };
+    }
+
+    await prisma.iml_products.update({ where: { id: product.id }, data });
+    updated++;
+  }
+
+  return updated;
+}
+
+/** Obnoví die_cut_tool_code u produktů s daným selected_tool_id. */
+export async function resyncProductsForTool(toolId: number): Promise<number> {
+  const tool = await prisma.iml_tool_catalog.findUnique({
+    where: { id: toolId },
+    select: { tool_code_orig: true, tool_code_new: true },
+  });
+  if (!tool) return 0;
+
+  const code = tool.tool_code_orig || tool.tool_code_new;
+  const result = await prisma.iml_products.updateMany({
+    where: { selected_tool_id: toolId },
+    data: { die_cut_tool_code: code },
+  });
+  return result.count;
+}
+
+/** Obnoví montážní skaláry u produktů s daným selected_imposition_id. */
+export async function resyncProductsForImposition(
+  impositionId: number
+): Promise<number> {
+  const imp = await prisma.iml_imposition_catalog.findUnique({
+    where: { id: impositionId },
+    select: { imposition_code: true, positions_count: true },
+  });
+  if (!imp) return 0;
+
+  const result = await prisma.iml_products.updateMany({
+    where: { selected_imposition_id: impositionId },
+    data: {
+      assembly_code: imp.imposition_code,
+      positions_on_sheet: imp.positions_count,
+      labels_per_sheet: imp.positions_count,
+    },
+  });
+  return result.count;
+}
+
+/**
+ * Přepočítá produkty pro jeden tvar, nebo pro všechny tvary s alespoň jedním produktem.
+ */
+export async function resyncProductsForShapes(
+  shapeId?: number | null
+): Promise<{ shapes: number; products: number }> {
+  if (shapeId != null) {
+    const products = await resyncProductsForShape(shapeId);
+    return { shapes: products > 0 ? 1 : 0, products };
+  }
+
+  const linked = await prisma.iml_products.findMany({
+    where: { shape_id: { not: null } },
+    select: { shape_id: true },
+    distinct: ["shape_id"],
+  });
+  const shapeIds = linked
+    .map((r) => r.shape_id)
+    .filter((id): id is number => id != null);
+
+  let products = 0;
+  for (const id of shapeIds) {
+    products += await resyncProductsForShape(id);
+  }
+  return { shapes: shapeIds.length, products };
+}

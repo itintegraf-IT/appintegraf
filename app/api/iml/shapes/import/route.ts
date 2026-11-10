@@ -9,6 +9,7 @@ import {
   parseShapeImportRow,
   type ShapeColumnMapping,
 } from "@/lib/iml/shapes-import";
+import { resyncProductsForShape } from "@/lib/iml/product-shape-sync";
 
 async function findOrCreateTool(
   toolCode: string,
@@ -168,6 +169,8 @@ export async function POST(req: NextRequest) {
     let toolsCreated = 0;
     let assignmentsUpserted = 0;
     let customersLinked = 0;
+    let productsResynced = 0;
+    const touchedShapeIds = new Set<number>();
     const errors: string[] = [];
     const warnings: string[] = [];
 
@@ -233,6 +236,7 @@ export async function POST(req: NextRequest) {
 
         await ensurePrimaryAssignment(shapeId, tool.id);
         assignmentsUpserted++;
+        touchedShapeIds.add(shapeId);
 
         for (const customerId of customerIds) {
           await prisma.iml_shape_customer_assignment.upsert({
@@ -250,6 +254,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    for (const shapeId of touchedShapeIds) {
+      productsResynced += await resyncProductsForShape(shapeId);
+    }
+
     return NextResponse.json({
       success: true,
       created,
@@ -257,6 +265,7 @@ export async function POST(req: NextRequest) {
       toolsCreated,
       assignmentsUpserted,
       customersLinked,
+      productsResynced,
       errors,
       warnings,
       headers,

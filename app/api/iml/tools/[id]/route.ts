@@ -5,6 +5,7 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { canManageImlTools } from "@/lib/iml-permissions";
 import { parseToolBody } from "@/lib/iml/shape-tool-parse";
 import { deleteAllCatalogAttachments } from "@/lib/iml-catalog-attachments";
+import { resyncProductsForTool } from "@/lib/iml/product-shape-sync";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -54,7 +55,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
 
   try {
     const tool = await prisma.iml_tool_catalog.update({ where: { id }, data: parsed });
-    return NextResponse.json({ success: true, tool });
+    const updatedProducts = await resyncProductsForTool(id);
+    return NextResponse.json({ success: true, tool, updatedProducts });
   } catch (e) {
     console.error("PUT /api/iml/tools/[id]", e);
     return NextResponse.json({ error: "Uložení selhalo" }, { status: 500 });

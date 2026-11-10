@@ -5,6 +5,7 @@ import { hasModuleAccess } from "@/lib/auth-utils";
 import { canManageImlShapes } from "@/lib/iml-permissions";
 import { parseShapeBody } from "@/lib/iml/shape-tool-parse";
 import { deleteAllCatalogAttachments } from "@/lib/iml-catalog-attachments";
+import { resyncProductsForShape } from "@/lib/iml/product-shape-sync";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -77,7 +78,8 @@ export async function PUT(req: NextRequest, ctx: Ctx) {
       where: { id },
       data: parsed,
     });
-    return NextResponse.json({ success: true, shape });
+    const updatedProducts = await resyncProductsForShape(id);
+    return NextResponse.json({ success: true, shape, updatedProducts });
   } catch (e) {
     console.error("PUT /api/iml/shapes/[id]", e);
     return NextResponse.json({ error: "Uložení selhalo" }, { status: 500 });

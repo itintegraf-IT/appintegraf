@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { canManageImlShapes } from "@/lib/iml-permissions";
 import { parseAssignmentBody } from "@/lib/iml/shape-tool-parse";
+import { resyncProductsForShape } from "@/lib/iml/product-shape-sync";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -32,7 +33,8 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       data: parsed,
       include: { tool: true },
     });
-    return NextResponse.json({ success: true, assignment });
+    const updatedProducts = await resyncProductsForShape(shapeId);
+    return NextResponse.json({ success: true, assignment, updatedProducts });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     if (msg.includes("Unique") || msg.includes("Duplicate")) {
@@ -68,5 +70,6 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   await prisma.iml_shape_tool_assignment.deleteMany({
     where: { id: assignmentId, shape_id: shapeId },
   });
-  return NextResponse.json({ success: true });
+  const updatedProducts = await resyncProductsForShape(shapeId);
+  return NextResponse.json({ success: true, updatedProducts });
 }

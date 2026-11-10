@@ -140,7 +140,7 @@ export default async function ImlPage() {
       icon: Layers,
       value: dieCutsCount,
       label: "Výseky",
-      hint: "Tvary · nástroje · montáže · legacy",
+      hint: "Tvary · nástroje · montáže",
     },
     { href: "/iml/orders", icon: ShoppingCart, value: ordersCount, label: "Objednávky" },
     {

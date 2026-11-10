@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Layers, Scissors, Wrench, LayoutGrid } from "lucide-react";
+import { Layers, Wrench, LayoutGrid } from "lucide-react";
 import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { prisma } from "@/lib/db";
+import { ResyncProductsButton } from "./ResyncProductsButton";
 
 export default async function ImVysekyHubPage() {
   const session = await auth();
@@ -11,11 +12,10 @@ export default async function ImVysekyHubPage() {
   const userId = parseInt(session.user.id, 10);
   if (!(await hasModuleAccess(userId, "iml", "read"))) redirect("/iml");
 
-  const [shapesCount, toolsCount, impositionsCount, legacyCount] = await Promise.all([
+  const [shapesCount, toolsCount, impositionsCount] = await Promise.all([
     prisma.iml_shape_catalog.count(),
     prisma.iml_tool_catalog.count(),
     prisma.iml_imposition_catalog.count(),
-    prisma.iml_die_cuts.count({ where: { is_active: true } }),
   ]);
 
   const cards = [
@@ -40,14 +40,6 @@ export default async function ImVysekyHubPage() {
       value: impositionsCount,
       desc: "Musters Fénix / Equios, počet užitků",
     },
-    {
-      href: "/iml/die-cuts",
-      icon: Scissors,
-      title: "Výseky (legacy)",
-      value: legacyCount,
-      desc: "Starý monolitický katalog — dočasný bridge",
-      muted: true,
-    },
   ] as const;
 
   return (
@@ -63,7 +55,7 @@ export default async function ImVysekyHubPage() {
         <p className="mt-1 text-gray-600">
           Tříúrovňový katalog: tvar → nástroj → montáž
         </p>
-        <div className="mt-3 flex flex-wrap gap-3 text-sm">
+        <div className="mt-3 flex flex-wrap items-start gap-3 text-sm">
           <Link
             href="/iml/shapes/import"
             className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-1.5 font-medium text-violet-900 hover:bg-violet-100"
@@ -76,26 +68,19 @@ export default async function ImVysekyHubPage() {
           >
             Import jen nástrojů
           </Link>
+          <ResyncProductsButton />
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((c) => (
           <Link
             key={c.href}
             href={c.href}
-            className={`rounded-xl border bg-white p-5 shadow-sm transition hover:border-violet-300 hover:shadow ${
-              "muted" in c && c.muted
-                ? "border-amber-200 opacity-90"
-                : "border-gray-200"
-            }`}
+            className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-violet-300 hover:shadow"
           >
             <div className="flex items-start justify-between gap-2">
-              <c.icon
-                className={`h-6 w-6 ${
-                  "muted" in c && c.muted ? "text-amber-600" : "text-violet-600"
-                }`}
-              />
+              <c.icon className="h-6 w-6 text-violet-600" />
               <span className="text-2xl font-bold text-gray-900">{c.value}</span>
             </div>
             <h2 className="mt-3 text-base font-semibold text-gray-900">{c.title}</h2>
