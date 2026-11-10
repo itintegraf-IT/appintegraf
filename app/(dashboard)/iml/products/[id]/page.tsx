@@ -19,6 +19,7 @@ import ProductDetailView, {
 } from "../_components/ProductDetailView";
 import ProductImagePreview from "../_components/ProductImagePreview";
 import ProductPdfHistory from "../_components/ProductPdfHistory";
+import ProductAuditTrail from "../_components/ProductAuditTrail";
 import { ProductArchiveBanner } from "../_components/ProductArchiveBanner";
 import { ShapePackagingReadonly } from "../_components/ShapePackagingReadonly";
 import { LockedPdfDownload } from "../_components/LockedPdfDownload";
@@ -402,6 +403,7 @@ export default async function ImlProductDetailPage({
               canWrite={canWrite}
               isLocked={!!product.is_locked}
             />
+            <ProductAuditTrail productId={product.id} />
           </div>
         </div>
       ),
