@@ -85,6 +85,8 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const search = filters.search;
   /** Lokální hodnota inputu — URL/API se aktualizuje až po debounce. */
   const [searchInput, setSearchInput] = useState(search);
+  /** Během focusu nesynchronizovat z URL — jinak race s debounce přepíše právě psaný text. */
+  const searchFocusedRef = useRef(false);
   const filterCustomer = filters.customer_id;
   const filterStatus = filters.status;
   const filterProductKind = filters.product_kind;
@@ -145,8 +147,9 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
 
   const tableReady = columnsReady && widthsReady;
 
-  // Sync z URL (zpět/dopředu v historii, sdílený odkaz)
+  // Sync z URL jen mimo focus (zpět/dopředu, sdílený odkaz) — ne při psaní
   useEffect(() => {
+    if (searchFocusedRef.current) return;
     setSearchInput(search);
   }, [search]);
 
@@ -155,7 +158,7 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     if (searchInput === search) return;
     const t = setTimeout(() => {
       setFilter("search", searchInput);
-    }, 300);
+    }, 450);
     return () => clearTimeout(t);
   }, [searchInput, search, setFilter]);
 
@@ -266,10 +269,20 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   );
 
   const fetchProductsPage = useCallback(
-    async (pageNum: number, opts?: { skipTotal?: boolean }) => {
-      const res = await fetch(`/api/iml/products?${buildListParams(pageNum, opts)}`);
-      if (!res.ok) return null;
-      return (await res.json()) as ProductsApiResponse;
+    async (
+      pageNum: number,
+      opts?: { skipTotal?: boolean; signal?: AbortSignal }
+    ) => {
+      try {
+        const res = await fetch(`/api/iml/products?${buildListParams(pageNum, opts)}`, {
+          signal: opts?.signal,
+        });
+        if (!res.ok) return null;
+        return (await res.json()) as ProductsApiResponse;
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return null;
+        throw e;
+      }
     },
     [buildListParams]
   );
@@ -288,48 +301,56 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     [fetchProductsPage]
   );
 
-  const fetchPagedProducts = useCallback(async () => {
-    setLoading(true);
-    const data = await fetchProductsPage(page);
-    if (data) {
-      setProducts(data.products ?? []);
-      setTotal(typeof data.total === "number" ? data.total : (data.products?.length ?? 0));
-      setTotalPages(typeof data.totalPages === "number" ? data.totalPages : 1);
-      setHasMore(false);
-      setReachedCap(false);
-    }
-    setLoading(false);
-  }, [fetchProductsPage, page]);
-
-  const fetchInfiniteInitial = useCallback(async () => {
-    setLoading(true);
-    setLoadingMore(false);
-    setReachedCap(false);
-    setHasMore(false);
-    prefetchRef.current = null;
-    infinitePageRef.current = 1;
-    loadMoreLockRef.current = false;
-
-    const data = await fetchProductsPage(1);
-    if (data) {
-      const rows = data.products ?? [];
-      setProducts(rows);
-      const totalCount = typeof data.total === "number" ? data.total : rows.length;
-      setTotal(totalCount);
-      const more =
-        data.hasMore === true ||
-        (rows.length === INFINITE_CHUNK_SIZE && rows.length < totalCount);
-      setHasMore(more && rows.length < INFINITE_MAX_ROWS);
-      setReachedCap(rows.length >= INFINITE_MAX_ROWS);
-      if (more && rows.length < INFINITE_MAX_ROWS) {
-        void prefetchInfinitePage(2);
+  const fetchPagedProducts = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      const data = await fetchProductsPage(page, { signal });
+      if (signal?.aborted) return;
+      if (data) {
+        setProducts(data.products ?? []);
+        setTotal(typeof data.total === "number" ? data.total : (data.products?.length ?? 0));
+        setTotalPages(typeof data.totalPages === "number" ? data.totalPages : 1);
+        setHasMore(false);
+        setReachedCap(false);
       }
-    } else {
-      setProducts([]);
-      setTotal(0);
-    }
-    setLoading(false);
-  }, [fetchProductsPage, prefetchInfinitePage]);
+      setLoading(false);
+    },
+    [fetchProductsPage, page]
+  );
+
+  const fetchInfiniteInitial = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setLoadingMore(false);
+      setReachedCap(false);
+      setHasMore(false);
+      prefetchRef.current = null;
+      infinitePageRef.current = 1;
+      loadMoreLockRef.current = false;
+
+      const data = await fetchProductsPage(1, { signal });
+      if (signal?.aborted) return;
+      if (data) {
+        const rows = data.products ?? [];
+        setProducts(rows);
+        const totalCount = typeof data.total === "number" ? data.total : rows.length;
+        setTotal(totalCount);
+        const more =
+          data.hasMore === true ||
+          (rows.length === INFINITE_CHUNK_SIZE && rows.length < totalCount);
+        setHasMore(more && rows.length < INFINITE_MAX_ROWS);
+        setReachedCap(rows.length >= INFINITE_MAX_ROWS);
+        if (more && rows.length < INFINITE_MAX_ROWS) {
+          void prefetchInfinitePage(2);
+        }
+      } else {
+        setProducts([]);
+        setTotal(0);
+      }
+      setLoading(false);
+    },
+    [fetchProductsPage, prefetchInfinitePage]
+  );
 
   const loadMoreInfinite = useCallback(async () => {
     if (loadMoreLockRef.current || loading || loadingMore || !hasMore || reachedCap) return;
@@ -453,14 +474,18 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   };
 
   useEffect(() => {
+    const ac = new AbortController();
     const t = setTimeout(() => {
       if (isInfiniteMode) {
-        void fetchInfiniteInitial();
+        void fetchInfiniteInitial(ac.signal);
       } else {
-        void fetchPagedProducts();
+        void fetchPagedProducts(ac.signal);
       }
     }, 300);
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      ac.abort();
+    };
   }, [filterKey, page, fetchInfiniteInitial, fetchPagedProducts, isInfiniteMode]);
 
   useEffect(() => {
@@ -673,6 +698,14 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
                 placeholder="Hledat podle kódu, názvu, SKU, formátu, výseku, barev…"
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
+                onFocus={() => {
+                  searchFocusedRef.current = true;
+                }}
+                onBlur={() => {
+                  searchFocusedRef.current = false;
+                  // Commit pending text — nevracet starší hodnotu z URL
+                  if (searchInput !== search) setFilter("search", searchInput);
+                }}
                 className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3"
               />
             </div>
