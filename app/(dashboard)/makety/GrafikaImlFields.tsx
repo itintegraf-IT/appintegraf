@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 
 export type GrafikaImlInitial = {
   customer_id: number | null;
@@ -16,6 +16,7 @@ export type GrafikaImlInitial = {
 type CustomerOpt = { id: number; name: string };
 type ProductOpt = {
   id: number;
+  customer_id: number | null;
   ig_code: string | null;
   client_code: string | null;
   ig_short_name: string | null;
@@ -86,6 +87,12 @@ export function GrafikaImlFields({ initial, requireProduct = false }: Props) {
   const [loadError, setLoadError] = useState<string | null>(null);
   const customerBoxRef = useRef<HTMLDivElement>(null);
 
+  const [productQuery, setProductQuery] = useState("");
+  const [productOpen, setProductOpen] = useState(false);
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [selectedProductLabel, setSelectedProductLabel] = useState("");
+  const productBoxRef = useRef<HTMLDivElement>(null);
+
   const loadCustomers = useCallback(async () => {
     setCustomersLoading(true);
     try {
@@ -122,6 +129,40 @@ export function GrafikaImlFields({ initial, requireProduct = false }: Props) {
     })();
   }, []);
 
+  // Načíst vybranou etiketu při editaci (úprava dat / initial)
+  useEffect(() => {
+    if (!requireProduct || !initial?.product_id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const params = new URLSearchParams({
+          type: "products",
+          id: String(initial.product_id),
+        });
+        const res = await fetch(`/api/makety/iml-lookup?${params}`);
+        const data = await res.json().catch(() => ({}));
+        if (cancelled || !res.ok) return;
+        const list = Array.isArray(data.products) ? (data.products as ProductOpt[]) : [];
+        const found = list.find((p) => p.id === initial.product_id);
+        if (found) {
+          setProducts((prev) =>
+            prev.some((p) => p.id === found.id) ? prev : [found, ...prev]
+          );
+          setSelectedProductLabel(productLabel(found));
+        } else if (initial.label_code || initial.product_name) {
+          setSelectedProductLabel(
+            [initial.label_code, initial.product_name].filter(Boolean).join(" — ")
+          );
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [requireProduct, initial?.product_id, initial?.label_code, initial?.product_name]);
+
   const selectedCustomer = useMemo(
     () => allCustomers.find((c) => String(c.id) === customerId) ?? null,
     [allCustomers, customerId]
@@ -144,12 +185,17 @@ export function GrafikaImlFields({ initial, requireProduct = false }: Props) {
       if (customerBoxRef.current && !customerBoxRef.current.contains(e.target as Node)) {
         setCustomerOpen(false);
       }
+      if (productBoxRef.current && !productBoxRef.current.contains(e.target as Node)) {
+        setProductOpen(false);
+      }
     };
     document.addEventListener("mousedown", onDocClick);
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
+  // Nová data: produkty jen podle klienta (původní chování)
   useEffect(() => {
+    if (requireProduct) return;
     if (!customerId) {
       setProducts([]);
       setDieCuts([]);
@@ -177,25 +223,78 @@ export function GrafikaImlFields({ initial, requireProduct = false }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [customerId]);
+  }, [customerId, requireProduct]);
 
-  const onCustomerChange = (value: string) => {
-    setCustomerId(value);
-    setProductId("");
-    setDieCutId("");
-    setLabelCode("");
-    setProductName("");
-    setProductNameTouched(false);
-    setCustomerOpen(false);
-  };
+  // Úprava dat: globální / filtrované hledání etiket
+  useEffect(() => {
+    if (!requireProduct) return;
+    const q = productQuery.trim();
+    // Bez query: nic nenačítej (kromě už vybrané v products)
+    if (q.length < 2 && !customerId) {
+      setProducts((prev) =>
+        productId ? prev.filter((p) => String(p.id) === productId) : []
+      );
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      void (async () => {
+        setProductsLoading(true);
+        try {
+          const params = new URLSearchParams({ type: "products" });
+          if (q.length >= 2) params.set("q", q);
+          if (customerId) params.set("customer_id", customerId);
+          if (productId) params.set("id", productId);
+          // S klientem a bez q: seznam klienta (API to umí)
+          if (customerId && q.length < 2) {
+            // ok – API bez q a s customer_id vrátí produkty klienta
+          } else if (!customerId && q.length < 2) {
+            setProductsLoading(false);
+            return;
+          }
+          const res = await fetch(`/api/makety/iml-lookup?${params}`);
+          const data = await res.json().catch(() => ({}));
+          if (cancelled) return;
+          setProducts(Array.isArray(data.products) ? data.products : []);
+        } catch {
+          if (!cancelled) setProducts([]);
+        } finally {
+          if (!cancelled) setProductsLoading(false);
+        }
+      })();
+    }, 300);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [requireProduct, productQuery, customerId, productId]);
 
-  // shape_id se nemění při změně klienta – tvary jsou globální
+  // Výseky při klientovi (i u úpravy dat)
+  useEffect(() => {
+    if (!requireProduct) return;
+    if (!customerId) {
+      setDieCuts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const dieRes = await fetch(
+          `/api/makety/iml-lookup?type=die_cuts&customer_id=${customerId}`
+        );
+        const dieData = await dieRes.json().catch(() => ({}));
+        if (cancelled) return;
+        setDieCuts(Array.isArray(dieData.die_cuts) ? dieData.die_cuts : []);
+      } catch {
+        if (!cancelled) setDieCuts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [requireProduct, customerId]);
 
-  const onProductChange = (value: string) => {
-    setProductId(value);
-    if (!value) return;
-    const p = products.find((x) => String(x.id) === value);
-    if (!p) return;
+  const applyProductFields = (p: ProductOpt) => {
     const code = p.ig_code || p.client_code || p.ean_code || "";
     if (code) setLabelCode(code);
     if (p.die_cut_id != null) setDieCutId(String(p.die_cut_id));
@@ -205,11 +304,92 @@ export function GrafikaImlFields({ initial, requireProduct = false }: Props) {
     }
   };
 
+  const onCustomerChange = (value: string) => {
+    setCustomerId(value);
+    setCustomerOpen(false);
+    if (!requireProduct) {
+      setProductId("");
+      setDieCutId("");
+      setLabelCode("");
+      setProductName("");
+      setProductNameTouched(false);
+      setSelectedProductLabel("");
+      return;
+    }
+    // Úprava dat: produkt zruš jen když nesedí k novému klientovi
+    if (value && productId) {
+      const p = products.find((x) => String(x.id) === productId);
+      if (p?.customer_id != null && String(p.customer_id) !== value) {
+        setProductId("");
+        setSelectedProductLabel("");
+        setDieCutId("");
+        setLabelCode("");
+        setProductName("");
+        setProductNameTouched(false);
+      }
+    }
+  };
+
+  const onProductChange = (value: string) => {
+    setProductId(value);
+    if (!value) {
+      setSelectedProductLabel("");
+      return;
+    }
+    const p = products.find((x) => String(x.id) === value);
+    if (!p) return;
+    applyProductFields(p);
+    setSelectedProductLabel(productLabel(p));
+  };
+
+  const onProductPick = (p: ProductOpt) => {
+    setProductId(String(p.id));
+    applyProductFields(p);
+    setSelectedProductLabel(productLabel(p));
+    setProductOpen(false);
+    setProductQuery("");
+    if (p.customer_id != null) {
+      const cid = String(p.customer_id);
+      setCustomerId(cid);
+      // Zajistit, že klient je v seznamu (pro zobrazení jména)
+      if (!allCustomers.some((c) => c.id === p.customer_id)) {
+        void (async () => {
+          try {
+            const params = new URLSearchParams({
+              type: "customers",
+              scope: "roots",
+              id: cid,
+            });
+            const res = await fetch(`/api/makety/iml-lookup?${params}`);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && Array.isArray(data.customers)) {
+              setAllCustomers((prev) => {
+                const next = [...prev];
+                for (const c of data.customers as CustomerOpt[]) {
+                  if (!next.some((x) => x.id === c.id)) next.push(c);
+                }
+                return next;
+              });
+            }
+          } catch {
+            /* ignore */
+          }
+        })();
+      }
+    }
+  };
+
   const displayValue = customerOpen
     ? customerQuery
     : selectedCustomer
       ? selectedCustomer.name
       : EMPTY_CUSTOMER_LABEL;
+
+  const productDisplayValue = productOpen
+    ? productQuery
+    : productId
+      ? selectedProductLabel || "Vybraná etiketa"
+      : "";
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
@@ -308,7 +488,9 @@ export function GrafikaImlFields({ initial, requireProduct = false }: Props) {
           <p className="mt-1 text-xs text-gray-500">
             {customersLoading
               ? "Načítání klientů…"
-              : "Rozevírací seznam — pište pro vyhledání, výchozí je bez klienta"}
+              : requireProduct
+                ? "Volitelné — nebo nejdřív vyberte etiketu z katalogu (klient se doplní)"
+                : "Rozevírací seznam — pište pro vyhledání, výchozí je bez klienta"}
           </p>
         </div>
 
@@ -336,27 +518,111 @@ export function GrafikaImlFields({ initial, requireProduct = false }: Props) {
             Etiketa (katalog)
             {requireProduct && <span className="text-red-600"> *</span>}
           </label>
-          <select
-            name="product_id"
-            value={productId}
-            onChange={(e) => onProductChange(e.target.value)}
-            disabled={!customerId}
-            required={requireProduct}
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
-          >
-            <option value="">
-              {requireProduct ? "— Vyberte etiketu —" : "— volitelné —"}
-            </option>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {productLabel(p)}
-              </option>
-            ))}
-          </select>
-          {requireProduct && (
-            <p className="mt-1 text-xs text-amber-700">
-              U úpravy dat je vazba na existující položku IML povinná (produkt se zamkne).
-            </p>
+          {requireProduct ? (
+            <div ref={productBoxRef} className="relative">
+              <input type="hidden" name="product_id" value={productId} />
+              {/* Native required: combobox samotný nestačí (text ≠ vybrané id) */}
+              <input
+                tabIndex={-1}
+                aria-hidden
+                className="pointer-events-none absolute h-0 w-0 opacity-0"
+                value={productId}
+                required
+                onChange={() => {}}
+              />
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  role="combobox"
+                  aria-expanded={productOpen}
+                  aria-controls="grafika-product-listbox"
+                  aria-autocomplete="list"
+                  value={productDisplayValue}
+                  placeholder="Pište kód / název / EAN…"
+                  onChange={(e) => {
+                    setProductQuery(e.target.value);
+                    setProductOpen(true);
+                    if (!e.target.value.trim()) {
+                      setProductId("");
+                      setSelectedProductLabel("");
+                    }
+                  }}
+                  onFocus={() => {
+                    setProductOpen(true);
+                    setProductQuery("");
+                  }}
+                  className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-9 text-sm"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  aria-label="Otevřít seznam etiket"
+                  onClick={() => setProductOpen((o) => !o)}
+                  className="absolute inset-y-0 right-0 flex items-center px-2 text-gray-400 hover:text-gray-600"
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
+              {productOpen && (
+                <ul
+                  id="grafika-product-listbox"
+                  role="listbox"
+                  className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg"
+                >
+                  {productsLoading ? (
+                    <li className="px-3 py-2 text-sm text-gray-500">Hledám…</li>
+                  ) : productQuery.trim().length < 2 && !customerId ? (
+                    <li className="px-3 py-2 text-sm text-gray-500">
+                      Zadejte alespoň 2 znaky pro hledání v celém katalogu
+                    </li>
+                  ) : products.length === 0 ? (
+                    <li className="px-3 py-2 text-sm text-gray-500">Žádná etiketa</li>
+                  ) : (
+                    products.map((p) => (
+                      <li
+                        key={p.id}
+                        role="option"
+                        aria-selected={String(p.id) === productId}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onProductPick(p)}
+                          className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
+                            String(p.id) === productId
+                              ? "bg-red-50 text-red-800"
+                              : "text-gray-800"
+                          }`}
+                        >
+                          {productLabel(p)}
+                        </button>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
+              <p className="mt-1 text-xs text-amber-700">
+                U úpravy dat je vazba na existující položku IML povinná (produkt se zamkne).
+                Hledejte v celém katalogu i bez klienta.
+              </p>
+            </div>
+          ) : (
+            <>
+              <select
+                name="product_id"
+                value={productId}
+                onChange={(e) => onProductChange(e.target.value)}
+                disabled={!customerId}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-100"
+              >
+                <option value="">— volitelné —</option>
+                {products.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {productLabel(p)}
+                  </option>
+                ))}
+              </select>
+            </>
           )}
         </div>
 

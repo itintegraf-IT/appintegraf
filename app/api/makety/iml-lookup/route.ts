@@ -57,13 +57,39 @@ export async function GET(req: NextRequest) {
   }
 
   if (type === "products") {
-    if (customerId == null || Number.isNaN(customerId)) {
+    const hasCustomer = customerId != null && !Number.isNaN(customerId);
+    const idRaw = searchParams.get("id");
+    const ensureId = idRaw ? parseInt(idRaw, 10) : null;
+    const productSelect = {
+      id: true,
+      customer_id: true,
+      ig_code: true,
+      client_code: true,
+      ig_short_name: true,
+      client_name: true,
+      ean_code: true,
+      die_cut_id: true,
+      label_shape_code: true,
+    } as const;
+
+    // Globální search (úprava dat): vyžaduje q, nebo jen ensure podle id
+    if (!hasCustomer && q.length < 2) {
+      if (ensureId != null && !Number.isNaN(ensureId)) {
+        const one = await prisma.iml_products.findFirst({
+          where: { id: ensureId, is_active: true },
+          select: productSelect,
+        });
+        return NextResponse.json({ products: one ? [one] : [] });
+      }
       return NextResponse.json({ products: [] });
     }
+
     const where: Prisma.iml_productsWhereInput = {
-      customer_id: customerId,
       is_active: true,
     };
+    if (hasCustomer) {
+      where.customer_id = customerId;
+    }
     if (q) {
       where.OR = [
         { ig_code: { contains: q } },
@@ -73,21 +99,26 @@ export async function GET(req: NextRequest) {
         { ean_code: { contains: q } },
       ];
     }
+
     const products = await prisma.iml_products.findMany({
       where,
       orderBy: [{ ig_code: "asc" }, { client_code: "asc" }],
-      take: 300,
-      select: {
-        id: true,
-        ig_code: true,
-        client_code: true,
-        ig_short_name: true,
-        client_name: true,
-        ean_code: true,
-        die_cut_id: true,
-        label_shape_code: true,
-      },
+      take: hasCustomer ? 300 : 50,
+      select: productSelect,
     });
+
+    if (
+      ensureId != null &&
+      !Number.isNaN(ensureId) &&
+      !products.some((p) => p.id === ensureId)
+    ) {
+      const extra = await prisma.iml_products.findFirst({
+        where: { id: ensureId, is_active: true },
+        select: productSelect,
+      });
+      if (extra) products.unshift(extra);
+    }
+
     return NextResponse.json({ products });
   }
 
