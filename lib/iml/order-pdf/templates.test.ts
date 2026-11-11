@@ -99,6 +99,47 @@ Cena celkem bez DPH
     expect(r.items[0].quantity).toBe(1500);
     expect(r.items[0].price).toBe(0.81);
   });
+
+  it("parsuje layout C (QI: Číslo zákazníka + datum na řádku, IG v popisu)", () => {
+    const text = `OBJEDNÁVKA \tVO-2026-002215
+Datum: \t11.11.2026
+PS PLASTY CZ s.r.o.
+Popis\tČíslo \tCena za jedn. \tCena celkem\tMnožství\tPožadované
+datum dodání
+16040 \tks\t50 000,00 \t0,6430 \t32 150,0000\t25.11.2026\tIML Krajanka žervé \t1kg na kbelík kulatý \t1 180 ml, PP, \tbílý,
+s ručkou bílou \t02-03-253 (11/26) AK1
+16041 \tks\t50 000,00 \t0,3210 \t16 050,0000\t25.11.2026\tIML Krajanka žervé \t1kg na víčko na kbelík kulatý \t1 180 ml,
+PP, \tbílé \t02-02-253 (11/26) AK1
+Celkem s DPH
+CZK
+48 200,00
+10 122,00
+CZK\t58 322,00
+Cena celkem bez DPH
+Celkem DPH`;
+
+    const r = parsePsPlastyOrderText(text);
+    expect(r.orderNumber).toBe("VO-2026-002215");
+    expect(r.orderDate).toBe("2026-11-11");
+    expect(r.totalAmount).toBe(48200);
+    expect(r.items).toHaveLength(2);
+    expect(r.items[0].customerMaterialNo).toBe("16040");
+    expect(r.items[0].yourMaterialNo).toBe("02-03-253");
+    expect(r.items[0].itemNo).toBe("02-03-253");
+    expect(r.items[0].quantity).toBe(50000);
+    expect(r.items[0].price).toBe(0.643);
+    expect(r.items[0].netAmount).toBe(32150);
+    expect(r.items[0].deliveryDate).toBe("2026-11-25");
+    expect(r.items[0].description).toContain("IML Krajanka");
+    expect(r.items[0].description).toContain("02-03-253");
+    expect(r.items[1].customerMaterialNo).toBe("16041");
+    expect(r.items[1].yourMaterialNo).toBe("02-02-253");
+    expect(r.items[1].quantity).toBe(50000);
+    expect(r.items[1].price).toBe(0.321);
+    expect(r.items[1].netAmount).toBe(16050);
+    expect(r.items[1].deliveryDate).toBe("2026-11-25");
+    expect(r.warnings.filter((w) => /množství/i.test(w))).toEqual([]);
+  });
 });
 
 describe("parseSfaOrderText", () => {

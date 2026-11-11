@@ -17,6 +17,10 @@ import { normalizeLines, parseCzDate, parseCzNumber } from "./parse-utils";
  *   10828
  *   1 500,00 ks
  *   0,81 1 215,00 21,00 0,00 1 215,00
+ *
+ * Layout C – QI nový export: Číslo zákazníka na začátku, IG v popisu, datum na řádku:
+ *   16040 ks 50 000,00 0,6430 32 150,0000 25.11.2026 IML Krajanka … PP, bílý,
+ *   s ručkou bílou 02-03-253 (11/26) AK1
  */
 
 const IG_CODE_IN_TEXT = /\b(\d{2}-\d{2}-\d{3})\b/;
@@ -26,6 +30,10 @@ const PRICE_LINE =
 
 const LAYOUT_B_ONE_LINE =
   /^(IML.+)\s+(\d{5})\s+([\d\s]+,\d+)\s*ks\s+(\d+,\d+)\s+([\d\s]+,\d+)\s+\d+,\d+\s+[\d\s]+(?:,\d+)?\s*%?\s*[\d\s]+,\d+$/i;
+
+/** Číslo ks množství cena net datum IML… */
+const LAYOUT_C_ITEM =
+  /^(\d{5})\s+ks\s+([\d\s]+,\d+)\s+(\d+,\d+)\s+([\d\s]+,\d+)\s+(\d{1,2}\.\d{1,2}\.\d{4})\s+(IML\b.+)$/i;
 
 const QTY_LINE = /^([\d\s]+,\d+)\s*ks$/i;
 const CUSTOMER_NO_LINE = /^(\d{5})$/;
@@ -120,17 +128,17 @@ export function parsePsPlastyOrderText(text: string): ParsedPdfOrder {
   let current: ParsedPdfOrderItem | null = null;
   let qtyBuffer = "";
   let inTable = false;
-  let currentLayout: "a" | "b" | null = null;
+  let currentLayout: "a" | "b" | "c" | null = null;
   let layoutBPhase: "desc" | "customerNo" | "qty" | "price" | "done" | null = null;
 
-  const finalizeLayoutB = () => {
-    if (!current || currentLayout !== "b") return;
+  const finalizeIgFromDescription = (warnIfMissing: boolean) => {
+    if (!current) return;
     const ig =
       current.yourMaterialNo ?? extractIgCodeFromDescription(current.description);
     if (ig) {
       current.yourMaterialNo = ig;
       current.itemNo = ig;
-    } else {
+    } else if (warnIfMissing) {
       warnings.push(
         `Položka ${current.description.slice(0, 40)}…: v popisu chybí Kód IG (NN-NN-NNN).`
       );
@@ -139,8 +147,8 @@ export function parsePsPlastyOrderText(text: string): ParsedPdfOrder {
 
   const push = () => {
     if (!current) return;
-    if (currentLayout === "b") {
-      finalizeLayoutB();
+    if (currentLayout === "b" || currentLayout === "c") {
+      finalizeIgFromDescription(true);
     } else if (qtyBuffer) {
       const q = parseCzNumber(qtyBuffer);
       if (q != null) current.quantity = Math.round(q);
@@ -192,8 +200,8 @@ export function parsePsPlastyOrderText(text: string): ParsedPdfOrder {
     }
 
     if (/^IML\b/i.test(line)) {
-      if (currentLayout === "a") {
-        // popis položky layout A – zpracuje se níže
+      if (currentLayout === "a" || currentLayout === "c") {
+        // popis položky layout A/C – zpracuje se níže
       } else {
         push();
         const igCode = extractIgCodeFromDescription(line);
@@ -202,6 +210,20 @@ export function parsePsPlastyOrderText(text: string): ParsedPdfOrder {
         layoutBPhase = igCode ? "customerNo" : "desc";
         continue;
       }
+    }
+
+    const layoutC = line.match(LAYOUT_C_ITEM);
+    if (layoutC) {
+      push();
+      const desc = layoutC[6].trim();
+      const igCode = extractIgCodeFromDescription(desc);
+      current = emptyItemFromDescription(igCode, layoutC[1], desc);
+      current.quantity = Math.round(parseCzNumber(layoutC[2]) ?? 0) || null;
+      current.price = parseCzNumber(layoutC[3]);
+      current.netAmount = parseCzNumber(layoutC[4]);
+      current.deliveryDate = parseCzDate(layoutC[5]);
+      currentLayout = "c";
+      continue;
     }
 
     const itemStart = line.match(/^(\d{5})\s+ks\s+(.+)$/i);
@@ -270,6 +292,18 @@ export function parsePsPlastyOrderText(text: string): ParsedPdfOrder {
         continue;
       }
 
+      continue;
+    }
+
+    if (currentLayout === "c") {
+      if (!/^\d{5}\s+ks\b/i.test(line)) {
+        current.description = `${current.description} ${line}`.trim();
+        const igCode = extractIgCodeFromDescription(current.description);
+        if (igCode) {
+          current.yourMaterialNo = igCode;
+          current.itemNo = igCode;
+        }
+      }
       continue;
     }
 
