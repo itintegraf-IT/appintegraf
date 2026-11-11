@@ -28,15 +28,18 @@ export type UseMaketyListColumnsResult = {
   ready: boolean;
 };
 
-function persist(ids: MaketyListColumnId[]) {
+function persist(ids: MaketyListColumnId[], storageKey: string) {
   try {
-    localStorage.setItem(MAKETY_LIST_COLUMNS_STORAGE_KEY, serializeMaketyListColumnPrefs(ids));
+    localStorage.setItem(storageKey, serializeMaketyListColumnPrefs(ids));
   } catch {
     /* ignore */
   }
 }
 
-export function useMaketyListColumns(canModuleAdmin: boolean): UseMaketyListColumnsResult {
+export function useMaketyListColumns(
+  canModuleAdmin: boolean,
+  storageKey: string = MAKETY_LIST_COLUMNS_STORAGE_KEY
+): UseMaketyListColumnsResult {
   const defaults = useMemo(
     () => defaultVisibleMaketyListColumnIds(canModuleAdmin),
     [canModuleAdmin]
@@ -47,7 +50,7 @@ export function useMaketyListColumns(canModuleAdmin: boolean): UseMaketyListColu
   useEffect(() => {
     try {
       const stored = parseStoredMaketyListColumnPrefs(
-        localStorage.getItem(MAKETY_LIST_COLUMNS_STORAGE_KEY),
+        localStorage.getItem(storageKey),
         canModuleAdmin
       );
       setVisibleColumnIdsState(stored ?? defaults);
@@ -55,15 +58,15 @@ export function useMaketyListColumns(canModuleAdmin: boolean): UseMaketyListColu
       setVisibleColumnIdsState(defaults);
     }
     setReady(true);
-  }, [canModuleAdmin, defaults]);
+  }, [canModuleAdmin, defaults, storageKey]);
 
   const setVisibleColumnIds = useCallback(
     (ids: MaketyListColumnId[]) => {
       const resolved = resolveVisibleMaketyListColumnIds(ids, canModuleAdmin);
       setVisibleColumnIdsState(resolved);
-      persist(resolved);
+      persist(resolved, storageKey);
     },
-    [canModuleAdmin]
+    [canModuleAdmin, storageKey]
   );
 
   const toggleColumn = useCallback(
@@ -74,11 +77,11 @@ export function useMaketyListColumns(canModuleAdmin: boolean): UseMaketyListColu
         const has = prev.includes(id);
         const next = has ? prev.filter((x) => x !== id) : [...prev, id];
         const resolved = resolveVisibleMaketyListColumnIds(next, canModuleAdmin);
-        persist(resolved);
+        persist(resolved, storageKey);
         return resolved;
       });
     },
-    [canModuleAdmin]
+    [canModuleAdmin, storageKey]
   );
 
   const resetToDefaults = useCallback(() => {
@@ -89,11 +92,11 @@ export function useMaketyListColumns(canModuleAdmin: boolean): UseMaketyListColu
     (activeId: MaketyListColumnId, overId: MaketyListColumnId) => {
       setVisibleColumnIdsState((prev) => {
         const next = reorderMaketyListColumnIds(prev, activeId, overId, canModuleAdmin);
-        persist(next);
+        persist(next, storageKey);
         return next;
       });
     },
-    [canModuleAdmin]
+    [canModuleAdmin, storageKey]
   );
 
   const visibleColumns = useMemo(

@@ -29,6 +29,8 @@ Pokud Linux hlásí `bash\r: No such file or directory`, soubor má **Windows ko
 | `--apply-sql SOUBOR` | Aplikuje SQL soubor z `prisma/migrations/` (lze uvést víckrát). |
 | `--skip-migrate` | Přeskočí `npx prisma migrate deploy`. |
 | `--skip-build` | Přeskočí `npm run build` (nouzově). |
+| `--announce` | Po restartu PM2 vždy rozešle systémové novinky (i mimo větev `main`). |
+| `--skip-announce` | Přeskočí rozesílání novinek (i na `main`). |
 
 Proměnné prostředí `DEPLOY_BRANCH` a `PM2_APP_NAME` mají stejný efekt jako `--branch` a `--pm2-name`.
 
@@ -76,7 +78,44 @@ Při nesouladu skript skončí chybou a build ani restart se nespustí.
 6. `npm run build` (heap 6 GB přes `node --max-old-space-size=6144`; deploy skript nastaví i `NODE_OPTIONS`)
 7. `pm2 restart appintegraf` (nebo váš název procesu)
 
-### Ruční SQL (moduly mimo Prisma migrate)
+### Systémové novinky (zvonek po nasazení)
+
+Po úspěšném **produkčním** deployi (`DEPLOY_BRANCH=main`) skript automaticky zavolá `npm run announce:release`. Ten přečte [`data/release-notes.json`](data/release-notes.json) a do zvonku (`type: system_update`) pošle jen **ještě neoznámené** release.
+
+**Filtrování podle modulů:** každá položka má `modules` (klíče jako v administraci: `makety`, `iml`, `calendar`, …). Uživatel dostane jen body, ke kterým má alespoň `read` přístup. Prázdné `modules: []` = globální novinka pro všechny aktivní uživatele. Jedna notifikace = jeden release (v message jen relevantní body).
+
+**Workflow:**
+
+1. Před nasazením doplňte do `data/release-notes.json` nový objekt do `releases` (unikátní `id`, `title`, `items`).
+2. Commit + push na `main`.
+3. Na serveru `./scripts/deploy-server.sh` — po PM2 se novinky rozešlou samy.
+4. Hotfix bez položky v JSON = žádná notifikace.
+
+Příklad položky:
+
+```json
+{
+  "id": "2026-11-11-makety",
+  "date": "2026-11-11",
+  "title": "Aktualizace systému",
+  "items": [
+    { "modules": ["makety"], "text": "Fronta maket a upozornění na deadline." },
+    { "modules": [], "text": "Rychlejší načítání dashboardu." }
+  ]
+}
+```
+
+| Příkaz | Účel |
+|--------|------|
+| `npm run db:system-release-announcements` | Vytvoří tabulku idempotence (běží i v deploy skriptu) |
+| `npm run announce:release` | Ruční rozeslání nezveřejněných novinek |
+| `npm run announce:release -- --dry-run` | Náhled bez zápisu |
+
+Test prostředí (`test` větev) novinky **defaultně neposílá**; vynucení: `./scripts/deploy-server.sh --branch test --pm2-name appintegraf-test --announce`.
+
+SQL soubor: [`prisma/migrations/20261111_system_release_announcements.sql`](prisma/migrations/20261111_system_release_announcements.sql).
+
+## Ruční SQL (moduly mimo Prisma migrate)
 
 Po změnách v `schema.prisma` mohou v `prisma/migrations/*.sql` ležet skripty, které je potřeba na produkci spustit ručně (např. modul smluv, osobní údaje u kontaktů). Bez toho může aplikace při dotazu na chybějící sloupce/tabulky spadnout (Next.js „Application error“).
 
@@ -87,6 +126,7 @@ Po změnách v `schema.prisma` mohou v `prisma/migrations/*.sql` ležet skripty,
 | [`prisma/migrations/20260328_users_personal_contact.sql`](prisma/migrations/20260328_users_personal_contact.sql) | Sloupce `users.personal_phone`, `users.personal_email` (kontakty) |
 | [`prisma/migrations/20260408_add_ukoly_module.sql`](prisma/migrations/20260408_add_ukoly_module.sql) | Tabulky modulu Úkoly (`ukoly`, `ukoly_departments`) |
 | [`prisma/migrations/20260423_calendar_is_private.sql`](prisma/migrations/20260423_calendar_is_private.sql) | Sloupec `calendar_events.is_private` (soukromé události mimo globální kalendář) |
+| [`prisma/migrations/20261111_system_release_announcements.sql`](prisma/migrations/20261111_system_release_announcements.sql) | Tabulka `system_release_announcements` (oznamování systémových novinek) |
 
 ```bash
 mysql -u root -p appintegraf < prisma/migrations/20260328_users_personal_contact.sql
@@ -122,6 +162,8 @@ Viz [`ecosystem.config.js`](ecosystem.config.js) — upravte `cwd`, proměnné p
 ## Související soubory
 
 - [`scripts/deploy-server.sh`](scripts/deploy-server.sh) — nasazovací skript  
+- [`scripts/announce-release.mjs`](scripts/announce-release.mjs) — rozesílání systémových novinek  
+- [`data/release-notes.json`](data/release-notes.json) — texty novinek po nasazení  
 - [`scripts/run-planovani-db-upgrade.mjs`](scripts/run-planovani-db-upgrade.mjs) — SQL upgrade plánování  
 - [`migrations/planovani-igvyroba/README.md`](migrations/planovani-igvyroba/README.md) — migrace dat z databáze PlanovaniVyroby (`migrate:idvyroba`)  
 - [`.env.example`](.env.example) — šablona proměnných prostředí  

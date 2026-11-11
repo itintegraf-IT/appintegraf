@@ -1,0 +1,43 @@
+{
+  "releases": [
+    {
+      "id": "2026-11-11-novinky",
+      "date": "2026-11-11",
+      "title": "Aktualizace systému (10.–11. 11. 2026)",
+      "items": [
+        {
+          "modules": ["calendar"],
+          "text": "Schvalování: nepřítomného schvalovatele (včetně správce vozidel) nepřeskakovat, pokud se stihne vrátit alespoň 3 pracovní dny před začátkem."
+        },
+        {
+          "modules": ["iml"],
+          "text": "Detail produktu: rozklikávací auditní stopa změn."
+        },
+        {
+          "modules": ["iml"],
+          "text": "Výseky: synchronizace na produkty a odstranění legacy dlaždice."
+        },
+        {
+          "modules": ["iml"],
+          "text": "Oprava vyhledávání produktů při rychlém psaní (stabilnější výsledky)."
+        },
+        {
+          "modules": ["makety"],
+          "text": "Úprava dat: globální hledání etikety IML."
+        },
+        {
+          "modules": ["makety"],
+          "text": "Archiv: vlastní nastavení viditelných sloupců seznamu."
+        },
+        {
+          "modules": [],
+          "text": "Dashboard: notifikace seskupené do sekcí Kalendář a Aplikace."
+        },
+        {
+          "modules": [],
+          "text": "Po nasazení se ve zvonku zobrazí novinky relevantní k vašim modulům."
+        }
+      ]
+    }
+  ]
+}

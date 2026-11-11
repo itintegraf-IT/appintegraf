@@ -19,6 +19,8 @@
 #                         Příklad: --apply-sql 20260420_auth_tokens.sql
 #   --skip-migrate        přeskočí npx prisma migrate deploy
 #   --skip-build          přeskočí npm run build (jen pro nouzi)
+#   --announce            po PM2 restartu vždy rozešle systémové novinky (i mimo main)
+#   --skip-announce       přeskočí rozesílání novinek (i na main)
 
 set -euo pipefail
 
@@ -30,10 +32,12 @@ PM2_NAME="${PM2_APP_NAME:-appintegraf}"
 SKIP_MIGRATE=0
 SKIP_BUILD=0
 DO_PLANOVANI=0
+FORCE_ANNOUNCE=0
+SKIP_ANNOUNCE=0
 SQL_FILES=()
 
 usage() {
-  sed -n '1,22p' "$0" | tail -n +2
+  sed -n '1,24p' "$0" | tail -n +2
   exit 0
 }
 
@@ -50,6 +54,8 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-migrate) SKIP_MIGRATE=1; shift ;;
     --skip-build) SKIP_BUILD=1; shift ;;
+    --announce) FORCE_ANNOUNCE=1; shift ;;
+    --skip-announce) SKIP_ANNOUNCE=1; shift ;;
     --pm2-name)
       PM2_NAME="${2:?}"
       shift 2
@@ -258,8 +264,38 @@ else
   echo "==> Next.js: build přeskočen (--skip-build)"
 fi
 
+echo "==> SQL: system_release_announcements (db:system-release-announcements)"
+set +e
+npm run db:system-release-announcements
+sra_exit=$?
+set -e
+if [[ "$sra_exit" -ne 0 ]]; then
+  echo "Upozornění: db:system-release-announcements skončil s kódem $sra_exit."
+  echo "  Na serveru spusťte ručně: npm run db:system-release-announcements"
+  echo "  nebo: ./scripts/deploy-server.sh --apply-sql 20261111_system_release_announcements.sql"
+  echo ""
+fi
+
 echo "==> PM2: restart $PM2_NAME"
 pm2 restart "$PM2_NAME"
+
+# Systémové novinky (data/release-notes.json → zvonek): default jen produkce (main)
+if [[ "$SKIP_ANNOUNCE" -eq 1 ]]; then
+  echo "==> Novinky: přeskočeno (--skip-announce)"
+elif [[ "$DEPLOY_BRANCH" == "main" || "$FORCE_ANNOUNCE" -eq 1 ]]; then
+  echo "==> Novinky: announce:release (větev=$DEPLOY_BRANCH)"
+  set +e
+  npm run announce:release
+  announce_exit=$?
+  set -e
+  if [[ "$announce_exit" -ne 0 ]]; then
+    echo "Upozornění: announce:release skončil s kódem $announce_exit (deploy jinak OK)."
+    echo "  Ručně: npm run announce:release"
+    echo ""
+  fi
+else
+  echo "==> Novinky: přeskočeno (větev $DEPLOY_BRANCH ≠ main; pro vynucení: --announce)"
+fi
 
 echo ""
 echo "Nasazení dokončeno."

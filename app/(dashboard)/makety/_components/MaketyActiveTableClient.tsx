@@ -15,6 +15,7 @@ import { maketyWorkTypeLabel, type MaketyWorkType } from "@/lib/makety-work-type
 import { maketyDataKindLabel } from "@/lib/makety-data-kind";
 import { formatDateTimeCz } from "@/lib/datetime-cz";
 import {
+  MAKETY_LIST_COLUMNS_STORAGE_KEY,
   type MaketyListColumnId,
   type MaketyListRow,
 } from "@/lib/makety/makety-list-columns";
@@ -29,6 +30,8 @@ type Props = {
   headingExtra?: string | null;
   rows: MaketyListRow[];
   canModuleAdmin: boolean;
+  /** Oddělený localStorage klíč (např. archiv). */
+  columnsStorageKey?: string;
 };
 
 type SortDir = "asc" | "desc";
@@ -234,10 +237,11 @@ export function MaketyActiveTableClient({
   headingExtra,
   rows,
   canModuleAdmin,
+  columnsStorageKey = MAKETY_LIST_COLUMNS_STORAGE_KEY,
 }: Props) {
   const router = useRouter();
   const { visibleColumnIds, visibleColumns, toggleColumn, reorderColumns, resetToDefaults, ready } =
-    useMaketyListColumns(canModuleAdmin);
+    useMaketyListColumns(canModuleAdmin, columnsStorageKey);
 
   const [sortBy, setSortBy] = useState<SortableColumn | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");

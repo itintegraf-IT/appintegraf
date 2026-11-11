@@ -40,6 +40,8 @@
     "db:iml-cmyk-flags": "node scripts/run-iml-cmyk-flags-migration.mjs",
     "db:pozadavky-migrate": "node scripts/run-pozadavky-migration.mjs",
     "db:projekty-migrate": "node scripts/run-projekty-migration.mjs",
+    "db:system-release-announcements": "node scripts/run-system-release-announcements-migration.mjs",
+    "announce:release": "node scripts/announce-release.mjs",
     "iml:backfill-thumbnails": "node scripts/iml-backfill-product-thumbnails.mjs",
     "iml:backfill-shape-cascade": "node scripts/backfill-product-shape-cascade.mjs",
     "verify:canvas": "node scripts/verify-canvas.mjs"

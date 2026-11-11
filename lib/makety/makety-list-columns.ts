@@ -3,6 +3,8 @@
  */
 
 export const MAKETY_LIST_COLUMNS_STORAGE_KEY = "makety-list-visible-columns";
+/** Oddělené preference sloupců pro /makety/archive. */
+export const MAKETY_ARCHIVE_LIST_COLUMNS_STORAGE_KEY = "makety-archive-list-visible-columns";
 export const MAKETY_LIST_COLUMNS_PREF_VERSION = 2 as const;
 
 export type MaketyListColumnId =

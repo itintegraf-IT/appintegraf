@@ -1523,6 +1523,15 @@ model notifications {
   @@index([read_at], map: "idx_read_at")
 }
 
+/// Idempotence oznamování systémových novinek z data/release-notes.json
+model system_release_announcements {
+  id              Int      @id @default(autoincrement())
+  release_id      String   @unique(map: "uq_system_release_id") @db.VarChar(120)
+  announced_at    DateTime @default(now()) @db.Timestamp(0)
+  git_sha         String?  @db.VarChar(64)
+  recipient_count Int      @default(0)
+}
+
 enum questions_difficulty {
   snadn_  @map("snadná")
   st_edn_ @map("střední")
