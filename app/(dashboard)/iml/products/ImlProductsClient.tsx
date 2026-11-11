@@ -12,6 +12,10 @@ import {
 import { useProductListColumns } from "@/lib/iml/use-product-list-columns";
 import { useProductListColumnWidths } from "@/lib/iml/use-product-list-column-widths";
 import type { ProductListSortDir } from "@/lib/iml/product-list-sort";
+import {
+  downloadBlobAsFile,
+  filenameFromContentDisposition,
+} from "@/lib/download-blob-as-file";
 import { ProductListColumnPicker } from "./_components/ProductListColumnPicker";
 import { ResizableProductListTable } from "./_components/ResizableProductListTable";
 
@@ -137,6 +141,8 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
   const [bulkShapeId, setBulkShapeId] = useState("");
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkMsg, setBulkMsg] = useState<string | null>(null);
+  const [shareEmail, setShareEmail] = useState("");
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
 
   const infinitePageRef = useRef(1);
   const prefetchRef = useRef<{ page: number; products: ProductListRow[]; hasMore: boolean } | null>(
@@ -473,6 +479,87 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
     }
   };
 
+  const runSharePreview = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    setBulkMsg(null);
+    setShareUrl(null);
+    try {
+      const res = await fetch("/api/iml/products/share-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_ids: [...selectedIds],
+          email: shareEmail.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBulkMsg(typeof data.error === "string" ? data.error : "Sdílení náhledů selhalo");
+        return;
+      }
+      const url = typeof data.url === "string" ? data.url : "";
+      setShareUrl(url || null);
+      const expires =
+        typeof data.expires_at === "string"
+          ? new Date(data.expires_at).toLocaleString("cs-CZ")
+          : "";
+      let msg = `Odkaz na ${data.product_count ?? selectedIds.size} náhledů vytvořen`;
+      if (expires) msg += ` (platí do ${expires})`;
+      if (shareEmail.trim()) {
+        msg += data.email_sent
+          ? ", e-mail odeslán"
+          : data.email_error
+            ? `, e-mail se nepodařilo odeslat: ${data.email_error}`
+            : "";
+      }
+      setBulkMsg(msg);
+      if (url && typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        try {
+          await navigator.clipboard.writeText(url);
+          setBulkMsg(`${msg}. URL zkopírována do schránky.`);
+        } catch {
+          // ignore clipboard failures
+        }
+      }
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const runExportSoftproofZip = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkBusy(true);
+    setBulkMsg(null);
+    try {
+      const res = await fetch("/api/iml/products/export-softproof-zip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_ids: [...selectedIds] }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setBulkMsg(
+          typeof data.error === "string" ? data.error : "Stažení softproofů selhalo"
+        );
+        return;
+      }
+      const blob = await res.blob();
+      const name =
+        filenameFromContentDisposition(res.headers.get("Content-Disposition")) ||
+        `iml-softproofy-${new Date().toISOString().slice(0, 10)}.zip`;
+      downloadBlobAsFile(blob, name);
+      const skipped = res.headers.get("X-Skipped-Count");
+      setBulkMsg(
+        skipped && skipped !== "0"
+          ? `ZIP stažen (u ${skipped} položek chyběl softproof).`
+          : "ZIP softproofů stažen."
+      );
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
   useEffect(() => {
     const ac = new AbortController();
     const t = setTimeout(() => {
@@ -777,31 +864,66 @@ export function ImlProductsClient({ canWrite, canRead = true }: Props) {
             </button>
           </form>
           {canWrite && (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-violet-100 bg-violet-50/50 p-3">
-              <span className="text-sm text-gray-700">
-                Vybráno: <strong>{selectedIds.size}</strong>
-              </span>
-              <select
-                value={bulkShapeId}
-                onChange={(e) => setBulkShapeId(e.target.value)}
-                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
-              >
-                <option value="">— Vyberte tvar —</option>
-                {shapes.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.shape_code} ({Number(s.width_mm)}×{Number(s.height_mm)} mm)
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={bulkBusy || selectedIds.size === 0 || !bulkShapeId}
-                onClick={() => void runBulkAssignShape()}
-                className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
-              >
-                Přiřadit tvar vybraným položkám
-              </button>
-              {bulkMsg && <span className="text-sm text-gray-600">{bulkMsg}</span>}
+            <div className="mt-3 space-y-2 rounded-lg border border-violet-100 bg-violet-50/50 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-gray-700">
+                  Vybráno: <strong>{selectedIds.size}</strong>
+                </span>
+                <select
+                  value={bulkShapeId}
+                  onChange={(e) => setBulkShapeId(e.target.value)}
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                >
+                  <option value="">— Vyberte tvar —</option>
+                  {shapes.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.shape_code} ({Number(s.width_mm)}×{Number(s.height_mm)} mm)
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={bulkBusy || selectedIds.size === 0 || !bulkShapeId}
+                  onClick={() => void runBulkAssignShape()}
+                  className="rounded-lg bg-violet-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                >
+                  Přiřadit tvar vybraným položkám
+                </button>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="email"
+                  value={shareEmail}
+                  onChange={(e) => setShareEmail(e.target.value)}
+                  placeholder="E-mail klienta (volitelné)"
+                  className="min-w-[220px] flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm"
+                />
+                <button
+                  type="button"
+                  disabled={bulkBusy || selectedIds.size === 0}
+                  onClick={() => void runSharePreview()}
+                  className="rounded-lg bg-sky-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+                >
+                  Sdílet náhledy
+                </button>
+                <button
+                  type="button"
+                  disabled={bulkBusy || selectedIds.size === 0}
+                  onClick={() => void runExportSoftproofZip()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Stáhnout softproofy (ZIP)
+                </button>
+              </div>
+              {bulkMsg && <p className="text-sm text-gray-600">{bulkMsg}</p>}
+              {shareUrl && (
+                <p className="break-all text-xs text-sky-800">
+                  <a href={shareUrl} target="_blank" rel="noopener noreferrer" className="underline">
+                    {shareUrl}
+                  </a>
+                </p>
+              )}
             </div>
           )}
         </div>

@@ -61,3 +61,35 @@ export async function buildProductExportZip(input: {
     filename: input.zipFilename ?? `iml-produkty-${stamp}.zip`,
   };
 }
+
+/** ZIP jen ze souborů softproofů (bez tabulky exportu). */
+export async function buildAssetsOnlyZip(input: {
+  assets: ProductExportAssetFile[];
+  zipFilename?: string;
+}): Promise<{ buffer: Buffer; filename: string }> {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const pass = new PassThrough();
+  const chunks: Buffer[] = [];
+  pass.on("data", (chunk: Buffer) => chunks.push(chunk));
+
+  const archive = createZipArchive();
+  archive.pipe(pass);
+
+  for (const asset of input.assets) {
+    archive.append(asset.buffer, { name: asset.zipPath });
+  }
+
+  const done = new Promise<void>((resolve, reject) => {
+    pass.on("finish", () => resolve());
+    pass.on("error", reject);
+    archive.on("error", reject);
+  });
+
+  await archive.finalize();
+  await done;
+
+  return {
+    buffer: Buffer.concat(chunks),
+    filename: input.zipFilename ?? `iml-softproofy-${stamp}.zip`,
+  };
+}

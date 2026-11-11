@@ -38,6 +38,7 @@
     "db:training-assignment-users": "node scripts/run-training-assignment-users-migration.mjs",
     "db:training-assignment-notifications": "node scripts/run-training-assignment-notifications-migration.mjs",
     "db:iml-cmyk-flags": "node scripts/run-iml-cmyk-flags-migration.mjs",
+    "db:iml-preview-shares": "node scripts/run-iml-preview-shares-migration.mjs",
     "db:pozadavky-migrate": "node scripts/run-pozadavky-migration.mjs",
     "db:projekty-migrate": "node scripts/run-projekty-migration.mjs",
     "db:system-release-announcements": "node scripts/run-system-release-announcements-migration.mjs",

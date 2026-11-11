@@ -1358,6 +1358,7 @@ model users {
   makety_status_log_entries                                      makety_status_log[]           @relation("makety_status_log_user")
   makety_file_events_entries                                     makety_file_events[]          @relation("makety_file_events_user")
   makety_softproof_links_created                                 makety_softproof_links[]      @relation("makety_softproof_links_created")
+  iml_product_preview_shares_created                             iml_product_preview_shares[]  @relation("iml_product_preview_shares_created")
   makety_user_customers                                          makety_user_customers[]
   stitky_orders_created                                          stitky_orders[]               @relation("stitky_orders_creator")
   stitky_orders_changed                                          stitky_orders[]               @relation("stitky_orders_changed")
@@ -1886,6 +1887,7 @@ model iml_products {
   lacquer_material      materials?           @relation("ImlProductLacquer", fields: [lacquer_material_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
   makety                makety[]
   locked_by_maketa      makety?              @relation("iml_product_locked_by_maketa", fields: [locked_maketa_id], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  iml_product_preview_share_items iml_product_preview_share_items[]
 
   @@index([customer_id])
   @@index([ig_code])
@@ -1906,6 +1908,37 @@ model iml_products {
   @@index([is_locked], map: "idx_iml_products_is_locked")
   @@index([locked_maketa_id], map: "idx_iml_products_locked_maketa")
   @@map("iml_products")
+}
+
+/// Veřejný hromadný náhled softproofů produktů (bez schvalování).
+model iml_product_preview_shares {
+  id            Int       @id @default(autoincrement())
+  token_hash    String    @unique(map: "iml_product_preview_shares_token_hash") @db.VarChar(64)
+  title         String?   @db.VarChar(255)
+  note          String?   @db.Text
+  sent_to_email String?   @db.VarChar(190)
+  expires_at    DateTime  @db.DateTime(0)
+  created_by    Int
+  created_at    DateTime  @default(now()) @db.Timestamp(0)
+  users         users     @relation("iml_product_preview_shares_created", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "iml_preview_shares_user_fk")
+  items         iml_product_preview_share_items[]
+
+  @@index([expires_at], map: "idx_iml_preview_shares_expires")
+  @@index([created_by], map: "idx_iml_preview_shares_created_by")
+  @@map("iml_product_preview_shares")
+}
+
+model iml_product_preview_share_items {
+  id         Int @id @default(autoincrement())
+  share_id   Int
+  product_id Int
+  sort_order Int @default(0)
+  share      iml_product_preview_shares @relation(fields: [share_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "iml_preview_share_items_share_fk")
+  product    iml_products               @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "iml_preview_share_items_product_fk")
+
+  @@unique([share_id, product_id], map: "iml_preview_share_items_unique")
+  @@index([product_id], map: "idx_iml_preview_share_items_product")
+  @@map("iml_product_preview_share_items")
 }
 
 /// Typy krabic pro katalog výseků a balení produktů.
