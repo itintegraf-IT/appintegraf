@@ -298,6 +298,8 @@ Pravidla:
 - `pending` schvaluje pouze uživatel v `deputy_id`.
 - **Zástupci** se nabízejí z oddělení, kde je žadatel členem (hlavní + sekundární) – `GET /api/calendar/deputies`.
 - Po schválení zástupem se finální schvalovatel vybere z administrace **Schvalovatelé kalendáře** podle oddělení žadatele z profilu (hlavní oddělení, při absenci první sekundární): primární → sekundární → terciární → vedoucí oddělení (fallback).
+- Nepřítomný schvalovatel (OOO v kalendáři v okamžiku schválení zástupem) se **nepřeskakuje**, pokud se vrátí alespoň **3 pracovní dny** (Po–Pá bez CZ svátků) před `start_date` schvalované události – schválení na něm zůstane a počká se. Jinak se cascade posune na dalšího. Fallback vedoucí oddělení se nekontroluje na absenci.
+- Stejné pravidlo platí i pro výběr správce vozidel u rezervací aut.
 - `deputy_approved` schvaluje přiřazený finální schvalovatel (primární / sekundární / terciární / vedoucí).
 - `reject` vyžaduje povinný `comment`.
 - Pokud finální schvalovatel není určen, nebo je stejný jako zástup, schválení zástupem přechází rovnou do `approved`.
@@ -374,6 +376,8 @@ Definice v `app/(dashboard)/calendar/lib/event-types.ts`, mapování barev v `li
 Role **Správa vozidel** (`sprava_vozidel`) je **doplňková** – nezávislá na Viewer/Editor/Admin v `module_access`. Přiřadí se v Admin → Uživatelé (checkbox) nebo automaticky při výběru správce v Admin → Správci vozidel.
 
 Doporučené nastavení správce vozidel: hlavní role Viewer + `calendar: read` + checkbox Správa vozidel.
+
+Výběr správce při rezervaci auta: primární → sekundární → terciární; nepřítomný se nepřeskakuje, pokud se vrátí ≥ 3 pracovní dny před začátkem rezervace (stejná logika jako u finálního schvalovatele kalendáře).
 
 ---
 

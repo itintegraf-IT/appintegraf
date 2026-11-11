@@ -1,5 +1,13 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { getHolidaysForRange } from "@/app/(dashboard)/calendar/lib/holidays";
 import { CALENDAR_OUT_OF_OFFICE_TYPE_LIST } from "@/lib/calendar-out-of-office";
+import {
+  addDaysToYmdPrague,
+  formatDateYmdPrague,
+  getPragueParts,
+  getPragueWeekdayIndex,
+  parseDateTimeLocalInput,
+} from "@/lib/datetime-cz";
 
 export type CalendarApproverTier = "primary" | "secondary" | "tertiary" | "manager";
 
@@ -7,9 +15,14 @@ export type ResolvedCalendarApprover = {
   userId: number;
   tier: CalendarApproverTier;
   skippedTiers: CalendarApproverTier[];
+  /** Schvalovatel je teď nepřítomen, ale stihne se vrátit včas – přiřazen a čeká se. */
+  waitingForReturn?: boolean;
 };
 
 type Db = PrismaClient | Prisma.TransactionClient;
+
+/** Kolik pracovních dní před začátkem události musí být schvalovatel zpět, aby se neeskálovalo. */
+export const APPROVER_RETURN_BUFFER_WORKING_DAYS = 3;
 
 const TIER_LABELS: Record<CalendarApproverTier, string> = {
   primary: "primární schvalovatel",
@@ -69,23 +82,94 @@ export async function isUserAbsentAt(
   return isUserAbsentInRange(db, userId, at, at, excludeEventId);
 }
 
+/** Po–Pá a není český státní svátek / den pracovního klidu. */
+export function isCzechWorkingDay(ymd: string): boolean {
+  const weekday = getPragueWeekdayIndex(ymd);
+  if (weekday >= 5) return false;
+  return getHolidaysForRange(ymd, ymd).length === 0;
+}
+
+/**
+ * Odečte N pracovních dní od data (Europe/Prague), zachová hodinu:minutu z `from`.
+ */
+export function subtractWorkingDays(from: Date, workingDays: number): Date {
+  if (workingDays <= 0) return new Date(from.getTime());
+
+  let ymd = formatDateYmdPrague(from);
+  let remaining = workingDays;
+  while (remaining > 0) {
+    ymd = addDaysToYmdPrague(ymd, -1);
+    if (isCzechWorkingDay(ymd)) remaining -= 1;
+  }
+
+  const p = getPragueParts(from);
+  const h = String(p.hour).padStart(2, "0");
+  const min = String(p.minute).padStart(2, "0");
+  return parseDateTimeLocalInput(`${ymd}T${h}:${min}`);
+}
+
+/**
+ * Nepřítomného schvalovatele ponechat, pokud se vrátí nejpozději
+ * `APPROVER_RETURN_BUFFER_WORKING_DAYS` pracovních dní před začátkem události.
+ */
+export function shouldKeepAbsentApprover(
+  returnAt: Date,
+  eventStart: Date,
+  bufferWorkingDays: number = APPROVER_RETURN_BUFFER_WORKING_DAYS
+): boolean {
+  const deadline = subtractWorkingDays(eventStart, bufferWorkingDays);
+  return returnAt.getTime() <= deadline.getTime();
+}
+
+/**
+ * Konec aktuální absence (OOO pokrývající `at`). Při více překryvech max(end_date).
+ */
+export async function getCurrentAbsenceEnd(
+  db: Db,
+  userId: number,
+  at: Date,
+  excludeEventId?: number | null
+): Promise<Date | null> {
+  const rows = await db.calendar_events.findMany({
+    where: {
+      ...(excludeEventId ? { id: { not: excludeEventId } } : {}),
+      created_by: userId,
+      event_type: { in: CALENDAR_OUT_OF_OFFICE_TYPE_LIST },
+      start_date: { lte: at },
+      end_date: { gte: at },
+      OR: [{ approval_status: { not: "rejected" } }, { approval_status: null }],
+    },
+    select: { end_date: true },
+  });
+  if (rows.length === 0) return null;
+  let maxEnd = rows[0].end_date;
+  for (let i = 1; i < rows.length; i++) {
+    if (rows[i].end_date.getTime() > maxEnd.getTime()) maxEnd = rows[i].end_date;
+  }
+  return maxEnd;
+}
+
 export type ResolveDepartmentCalendarApproverOptions = {
   /** Okamžik kontroly přítomnosti; výchozí = teď (doba žádosti). */
   presenceAt?: Date;
+  /** Začátek schvalované události – pro rozhodnutí „počkat na návrat“. */
+  eventStart: Date;
   excludeEventId?: number | null;
 };
 
 /**
  * Vybere finálního schvalovatele po zástupovi: primární → sekundární → terciární → manager_id.
- * Přítomnost se posuzuje v okamžiku žádosti (`presenceAt`), ne v termínu schvalované události.
+ * Přítomnost se posuzuje v okamžiku žádosti (`presenceAt`).
+ * Nepřítomný se nepřeskakuje, pokud se vrátí ≥ 3 pracovní dny před `eventStart`.
  */
 export async function resolveDepartmentCalendarApprover(
   db: Db,
   departmentId: number,
-  options?: ResolveDepartmentCalendarApproverOptions
+  options: ResolveDepartmentCalendarApproverOptions
 ): Promise<ResolvedCalendarApprover | null> {
-  const presenceAt = options?.presenceAt ?? new Date();
-  const excludeEventId = options?.excludeEventId;
+  const presenceAt = options.presenceAt ?? new Date();
+  const eventStart = options.eventStart;
+  const excludeEventId = options.excludeEventId;
   const dept = await db.departments.findUnique({
     where: { id: departmentId },
     select: {
@@ -127,6 +211,17 @@ export async function resolveDepartmentCalendarApprover(
     if (!absent) {
       return { userId: c.userId, tier: c.tier, skippedTiers };
     }
+
+    const returnAt = await getCurrentAbsenceEnd(db, c.userId, presenceAt, excludeEventId);
+    if (returnAt && shouldKeepAbsentApprover(returnAt, eventStart)) {
+      return {
+        userId: c.userId,
+        tier: c.tier,
+        skippedTiers,
+        waitingForReturn: true,
+      };
+    }
+
     skippedTiers.push(c.tier);
   }
 
@@ -140,12 +235,16 @@ export async function resolveDepartmentCalendarApprover(
 export function formatApproverAssignmentNote(
   approverName: string,
   tier: CalendarApproverTier,
-  skippedTiers: CalendarApproverTier[]
+  skippedTiers: CalendarApproverTier[],
+  waitingForReturn?: boolean
 ): string {
   const tierLabel = calendarApproverTierLabel(tier);
+  const waitSuffix = waitingForReturn
+    ? " – nepřítomen, návrat včas, čeká se na schválení"
+    : "";
   if (skippedTiers.length === 0) {
-    return `Předáno ke schválení: ${approverName} (${tierLabel}).`;
+    return `Předáno ke schválení: ${approverName} (${tierLabel}${waitSuffix}).`;
   }
   const skipped = skippedTiers.map(calendarApproverTierLabel).join(", ");
-  return `Předáno ke schválení: ${approverName} (${tierLabel} – ${skipped} nepřítomen/nepřítomni).`;
+  return `Předáno ke schválení: ${approverName} (${tierLabel}${waitSuffix} – ${skipped} nepřítomen/nepřítomni).`;
 }

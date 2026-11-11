@@ -134,6 +134,7 @@ export async function POST(
 
       const resolved = await resolveDepartmentCalendarApprover(prisma, departmentId, {
         excludeEventId: id,
+        eventStart: event.start_date,
       });
 
       if (!resolved) {
@@ -204,7 +205,8 @@ export async function POST(
       const assignmentNote = formatApproverAssignmentNote(
         approverName,
         resolved.tier,
-        resolved.skippedTiers
+        resolved.skippedTiers,
+        resolved.waitingForReturn
       );
       const newDescription = event.description
         ? `${event.description}\n\n${approvalNote}\n${assignmentNote}`
