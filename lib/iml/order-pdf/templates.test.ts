@@ -194,6 +194,41 @@ Packaging: 125.000 EURO single use x \t1pcs (Non-Stackable)`;
     expect(r.items[1].customerMaterialNo).toBe("403435");
     expect(r.warnings).toEqual([]);
   });
+
+  it("parsuje SFA multiline s IG kódem a qty na dalším řádku (IK261703)", () => {
+    const text = `SFA Packaging B.V.
+PURCHASE ORDER
+Page : 1 / 1
+IK261703
+1805
+09-11-2026
+EUR
+Product \tSFAcode \tDescription \tQuantity \tUnit \tDelivery
+07-03-003 etiketa \t403113 \tIML Cup 480ml 945503 Kumars CP CHIC
+500G
+5.000 \tPcs \t09-11-2026
+07-01-003 dno \t403114 \tBottomlabel Cup 480ml 118mm 945503
+Kumars CP CHIC 500G
+5.000 \tPcs \t09-11-2026`;
+
+    const r = parseSfaOrderText(text);
+    expect(r.orderNumber).toBe("IK261703");
+    expect(r.orderDate).toBe("2026-11-09");
+    expect(r.currency).toBe("EUR");
+    expect(r.items).toHaveLength(2);
+    expect(r.items[0].yourMaterialNo).toBe("07-03-003");
+    expect(r.items[0].customerMaterialNo).toBe("403113");
+    expect(r.items[0].quantity).toBe(5000);
+    expect(r.items[0].deliveryDate).toBe("2026-11-09");
+    expect(r.items[0].description).toContain("Kumars");
+    expect(r.items[0].description).toContain("500G");
+    expect(r.items[1].yourMaterialNo).toBe("07-01-003");
+    expect(r.items[1].customerMaterialNo).toBe("403114");
+    expect(r.items[1].quantity).toBe(5000);
+    expect(r.items[1].deliveryDate).toBe("2026-11-09");
+    expect(r.items[1].description).toContain("Kumars");
+    expect(r.warnings).toEqual([]);
+  });
 });
 
 describe("parseJepaOrderText", () => {

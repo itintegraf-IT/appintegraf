@@ -16,6 +16,11 @@ import { normalizeLines, parseDashDate } from "./parse-utils";
  *   403434  IML cup 400ml …  125.000  Pcs  30-11-2026
  *   (jeden sloupec kódu = Product = SFAcode)
  *
+ * NL multiline (IG + SFAcode, qty na dalším řádku):
+ *   07-03-003 etiketa  403113  IML Cup 480ml …
+ *   500G
+ *   5.000  Pcs  09-11-2026
+ *
  * Množství "25.000" = 25000 (tečka = tisíce).
  */
 
@@ -23,6 +28,12 @@ const ORDER_NO_LINE = /^(IK|ODA)\d+/i;
 const ORDER_NO_CAPTURE = /^((?:IK|ODA)\d+)/i;
 const ORDER_NO_FALLBACK = /\b((?:IK|ODA)\d{5,})\b/i;
 const OUR_ORDERNO = /Our orderno\.?\s*:?\s*((?:IK|ODA)\S+)/i;
+
+/** Product = IG + typ (etiketa/dno…), SFAcode, začátek popisu. */
+const ITEM_START_IG =
+  /^(\d{2}-\d{2}-\d{3})\s+\S+\s+(\d{5,8})\s+(.+)$/i;
+const QTY_DELIVERY_LINE =
+  /^([\d.]+)\s+Pcs\s+(\d{1,2}-\d{1,2}-\d{4})$/i;
 
 function parseQty(raw: string): number | null {
   const cleaned = raw.trim().replace(/\./g, "").replace(",", ".");
@@ -117,9 +128,34 @@ export function parseSfaOrderText(text: string): ParsedPdfOrder {
   const itemReSingle =
     /^(\d{5,8})\s+(.+?)\s+([\d.]+)\s+Pcs\s+(\d{1,2}-\d{1,2}-\d{4})$/i;
 
+  let pending: {
+    yourMaterialNo: string;
+    customerMaterialNo: string;
+    description: string;
+  } | null = null;
+
+  const pushPending = (quantity: number | null, deliveryDate: string | null) => {
+    if (!pending) return;
+    items.push({
+      itemNo: String(items.length + 1).padStart(5, "0"),
+      description: pending.description.trim(),
+      customerMaterialNo: pending.customerMaterialNo,
+      yourMaterialNo: pending.yourMaterialNo,
+      quantity,
+      price: null,
+      priceBasis: 1,
+      netAmount: null,
+      deliveryDate,
+    });
+    pending = null;
+  };
+
   for (const line of lines) {
+    if (!line) continue;
+
     const dual = line.match(itemReDual);
     if (dual) {
+      pushPending(null, null);
       items.push({
         itemNo: String(items.length + 1).padStart(5, "0"),
         description: dual[3].trim(),
@@ -135,6 +171,7 @@ export function parseSfaOrderText(text: string): ParsedPdfOrder {
     }
     const single = line.match(itemReSingle);
     if (single) {
+      pushPending(null, null);
       const code = single[1];
       items.push({
         itemNo: String(items.length + 1).padStart(5, "0"),
@@ -149,10 +186,39 @@ export function parseSfaOrderText(text: string): ParsedPdfOrder {
       });
       continue;
     }
+
+    const igStart = line.match(ITEM_START_IG);
+    if (igStart) {
+      pushPending(null, null);
+      pending = {
+        yourMaterialNo: igStart[1],
+        customerMaterialNo: igStart[2],
+        description: igStart[3].trim(),
+      };
+      continue;
+    }
+
+    const qtyLine = line.match(QTY_DELIVERY_LINE);
+    if (qtyLine && pending) {
+      pushPending(parseQty(qtyLine[1]), parseDashDate(qtyLine[2]));
+      continue;
+    }
+
+    if (pending) {
+      if (/^Packaging:/i.test(line) || /^Page\s*:/i.test(line) || /^--\s*\d+\s+of/i.test(line)) {
+        pushPending(null, null);
+        if (/^Packaging:/i.test(line)) noteLines.push(line);
+        continue;
+      }
+      pending.description = `${pending.description} ${line}`.trim();
+      continue;
+    }
+
     if (/^Packaging:/i.test(line)) {
       noteLines.push(line);
     }
   }
+  pushPending(null, null);
 
   if (!orderNumber) warnings.push("V PDF se nepodařilo najít číslo objednávky (IK…/ODA…).");
   if (!orderDate) warnings.push("V PDF se nepodařilo najít datum objednávky.");
