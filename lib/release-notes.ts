@@ -40,7 +40,5 @@ export async function loadReleaseNotes(
 export function validateReleaseNotesData(
   value: unknown
 ): { ok: true; data: ReleaseNotesFile } | { ok: false; error: string } {
-  const result = validateReleaseNotes(value);
-  if (!result.ok) return result;
-  return { ok: true, data: result.data as ReleaseNotesFile };
+  return validateReleaseNotes(value);
 }
