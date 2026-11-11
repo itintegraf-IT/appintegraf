@@ -10,10 +10,20 @@ type Props = {
   link: string | null;
   readAt: Date | null;
   createdAt: Date;
+  type?: string | null;
 };
 
-export function NotificationLink({ id, title, message, link, readAt, createdAt }: Props) {
+export function NotificationLink({
+  id,
+  title,
+  message,
+  link,
+  readAt,
+  createdAt,
+  type,
+}: Props) {
   const router = useRouter();
+  const isSystemUpdate = type === "system_update";
 
   const handleClick = async () => {
     if (!readAt) {
@@ -32,7 +42,13 @@ export function NotificationLink({ id, title, message, link, readAt, createdAt }
     >
       <p className="font-medium text-gray-900">{title}</p>
       {message && (
-        <p className="text-sm text-gray-600 line-clamp-2">{message}</p>
+        <p
+          className={`text-sm text-gray-600 ${
+            isSystemUpdate ? "whitespace-pre-line" : "line-clamp-2"
+          }`}
+        >
+          {message}
+        </p>
       )}
       <p className="text-xs text-gray-500">
         {new Date(createdAt).toLocaleDateString("cs-CZ", {

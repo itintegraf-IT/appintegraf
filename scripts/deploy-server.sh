@@ -19,8 +19,8 @@
 #                         Příklad: --apply-sql 20260420_auth_tokens.sql
 #   --skip-migrate        přeskočí npx prisma migrate deploy
 #   --skip-build          přeskočí npm run build (jen pro nouzi)
-#   --announce            po PM2 restartu vždy rozešle systémové novinky (i mimo main)
-#   --skip-announce       přeskočí rozesílání novinek (i na main)
+#   --announce            po PM2 restartu vynutí announce (alias; default běží vždy)
+#   --skip-announce       přeskočí rozesílání systémových novinek
 
 set -euo pipefail
 
@@ -279,22 +279,22 @@ fi
 echo "==> PM2: restart $PM2_NAME"
 pm2 restart "$PM2_NAME"
 
-# Systémové novinky (data/release-notes.json → zvonek): default jen produkce (main)
+# Systémové novinky (data/release-notes.json → zvonek): default na test i produkci
 if [[ "$SKIP_ANNOUNCE" -eq 1 ]]; then
   echo "==> Novinky: přeskočeno (--skip-announce)"
-elif [[ "$DEPLOY_BRANCH" == "main" || "$FORCE_ANNOUNCE" -eq 1 ]]; then
+else
   echo "==> Novinky: announce:release (větev=$DEPLOY_BRANCH)"
   set +e
   npm run announce:release
   announce_exit=$?
   set -e
   if [[ "$announce_exit" -ne 0 ]]; then
-    echo "Upozornění: announce:release skončil s kódem $announce_exit (deploy jinak OK)."
+    echo ""
+    echo "!!! NOVINKY SE NEODESLALY (announce:release exit $announce_exit). Deploy aplikace jinak OK."
     echo "  Ručně: npm run announce:release"
+    echo "  Znovu po chybě: npm run announce:release -- --force"
     echo ""
   fi
-else
-  echo "==> Novinky: přeskočeno (větev $DEPLOY_BRANCH ≠ main; pro vynucení: --announce)"
 fi
 
 echo ""

@@ -29,8 +29,8 @@ Pokud Linux hlásí `bash\r: No such file or directory`, soubor má **Windows ko
 | `--apply-sql SOUBOR` | Aplikuje SQL soubor z `prisma/migrations/` (lze uvést víckrát). |
 | `--skip-migrate` | Přeskočí `npx prisma migrate deploy`. |
 | `--skip-build` | Přeskočí `npm run build` (nouzově). |
-| `--announce` | Po restartu PM2 vždy rozešle systémové novinky (i mimo větev `main`). |
-| `--skip-announce` | Přeskočí rozesílání novinek (i na `main`). |
+| `--announce` | Alias; rozesílání novinek běží defaultně na testu i produkci. |
+| `--skip-announce` | Přeskočí rozesílání systémových novinek. |
 
 Proměnné prostředí `DEPLOY_BRANCH` a `PM2_APP_NAME` mají stejný efekt jako `--branch` a `--pm2-name`.
 
@@ -80,7 +80,7 @@ Při nesouladu skript skončí chybou a build ani restart se nespustí.
 
 ### Systémové novinky (zvonek po nasazení)
 
-Po úspěšném **produkčním** deployi (`DEPLOY_BRANCH=main`) skript automaticky zavolá `npm run announce:release`. Ten přečte [`data/release-notes.json`](data/release-notes.json) a do zvonku (`type: system_update`) pošle jen **ještě neoznámené** release.
+Po úspěšném deployi (test i produkce) skript automaticky zavolá `npm run announce:release`. Ten přečte [`data/release-notes.json`](data/release-notes.json) a do zvonku (`type: system_update`) pošle jen **ještě neoznámené** release.
 
 **Filtrování podle modulů:** každá položka má `modules` (klíče jako v administraci: `makety`, `iml`, `calendar`, …). Uživatel dostane jen body, ke kterým má alespoň `read` přístup. Prázdné `modules: []` = globální novinka pro všechny aktivní uživatele. Jedna notifikace = jeden release (v message jen relevantní body).
 
@@ -110,8 +110,9 @@ Příklad položky:
 | `npm run db:system-release-announcements` | Vytvoří tabulku idempotence (běží i v deploy skriptu) |
 | `npm run announce:release` | Ruční rozeslání nezveřejněných novinek |
 | `npm run announce:release -- --dry-run` | Náhled bez zápisu |
+| `npm run announce:release -- --force` | Smaže záznamy idempotence pro release v JSON a pošle znovu |
 
-Test prostředí (`test` větev) novinky **defaultně neposílá**; vynucení: `./scripts/deploy-server.sh --branch test --pm2-name appintegraf-test --announce`.
+Vypnutí novinek u konkrétního deploye: `--skip-announce`.
 
 SQL soubor: [`prisma/migrations/20261111_system_release_announcements.sql`](prisma/migrations/20261111_system_release_announcements.sql).
 

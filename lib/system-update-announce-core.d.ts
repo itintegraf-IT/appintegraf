@@ -43,10 +43,13 @@ export function announcePendingReleases(
     releases: ReleaseNote[];
     gitSha?: string | null;
     dryRun?: boolean;
+    force?: boolean;
+    databaseLabel?: string | null;
     log?: (msg: string) => void;
   }
 ): Promise<{
   announced: { releaseId: string; recipientCount: number }[];
   totalRecipients: number;
   skipped: number;
+  zeroRecipientIds?: string[];
 }>;

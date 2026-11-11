@@ -195,7 +195,12 @@ export function NotificationsDropdown() {
                       {n.title}
                     </p>
                     {n.message && (
-                      <p className="mt-0.5 line-clamp-2 pl-4 text-xs" style={{ color: "var(--muted-foreground)" }}>
+                      <p
+                        className={`mt-0.5 pl-4 text-xs ${
+                          n.type === "system_update" ? "whitespace-pre-line" : "line-clamp-2"
+                        }`}
+                        style={{ color: "var(--muted-foreground)" }}
+                      >
                         {n.message}
                       </p>
                     )}
@@ -303,7 +308,12 @@ export function NotificationsDropdown() {
                       {n.title}
                     </p>
                     {n.message && (
-                      <p className="mt-0.5 line-clamp-2 pl-4 text-xs" style={{ color: "var(--muted-foreground)" }}>
+                      <p
+                        className={`mt-0.5 pl-4 text-xs ${
+                          n.type === "system_update" ? "whitespace-pre-line" : "line-clamp-2"
+                        }`}
+                        style={{ color: "var(--muted-foreground)" }}
+                      >
                         {n.message}
                       </p>
                     )}

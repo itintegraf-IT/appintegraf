@@ -6,6 +6,7 @@ export type AnnounceSystemUpdatesOptions = {
   cwd?: string;
   gitSha?: string | null;
   dryRun?: boolean;
+  force?: boolean;
   log?: (msg: string) => void;
 };
 
@@ -21,6 +22,7 @@ export async function announcePendingSystemUpdates(
     releases: notes.releases,
     gitSha: opts.gitSha,
     dryRun: opts.dryRun,
+    force: opts.force,
     log: opts.log,
   });
 }

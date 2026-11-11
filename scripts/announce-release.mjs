@@ -8,7 +8,9 @@
  * Spuštění:
  *   node scripts/announce-release.mjs
  *   node scripts/announce-release.mjs --dry-run
+ *   node scripts/announce-release.mjs --force
  *   npm run announce:release
+ *   npm run announce:release -- --force
  */
 import { readFileSync, existsSync } from "fs";
 import path from "path";
@@ -38,6 +40,16 @@ function parseDatabaseUrl(url) {
   };
 }
 
+/** Bezpečný popis DB pro log (bez hesla). */
+function databaseLabel(url) {
+  try {
+    const cfg = parseDatabaseUrl(url);
+    return `${cfg.host}:${cfg.port}/${cfg.database || "?"}`;
+  } catch {
+    return "(nepodařilo se parsovat DATABASE_URL)";
+  }
+}
+
 function gitSha() {
   try {
     return execSync("git rev-parse HEAD", { cwd: ROOT, encoding: "utf8" }).trim();
@@ -48,6 +60,7 @@ function gitSha() {
 
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
+  const force = process.argv.includes("--force");
   const url = process.env.DATABASE_URL;
   if (!url) {
     console.error("CHYBA: Chybí DATABASE_URL (.env).");
@@ -80,6 +93,9 @@ async function main() {
     return;
   }
 
+  const dbLabel = databaseLabel(url);
+  console.log(`announce-release: db=${dbLabel}${dryRun ? " dry-run" : ""}${force ? " force" : ""}`);
+
   const adapter = new PrismaMariaDb(parseDatabaseUrl(url));
   const prisma = new PrismaClient({ adapter });
 
@@ -88,6 +104,8 @@ async function main() {
       releases: parsed.data.releases,
       gitSha: gitSha(),
       dryRun,
+      force,
+      databaseLabel: dbLabel,
       log: (msg) => console.log(`  ${msg}`),
     });
 
@@ -105,7 +123,9 @@ async function main() {
       console.error(
         "  ./scripts/deploy-server.sh --apply-sql 20261111_system_release_announcements.sql"
       );
+      console.error("  nebo: npm run db:system-release-announcements");
     }
+    console.error("!!! NOVINKY SE NEODESLALY");
     console.error(e);
     process.exit(1);
   } finally {
@@ -114,6 +134,7 @@ async function main() {
 }
 
 main().catch((e) => {
+  console.error("!!! NOVINKY SE NEODESLALY");
   console.error(e);
   process.exit(1);
 });

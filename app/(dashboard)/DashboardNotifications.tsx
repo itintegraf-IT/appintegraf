@@ -52,6 +52,7 @@ function NotificationGroup({
               link={n.link}
               readAt={n.read_at}
               createdAt={n.created_at}
+              type={n.type}
             />
           ))}
         </div>
