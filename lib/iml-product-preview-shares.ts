@@ -128,9 +128,10 @@ export async function loadImlPreviewProductImage(
       },
     },
   });
-  const data = item?.product?.image_data;
-  if (data == null) return null;
+  const product = item?.product;
+  const data = product?.image_data;
+  if (product == null || data == null) return null;
   const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
   if (buffer.length === 0) return null;
-  return { buffer, ig_code: item.product.ig_code };
+  return { buffer, ig_code: product.ig_code };
 }
