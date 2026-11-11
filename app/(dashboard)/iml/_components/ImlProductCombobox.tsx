@@ -15,6 +15,9 @@ type Props = {
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+  inputClassName?: string;
+  /** Předvyplní hledání při focusu, pokud není vybraný produkt (např. IG z PDF). */
+  defaultQuery?: string;
 };
 
 export default function ImlProductCombobox({
@@ -25,6 +28,8 @@ export default function ImlProductCombobox({
   disabled = false,
   placeholder = "Hledat produkt (kód / název)…",
   className = "",
+  inputClassName = "",
+  defaultQuery = "",
 }: Props) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -80,9 +85,9 @@ export default function ImlProductCombobox({
         }}
         onFocus={() => {
           setOpen(true);
-          setQuery(selected ? formatProductLabel(selected) : "");
+          setQuery(selected ? formatProductLabel(selected) : defaultQuery);
         }}
-        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50"
+        className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 ${inputClassName}`}
       />
       {open && !disabled && (
         <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border border-gray-200 bg-white py-1 shadow-lg">

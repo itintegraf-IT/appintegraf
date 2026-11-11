@@ -5,6 +5,8 @@ import Link from "next/link";
 import { FileText, Upload, AlertTriangle } from "lucide-react";
 import { ORDER_PDF_TEMPLATES } from "@/lib/iml/order-pdf/registry";
 import { CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE } from "@/lib/iml/order-job-number";
+import ImlProductCombobox from "@/app/(dashboard)/iml/_components/ImlProductCombobox";
+import type { ImlSearchableProduct } from "@/lib/iml-product-search";
 
 type Customer = { id: number; name: string };
 type ProductOption = {
@@ -106,9 +108,6 @@ export function PdfOrderImport() {
       .then((d) => setCustomerProducts(d.products ?? []))
       .catch(() => setCustomerProducts([]));
   }, [form.customer_id]);
-
-  const productOptionLabel = (p: ProductOption) =>
-    `${p.ig_code ?? `#${p.id}`} — ${p.client_name ?? p.ig_short_name ?? "Bez názvu"}`;
 
   const customerProductIds = useMemo(
     () => new Set(customerProducts.map((p) => p.id)),
@@ -499,6 +498,20 @@ export function PdfOrderImport() {
                     const selectedId = row.productId ? parseInt(row.productId, 10) : null;
                     const showFallbackOption =
                       selectedId != null && !customerProductIds.has(selectedId);
+                    const rowProducts: ImlSearchableProduct[] = showFallbackOption
+                      ? [
+                          {
+                            id: selectedId!,
+                            ig_code: row.yourMaterialNo,
+                            client_code: row.customerMaterialNo,
+                            client_name: row.productLabel,
+                            ig_short_name: row.productLabel,
+                          },
+                          ...customerProducts,
+                        ]
+                      : customerProducts;
+                    const searchHint =
+                      row.yourMaterialNo?.trim() || row.customerMaterialNo?.trim() || "";
                     return (
                       <tr
                         key={`${row.itemNo}-${index}`}
@@ -518,25 +531,16 @@ export function PdfOrderImport() {
                         </td>
                         <td className="px-3 py-2 font-mono text-xs">{row.yourMaterialNo ?? "—"}</td>
                         <td className="px-3 py-2">
-                          <select
+                          <ImlProductCombobox
+                            products={rowProducts}
                             value={row.productId}
-                            onChange={(e) => setRowField(index, "productId", e.target.value)}
-                            className={`w-full min-w-[200px] rounded border px-2 py-1 text-sm ${
-                              matched ? "border-gray-300" : "border-amber-400 bg-white"
-                            }`}
-                          >
-                            <option value="">— Vyberte produkt —</option>
-                            {showFallbackOption && (
-                              <option value={selectedId!}>
-                                {row.productLabel ?? `#${selectedId}`}
-                              </option>
-                            )}
-                            {customerProducts.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {productOptionLabel(p)}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={(v) => setRowField(index, "productId", v)}
+                            defaultQuery={searchHint}
+                            placeholder="Hledat podle IG / kódu / názvu…"
+                            inputClassName={
+                              matched ? "" : "border-amber-400 bg-white focus:border-amber-500"
+                            }
+                          />
                           {row.matchedBy && (
                             <span className="text-xs text-gray-500">
                               Spárováno dle {row.matchedBy === "client_code" ? "kódu klienta" : "kódu IG"}
