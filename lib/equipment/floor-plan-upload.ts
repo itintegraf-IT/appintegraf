@@ -25,13 +25,13 @@ export async function saveFloorPlanUpload(
   let outBuf: Buffer = buf;
   let ext = verified.ext;
   if (verified.mime === "application/pdf") {
-    const { pdfBufferToJpeg } = await import("@/lib/iml-product-preview-pdf-server");
-    const jpeg = await pdfBufferToJpeg(buf, { maxSide: 2800, jpegQuality: 0.92 });
-    if (!jpeg) {
-      console.error("floor plan: převod PDF na obrázek selhal (na serveru ověřte npm run verify:canvas)");
+    const { pdfBufferToJpegResult } = await import("@/lib/iml-product-preview-pdf-server");
+    const jpeg = await pdfBufferToJpegResult(buf, { maxSide: 2800, jpegQuality: 0.92 });
+    if (!jpeg.ok) {
+      console.error("floor plan: převod PDF na obrázek selhal:", jpeg.reason);
       throw new FloorPlanUploadError("PDF se nepodařilo převést na obrázek. Nahrajte PNG nebo JPG.");
     }
-    outBuf = jpeg;
+    outBuf = jpeg.buffer;
     ext = ".jpg";
   }
   if (outBuf.length > FLOOR_PLAN_MAX_BYTES) {

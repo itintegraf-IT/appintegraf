@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/db";
 import { logImlAudit } from "@/lib/iml-audit";
-import { pdfBufferToJpeg, isPdfThumbnailGenerationAvailable } from "@/lib/iml-product-preview-pdf-server";
+import {
+  pdfBufferToJpegResult,
+  isPdfThumbnailGenerationAvailable,
+} from "@/lib/iml-product-preview-pdf-server";
 import { resolveProductPdfBuffer } from "@/lib/iml-product-archive";
 
 const MAX_PREVIEW_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -62,13 +65,13 @@ export async function ensureProductThumbnailFromPdf(
     return false;
   }
 
-  const jpeg = await pdfBufferToJpeg(pdfBuffer, {
+  const jpeg = await pdfBufferToJpegResult(pdfBuffer, {
     maxSide: LIST_THUMB_MAX_SIDE,
     jpegQuality: LIST_THUMB_JPEG_QUALITY,
   });
-  if (!jpeg) return false;
+  if (!jpeg.ok) return false;
 
-  await saveProductPreviewImage(productId, jpeg, userId, "pdf_thumb");
+  await saveProductPreviewImage(productId, jpeg.buffer, userId, "pdf_thumb");
   return true;
 }
 

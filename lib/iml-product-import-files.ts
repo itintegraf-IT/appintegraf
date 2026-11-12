@@ -3,7 +3,7 @@ import path from "path";
 import { prisma } from "@/lib/db";
 import { logImlAudit } from "@/lib/iml-audit";
 import type { ClassifiedZipFile } from "@/lib/iml-product-import-zip";
-import { pdfBufferToJpeg } from "@/lib/iml-product-preview-pdf-server";
+import { pdfBufferToJpegResult } from "@/lib/iml-product-preview-pdf-server";
 import {
   ensureProductThumbnailFromPdf,
   saveProductPreviewImage,
@@ -160,13 +160,13 @@ async function loadPreviewBuffer(
 ): Promise<Buffer> {
   const raw = await readFile(absPath);
   if (file.ext === ".pdf" || isPdfBuffer(raw)) {
-    const jpeg = await pdfBufferToJpeg(raw);
-    if (!jpeg) {
+    const jpeg = await pdfBufferToJpegResult(raw);
+    if (!jpeg.ok) {
       throw new Error(
-        "Náhled z PDF na serveru není k dispozici – použijte JPG/PNG pro softproof"
+        `Náhled z PDF na serveru není k dispozici (${jpeg.reason}) – použijte JPG/PNG pro softproof`
       );
     }
-    return jpeg;
+    return jpeg.buffer;
   }
   if (!IMAGE_EXT.has(file.ext)) {
     throw new Error(`Nepodporovaný formát náhledu: ${file.ext}`);

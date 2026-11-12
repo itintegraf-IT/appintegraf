@@ -5,6 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Download, Eye, Pencil, Trash2, Upload } from "lucide-react";
 import { VykresyPdfPreview } from "@/app/(dashboard)/vykresy/_components/VykresyPdfPreview";
+import { pdfFileToJpegPreviewBlob } from "@/lib/iml-product-preview-from-pdf";
+import {
+  TECHNOLOGIE_THUMB_JPEG_QUALITY,
+  TECHNOLOGIE_THUMB_MAX_SIDE,
+} from "@/lib/technologie/constants";
 
 type FileRow = {
   id: number;
@@ -92,19 +97,36 @@ export function TechnologieDetailClient({
     try {
       const fd = new FormData();
       fd.append("file", file);
+
+      try {
+        const thumbBlob = await pdfFileToJpegPreviewBlob(file, {
+          maxSide: TECHNOLOGIE_THUMB_MAX_SIDE,
+          jpegQuality: TECHNOLOGIE_THUMB_JPEG_QUALITY,
+        });
+        fd.append("thumbnail", thumbBlob, "nahled.jpg");
+      } catch (e) {
+        console.warn(
+          "technologie: klientský náhled se nepodařilo vytvořit",
+          e instanceof Error ? e.message : e
+        );
+      }
+
       const res = await fetch(`/api/technologie/${id}/files`, { method: "POST", body: fd });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
         thumbnailCreated?: boolean;
+        thumbnailError?: string | null;
       };
       if (!res.ok) {
         setActionError(data.error ?? "Nahrání se nezdařilo.");
         return;
       }
       if (data.thumbnailCreated === false) {
-        setActionError(
-          "PDF bylo uloženo, ale náhled se nepodařilo vygenerovat (zkontrolujte @napi-rs/canvas na serveru)."
-        );
+        const detail =
+          typeof data.thumbnailError === "string" && data.thumbnailError.trim()
+            ? data.thumbnailError.trim()
+            : "zkontrolujte @napi-rs/canvas na serveru (npm run verify:canvas)";
+        setActionError(`PDF bylo uloženo, ale náhled se nepodařilo vygenerovat (${detail}).`);
       }
       await load();
       router.refresh();

@@ -8,7 +8,7 @@ import {
   attachProductPreviewImage,
   isPdfBuffer,
 } from "@/lib/iml-product-import-files";
-import { pdfBufferToJpeg } from "@/lib/iml-product-preview-pdf-server";
+import { pdfBufferToJpegResult } from "@/lib/iml-product-preview-pdf-server";
 import { ensureProductThumbnailFromPdf } from "@/lib/iml-product-thumbnail";
 import { markImlProductDataChanged } from "@/lib/iml-product-data-change";
 
@@ -59,13 +59,13 @@ async function attachSoftproofPreviewFromBuffer(
   if (IMAGE_EXT.has(ext) && !isPdfBuffer(buffer)) {
     previewBuffer = buffer;
   } else if (isPdf) {
-    const jpeg = await pdfBufferToJpeg(buffer);
-    if (!jpeg) {
+    const jpeg = await pdfBufferToJpegResult(buffer);
+    if (!jpeg.ok) {
       throw new Error(
-        "Softproof PDF nelze převést na náhled – nahrajte JPG/PNG nebo ověřte PDF službu"
+        `Softproof PDF nelze převést na náhled (${jpeg.reason}). Nahrajte JPG/PNG.`
       );
     }
-    previewBuffer = jpeg;
+    previewBuffer = jpeg.buffer;
   } else {
     throw new Error(`Nepodporovaný formát softproofu: ${ext || "neznámý"}`);
   }

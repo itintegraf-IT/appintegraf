@@ -3,10 +3,18 @@
  * Používá @napi-rs/canvas (prebuilt binárky, bez libcairo na serveru).
  */
 
-export async function pdfBufferToJpeg(
+export type PdfToJpegResult =
+  | { ok: true; buffer: Buffer }
+  | { ok: false; reason: string };
+
+/**
+ * Převod PDF → JPEG s důvodem selhání (pro API / logy).
+ * Při chybě loguje `[pdf-preview]` a vrací `{ ok: false, reason }`.
+ */
+export async function pdfBufferToJpegResult(
   pdfBuffer: Buffer,
   opts?: { maxSide?: number; jpegQuality?: number }
-): Promise<Buffer | null> {
+): Promise<PdfToJpegResult> {
   const maxSide = opts?.maxSide ?? 900;
   const jpegQuality = opts?.jpegQuality ?? 0.88;
 
@@ -17,12 +25,20 @@ export async function pdfBufferToJpeg(
     pdfBuffer[2] !== 0x44 ||
     pdfBuffer[3] !== 0x46
   ) {
-    return null;
+    const reason = "Soubor není platné PDF (chybí hlavička %PDF).";
+    console.warn("[pdf-preview]", reason);
+    return { ok: false, reason };
   }
 
   try {
     const canvasMod = await importOptionalCanvas();
-    if (!canvasMod) return null;
+    if (!canvasMod) {
+      const reason =
+        lastCanvasLoadError ??
+        "Modul @napi-rs/canvas se nepodařilo načíst (npm run verify:canvas).";
+      console.error("[pdf-preview]", reason);
+      return { ok: false, reason };
+    }
 
     const { createCanvas } = canvasMod;
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
@@ -44,7 +60,11 @@ export async function pdfBufferToJpeg(
         Math.floor(viewport.height)
       );
       const ctx = canvas.getContext("2d");
-      if (!ctx) return null;
+      if (!ctx) {
+        const reason = "Nepodařilo se vytvořit 2D kontext canvas.";
+        console.error("[pdf-preview]", reason);
+        return { ok: false, reason };
+      }
 
       await page
         .render({
@@ -56,13 +76,24 @@ export async function pdfBufferToJpeg(
 
       const quality = Math.min(100, Math.max(1, Math.round(jpegQuality * 100)));
       const encoded = await canvas.encode("jpeg", quality);
-      return Buffer.from(encoded);
+      return { ok: true, buffer: Buffer.from(encoded) };
     } finally {
       await pdf.destroy();
     }
-  } catch {
-    return null;
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    console.error("[pdf-preview] render failed:", reason);
+    return { ok: false, reason: `Převod PDF na náhled selhal: ${reason}` };
   }
+}
+
+/** Kompatibilní wrapper — vrací Buffer nebo null. */
+export async function pdfBufferToJpeg(
+  pdfBuffer: Buffer,
+  opts?: { maxSide?: number; jpegQuality?: number }
+): Promise<Buffer | null> {
+  const result = await pdfBufferToJpegResult(pdfBuffer, opts);
+  return result.ok ? result.buffer : null;
 }
 
 export type CanvasLoadDiagnostics = {

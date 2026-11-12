@@ -94,11 +94,27 @@ export async function POST(
     }
 
     const buf = Buffer.from(await file.arrayBuffer());
-    const { pdfId, thumbnailCreated } = await saveTechnologiePdfUpload(
+
+    let clientThumb: Buffer | null = null;
+    const thumbPart = formData.get("thumbnail");
+    if (thumbPart instanceof File && thumbPart.size > 0) {
+      const thumbBuf = Buffer.from(await thumbPart.arrayBuffer());
+      const isJpeg =
+        thumbBuf.length >= 3 &&
+        thumbBuf[0] === 0xff &&
+        thumbBuf[1] === 0xd8 &&
+        thumbBuf[2] === 0xff;
+      if (isJpeg && thumbBuf.length <= 5 * 1024 * 1024) {
+        clientThumb = thumbBuf;
+      }
+    }
+
+    const { pdfId, thumbnailCreated, thumbnailError } = await saveTechnologiePdfUpload(
       recordId,
       userId,
       file.name,
-      buf
+      buf,
+      clientThumb
     );
 
     const row = await prisma.file_uploads.findUnique({
@@ -106,7 +122,11 @@ export async function POST(
       include: { users: { select: { first_name: true, last_name: true } } },
     });
 
-    return NextResponse.json({ file: row, thumbnailCreated });
+    return NextResponse.json({
+      file: row,
+      thumbnailCreated,
+      thumbnailError: thumbnailCreated ? null : thumbnailError,
+    });
   } catch (e) {
     console.error("technologie files POST:", e);
     return NextResponse.json({ error: "Chyba při nahrávání souboru" }, { status: 500 });

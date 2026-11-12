@@ -1,7 +1,7 @@
 import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { prisma } from "@/lib/db";
-import { pdfBufferToJpeg } from "@/lib/iml-product-preview-pdf-server";
+import { pdfBufferToJpegResult } from "@/lib/iml-product-preview-pdf-server";
 import {
   TECHNOLOGIE_DOC_PDF,
   TECHNOLOGIE_DOC_THUMBNAIL,
@@ -52,12 +52,50 @@ export async function deleteTechnologiePdfAndThumbnail(recordId: number): Promis
   }
 }
 
+async function persistTechnologieThumbnail(
+  recordId: number,
+  userId: number,
+  jpeg: Buffer
+): Promise<void> {
+  const uploadDir = technologieUploadDir();
+  await mkdir(uploadDir, { recursive: true });
+
+  const thumbSafeName = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}.jpg`;
+  const thumbWebPath = `/uploads/technologie/${thumbSafeName}`;
+  await writeFile(path.join(uploadDir, thumbSafeName), jpeg);
+
+  await prisma.file_uploads.create({
+    data: {
+      filename: thumbSafeName,
+      original_filename: "nahled.jpg",
+      file_path: thumbWebPath,
+      file_size: jpeg.length,
+      mime_type: "image/jpeg",
+      module: TECHNOLOGIE_MODULE,
+      record_id: recordId,
+      document_type: TECHNOLOGIE_DOC_THUMBNAIL,
+      uploaded_by: userId,
+      is_public: false,
+    },
+  });
+
+  await prisma.technologie.update({
+    where: { id: recordId },
+    data: { preview_updated_at: new Date(), updated_at: new Date() },
+  });
+}
+
+function isJpegBuffer(buf: Buffer): boolean {
+  return buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+}
+
 export async function saveTechnologiePdfUpload(
   recordId: number,
   userId: number,
   originalName: string,
-  pdfBuffer: Buffer
-): Promise<{ pdfId: number; thumbnailCreated: boolean }> {
+  pdfBuffer: Buffer,
+  clientThumbnail?: Buffer | null
+): Promise<{ pdfId: number; thumbnailCreated: boolean; thumbnailError: string | null }> {
   await deleteTechnologiePdfAndThumbnail(recordId);
 
   const uploadDir = technologieUploadDir();
@@ -83,42 +121,47 @@ export async function saveTechnologiePdfUpload(
   });
 
   let thumbnailCreated = false;
-  const jpeg = await pdfBufferToJpeg(pdfBuffer, {
-    maxSide: TECHNOLOGIE_THUMB_MAX_SIDE,
-    jpegQuality: TECHNOLOGIE_THUMB_JPEG_QUALITY,
-  });
+  let thumbnailError: string | null = null;
 
-  if (jpeg) {
-    const thumbSafeName = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}.jpg`;
-    const thumbWebPath = `/uploads/technologie/${thumbSafeName}`;
-    await writeFile(path.join(uploadDir, thumbSafeName), jpeg);
+  const clientJpeg =
+    clientThumbnail && isJpegBuffer(clientThumbnail) && clientThumbnail.length > 0
+      ? clientThumbnail
+      : null;
 
-    await prisma.file_uploads.create({
-      data: {
-        filename: thumbSafeName,
-        original_filename: "nahled.jpg",
-        file_path: thumbWebPath,
-        file_size: jpeg.length,
-        mime_type: "image/jpeg",
-        module: TECHNOLOGIE_MODULE,
-        record_id: recordId,
-        document_type: TECHNOLOGIE_DOC_THUMBNAIL,
-        uploaded_by: userId,
-        is_public: false,
-      },
-    });
-    thumbnailCreated = true;
-    await prisma.technologie.update({
-      where: { id: recordId },
-      data: { preview_updated_at: new Date(), updated_at: new Date() },
-    });
-  } else {
-    await prisma.technologie.update({
-      where: { id: recordId },
-      data: { preview_updated_at: null, updated_at: new Date() },
-    });
-    console.warn("technologie: thumbnail generation failed for record", recordId);
+  if (clientJpeg) {
+    try {
+      await persistTechnologieThumbnail(recordId, userId, clientJpeg);
+      thumbnailCreated = true;
+    } catch (e) {
+      thumbnailError =
+        e instanceof Error ? e.message : "Uložení klientského náhledu selhalo.";
+      console.error("technologie: client thumbnail save failed", recordId, thumbnailError);
+    }
   }
 
-  return { pdfId: pdfRow.id, thumbnailCreated };
+  if (!thumbnailCreated) {
+    const jpeg = await pdfBufferToJpegResult(pdfBuffer, {
+      maxSide: TECHNOLOGIE_THUMB_MAX_SIDE,
+      jpegQuality: TECHNOLOGIE_THUMB_JPEG_QUALITY,
+    });
+
+    if (jpeg.ok) {
+      await persistTechnologieThumbnail(recordId, userId, jpeg.buffer);
+      thumbnailCreated = true;
+      thumbnailError = null;
+    } else {
+      thumbnailError = jpeg.reason;
+      await prisma.technologie.update({
+        where: { id: recordId },
+        data: { preview_updated_at: null, updated_at: new Date() },
+      });
+      console.warn(
+        "technologie: thumbnail generation failed for record",
+        recordId,
+        jpeg.reason
+      );
+    }
+  }
+
+  return { pdfId: pdfRow.id, thumbnailCreated, thumbnailError };
 }
