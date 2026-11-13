@@ -7,6 +7,10 @@ import {
   partyRoleForMaketa,
 } from "@/lib/makety-notify-matrix";
 import {
+  buildMaketaEmailSubject,
+  buildMaketaEmailSubjectRef,
+} from "@/lib/makety-notify-subject";
+import {
   maketyWorkTypeWording,
   normalizeMaketyWorkType,
   type MaketyWorkType,
@@ -290,8 +294,16 @@ export async function notifyMaketaUsers(params: {
       select: { id: true, email: true, first_name: true, last_name: true },
     });
 
+    const subjectRef = buildMaketaEmailSubjectRef({
+      maketaId: params.maketaId,
+      workType,
+      orderNumber: params.orderNumber,
+      jobNumber: product.jobNumber,
+      labelCode: product.labelCode,
+    });
+
     await sendMaketaEmailsToUsers(users, {
-      subject: `${title} – INTEGRAF`,
+      subject: buildMaketaEmailSubject(title, subjectRef),
       intro,
       bodyPreview: params.bodyPreview,
       orderNumber: params.orderNumber,

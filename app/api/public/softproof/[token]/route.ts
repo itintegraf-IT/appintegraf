@@ -234,12 +234,14 @@ export async function POST(
       },
     });
 
+    const notifyOrderNumber = maketa.job_number || maketa.order_number;
+
     if (decision.action === "approved") {
       await notifyMaketaUsers({
         maketaId: maketa.id,
         userIds: [maketa.created_by],
         bodyPreview: notifyPreview,
-        orderNumber: maketa.order_number,
+        orderNumber: notifyOrderNumber,
         kind: "client_approved",
         workType: "grafika",
       });
@@ -248,7 +250,7 @@ export async function POST(
         maketaId: maketa.id,
         userIds: [maketa.assignee_user_id, maketa.created_by],
         bodyPreview: notifyPreview,
-        orderNumber: maketa.order_number,
+        orderNumber: notifyOrderNumber,
         kind: "client_rejected",
         workType: "grafika",
       });
