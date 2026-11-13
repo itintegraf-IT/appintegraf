@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft, Upload, FileSpreadsheet, GripVertical } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -14,12 +14,25 @@ const TARGET_FIELDS = [
   { key: "order_date", label: "Datum objednávky", required: true },
   { key: "status", label: "Stav", required: false },
   { key: "notes", label: "Poznámky", required: false },
-  { key: "product_identifier", label: "Produkt (kód IG / SKU / název)", required: true },
+  {
+    key: "product_identifier",
+    label: "Produkt (kód IG / SKU / kód klienta / název)",
+    required: true,
+  },
   { key: "quantity", label: "Množství", required: true },
   { key: "unit_price", label: "Jednotková cena", required: false },
 ] as const;
 
 type Mapping = Record<string, number>;
+type CustomerOption = { id: number; name: string };
+
+function todayIsoDate(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 
 function parseCsv(text: string): string[][] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
@@ -44,6 +57,10 @@ function parseCsv(text: string): string[][] {
   return result;
 }
 
+function isMapped(mapping: Mapping, key: string): boolean {
+  return typeof mapping[key] === "number" && mapping[key] >= 0;
+}
+
 function CsvOrdersImport() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -55,6 +72,25 @@ function CsvOrdersImport() {
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [draggedCol, setDraggedCol] = useState<number | null>(null);
+  const [customers, setCustomers] = useState<CustomerOption[]>([]);
+  const [headerCustomerId, setHeaderCustomerId] = useState("");
+  const [headerOrderNumber, setHeaderOrderNumber] = useState("");
+  const [headerOrderDate, setHeaderOrderDate] = useState(todayIsoDate);
+  const [headerJobNumber, setHeaderJobNumber] = useState("");
+
+  useEffect(() => {
+    fetch("/api/iml/customers?scope=units")
+      .then((r) => r.json())
+      .then((d) => setCustomers(Array.isArray(d.customers) ? d.customers : []))
+      .catch(() => setCustomers([]));
+  }, []);
+
+  const resetHeaderDefaults = () => {
+    setHeaderCustomerId("");
+    setHeaderOrderNumber("");
+    setHeaderOrderDate(todayIsoDate());
+    setHeaderJobNumber("");
+  };
 
   const parseFile = useCallback((f: File) => {
     const ext = f.name.toLowerCase();
@@ -75,7 +111,7 @@ function CsvOrdersImport() {
             setHeaders([]);
             setRows([]);
           }
-        } catch (err) {
+        } catch {
           setError("Nepodařilo se načíst Excel soubor");
         }
       };
@@ -103,6 +139,7 @@ function CsvOrdersImport() {
     setResult(null);
     setError("");
     setMapping({});
+    resetHeaderDefaults();
     if (f) parseFile(f);
     else {
       setHeaders([]);
@@ -114,11 +151,17 @@ function CsvOrdersImport() {
     e.preventDefault();
     setDragOver(null);
     const f = e.dataTransfer.files?.[0];
-    if (f && (f.name.toLowerCase().endsWith(".csv") || f.name.toLowerCase().endsWith(".xlsx") || f.name.toLowerCase().endsWith(".xls"))) {
+    if (
+      f &&
+      (f.name.toLowerCase().endsWith(".csv") ||
+        f.name.toLowerCase().endsWith(".xlsx") ||
+        f.name.toLowerCase().endsWith(".xls"))
+    ) {
       setFile(f);
       setResult(null);
       setError("");
       setMapping({});
+      resetHeaderDefaults();
       parseFile(f);
     } else {
       setError("Podporované formáty: CSV, Excel (.xlsx, .xls)");
@@ -151,10 +194,35 @@ function CsvOrdersImport() {
     });
   };
 
-  const canImport = () => {
-    const required = TARGET_FIELDS.filter((f) => f.required);
-    return file && required.every((f) => typeof mapping[f.key] === "number" && mapping[f.key] >= 0);
-  };
+  const missingRequirements = useMemo(() => {
+    if (!file || headers.length === 0) return [] as string[];
+    const missing: string[] = [];
+    if (!isMapped(mapping, "product_identifier")) {
+      missing.push("Produkt (kód IG / SKU / kód klienta / název) — namapujte sloupec");
+    }
+    if (!isMapped(mapping, "quantity")) {
+      missing.push("Množství — namapujte sloupec");
+    }
+    if (!isMapped(mapping, "order_number") && !headerOrderNumber.trim()) {
+      missing.push("Číslo objednávky — namapujte sloupec nebo vyplňte hlavičku");
+    }
+    if (!isMapped(mapping, "order_date") && !headerOrderDate.trim()) {
+      missing.push("Datum objednávky — namapujte sloupec nebo vyplňte hlavičku");
+    }
+    if (!isMapped(mapping, "customer_name") && !headerCustomerId) {
+      missing.push("Zákazník — namapujte sloupec nebo vyberte v hlavičce");
+    }
+    return missing;
+  }, [
+    file,
+    headers.length,
+    mapping,
+    headerOrderNumber,
+    headerOrderDate,
+    headerCustomerId,
+  ]);
+
+  const canImport = () => !!file && missingRequirements.length === 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,8 +231,7 @@ function CsvOrdersImport() {
     setError("");
     setResult(null);
     try {
-      const jobMapped =
-        typeof mapping.job_number === "number" && mapping.job_number >= 0;
+      const jobMapped = isMapped(mapping, "job_number") || !!headerJobNumber.trim();
       let confirmedWithout = false;
       if (!jobMapped) {
         if (!confirm(CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE)) {
@@ -172,14 +239,23 @@ function CsvOrdersImport() {
           return;
         }
         confirmedWithout = true;
-      } else {
-        // Některé řádky mohou mít prázdné číslo zakázky — API to ověří; při 400 s needs_job_number_confirm znovu potvrdíme.
-        confirmedWithout = false;
       }
 
       const formData = new FormData();
       formData.append("file", file);
       formData.append("mapping", JSON.stringify(mapping));
+      if (headerOrderNumber.trim()) {
+        formData.append("default_order_number", headerOrderNumber.trim());
+      }
+      if (headerOrderDate.trim()) {
+        formData.append("default_order_date", headerOrderDate.trim());
+      }
+      if (headerJobNumber.trim()) {
+        formData.append("default_job_number", headerJobNumber.trim());
+      }
+      if (headerCustomerId) {
+        formData.append("customer_id", headerCustomerId);
+      }
       if (confirmedWithout) {
         formData.append("confirmed_without_job_number", "1");
       }
@@ -200,7 +276,8 @@ function CsvOrdersImport() {
       setHeaders([]);
       setRows([]);
       setMapping({});
-      fileInputRef.current!.value = "";
+      resetHeaderDefaults();
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (err) {
       setError(err instanceof Error ? err.message : "Chyba při importu");
     } finally {
@@ -210,185 +287,273 @@ function CsvOrdersImport() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-        {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
-        )}
-        {result && (
-          <div className="rounded-lg bg-green-50 p-3 text-sm text-green-800">
-            Importováno: {result.imported} objednávek.
-            {result.errors.length > 0 && (
-              <div className="mt-2 text-amber-700">
-                Chyby: {result.errors.slice(0, 5).join("; ")}
-                {result.errors.length > 5 && ` (+${result.errors.length - 5})`}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div
-          onDrop={handleDrop}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          className={`rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
-            dragOver === "zone"
-              ? "border-red-400 bg-red-50"
-              : "border-gray-300 bg-gray-50 hover:border-gray-400"
-          }`}
-        >
-          <FileSpreadsheet className="mx-auto mb-2 h-10 w-10 text-gray-500" />
-          <p className="mb-2 text-sm font-medium text-gray-700">
-            Přetáhněte soubor sem nebo klikněte pro výběr
-          </p>
-          <p className="mb-4 text-xs text-gray-500">CSV, Excel (.xlsx, .xls)</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.xlsx,.xls"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-          >
-            Vybrat soubor
-          </button>
-          {file && (
-            <p className="mt-2 text-sm text-gray-600">
-              <strong>{file.name}</strong>
-            </p>
+      {error && (
+        <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+      )}
+      {result && (
+        <div className="rounded-lg bg-green-50 p-3 text-sm text-green-800">
+          Importováno: {result.imported} objednávek.
+          {result.errors.length > 0 && (
+            <div className="mt-2 text-amber-700">
+              Chyby: {result.errors.slice(0, 5).join("; ")}
+              {result.errors.length > 5 && ` (+${result.errors.length - 5})`}
+            </div>
           )}
         </div>
+      )}
 
-        {headers.length > 0 && (
-          <>
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-sm font-semibold text-gray-700">
-                Mapování sloupců – přetáhněte sloupec ze zdroje na cílové pole
-              </h3>
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div>
-                  <p className="mb-2 text-xs font-medium text-gray-500">Sloupce v souboru</p>
-                  <div className="flex flex-wrap gap-2">
-                    {headers.map((h, i) => (
-                      <div
-                        key={i}
-                        draggable
-                        onDragStart={() => onDragStartCol(i)}
-                        onDragEnd={onDragEndCol}
-                        className={`flex cursor-grab items-center gap-1 rounded-lg border px-3 py-2 text-sm ${
-                          draggedCol === i
-                            ? "border-red-400 bg-red-50 opacity-80"
-                            : "border-gray-300 bg-white hover:border-gray-400"
-                        }`}
-                      >
-                        <GripVertical className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium">{h}</span>
-                        <span className="text-gray-400">({i})</span>
-                      </div>
-                    ))}
-                  </div>
+      <div
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        className={`rounded-xl border-2 border-dashed p-8 text-center transition-colors ${
+          dragOver === "zone"
+            ? "border-red-400 bg-red-50"
+            : "border-gray-300 bg-gray-50 hover:border-gray-400"
+        }`}
+      >
+        <FileSpreadsheet className="mx-auto mb-2 h-10 w-10 text-gray-500" />
+        <p className="mb-2 text-sm font-medium text-gray-700">
+          Přetáhněte soubor sem nebo klikněte pro výběr
+        </p>
+        <p className="mb-4 text-xs text-gray-500">CSV, Excel (.xlsx, .xls)</p>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          className="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+        >
+          Vybrat soubor
+        </button>
+        {file && (
+          <p className="mt-2 text-sm text-gray-600">
+            <strong>{file.name}</strong>
+          </p>
+        )}
+      </div>
+
+      {headers.length > 0 && (
+        <>
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-sm font-semibold text-gray-700">
+              Mapování sloupců – přetáhněte sloupec ze zdroje na cílové pole
+            </h3>
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div>
+                <p className="mb-2 text-xs font-medium text-gray-500">Sloupce v souboru</p>
+                <div className="flex flex-wrap gap-2">
+                  {headers.map((h, i) => (
+                    <div
+                      key={i}
+                      draggable
+                      onDragStart={() => onDragStartCol(i)}
+                      onDragEnd={onDragEndCol}
+                      className={`flex cursor-grab items-center gap-1 rounded-lg border px-3 py-2 text-sm ${
+                        draggedCol === i
+                          ? "border-red-400 bg-red-50 opacity-80"
+                          : "border-gray-300 bg-white hover:border-gray-400"
+                      }`}
+                    >
+                      <GripVertical className="h-4 w-4 text-gray-400" />
+                      <span className="font-medium">{h}</span>
+                      <span className="text-gray-400">({i})</span>
+                    </div>
+                  ))}
                 </div>
-                <div>
-                  <p className="mb-2 text-xs font-medium text-gray-500">Cílová pole</p>
-                  <div className="space-y-2">
-                    {TARGET_FIELDS.map((f) => (
-                      <div
-                        key={f.key}
-                        onDragOver={(e) => {
-                          e.preventDefault();
-                          setDragOver(f.key);
-                        }}
-                        onDragLeave={() => setDragOver(null)}
-                        onDrop={() => onDropTarget(f.key)}
-                        className={`flex items-center justify-between rounded-lg border-2 px-3 py-2 ${
-                          dragOver === f.key
-                            ? "border-red-400 bg-red-50"
-                            : mapping[f.key] != null
-                              ? "border-green-300 bg-green-50/50"
-                              : "border-dashed border-gray-300 bg-gray-50"
-                        }`}
-                      >
-                        <span className="text-sm">
-                          {f.label}
-                          {f.required && <span className="text-red-500"> *</span>}
-                        </span>
-                        {mapping[f.key] != null ? (
-                          <span className="flex items-center gap-1">
-                            <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-800">
-                              {headers[mapping[f.key]]} ({mapping[f.key]})
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => removeMapping(f.key)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              ×
-                            </button>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-medium text-gray-500">Cílová pole</p>
+                <div className="space-y-2">
+                  {TARGET_FIELDS.map((f) => (
+                    <div
+                      key={f.key}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOver(f.key);
+                      }}
+                      onDragLeave={() => setDragOver(null)}
+                      onDrop={() => onDropTarget(f.key)}
+                      className={`flex items-center justify-between rounded-lg border-2 px-3 py-2 ${
+                        dragOver === f.key
+                          ? "border-red-400 bg-red-50"
+                          : mapping[f.key] != null
+                            ? "border-green-300 bg-green-50/50"
+                            : "border-dashed border-gray-300 bg-gray-50"
+                      }`}
+                    >
+                      <span className="text-sm">
+                        {f.label}
+                        {f.required && <span className="text-red-500"> *</span>}
+                      </span>
+                      {mapping[f.key] != null ? (
+                        <span className="flex items-center gap-1">
+                          <span className="rounded bg-green-100 px-2 py-0.5 text-xs text-green-800">
+                            {headers[mapping[f.key]]} ({mapping[f.key]})
                           </span>
-                        ) : (
-                          <span className="text-xs text-gray-400">Přetáhněte sloupec</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                          <button
+                            type="button"
+                            onClick={() => removeMapping(f.key)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400">Přetáhněte sloupec</span>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
-              <h3 className="mb-4 text-sm font-semibold text-gray-700">Náhled dat</h3>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-200 bg-gray-50">
-                      {headers.map((h, i) => (
-                        <th key={i} className="px-3 py-2 text-left font-medium text-gray-700">
-                          {h}
-                          {Object.entries(mapping).some(([, v]) => v === i) && (
-                            <span className="ml-1 text-green-600">✓</span>
-                          )}
-                        </th>
+          <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-6 shadow-sm">
+            <h3 className="mb-1 text-sm font-semibold text-gray-800">
+              Hlavička objednávky
+            </h3>
+            <p className="mb-4 text-xs text-gray-600">
+              Pokud soubor nemá sloupce pro číslo, datum nebo zákazníka, doplňte je zde. Platí pro
+              všechny řádky.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-gray-700">
+                  Zákazník
+                  {!isMapped(mapping, "customer_name") && (
+                    <span className="text-red-500"> *</span>
+                  )}
+                </span>
+                <select
+                  value={headerCustomerId}
+                  onChange={(e) => setHeaderCustomerId(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">
+                    {isMapped(mapping, "customer_name")
+                      ? "— použít sloupec —"
+                      : "— Vyberte zákazníka —"}
+                  </option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-gray-700">
+                  Číslo objednávky
+                  {!isMapped(mapping, "order_number") && (
+                    <span className="text-red-500"> *</span>
+                  )}
+                </span>
+                <input
+                  type="text"
+                  value={headerOrderNumber}
+                  onChange={(e) => setHeaderOrderNumber(e.target.value)}
+                  placeholder={
+                    isMapped(mapping, "order_number") ? "volitelné přepsání" : "např. OBJ-2026-001"
+                  }
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-gray-700">
+                  Datum objednávky
+                  {!isMapped(mapping, "order_date") && (
+                    <span className="text-red-500"> *</span>
+                  )}
+                </span>
+                <input
+                  type="date"
+                  value={headerOrderDate}
+                  onChange={(e) => setHeaderOrderDate(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block font-medium text-gray-700">Číslo zakázky</span>
+                <input
+                  type="text"
+                  value={headerJobNumber}
+                  onChange={(e) => setHeaderJobNumber(e.target.value)}
+                  placeholder="volitelné"
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+            <h3 className="mb-4 text-sm font-semibold text-gray-700">Náhled dat</h3>
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    {headers.map((h, i) => (
+                      <th key={i} className="px-3 py-2 text-left font-medium text-gray-700">
+                        {h}
+                        {Object.entries(mapping).some(([, v]) => v === i) && (
+                          <span className="ml-1 text-green-600">✓</span>
+                        )}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, ri) => (
+                    <tr key={ri} className="border-b border-gray-100">
+                      {headers.map((_, ci) => (
+                        <td key={ci} className="max-w-[200px] truncate px-3 py-2">
+                          {row[ci] ?? ""}
+                        </td>
                       ))}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((row, ri) => (
-                      <tr key={ri} className="border-b border-gray-100">
-                        {headers.map((_, ci) => (
-                          <td key={ci} className="max-w-[200px] truncate px-3 py-2">
-                            {row[ci] ?? ""}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="mt-2 text-xs text-gray-500">
-                Zobrazeno prvních {rows.length} řádků
-              </p>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          </>
-        )}
+            <p className="mt-2 text-xs text-gray-500">
+              Zobrazeno prvních {rows.length} řádků
+            </p>
+          </div>
+        </>
+      )}
 
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            disabled={loading || !canImport()}
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
-          >
-            <Upload className="h-4 w-4" />
-            {loading ? "Importuji…" : "Importovat"}
-          </button>
-          <Link
-            href="/iml/orders"
-            className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-          >
-            Zrušit
-          </Link>
+      {headers.length > 0 && missingRequirements.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="font-medium">Nelze importovat — doplňte:</p>
+          <ul className="mt-1 list-inside list-disc">
+            {missingRequirements.map((m) => (
+              <li key={m}>{m}</li>
+            ))}
+          </ul>
         </div>
+      )}
+
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={loading || !canImport()}
+          className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
+        >
+          <Upload className="h-4 w-4" />
+          {loading ? "Importuji…" : "Importovat"}
+        </button>
+        <Link
+          href="/iml/orders"
+          className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+        >
+          Zrušit
+        </Link>
+      </div>
     </form>
   );
 }

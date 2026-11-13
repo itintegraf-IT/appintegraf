@@ -59,6 +59,15 @@ function parseCsv(text: string): string[][] {
   return lines.map((l: string) => parseCsvLine(l, delimiter));
 }
 
+function formText(formData: FormData, key: string): string {
+  const v = formData.get(key);
+  return typeof v === "string" ? v.trim() : "";
+}
+
+function isMapped(mapping: Record<string, number> | null, field: string): boolean {
+  return !!mapping && typeof mapping[field] === "number" && mapping[field] >= 0;
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -78,21 +87,59 @@ export async function POST(req: NextRequest) {
       formData.get("confirmed_without_job_number")
     );
 
+    const defaultOrderNumber = formText(formData, "default_order_number");
+    const defaultOrderDate = formText(formData, "default_order_date");
+    const defaultJobNumber = normalizeJobNumber(formText(formData, "default_job_number"));
+    const customerIdRaw = formText(formData, "customer_id");
+    const headerCustomerId = customerIdRaw ? parseInt(customerIdRaw, 10) : NaN;
+    const fixedCustomerId =
+      Number.isFinite(headerCustomerId) && headerCustomerId > 0 ? headerCustomerId : null;
+
     if (!file?.size) {
       return NextResponse.json({ error: "Žádný soubor" }, { status: 400 });
     }
 
     const mapping = mappingStr ? (JSON.parse(mappingStr) as Record<string, number>) : null;
-    const required = ["order_number", "customer_name", "order_date", "product_identifier", "quantity"];
-    for (const field of required) {
-      if (!mapping || typeof mapping[field] !== "number" || mapping[field] < 0) {
+    const map = (mapping ?? {}) as Record<string, number>;
+
+    const columnRequired = ["product_identifier", "quantity"] as const;
+    for (const field of columnRequired) {
+      if (!isMapped(map, field)) {
         return NextResponse.json(
-          { error: `Mapování musí obsahovat pole: ${required.join(", ")}` },
+          { error: `Mapování musí obsahovat sloupec: ${field}` },
           { status: 400 }
         );
       }
     }
-    const map = mapping as Record<string, number>;
+
+    if (!isMapped(map, "order_number") && !defaultOrderNumber) {
+      return NextResponse.json(
+        { error: "Chybí číslo objednávky — namapujte sloupec nebo vyplňte hlavičku." },
+        { status: 400 }
+      );
+    }
+    if (!isMapped(map, "order_date") && !defaultOrderDate) {
+      return NextResponse.json(
+        { error: "Chybí datum objednávky — namapujte sloupec nebo vyplňte hlavičku." },
+        { status: 400 }
+      );
+    }
+    if (!isMapped(map, "customer_name") && !fixedCustomerId) {
+      return NextResponse.json(
+        { error: "Chybí zákazník — namapujte sloupec nebo vyberte zákazníka v hlavičce." },
+        { status: 400 }
+      );
+    }
+
+    if (fixedCustomerId) {
+      const exists = await prisma.iml_customers.findUnique({
+        where: { id: fixedCustomerId },
+        select: { id: true },
+      });
+      if (!exists) {
+        return NextResponse.json({ error: "Vybraný zákazník nenalezen" }, { status: 400 });
+      }
+    }
 
     const get = (row: string[], field: string) => {
       const idx = map[field];
@@ -124,9 +171,14 @@ export async function POST(req: NextRequest) {
     const customerByName = buildCustomerByNameMap(customers);
 
     const products = await prisma.iml_products.findMany({
-      select: { id: true, ig_code: true, sku: true, client_name: true },
+      select: { id: true, ig_code: true, sku: true, client_name: true, client_code: true },
     });
     type ProductRow = (typeof products)[number];
+    const productByClientCode = new Map<string, number>(
+      products
+        .filter((p: ProductRow) => p.client_code)
+        .map((p: ProductRow) => [p.client_code!.toLowerCase().trim(), p.id])
+    );
     const productByIgCode = new Map<string, number>(
       products.filter((p: ProductRow) => p.ig_code).map((p: ProductRow) => [p.ig_code!.toLowerCase().trim(), p.id])
     );
@@ -139,7 +191,13 @@ export async function POST(req: NextRequest) {
 
     const findProduct = (ident: string): number | null => {
       const s = ident.toLowerCase().trim();
-      return productByIgCode.get(s) ?? productBySku.get(s) ?? productByClientName.get(s) ?? null;
+      return (
+        productByClientCode.get(s) ??
+        productByIgCode.get(s) ??
+        productBySku.get(s) ??
+        productByClientName.get(s) ??
+        null
+      );
     };
 
     type OrderKey = string;
@@ -160,25 +218,33 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < dataRows.length; i++) {
       const row = dataRows[i];
-      const orderNumber = get(row, "order_number");
+      const orderNumber = get(row, "order_number") || defaultOrderNumber;
       const customerName = get(row, "customer_name");
-      const orderDate = get(row, "order_date");
+      const orderDate = get(row, "order_date") || defaultOrderDate;
       const productIdent = get(row, "product_identifier");
       const qtyStr = get(row, "quantity");
       const status = get(row, "status") || "nová";
       const notes = get(row, "notes");
       const unitPriceStr = get(row, "unit_price");
-      const jobNumber = normalizeJobNumber(get(row, "job_number"));
+      const jobNumber =
+        normalizeJobNumber(get(row, "job_number")) || defaultJobNumber;
 
-      if (!orderNumber || !customerName || !orderDate || !productIdent || !qtyStr) {
+      if (!orderNumber || !orderDate || !productIdent || !qtyStr) {
         errors.push(`Řádek ${i + 2}: Chybí povinná pole`);
         continue;
       }
-
-      const customerId = customerByName.get(normalizeCustomerNameKey(customerName));
-      if (!customerId) {
-        errors.push(`Řádek ${i + 2}: Zákazník "${customerName}" nenalezen`);
+      if (!fixedCustomerId && !customerName) {
+        errors.push(`Řádek ${i + 2}: Chybí zákazník`);
         continue;
+      }
+
+      let customerId: number | undefined = fixedCustomerId ?? undefined;
+      if (!customerId) {
+        customerId = customerByName.get(normalizeCustomerNameKey(customerName));
+        if (!customerId) {
+          errors.push(`Řádek ${i + 2}: Zákazník "${customerName}" nenalezen`);
+          continue;
+        }
       }
 
       const productId = findProduct(productIdent);
