@@ -2,10 +2,26 @@
  * Převod první stránky PDF na JPEG na serveru (import / miniatury produktů).
  * Používá @napi-rs/canvas (prebuilt binárky, bez libcairo na serveru).
  */
+import { createRequire } from "node:module";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 export type PdfToJpegResult =
   | { ok: true; buffer: Buffer }
   | { ok: false; reason: string };
+
+/** Resoluce z kořene app (Next serverExternalPackages) — ne z nested pdf-parse. */
+const requireFromAppRoot = createRequire(join(process.cwd(), "package.json"));
+
+/** Worker ze stejného pdfjs-dist balíku jako API (zabrání mismatch verzí). */
+function pinPdfjsWorker(
+  pdfjs: { GlobalWorkerOptions: { workerSrc: string } }
+): void {
+  const workerPath = requireFromAppRoot.resolve(
+    "pdfjs-dist/legacy/build/pdf.worker.mjs"
+  );
+  pdfjs.GlobalWorkerOptions.workerSrc = pathToFileURL(workerPath).href;
+}
 
 /**
  * Převod PDF → JPEG s důvodem selhání (pro API / logy).
@@ -42,6 +58,7 @@ export async function pdfBufferToJpegResult(
 
     const { createCanvas } = canvasMod;
     const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+    pinPdfjsWorker(pdfjs);
 
     const loadingTask = pdfjs.getDocument({
       data: new Uint8Array(pdfBuffer),
