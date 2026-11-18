@@ -73,8 +73,9 @@ export async function PATCH(
   try {
     const pdf = await loadPrimaryPdfBuffer(id);
     if (pdf) {
+      // Softproof nepřepisovat existující — jen fallback když chybí
       preview_updated = await ensureProductThumbnailFromPdf(id, pdf, userId, {
-        onlyIfMissing: false,
+        onlyIfMissing: true,
       });
     }
   } catch (thumbErr) {

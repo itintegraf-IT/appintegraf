@@ -65,26 +65,6 @@ export function ProductFilesUpload({
   const pickPdf = () => pdfInputRef.current?.click();
   const fileInputClass = "sr-only";
 
-  /** Softproof (image_data) z první stránky PDF — spolehlivější než server canvas. */
-  const uploadSoftproofFromPdfFile = async (file: File): Promise<boolean> => {
-    if (file.size > MAX_PREVIEW_SOURCE_PDF_BYTES) return false;
-    try {
-      const blob = await pdfFileToJpegPreviewBlob(file);
-      const formData = new FormData();
-      formData.append(
-        "file",
-        new File([blob], "nahled-z-pdf.jpg", { type: "image/jpeg" })
-      );
-      const res = await fetch(`/api/iml/products/${productId}/image`, {
-        method: "POST",
-        body: formData,
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
-  };
-
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -98,7 +78,7 @@ export function ProductFilesUpload({
       if (isPdf) {
         if (file.size > MAX_PREVIEW_SOURCE_PDF_BYTES) {
           setImageError(
-            `PDF je příliš velké pro náhled v prohlížeči (max ${MAX_PREVIEW_SOURCE_PDF_MB} MB). Nahrajte ho vpravo jako Tisková data (PDF) — softproof se vytvoří automaticky.`
+            `PDF je příliš velké pro náhled v prohlížeči (max ${MAX_PREVIEW_SOURCE_PDF_MB} MB). Nahrajte menší PDF/JPG zde, nebo tisková data vpravo (softproof se doplní jen pokud ještě chybí).`
           );
           return;
         }
@@ -189,24 +169,25 @@ export function ProductFilesUpload({
         return;
       }
 
-      // Softproof (image_data) musí odpovídat novému PDF všude — klientský PDF.js je spolehlivější než server canvas.
-      const clientPreviewOk = await uploadSoftproofFromPdfFile(file);
-      const previewOk = clientPreviewOk || data.preview_updated === true;
+      // Softproof (vlevo) a tisková data (vpravo) jsou oddělené — tiskové PDF softproof nepřepisuje.
+      // Server doplní image_data jen pokud softproof chybí (fallback pro katalog).
+      const softproofFilled = !localHasImage && data.preview_updated === true;
 
       setLocalHasPdf(true);
-      if (previewOk) setLocalHasImage(true);
-      const bust = Date.now();
-      setImageCacheBust(bust);
-      setPdfCacheBust(bust);
+      if (softproofFilled) setLocalHasImage(true);
+      setPdfCacheBust(Date.now());
+      if (softproofFilled) {
+        setImageCacheBust(Date.now());
+        onImageChange?.();
+      }
       setPdfSuccess(
-        previewOk
-          ? "PDF bylo nahráno. Náhled a stav položky byly aktualizovány."
-          : "PDF bylo nahráno a stav položky změněn. Softproof se nepodařilo přegenerovat — nahrajte náhled vlevo ručně (nebo PDF ≤ 15 MB)."
+        softproofFilled
+          ? "PDF bylo nahráno. Softproof chyběl — doplněn z 1. stránky PDF. Stav položky aktualizován."
+          : "PDF bylo nahráno. Stav položky byl aktualizován."
       );
       onPdfChange?.(
         data.item_status ? { itemStatus: data.item_status } : undefined
       );
-      if (previewOk) onImageChange?.();
     } catch {
       setPdfError("Chyba při nahrávání");
     } finally {
@@ -251,7 +232,7 @@ export function ProductFilesUpload({
             Náhled – obrázek (JPG, PNG, WebP, GIF) nebo PDF (1. stránka → uloží se jako JPEG, max. {MAX_PRODUCT_IMAGE_MB} MB)
             {!localHasImage && localHasPdf && (
               <span className="mt-0.5 block text-xs font-normal text-gray-500">
-                Dokud nenahrajete vlastní náhled výše, zobrazí se první stránka tiskových dat (PDF vpravo).
+                Softproof chybí — dokud nenahrajete vlastní náhled, v katalogu se použije 1. stránka tiskového PDF (fallback). Tisková data vpravo softproof nepřepisují.
               </span>
             )}
           </p>

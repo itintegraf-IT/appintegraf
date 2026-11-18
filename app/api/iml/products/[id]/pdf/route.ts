@@ -251,16 +251,10 @@ export async function POST(
 
     let preview_updated = false;
     try {
-      // Nahrazení tiskových dat → vždy přegenerovat softproof (image_data) z nového PDF
+      // Softproof (image_data) nepřepisovat — doplnit jen když chybí (fallback pro katalog)
       preview_updated = await ensureProductThumbnailFromPdf(id, buffer, userId, {
-        onlyIfMissing: false,
+        onlyIfMissing: true,
       });
-      if (!preview_updated) {
-        console.warn(
-          "IML product PDF thumbnail not updated after upload (server jpeg null)",
-          id
-        );
-      }
     } catch (thumbErr) {
       console.warn("IML product PDF thumbnail generation failed:", thumbErr);
     }
