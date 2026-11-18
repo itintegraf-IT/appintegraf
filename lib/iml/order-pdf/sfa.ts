@@ -21,6 +21,11 @@ import { normalizeLines, parseDashDate } from "./parse-utils";
  *   500G
  *   5.000  Pcs  09-11-2026
  *
+ * NL multiline (Product + SFAcode, zalomený popis, qty na dalším řádku — IK261735):
+ *   403902  403902  IML Cup 280ml AH Pasta Sauce 5
+ *   Formaggio - 301821
+ *   27.000  Pcs  13-11-2026
+ *
  * Množství "25.000" = 25000 (tečka = tisíce).
  */
 
@@ -32,6 +37,8 @@ const OUR_ORDERNO = /Our orderno\.?\s*:?\s*((?:IK|ODA)\S+)/i;
 /** Product = IG + typ (etiketa/dno…), SFAcode, začátek popisu. */
 const ITEM_START_IG =
   /^(\d{2}-\d{2}-\d{3})\s+\S+\s+(\d{5,8})\s+(.+)$/i;
+/** Product + SFAcode + začátek popisu (bez qty — zalomený popis). */
+const ITEM_START_DUAL = /^(\d{5,8})\s+(\d{5,8})\s+(.+)$/i;
 const QTY_DELIVERY_LINE =
   /^([\d.]+)\s+Pcs\s+(\d{1,2}-\d{1,2}-\d{4})$/i;
 
@@ -194,6 +201,17 @@ export function parseSfaOrderText(text: string): ParsedPdfOrder {
         yourMaterialNo: igStart[1],
         customerMaterialNo: igStart[2],
         description: igStart[3].trim(),
+      };
+      continue;
+    }
+
+    const dualStart = line.match(ITEM_START_DUAL);
+    if (dualStart) {
+      pushPending(null, null);
+      pending = {
+        yourMaterialNo: dualStart[1],
+        customerMaterialNo: dualStart[2],
+        description: dualStart[3].trim(),
       };
       continue;
     }

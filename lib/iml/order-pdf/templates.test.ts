@@ -229,6 +229,57 @@ Kumars CP CHIC 500G
     expect(r.items[1].description).toContain("Kumars");
     expect(r.warnings).toEqual([]);
   });
+
+  it("parsuje SFA dual multiline se zalomeným popisem (IK261735)", () => {
+    const text = `SFA Packaging B.V.
+PURCHASE ORDER
+Page : 1 / 2
+IK261735
+1805
+13-11-2026
+EUR
+Product \tSFAcode \tDescription \tQuantity \tUnit \tDelivery
+403902 \t403902 \tIML Cup 280ml AH Pasta Sauce 5
+Formaggio - 301821
+27.000 \tPcs \t13-11-2026
+403903 \t403903 \tIML Lid 95mm AH Pasta Sauce 5
+Formaggio - 301829
+65.000 \tPcs \t13-11-2026
+403908 \t403908 \tIML Cup 280ml AH Pasta Sauce Funghi -
+301824
+25.000 \tPcs \t13-11-2026
+
+-- 1 of 2 --
+
+Page : 2 / 2
+IK261735
+1805
+13-11-2026
+EUR
+Product \tSFAcode \tDescription \tQuantity \tUnit \tDelivery
+403797 \t403797 \tIML Beker 280ml AH Pastasaus Arrabbiata
+301702
+25.000 \tPcs \t13-11-2026`;
+
+    const r = parseSfaOrderText(text);
+    expect(r.orderNumber).toBe("IK261735");
+    expect(r.orderDate).toBe("2026-11-13");
+    expect(r.currency).toBe("EUR");
+    expect(r.items).toHaveLength(4);
+    expect(r.items[0].yourMaterialNo).toBe("403902");
+    expect(r.items[0].customerMaterialNo).toBe("403902");
+    expect(r.items[0].quantity).toBe(27000);
+    expect(r.items[0].deliveryDate).toBe("2026-11-13");
+    expect(r.items[0].description).toContain("Formaggio");
+    expect(r.items[1].yourMaterialNo).toBe("403903");
+    expect(r.items[1].customerMaterialNo).toBe("403903");
+    expect(r.items[1].quantity).toBe(65000);
+    expect(r.items[2].yourMaterialNo).toBe("403908");
+    expect(r.items[2].quantity).toBe(25000);
+    expect(r.items[3].yourMaterialNo).toBe("403797");
+    expect(r.items[3].quantity).toBe(25000);
+    expect(r.warnings).toEqual([]);
+  });
 });
 
 describe("parseJepaOrderText", () => {
