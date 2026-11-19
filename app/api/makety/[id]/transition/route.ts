@@ -295,20 +295,12 @@ async function notifyAfterGrafikaTransition(params: {
     return;
   }
 
-  if (toStatus === "in_progress" && fromStatus === "done") {
-    await notifyMaketaUsers({
-      maketaId,
-      userIds: [assigneeUserId, createdBy],
-      bodyPreview,
-      orderNumber,
-      kind: "returned_to_dtp",
-      workType: "grafika",
-      excludeUserId: actorUserId,
-    });
-    return;
-  }
-
-  if (toStatus === "in_progress" && fromStatus === "sent_for_approval") {
+  if (
+    toStatus === "in_progress" &&
+    (fromStatus === "done" ||
+      fromStatus === "prepress_approved" ||
+      fromStatus === "sent_for_approval")
+  ) {
     await notifyMaketaUsers({
       maketaId,
       userIds: [assigneeUserId, createdBy],

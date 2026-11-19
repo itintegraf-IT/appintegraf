@@ -67,8 +67,8 @@ describe("makety-grafika-status", () => {
       "in_progress",
     ]);
     expect(getAllowedGrafikaTransitions("done", ["grafik"])).not.toContain("prepress_approved");
-    expect(getAllowedGrafikaTransitions("prepress_approved", ["final"])).toContain(
-      "sent_for_approval"
+    expect(getAllowedGrafikaTransitions("prepress_approved", ["final"])).toEqual(
+      expect.arrayContaining(["sent_for_approval", "in_progress"])
     );
   });
 
@@ -88,6 +88,59 @@ describe("makety-grafika-status", () => {
         comment: "Špatný spad",
       })
     ).not.toThrow();
+  });
+
+  it("ze Schváleno prepressem lze vrátit grafikovi s povinným komentářem", () => {
+    expect(getAllowedGrafikaTransitions("prepress_approved", ["final"])).toContain("in_progress");
+    expect(getAllowedGrafikaTransitions("prepress_approved", ["prepress"])).toEqual([
+      "in_progress",
+    ]);
+    expect(getAllowedGrafikaTransitions("prepress_approved", ["zadavatel"])).toEqual([
+      "in_progress",
+    ]);
+    expect(getAllowedGrafikaTransitions("prepress_approved", ["grafik"])).toEqual([]);
+    expect(grafikaTransitionActionLabel("in_progress", "prepress_approved")).toBe(
+      "Vrátit grafikovi"
+    );
+    expect(() =>
+      assertGrafikaTransition({
+        fromStatus: "prepress_approved",
+        toStatus: "in_progress",
+        comment: "",
+      })
+    ).toThrow(/důvod/i);
+    expect(() =>
+      assertGrafikaTransition({
+        fromStatus: "prepress_approved",
+        toStatus: "in_progress",
+        comment: "Ještě upravit texty",
+      })
+    ).not.toThrow();
+  });
+
+  it("listGrafikaTransitionOptions: návrat z prepress_approved dle role", () => {
+    expect(
+      listGrafikaTransitionOptions("prepress_approved", ["final"], false)
+    ).toEqual(
+      expect.arrayContaining([
+        { toStatus: "sent_for_approval", viaOverride: false, actingAs: "final" },
+        { toStatus: "in_progress", viaOverride: false, actingAs: "final" },
+      ])
+    );
+    expect(
+      listGrafikaTransitionOptions("prepress_approved", ["zadavatel"], false)
+    ).toEqual([{ toStatus: "in_progress", viaOverride: false, actingAs: "zadavatel" }]);
+    expect(
+      listGrafikaTransitionOptions("prepress_approved", ["prepress"], false)
+    ).toEqual([{ toStatus: "in_progress", viaOverride: false, actingAs: "prepress" }]);
+    const adminOverride = listGrafikaTransitionOptions("prepress_approved", [], true);
+    expect(adminOverride).toEqual(
+      expect.arrayContaining([
+        { toStatus: "sent_for_approval", viaOverride: true, actingAs: "final" },
+        // OVERRIDABLE_ROLES: prepress před final → actingAs prepress
+        { toStatus: "in_progress", viaOverride: true, actingAs: "prepress" },
+      ])
+    );
   });
 
   it("zadavatel a final mohou vrátit ze sent_for_approval grafikovi", () => {

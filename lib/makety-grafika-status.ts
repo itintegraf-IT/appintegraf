@@ -199,6 +199,7 @@ const TRANSITIONS: TransitionRule[] = [
   { from: ["done"], to: "prepress_approved" },
   { from: ["done"], to: "in_progress", requiresComment: true },
   { from: ["prepress_approved"], to: "sent_for_approval" },
+  { from: ["prepress_approved"], to: "in_progress", requiresComment: true },
   { from: ["sent_for_approval"], to: "approved" },
 ];
 
@@ -213,14 +214,17 @@ const ROLE_TRANSITIONS: Record<GrafikaTransitionRole, Array<{ from: GrafikaStatu
   ],
   zadavatel: [
     { from: "data_problem", to: "open" },
+    { from: "prepress_approved", to: "in_progress" },
     { from: "sent_for_approval", to: "in_progress" },
   ],
   prepress: [
     { from: "done", to: "prepress_approved" },
     { from: "done", to: "in_progress" },
+    { from: "prepress_approved", to: "in_progress" },
   ],
   final: [
     { from: "prepress_approved", to: "sent_for_approval" },
+    { from: "prepress_approved", to: "in_progress" },
     { from: "sent_for_approval", to: "approved" },
     { from: "sent_for_approval", to: "in_progress" },
   ],
@@ -338,6 +342,7 @@ export function grafikaTransitionActionLabel(toStatus: GrafikaStatus, fromStatus
       return fromStatus === "data_problem" ? "Uvolnit ke zpracování" : "Zařadit do fronty";
     case "in_progress":
       if (fromStatus === "done") return "Vrátit grafikovi (DTP)";
+      if (fromStatus === "prepress_approved") return "Vrátit grafikovi";
       if (fromStatus === "data_problem") return "Uvolnit a pokračovat";
       if (fromStatus === "sent_for_approval") return "Vrátit grafikovi k opravě";
       return "Zahájit práci";
