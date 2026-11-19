@@ -1,41 +1,25 @@
 {
   "releases": [
     {
-      "id": "2026-11-11-novinky",
-      "date": "2026-11-11",
-      "title": "Aktualizace systému (10.–11. 11. 2026)",
+      "id": "2026-11-19-novinky",
+      "date": "2026-11-19",
+      "title": "Aktualizace systému (16.–19. 11. 2026)",
       "items": [
         {
-          "modules": ["calendar"],
-          "text": "Schvalování: nepřítomného schvalovatele (včetně správce vozidel) nepřeskakovat, pokud se stihne vrátit alespoň 3 pracovní dny před začátkem."
+          "modules": ["iml"],
+          "text": "Při změně tvaru etikety se správně synchronizuje výsek na produktu."
         },
         {
           "modules": ["iml"],
-          "text": "Detail produktu: rozklikávací auditní stopa změn."
+          "text": "Oprava SFA importu: dual multiline položky se zalomeným popisem (IK261735)."
         },
         {
           "modules": ["iml"],
-          "text": "Výseky: synchronizace na produkty a odstranění legacy dlaždice."
+          "text": "Tiskové PDF už nepřepisuje softproof náhled — softproof zůstane oddělený od tiskových dat."
         },
         {
-          "modules": ["iml"],
-          "text": "Oprava vyhledávání produktů při rychlém psaní (stabilnější výsledky)."
-        },
-        {
-          "modules": ["makety"],
-          "text": "Úprava dat: globální hledání etikety IML."
-        },
-        {
-          "modules": ["makety"],
-          "text": "Archiv: vlastní nastavení viditelných sloupců seznamu."
-        },
-        {
-          "modules": [],
-          "text": "Dashboard: notifikace seskupené do sekcí Kalendář a Aplikace."
-        },
-        {
-          "modules": [],
-          "text": "Po nasazení se ve zvonku zobrazí novinky relevantní k vašim modulům."
+          "modules": ["iml", "makety"],
+          "text": "Stabilnější náhledy PDF (sjednocený pdf.js worker, oprava převodu softproofů Makety→IML)."
         }
       ]
     }
