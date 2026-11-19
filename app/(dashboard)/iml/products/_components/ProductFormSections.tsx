@@ -189,6 +189,9 @@ export default function ProductFormSections({
   useEffect(() => {
     if (!form.selected_tool_id || form.selected_imposition_id) return;
     if (impositions.length === 0) return;
+    const toolId = Number(form.selected_tool_id);
+    // Nebrat stale seznam z předchozího nástroje (race po změně tvaru/nástroje).
+    if (!impositions.every((i) => i.tool_id === toolId)) return;
     const sorted = [...impositions].sort((a, b) => a.id - b.id);
     const first = sorted[0];
     if (!first) return;
@@ -202,6 +205,7 @@ export default function ProductFormSections({
 
   const applyShape = (idStr: string) => {
     if (!idStr) {
+      setImpositions([]);
       setField("shape_id", "");
       setField("selected_tool_id", "");
       setField("selected_imposition_id", "");
@@ -219,6 +223,7 @@ export default function ProductFormSections({
       setField("shape_id", idStr);
       return;
     }
+    setImpositions([]);
     setField("shape_id", String(shape.id));
     setField("label_shape_code", shape.shape_code);
     setField("format_width_mm", String(shape.width_mm));
@@ -240,10 +245,14 @@ export default function ProductFormSections({
       setField("selected_tool_id", "");
       setField("die_cut_tool_code", "");
       setField("selected_imposition_id", "");
+      setField("assembly_code", "");
+      setField("positions_on_sheet", "");
+      setField("labels_per_sheet", "");
     }
   };
 
   const applyTool = (idStr: string) => {
+    setImpositions([]);
     setField("selected_tool_id", idStr);
     setField("selected_imposition_id", "");
     setField("assembly_code", "");
@@ -252,6 +261,8 @@ export default function ProductFormSections({
     const a = shapeTools.find((x) => String(x.tool.id) === idStr);
     if (a) {
       setField("die_cut_tool_code", a.tool.tool_code_orig || a.tool.tool_code_new);
+    } else if (!idStr) {
+      setField("die_cut_tool_code", "");
     }
   };
 

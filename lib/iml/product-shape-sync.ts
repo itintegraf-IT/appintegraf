@@ -144,6 +144,46 @@ export async function resolveDefaultToolAndImposition(shapeId: number): Promise<
 }
 
 /**
+ * Ověří, že nástroj patří k tvaru a montáž k nástroji.
+ * Stalé ID z předchozího tvaru (typicky po změně ve formuláři) nahradí výchozími.
+ */
+export async function resolveValidatedShapeSelection(params: {
+  shapeId: number;
+  toolId: number | null;
+  impositionId: number | null;
+}): Promise<{ toolId: number | null; impositionId: number | null }> {
+  let toolId = params.toolId;
+  let impositionId = params.impositionId;
+
+  if (toolId != null) {
+    const assigned = await prisma.iml_shape_tool_assignment.findFirst({
+      where: { shape_id: params.shapeId, tool_id: toolId },
+      select: { tool_id: true },
+    });
+    if (!assigned) toolId = null;
+  }
+
+  if (toolId == null) {
+    const defaults = await resolveDefaultToolAndImposition(params.shapeId);
+    return { toolId: defaults.toolId, impositionId: defaults.impositionId };
+  }
+
+  if (impositionId != null) {
+    const imp = await prisma.iml_imposition_catalog.findFirst({
+      where: { id: impositionId, tool_id: toolId },
+      select: { id: true },
+    });
+    if (!imp) impositionId = null;
+  }
+
+  if (impositionId == null) {
+    impositionId = await resolveFirstImpositionForTool(toolId);
+  }
+
+  return { toolId, impositionId };
+}
+
+/**
  * Přepočítá denormalizovaná výseková pole na produktech napojených na tvar.
  * Existující selected_tool_id / selected_imposition_id nepřepisuje — jen doplní null
  * z PRIMARY + první montáže.

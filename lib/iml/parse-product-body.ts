@@ -219,36 +219,33 @@ export async function parseImlProductBodyForSave(body: Record<string, unknown>) 
   if (merged.shape_id != null) {
     const {
       buildProductFieldsFromShapeSelection,
-      resolveDefaultToolAndImposition,
-      resolveFirstImpositionForTool,
+      resolveValidatedShapeSelection,
     } = await import("@/lib/iml/product-shape-sync");
 
-    // Doplnit výchozí PRIMARY nástroj / první montáž, pokud chybí (jako bulk-assign).
-    if (merged.selected_tool_id == null) {
-      const defaults = await resolveDefaultToolAndImposition(merged.shape_id);
-      if (defaults.toolId != null) merged.selected_tool_id = defaults.toolId;
-      if (merged.selected_imposition_id == null && defaults.impositionId != null) {
-        merged.selected_imposition_id = defaults.impositionId;
-      }
-    } else if (merged.selected_imposition_id == null) {
-      const impositionId = await resolveFirstImpositionForTool(merged.selected_tool_id);
-      if (impositionId != null) merged.selected_imposition_id = impositionId;
-    }
+    // Nástroj/montáž musí patřit k tvaru — stale ID z předchozího výběru resetovat.
+    const validated = await resolveValidatedShapeSelection({
+      shapeId: merged.shape_id,
+      toolId: merged.selected_tool_id,
+      impositionId: merged.selected_imposition_id,
+    });
+    merged.selected_tool_id = validated.toolId;
+    merged.selected_imposition_id = validated.impositionId;
 
     const synced = await buildProductFieldsFromShapeSelection({
       shapeId: merged.shape_id,
       toolId: merged.selected_tool_id,
       impositionId: merged.selected_imposition_id,
     });
+    // Katalog je zdroj pravdy — nenechat v body stará denormalizovaná pole.
     Object.assign(merged, {
-      label_shape_code: synced.label_shape_code ?? merged.label_shape_code,
-      die_cut_tool_code: synced.die_cut_tool_code ?? merged.die_cut_tool_code,
-      assembly_code: synced.assembly_code ?? merged.assembly_code,
-      positions_on_sheet: synced.positions_on_sheet ?? merged.positions_on_sheet,
-      labels_per_sheet: synced.labels_per_sheet ?? merged.labels_per_sheet,
-      format_width_mm: synced.format_width_mm ?? merged.format_width_mm,
-      format_height_mm: synced.format_height_mm ?? merged.format_height_mm,
-      product_format: synced.product_format ?? merged.product_format,
+      label_shape_code: synced.label_shape_code ?? null,
+      die_cut_tool_code: synced.die_cut_tool_code ?? null,
+      assembly_code: synced.assembly_code ?? null,
+      positions_on_sheet: synced.positions_on_sheet ?? null,
+      labels_per_sheet: synced.labels_per_sheet ?? null,
+      format_width_mm: synced.format_width_mm ?? null,
+      format_height_mm: synced.format_height_mm ?? null,
+      product_format: synced.product_format ?? null,
     });
     // Balicí matice zůstává u tvaru — do produktu se nepropisuje (jen read-only UI).
   } else if (merged.die_cut_id != null) {
