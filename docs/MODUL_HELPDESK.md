@@ -25,6 +25,18 @@ Helpdesk je dostupný na `/pozadavky` → záložka **Helpdesk**. Veřejný form
 | `vyreseno` | IT vyřešilo (s popisem řešení) |
 | `uzavreno` | Uzavřeno žadatelem nebo IT |
 
+## Archiv
+
+Uzavřené tickety zůstávají v databázi (`status=uzavreno`, `closed_at`). V UI na `/pozadavky?tab=helpdesk` je u **IT fronty** i **Moje tickety** přepínač **Otevřené / Archiv / Vše**.
+
+- **Otevřené** – vše kromě `uzavreno` (výchozí)
+- **Archiv** – jen uzavřené
+- **Vše** – bez filtru stavu
+
+Deep-link na uzavřený ticket (`?tab=helpdesk&id=…`) automaticky přepne filtr na Archiv, aby ticket zůstal ve seznamu.
+
+IT fronta API: `GET /api/helpdesk/tickets?status=open|uzavreno|all` (default `open`).
+
 ## Kategorie a priorita
 
 - **Kategorie:** `hardware`, `software`, `pristup`, `sit`, `jine`
@@ -49,7 +61,7 @@ Helpdesk je dostupný na `/pozadavky` → záložka **Helpdesk**. Veřejný form
 | Endpoint | Metoda | Účel |
 |---|---|---|
 | `/api/helpdesk/tickets` | POST | Vytvoření ticketu |
-| `/api/helpdesk/tickets` | GET | IT fronta (vyžaduje správu helpdesku) |
+| `/api/helpdesk/tickets` | GET | IT fronta / archiv (`?status=` `open` / `uzavreno` / `all`, default `open`; vyžaduje správu helpdesku) |
 | `/api/helpdesk/tickets/mine` | GET | Tickety aktuálního uživatele |
 | `/api/helpdesk/tickets/[id]` | GET, PATCH | Detail, změna stavu, uzavření |
 | `/api/helpdesk/tickets/[id]/comments` | POST | Komentář |

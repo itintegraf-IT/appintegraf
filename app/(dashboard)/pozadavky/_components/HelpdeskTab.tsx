@@ -42,15 +42,68 @@ type Comment = {
 
 type TicketDetail = Ticket & { comments: Comment[] };
 
+type TicketListFilter = "open" | "uzavreno" | "all";
+
+const FILTER_OPTIONS: { value: TicketListFilter; label: string }[] = [
+  { value: "open", label: "Otevřené" },
+  { value: "uzavreno", label: "Archiv" },
+  { value: "all", label: "Vše" },
+];
+
+function filterTicketsByStatus(tickets: Ticket[], filter: TicketListFilter): Ticket[] {
+  if (filter === "open") return tickets.filter((t) => t.status !== "uzavreno");
+  if (filter === "uzavreno") return tickets.filter((t) => t.status === "uzavreno");
+  return tickets;
+}
+
+function emptyListMessage(filter: TicketListFilter, kind: "queue" | "mine"): string {
+  if (kind === "mine") {
+    if (filter === "uzavreno") return "Archiv je prázdný — zatím nemáte žádné uzavřené tickety.";
+    if (filter === "all") return "Zatím nemáte žádné tickety.";
+    return "Nemáte žádné otevřené tickety.";
+  }
+  if (filter === "uzavreno") return "Archiv je prázdný.";
+  if (filter === "all") return "Žádné tickety.";
+  return "Žádné otevřené tickety.";
+}
+
+function TicketFilterToggle({
+  value,
+  onChange,
+}: {
+  value: TicketListFilter;
+  onChange: (next: TicketListFilter) => void;
+}) {
+  return (
+    <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+      {FILTER_OPTIONS.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          onClick={() => onChange(opt.value)}
+          className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+            value === opt.value
+              ? "bg-white text-gray-900 shadow-sm"
+              : "text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function HelpdeskTab() {
   const searchParams = useSearchParams();
   const highlightId = searchParams?.get("id") ? parseInt(searchParams.get("id")!, 10) : null;
-  const viewQueue = searchParams?.get("view") === "queue";
 
   const [canManage, setCanManage] = useState(false);
   const [itMembers, setItMembers] = useState<Member[]>([]);
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
   const [queueTickets, setQueueTickets] = useState<Ticket[]>([]);
+  const [queueFilter, setQueueFilter] = useState<TicketListFilter>("open");
+  const [mineFilter, setMineFilter] = useState<TicketListFilter>("open");
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
   const [error, setError] = useState("");
@@ -94,20 +147,23 @@ export function HelpdeskTab() {
       .catch(() => setMyTickets([]));
   }, []);
 
-  const fetchQueue = useCallback(() => {
-    return fetch("/api/helpdesk/tickets?status=open")
+  const fetchQueue = useCallback((status: TicketListFilter = queueFilter) => {
+    return fetch(`/api/helpdesk/tickets?status=${status}`)
       .then((r) => safeJson(r))
       .then((data) => setQueueTickets((data.tickets as Ticket[]) ?? []))
       .catch(() => setQueueTickets([]));
-  }, []);
+  }, [queueFilter]);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    const isManager = await fetchContext();
-    await fetchMine();
-    if (isManager) await fetchQueue();
-    setLoading(false);
-  }, [fetchContext, fetchMine, fetchQueue]);
+  const refresh = useCallback(
+    async (queueStatus?: TicketListFilter) => {
+      setLoading(true);
+      const isManager = await fetchContext();
+      await fetchMine();
+      if (isManager) await fetchQueue(queueStatus ?? queueFilter);
+      setLoading(false);
+    },
+    [fetchContext, fetchMine, fetchQueue, queueFilter]
+  );
 
   useEffect(() => {
     refresh();
@@ -116,6 +172,12 @@ export function HelpdeskTab() {
   useEffect(() => {
     if (highlightId) setExpandedId(highlightId);
   }, [highlightId]);
+
+  const applyClosedTicketFilters = useCallback((status: string) => {
+    if (status !== "uzavreno") return;
+    setMineFilter((prev) => (prev === "open" ? "uzavreno" : prev));
+    setQueueFilter((prev) => (prev === "open" ? "uzavreno" : prev));
+  }, []);
 
   const loadDetail = (id: number) => {
     setDetailLoading(true);
@@ -130,6 +192,9 @@ export function HelpdeskTab() {
             assigned_to_id: t.users_assigned ? String(t.users_assigned.id) : "",
             resolution_note: t.resolution_note ?? "",
           });
+          if (highlightId === t.id) {
+            applyClosedTicketFilters(t.status);
+          }
         }
       })
       .catch(() => setDetail(null))
@@ -139,7 +204,10 @@ export function HelpdeskTab() {
   useEffect(() => {
     if (expandedId) loadDetail(expandedId);
     else setDetail(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reload only when expanded ticket changes
   }, [expandedId]);
+
+  const filteredMyTickets = filterTicketsByStatus(myTickets, mineFilter);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -205,7 +273,12 @@ export function HelpdeskTab() {
       return;
     }
 
-    await refresh();
+    const nextQueueFilter =
+      manageForm.status === "uzavreno" && queueFilter === "open" ? "uzavreno" : queueFilter;
+    if (manageForm.status === "uzavreno") {
+      applyClosedTicketFilters("uzavreno");
+    }
+    await refresh(nextQueueFilter);
     loadDetail(expandedId);
     setActionLoading(false);
   };
@@ -219,7 +292,9 @@ export function HelpdeskTab() {
       body: JSON.stringify({ action: "close" }),
     });
     if (res.ok) {
-      await refresh();
+      const nextQueueFilter = queueFilter === "open" ? "uzavreno" : queueFilter;
+      applyClosedTicketFilters("uzavreno");
+      await refresh(nextQueueFilter);
       loadDetail(expandedId);
     }
     setActionLoading(false);
@@ -537,13 +612,18 @@ export function HelpdeskTab() {
         </form>
       </div>
 
-      {canManage && (viewQueue || queueTickets.length > 0) && (
+      {canManage && (
         <div>
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">IT fronta</h2>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {queueFilter === "uzavreno" ? "IT archiv" : "IT fronta"}
+            </h2>
+            <TicketFilterToggle value={queueFilter} onChange={setQueueFilter} />
+          </div>
           {loading ? (
             <p className="text-sm text-gray-500">Načítám…</p>
           ) : queueTickets.length === 0 ? (
-            <p className="text-sm text-gray-500">Žádné otevřené tickety.</p>
+            <p className="text-sm text-gray-500">{emptyListMessage(queueFilter, "queue")}</p>
           ) : (
             <div className="space-y-3">
               {queueTickets.map((t) => renderTicketCard(t, true))}
@@ -553,13 +633,18 @@ export function HelpdeskTab() {
       )}
 
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Moje tickety</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-gray-900">
+            {mineFilter === "uzavreno" ? "Můj archiv" : "Moje tickety"}
+          </h2>
+          <TicketFilterToggle value={mineFilter} onChange={setMineFilter} />
+        </div>
         {loading ? (
           <p className="text-sm text-gray-500">Načítám…</p>
-        ) : myTickets.length === 0 ? (
-          <p className="text-sm text-gray-500">Zatím nemáte žádné tickety.</p>
+        ) : filteredMyTickets.length === 0 ? (
+          <p className="text-sm text-gray-500">{emptyListMessage(mineFilter, "mine")}</p>
         ) : (
-          <div className="space-y-3">{myTickets.map((t) => renderTicketCard(t))}</div>
+          <div className="space-y-3">{filteredMyTickets.map((t) => renderTicketCard(t))}</div>
         )}
       </div>
     </div>
