@@ -1,6 +1,33 @@
 {
   "releases": [
     {
+      "id": "2026-11-20-novinky",
+      "date": "2026-11-20",
+      "title": "Aktualizace systému (19.–20. 11. 2026)",
+      "items": [
+        {
+          "modules": ["equipment"],
+          "text": "Helpdesk: archiv uzavřených ticketů — přepínač Otevřené / Archiv / Vše u IT fronty i Moje tickety."
+        },
+        {
+          "modules": ["makety"],
+          "text": "Makety: možnost vrátit grafiku grafikovi ze stavu prepress_approved."
+        },
+        {
+          "modules": ["iml"],
+          "text": "IML: verze tiskových dat je nabídka AK1–AK6 (místo volného textu)."
+        },
+        {
+          "modules": ["iml"],
+          "text": "IML: z detailu objednávky odstraněno hromadné přiřazení tvaru a výseku."
+        },
+        {
+          "modules": ["iml"],
+          "text": "IML: v seznamu produktů se zobrazuje alternativní výsekový nástroj."
+        }
+      ]
+    },
+    {
       "id": "2026-11-19-novinky",
       "date": "2026-11-19",
       "title": "Aktualizace systému (16.–19. 11. 2026)",
