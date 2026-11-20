@@ -61,7 +61,7 @@ export async function POST(
           title: "Nový komentář k ticketu",
           message: `Ticket ${ticket.ticket_number}: odpověď žadatele`,
           type: "helpdesk_comment",
-          link: `/pozadavky?tab=helpdesk&view=queue&id=${ticket.id}`,
+          link: `/pozadavky/helpdesk?id=${ticket.id}`,
         },
       });
     } else if (isManager && ticket.requester_id !== userId) {

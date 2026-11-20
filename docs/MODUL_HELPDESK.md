@@ -6,14 +6,14 @@ Dokumentace modulu helpdesku pro požadavky na IT servis (poruchy, software, př
 
 Přihlášení zaměstnanci mohou založit ticket na IT oddělení, sledovat stav a komunikovat přes komentáře. IT správci ticket přiřadí, řeší a uzavřou.
 
-Helpdesk je dostupný na `/pozadavky` → záložka **Helpdesk**. Veřejný formulář pro helpdesk není – vyžaduje přihlášení.
+Helpdesk je dostupný na `/pozadavky` → záložka **Helpdesk**. Kompletní IT správa (filtry, tabulka): `/pozadavky/helpdesk`. Veřejný formulář pro helpdesk není – vyžaduje přihlášení.
 
 ## Aktéři
 
 | Role | Přístup | Co dělá |
 |---|---|---|
 | **Žadatel** | `/pozadavky?tab=helpdesk` | Vytvoří ticket, vidí vlastní tickety, komentuje, uzavře vyřešený |
-| **IT** | Stejná stránka + sekce IT fronta | Člen oddělení „IT" + `equipment:write` (nebo admin) – přiřazení, změna stavu, interní poznámky |
+| **IT** | Záložka + `/pozadavky/helpdesk` | Člen oddělení „IT" + `equipment:write` (nebo admin) – fronta, filtry, přiřazení, změna stavu, interní poznámky |
 
 ## Stavy ticketu
 
@@ -25,17 +25,24 @@ Helpdesk je dostupný na `/pozadavky` → záložka **Helpdesk**. Veřejný form
 | `vyreseno` | IT vyřešilo (s popisem řešení) |
 | `uzavreno` | Uzavřeno žadatelem nebo IT |
 
+## Správa ticketů (IT)
+
+Stránka `/pozadavky/helpdesk` (jen správci helpdesku):
+
+- Filtry: stav (`open` / konkrétní / `all`), priorita, kategorie, řešitel (`me` / `unassigned` / id), žadatel, fulltext `q`
+- Tabulka + expand detailu (komentáře, přílohy, IT správa)
+- Stránkování (`page`, `limit`)
+
+Na záložce Helpdesk zůstává zkrácená **IT fronta** (otevřené) s odkazem „Kompletní správa“.
+
 ## Archiv
 
-Uzavřené tickety zůstávají v databázi (`status=uzavreno`, `closed_at`). V UI na `/pozadavky?tab=helpdesk` je u **IT fronty** i **Moje tickety** přepínač **Otevřené / Archiv / Vše**.
+Uzavřené tickety zůstávají v databázi (`status=uzavreno`, `closed_at`).
 
-- **Otevřené** – vše kromě `uzavreno` (výchozí)
-- **Archiv** – jen uzavřené
-- **Vše** – bez filtru stavu
+- **Moje tickety:** přepínač Otevřené / Archiv / Vše
+- **IT správa:** filtr stavu včetně Archiv (`uzavreno`) nebo Vše
 
-Deep-link na uzavřený ticket (`?tab=helpdesk&id=…`) automaticky přepne filtr na Archiv, aby ticket zůstal ve seznamu.
-
-IT fronta API: `GET /api/helpdesk/tickets?status=open|uzavreno|all` (default `open`).
+Deep-link: `/pozadavky/helpdesk?id=…` (IT) nebo `/pozadavky?tab=helpdesk&id=…` (žadatel).
 
 ## Kategorie a priorita
 
@@ -62,7 +69,7 @@ IT fronta API: `GET /api/helpdesk/tickets?status=open|uzavreno|all` (default `op
 | Endpoint | Metoda | Účel |
 |---|---|---|
 | `/api/helpdesk/tickets` | POST | Vytvoření ticketu |
-| `/api/helpdesk/tickets` | GET | IT fronta / archiv (`?status=` `open` / `uzavreno` / `all`, default `open`; vyžaduje správu helpdesku) |
+| `/api/helpdesk/tickets` | GET | IT list + filtry (`status`, `priority`, `category`, `assigned_to`, `requester_id`, `q`, `page`, `limit`; vyžaduje správu helpdesku) |
 | `/api/helpdesk/tickets/mine` | GET | Tickety aktuálního uživatele |
 | `/api/helpdesk/tickets/[id]` | GET, PATCH | Detail, změna stavu, uzavření |
 | `/api/helpdesk/tickets/[id]/comments` | POST | Komentář |
@@ -70,11 +77,11 @@ IT fronta API: `GET /api/helpdesk/tickets?status=open|uzavreno|all` (default `op
 | `/api/helpdesk/tickets/[id]/files/[fileId]` | GET, DELETE | Stažení / smazání přílohy ticketu |
 | `/api/helpdesk/tickets/[id]/comments/[commentId]/files` | GET, POST | Přílohy komentáře |
 | `/api/helpdesk/tickets/[id]/comments/[commentId]/files/[fileId]` | GET, DELETE | Stažení / smazání přílohy komentáře |
-| `/api/helpdesk/context` | GET | Kontext UI (`canManageHelpdesk`, členové IT) |
+| `/api/helpdesk/context` | GET | Kontext UI (`canManageHelpdesk`, členové IT, žadatelé) |
 
 ## Notifikace
 
-- Nový ticket → admini modulu Majetek (`equipment`)
+- Nový ticket → admini modulu Majetek (`equipment`) → odkaz na `/pozadavky/helpdesk?id=…`
 - Změna stavu / komentář IT → žadatel
 - Komentář žadatele → přiřazený řešitel (pokud existuje)
 
@@ -85,4 +92,4 @@ IT fronta API: `GET /api/helpdesk/tickets?status=open|uzavreno|all` (default `op
 | Účel | Nákup / dodání vybavení | IT servis, poruchy |
 | Schvalování vedením | Ano (IT → Vedení) | Ne |
 | Veřejný formulář | Ano (`/public/equipment-request`) | Ne |
-| Správa workflow | Majetek → Požadavky | `/pozadavky?tab=helpdesk` (IT fronta) |
+| Správa workflow | Majetek → Požadavky | `/pozadavky/helpdesk` (IT) + záložka Helpdesk |

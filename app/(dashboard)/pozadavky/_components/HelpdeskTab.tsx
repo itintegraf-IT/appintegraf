@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   HELPDESK_CATEGORY_LABELS,
@@ -56,15 +57,10 @@ function filterTicketsByStatus(tickets: Ticket[], filter: TicketListFilter): Tic
   return tickets;
 }
 
-function emptyListMessage(filter: TicketListFilter, kind: "queue" | "mine"): string {
-  if (kind === "mine") {
-    if (filter === "uzavreno") return "Archiv je prázdný — zatím nemáte žádné uzavřené tickety.";
-    if (filter === "all") return "Zatím nemáte žádné tickety.";
-    return "Nemáte žádné otevřené tickety.";
-  }
-  if (filter === "uzavreno") return "Archiv je prázdný.";
-  if (filter === "all") return "Žádné tickety.";
-  return "Žádné otevřené tickety.";
+function emptyMineListMessage(filter: TicketListFilter): string {
+  if (filter === "uzavreno") return "Archiv je prázdný — zatím nemáte žádné uzavřené tickety.";
+  if (filter === "all") return "Zatím nemáte žádné tickety.";
+  return "Nemáte žádné otevřené tickety.";
 }
 
 function TicketFilterToggle({
@@ -102,7 +98,6 @@ export function HelpdeskTab() {
   const [itMembers, setItMembers] = useState<Member[]>([]);
   const [myTickets, setMyTickets] = useState<Ticket[]>([]);
   const [queueTickets, setQueueTickets] = useState<Ticket[]>([]);
-  const [queueFilter, setQueueFilter] = useState<TicketListFilter>("open");
   const [mineFilter, setMineFilter] = useState<TicketListFilter>("open");
   const [loading, setLoading] = useState(true);
   const [submitLoading, setSubmitLoading] = useState(false);
@@ -147,23 +142,20 @@ export function HelpdeskTab() {
       .catch(() => setMyTickets([]));
   }, []);
 
-  const fetchQueue = useCallback((status: TicketListFilter = queueFilter) => {
-    return fetch(`/api/helpdesk/tickets?status=${status}`)
+  const fetchQueue = useCallback(() => {
+    return fetch("/api/helpdesk/tickets?status=open&limit=50")
       .then((r) => safeJson(r))
       .then((data) => setQueueTickets((data.tickets as Ticket[]) ?? []))
       .catch(() => setQueueTickets([]));
-  }, [queueFilter]);
+  }, []);
 
-  const refresh = useCallback(
-    async (queueStatus?: TicketListFilter) => {
-      setLoading(true);
-      const isManager = await fetchContext();
-      await fetchMine();
-      if (isManager) await fetchQueue(queueStatus ?? queueFilter);
-      setLoading(false);
-    },
-    [fetchContext, fetchMine, fetchQueue, queueFilter]
-  );
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const isManager = await fetchContext();
+    await fetchMine();
+    if (isManager) await fetchQueue();
+    setLoading(false);
+  }, [fetchContext, fetchMine, fetchQueue]);
 
   useEffect(() => {
     refresh();
@@ -176,7 +168,6 @@ export function HelpdeskTab() {
   const applyClosedTicketFilters = useCallback((status: string) => {
     if (status !== "uzavreno") return;
     setMineFilter((prev) => (prev === "open" ? "uzavreno" : prev));
-    setQueueFilter((prev) => (prev === "open" ? "uzavreno" : prev));
   }, []);
 
   const loadDetail = (id: number) => {
@@ -273,12 +264,10 @@ export function HelpdeskTab() {
       return;
     }
 
-    const nextQueueFilter =
-      manageForm.status === "uzavreno" && queueFilter === "open" ? "uzavreno" : queueFilter;
     if (manageForm.status === "uzavreno") {
       applyClosedTicketFilters("uzavreno");
     }
-    await refresh(nextQueueFilter);
+    await refresh();
     loadDetail(expandedId);
     setActionLoading(false);
   };
@@ -292,9 +281,8 @@ export function HelpdeskTab() {
       body: JSON.stringify({ action: "close" }),
     });
     if (res.ok) {
-      const nextQueueFilter = queueFilter === "open" ? "uzavreno" : queueFilter;
       applyClosedTicketFilters("uzavreno");
-      await refresh(nextQueueFilter);
+      await refresh();
       loadDetail(expandedId);
     }
     setActionLoading(false);
@@ -615,15 +603,21 @@ export function HelpdeskTab() {
       {canManage && (
         <div>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold text-gray-900">
-              {queueFilter === "uzavreno" ? "IT archiv" : "IT fronta"}
-            </h2>
-            <TicketFilterToggle value={queueFilter} onChange={setQueueFilter} />
+            <h2 className="text-lg font-semibold text-gray-900">IT fronta</h2>
+            <Link
+              href="/pozadavky/helpdesk"
+              className="text-sm font-medium text-red-700 hover:underline"
+            >
+              Kompletní správa →
+            </Link>
           </div>
+          <p className="mb-3 text-xs text-gray-500">
+            Otevřené tickety. Archiv, filtry podle stavu/žadatele a stránkování najdete ve správě.
+          </p>
           {loading ? (
             <p className="text-sm text-gray-500">Načítám…</p>
           ) : queueTickets.length === 0 ? (
-            <p className="text-sm text-gray-500">{emptyListMessage(queueFilter, "queue")}</p>
+            <p className="text-sm text-gray-500">Žádné otevřené tickety.</p>
           ) : (
             <div className="space-y-3">
               {queueTickets.map((t) => renderTicketCard(t, true))}
@@ -642,7 +636,7 @@ export function HelpdeskTab() {
         {loading ? (
           <p className="text-sm text-gray-500">Načítám…</p>
         ) : filteredMyTickets.length === 0 ? (
-          <p className="text-sm text-gray-500">{emptyListMessage(mineFilter, "mine")}</p>
+          <p className="text-sm text-gray-500">{emptyMineListMessage(mineFilter)}</p>
         ) : (
           <div className="space-y-3">{filteredMyTickets.map((t) => renderTicketCard(t))}</div>
         )}
