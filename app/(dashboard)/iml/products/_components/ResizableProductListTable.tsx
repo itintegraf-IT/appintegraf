@@ -18,6 +18,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { ArrowDown, ArrowUp, ArrowUpDown, GripVertical } from "lucide-react";
 import { startColumnResize } from "@/lib/iml/product-list-column-resize";
 import {
+  dieCutToolListCellTitleFromProduct,
   isProductListColumnDraggable,
   isProductListColumnSortable,
   type ProductListColumnId,
@@ -65,7 +66,7 @@ function cellTitle(columnId: ProductListColumnId, product: ProductListRow): stri
   }
   if (columnId === "customer") return product.iml_customers?.name ?? undefined;
   if (columnId === "print_colors_text") return product.print_colors_text ?? undefined;
-  if (columnId === "die_cut_tool_code") return product.die_cut_tool_code ?? undefined;
+  if (columnId === "die_cut_tool_code") return dieCutToolListCellTitleFromProduct(product);
   if (columnId === "foil") {
     const foil = product.iml_foils?.name ?? product.iml_foils?.code ?? product.foil_type;
     return foil ?? undefined;

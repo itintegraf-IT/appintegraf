@@ -10,8 +10,41 @@ import {
   resolveColumnWidths,
   parseStoredColumnWidths,
   getDefaultColumnWidth,
+  formatDieCutToolListCell,
+  dieCutToolListCellTitle,
+  altDieCutToolCodeFromShape,
 } from "./product-list-columns";
 import { buildProductListOrderBy } from "./product-list-sort";
+
+describe("formatDieCutToolListCell", () => {
+  it("primární / alternativa", () => {
+    expect(formatDieCutToolListCell("A43A", "M-25")).toBe("A43A / M-25");
+  });
+
+  it("jen primární když ALT chybí nebo je stejný", () => {
+    expect(formatDieCutToolListCell("A43A", null)).toBe("A43A");
+    expect(formatDieCutToolListCell("A43A", "A43A")).toBe("A43A");
+    expect(formatDieCutToolListCell("", "")).toBe("-");
+  });
+
+  it("tooltip s popisky při obou kódech", () => {
+    expect(dieCutToolListCellTitle("A43A", "M-25")).toBe(
+      "Primární: A43A · Alternativa: M-25"
+    );
+    expect(dieCutToolListCellTitle("A43A", null)).toBe("A43A");
+  });
+
+  it("altDieCutToolCodeFromShape bere tool_code_orig", () => {
+    expect(
+      altDieCutToolCodeFromShape({
+        tool_assignments: [
+          { tool: { tool_code_orig: "M-25", tool_code_new: "IML0001" } },
+        ],
+      })
+    ).toBe("M-25");
+    expect(altDieCutToolCodeFromShape(null)).toBeNull();
+  });
+});
 
 describe("resolveVisibleColumnIds", () => {
   it("vrátí výchozí sloupce bez uložené preference", () => {

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Eye, Pencil, Trash2, FileText, ImageOff, Lock } from "lucide-react";
 import { withReturnTo } from "@/lib/navigation/return-to";
 import {
+  formatDieCutToolListCellFromProduct,
   formatProductListDate,
   formatProductListFormat,
   formatProductListFoil,
@@ -177,7 +178,7 @@ export function renderProductListCell(
     case "ean_code":
       return dash(product.ean_code);
     case "die_cut_tool_code":
-      return dash(product.die_cut_tool_code);
+      return formatDieCutToolListCellFromProduct(product);
     case "label_shape_code":
       return dash(product.label_shape_code);
     case "assembly_code":

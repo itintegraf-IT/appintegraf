@@ -60,6 +60,12 @@ export type ProductListRow = {
   format_width_mm: number | string | null;
   format_height_mm: number | string | null;
   die_cut_tool_code: string | null;
+  /** Alternativní nástroj z tvaru (ALT_1), pokud je v API. */
+  iml_shape_catalog?: {
+    tool_assignments?: Array<{
+      tool: { tool_code_orig: string | null; tool_code_new: string | null } | null;
+    }>;
+  } | null;
   assembly_code: string | null;
   positions_on_sheet: number | null;
   labels_per_sheet: number | null;
@@ -136,7 +142,7 @@ export const PRODUCT_LIST_COLUMNS: ProductListColumnMeta[] = [
   { id: "ig_short_name", label: "Zkrácený název IG", group: "identifikace", defaultVisible: false, sortable: true, defaultWidthPx: 160, truncate: true },
   { id: "requester", label: "Zadavatel", group: "identifikace", defaultVisible: false, sortable: true, defaultWidthPx: 140, truncate: true },
   { id: "ean_code", label: "EAN", group: "identifikace", defaultVisible: false, sortable: true, defaultWidthPx: 130, cellClassName: "font-mono text-sm" },
-  { id: "die_cut_tool_code", label: "Výsekový nástroj", group: "výseky", defaultVisible: false, sortable: true, defaultWidthPx: 160, truncate: true },
+  { id: "die_cut_tool_code", label: "Výsekový nástroj", group: "výseky", defaultVisible: false, sortable: true, defaultWidthPx: 200, truncate: true },
   { id: "label_shape_code", label: "Kód tvaru etikety", group: "výseky", defaultVisible: false, sortable: true, defaultWidthPx: 140, truncate: true },
   { id: "assembly_code", label: "Montážní kód", group: "výseky", defaultVisible: false, sortable: true, defaultWidthPx: 130, truncate: true },
   { id: "positions_on_sheet", label: "Pozic na archu", group: "výseky", defaultVisible: false, sortable: true, align: "right", defaultWidthPx: 100 },
@@ -241,6 +247,73 @@ export function formatProductListFormat(row: ProductListRow): string {
     return `${w} × ${h} mm`;
   }
   return row.product_format?.trim() || "-";
+}
+
+/** Kód nástroje: orig, jinak new. */
+export function imlToolDisplayCode(
+  tool: { tool_code_orig?: string | null; tool_code_new?: string | null } | null | undefined
+): string | null {
+  if (!tool) return null;
+  const code = (tool.tool_code_orig || tool.tool_code_new || "").trim();
+  return code || null;
+}
+
+/** ALT_1 kód z tvaru (první přiřazení v tool_assignments). */
+export function altDieCutToolCodeFromShape(
+  shape:
+    | {
+        tool_assignments?: Array<{
+          tool: { tool_code_orig?: string | null; tool_code_new?: string | null } | null;
+        }> | null;
+      }
+    | null
+    | undefined
+): string | null {
+  const first = shape?.tool_assignments?.[0];
+  return imlToolDisplayCode(first?.tool);
+}
+
+/**
+ * Buňka výsekového nástroje: primární [/ alternativa].
+ * ALT se nezobrazí, pokud chybí nebo je stejný jako primární.
+ */
+export function formatDieCutToolListCell(
+  primary: string | null | undefined,
+  alt: string | null | undefined
+): string {
+  const p = (primary ?? "").trim();
+  const a = (alt ?? "").trim();
+  if (!p && !a) return "-";
+  if (!p) return a;
+  if (!a || a === p) return p;
+  return `${p} / ${a}`;
+}
+
+/** Tooltip pro sloupec výsekového nástroje. */
+export function dieCutToolListCellTitle(
+  primary: string | null | undefined,
+  alt: string | null | undefined
+): string | undefined {
+  const p = (primary ?? "").trim();
+  const a = (alt ?? "").trim();
+  if (!p && !a) return undefined;
+  if (a && p && a !== p) return `Primární: ${p} · Alternativa: ${a}`;
+  if (p) return p;
+  return a || undefined;
+}
+
+export function formatDieCutToolListCellFromProduct(row: ProductListRow): string {
+  return formatDieCutToolListCell(
+    row.die_cut_tool_code,
+    altDieCutToolCodeFromShape(row.iml_shape_catalog)
+  );
+}
+
+export function dieCutToolListCellTitleFromProduct(row: ProductListRow): string | undefined {
+  return dieCutToolListCellTitle(
+    row.die_cut_tool_code,
+    altDieCutToolCodeFromShape(row.iml_shape_catalog)
+  );
 }
 
 export function formatProductListDate(value: string | Date | null | undefined): string {

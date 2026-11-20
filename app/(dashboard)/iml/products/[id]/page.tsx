@@ -32,6 +32,10 @@ import {
   imlProductKindLabel,
 } from "@/lib/iml-constants";
 import { formatProductFormatFromMm } from "@/lib/iml/product-format";
+import {
+  altDieCutToolCodeFromShape,
+  formatDieCutToolListCell,
+} from "@/lib/iml/product-list-columns";
 import { formatPrintColorsSummaryForDisplay } from "@/lib/iml-print-colors-summary";
 import { normalizePantoneCode, resolvePantoneSwatchHex } from "@/lib/iml-pantone";
 
@@ -59,6 +63,17 @@ export default async function ImlProductDetailPage({
       include: {
         iml_customers: { select: { id: true, name: true } },
         iml_foils: { select: { id: true, code: true, name: true } },
+        iml_shape_catalog: {
+          select: {
+            tool_assignments: {
+              where: { priority: "ALT_1" },
+              take: 1,
+              select: {
+                tool: { select: { tool_code_orig: true, tool_code_new: true } },
+              },
+            },
+          },
+        },
         ...productMaterialIncludes,
         iml_product_colors: {
           include: {
@@ -181,7 +196,13 @@ export default async function ImlProductDetailPage({
       content: (
         <div className="grid gap-4 sm:grid-cols-2">
           <InfoField label="Kód tvaru etikety" value={fmt(product.label_shape_code)} />
-          <InfoField label="Kód výsekového nástroje" value={fmt(product.die_cut_tool_code)} />
+          <InfoField
+            label="Kód výsekového nástroje"
+            value={formatDieCutToolListCell(
+              product.die_cut_tool_code,
+              altDieCutToolCodeFromShape(product.iml_shape_catalog)
+            )}
+          />
           <InfoField label="Kód montáže" value={fmt(product.assembly_code)} />
           <InfoField label="Pozic na archu" value={fmtNum(product.positions_on_sheet)} />
           <InfoField label="Etiket na TA" value={fmtNum(product.labels_per_sheet)} />

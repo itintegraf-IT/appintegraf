@@ -33,6 +33,17 @@ const productListSelect = {
   format_width_mm: true,
   format_height_mm: true,
   die_cut_tool_code: true,
+  iml_shape_catalog: {
+    select: {
+      tool_assignments: {
+        where: { priority: "ALT_1" },
+        take: 1,
+        select: {
+          tool: { select: { tool_code_orig: true, tool_code_new: true } },
+        },
+      },
+    },
+  },
   assembly_code: true,
   positions_on_sheet: true,
   pieces_per_box: true,
