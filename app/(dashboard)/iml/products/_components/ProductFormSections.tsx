@@ -16,6 +16,7 @@ import {
   IML_COLOR_COUNT_OPTIONS,
   IML_ITEM_STATUSES,
   IML_LABEL_TYPES,
+  IML_PRINT_DATA_VERSIONS,
   IML_PRODUCT_KINDS,
   imlItemStatusLabel,
 } from "@/lib/iml-constants";
@@ -309,6 +310,11 @@ export default function ProductFormSections({
     form.approval_status &&
     !(IML_APPROVAL_STATUSES as readonly string[]).includes(form.approval_status)
       ? form.approval_status
+      : null;
+  const legacyPrintDataVersion =
+    form.print_data_version &&
+    !(IML_PRINT_DATA_VERSIONS as readonly string[]).includes(form.print_data_version)
+      ? form.print_data_version
       : null;
 
   const tabs: TabDef[] = [
@@ -737,13 +743,19 @@ export default function ProductFormSections({
               </select>
             </Field>
             <Field label="Verze tiskových dat" error={err.print_data_version}>
-              <input
-                type="text"
+              <select
                 value={form.print_data_version}
                 onChange={(e) => setField("print_data_version", e.target.value)}
-                placeholder="v1, v2…"
                 className={inputCls}
-              />
+              >
+                <option value="">— Vyberte —</option>
+                {IML_PRINT_DATA_VERSIONS.map((v) => (
+                  <option key={v} value={v}>{v}</option>
+                ))}
+                {legacyPrintDataVersion && (
+                  <option value={legacyPrintDataVersion}>{legacyPrintDataVersion}</option>
+                )}
+              </select>
             </Field>
             <Field
               label="Formát"

@@ -95,3 +95,6 @@ export type ImlApprovalStatus = (typeof IML_APPROVAL_STATUSES)[number];
 
 /** Počet barev na záložce Tisková data (`iml_products.color_count`). */
 export const IML_COLOR_COUNT_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8] as const;
+
+/** Verze tiskových dat (`iml_products.print_data_version`). */
+export const IML_PRINT_DATA_VERSIONS = ["AK1", "AK2", "AK3", "AK4", "AK5", "AK6"] as const;
