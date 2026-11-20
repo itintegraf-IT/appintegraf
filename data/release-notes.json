@@ -1,6 +1,21 @@
 {
   "releases": [
     {
+      "id": "2026-11-20-novinky-2",
+      "date": "2026-11-20",
+      "title": "Aktualizace systému (20. 11. 2026)",
+      "items": [
+        {
+          "modules": ["technologie"],
+          "text": "Technologie: číselník výsekového zařízení Příklop."
+        },
+        {
+          "modules": ["iml"],
+          "text": "IML: při PDF importu objednávky lze produkt přidat ručně."
+        }
+      ]
+    },
+    {
       "id": "2026-11-20-novinky",
       "date": "2026-11-20",
       "title": "Aktualizace systému (19.–20. 11. 2026)",
