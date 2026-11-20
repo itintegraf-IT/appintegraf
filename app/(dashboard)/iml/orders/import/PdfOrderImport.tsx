@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { FileText, Upload, AlertTriangle } from "lucide-react";
+import { FileText, Upload, AlertTriangle, Plus } from "lucide-react";
 import { ORDER_PDF_TEMPLATES } from "@/lib/iml/order-pdf/registry";
 import { CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE } from "@/lib/iml/order-job-number";
 import ImlProductCombobox from "@/app/(dashboard)/iml/_components/ImlProductCombobox";
@@ -59,11 +59,25 @@ type EditableRow = {
   productId: string;
   productLabel: string | null;
   matchedBy: "client_code" | "ig_code" | null;
+  source: "pdf" | "manual";
 };
 
 function formatCzk(n: number | null): string {
   if (n == null || !Number.isFinite(n)) return "—";
   return n.toLocaleString("cs-CZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function nextItemNo(rows: EditableRow[]): string {
+  let max = 0;
+  for (const r of rows) {
+    const n = parseInt(r.itemNo, 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return String(max + 1).padStart(5, "0");
+}
+
+function productDisplayLabel(p: ProductOption): string {
+  return p.client_name || p.ig_short_name || p.ig_code || `#${p.id}`;
 }
 
 export function PdfOrderImport() {
@@ -169,6 +183,7 @@ export function PdfOrderImport() {
           productId: it.productId != null ? String(it.productId) : "",
           productLabel: it.productLabel,
           matchedBy: it.matchedBy,
+          source: "pdf" as const,
         }))
       );
     } catch (err) {
@@ -181,13 +196,50 @@ export function PdfOrderImport() {
   const setRowField = (index: number, key: "quantity" | "subtotal" | "productId", value: string) => {
     setRows((prev) => {
       const next = [...prev];
-      next[index] = { ...next[index], [key]: value };
+      const current = next[index];
+      if (!current) return prev;
+      let updated: EditableRow = { ...current, [key]: value };
+      if (key === "productId" && current.source === "manual") {
+        const pid = parseInt(value, 10);
+        const p = customerProducts.find((x) => x.id === pid);
+        if (p) {
+          const label = productDisplayLabel(p);
+          updated = {
+            ...updated,
+            description: current.description.trim() ? current.description : label,
+            yourMaterialNo: current.yourMaterialNo || p.ig_code,
+            customerMaterialNo: current.customerMaterialNo || p.client_code,
+            productLabel: label,
+            matchedBy: null,
+          };
+        }
+      }
+      next[index] = updated;
       return next;
     });
   };
 
   const removeRow = (index: number) => {
     setRows((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const addManualRow = () => {
+    setRows((prev) => [
+      ...prev,
+      {
+        itemNo: nextItemNo(prev),
+        description: "",
+        customerMaterialNo: null,
+        yourMaterialNo: null,
+        deliveryDate: null,
+        quantity: "",
+        subtotal: "",
+        productId: "",
+        productLabel: null,
+        matchedBy: null,
+        source: "manual",
+      },
+    ]);
   };
 
   const rowUnitPrice = (row: EditableRow): number | null => {
@@ -198,6 +250,14 @@ export function PdfOrderImport() {
   };
 
   const unmatchedCount = rows.filter((r) => !r.productId).length;
+  const pdfRows = useMemo(
+    () => rows.map((row, index) => ({ row, index })).filter(({ row }) => row.source !== "manual"),
+    [rows]
+  );
+  const manualRows = useMemo(
+    () => rows.map((row, index) => ({ row, index })).filter(({ row }) => row.source === "manual"),
+    [rows]
+  );
   const canImport =
     !!preview &&
     !duplicate &&
@@ -211,6 +271,101 @@ export function PdfOrderImport() {
       const q = parseInt(r.quantity, 10);
       return Number.isFinite(q) && q > 0;
     });
+
+  const renderItemRow = (row: EditableRow, index: number) => {
+    const matched = !!row.productId;
+    const selectedId = row.productId ? parseInt(row.productId, 10) : null;
+    const showFallbackOption = selectedId != null && !customerProductIds.has(selectedId);
+    const rowProducts: ImlSearchableProduct[] = showFallbackOption
+      ? [
+          {
+            id: selectedId!,
+            ig_code: row.yourMaterialNo,
+            client_code: row.customerMaterialNo,
+            client_name: row.productLabel,
+            ig_short_name: row.productLabel,
+          },
+          ...customerProducts,
+        ]
+      : customerProducts;
+    const searchHint = row.yourMaterialNo?.trim() || row.customerMaterialNo?.trim() || "";
+    return (
+      <tr
+        key={`${row.source}-${row.itemNo}-${index}`}
+        className={`border-b border-gray-100 ${matched ? "" : "bg-amber-50/60"}`}
+      >
+        <td className="px-3 py-2 font-mono text-xs">{row.itemNo}</td>
+        <td className="max-w-[240px] px-3 py-2">
+          <span className="block truncate" title={row.description || undefined}>
+            {row.description || "—"}
+          </span>
+          {row.deliveryDate && (
+            <span className="text-xs text-gray-500">Dodání: {row.deliveryDate}</span>
+          )}
+        </td>
+        <td className="px-3 py-2 font-mono text-xs">{row.customerMaterialNo ?? "—"}</td>
+        <td className="px-3 py-2 font-mono text-xs">{row.yourMaterialNo ?? "—"}</td>
+        <td className="px-3 py-2">
+          <ImlProductCombobox
+            products={rowProducts}
+            value={row.productId}
+            onChange={(v) => setRowField(index, "productId", v)}
+            defaultQuery={searchHint}
+            placeholder="Hledat podle IG / kódu / názvu…"
+            inputClassName={matched ? "" : "border-amber-400 bg-white focus:border-amber-500"}
+          />
+          {row.matchedBy && (
+            <span className="text-xs text-gray-500">
+              Spárováno dle {row.matchedBy === "client_code" ? "kódu klienta" : "kódu IG"}
+            </span>
+          )}
+        </td>
+        <td className="px-3 py-2 text-right">
+          <input
+            type="number"
+            min="0"
+            value={row.quantity}
+            onChange={(e) => setRowField(index, "quantity", e.target.value)}
+            className="w-24 rounded border border-gray-300 px-2 py-1 text-right"
+          />
+        </td>
+        <td className="px-3 py-2 text-right text-gray-600">{formatCzk(rowUnitPrice(row))}</td>
+        <td className="px-3 py-2 text-right">
+          <input
+            type="text"
+            value={row.subtotal}
+            onChange={(e) => setRowField(index, "subtotal", e.target.value)}
+            className="w-28 rounded border border-gray-300 px-2 py-1 text-right"
+          />
+        </td>
+        <td className="px-3 py-2 text-right">
+          <button
+            type="button"
+            onClick={() => removeRow(index)}
+            className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
+          >
+            Odebrat
+          </button>
+        </td>
+      </tr>
+    );
+  };
+
+  const itemsTableHead = (descriptionLabel: string) => (
+    <thead className="border-b border-gray-200 bg-gray-50">
+      <tr>
+        <th className="px-3 py-2 text-left font-semibold text-gray-700">#</th>
+        <th className="px-3 py-2 text-left font-semibold text-gray-700">{descriptionLabel}</th>
+        <th className="px-3 py-2 text-left font-semibold text-gray-700">Kód klienta</th>
+        <th className="px-3 py-2 text-left font-semibold text-gray-700">Kód IG</th>
+        <th className="px-3 py-2 text-left font-semibold text-gray-700">Produkt</th>
+        <th className="px-3 py-2 text-right font-semibold text-gray-700">Množství</th>
+        <th className="px-3 py-2 text-right font-semibold text-gray-700">Cena/ks</th>
+        <th className="px-3 py-2 text-right font-semibold text-gray-700">Mezisoučet</th>
+        <th className="px-3 py-2" />
+      </tr>
+    </thead>
+  );
 
   const handleImport = async () => {
     if (!canImport) return;
@@ -470,7 +625,14 @@ export function PdfOrderImport() {
 
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-sm font-semibold text-gray-700">Položky ({rows.length})</h3>
+              <h3 className="text-sm font-semibold text-gray-700">
+                Položky z PDF ({pdfRows.length})
+                {manualRows.length > 0 && (
+                  <span className="ml-2 font-normal text-gray-500">
+                    · celkem {rows.length}
+                  </span>
+                )}
+              </h3>
               {unmatchedCount > 0 && (
                 <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
                   Nespárované položky: {unmatchedCount}
@@ -479,122 +641,49 @@ export function PdfOrderImport() {
             </div>
             <div className="overflow-x-auto rounded-lg border border-gray-200">
               <table className="w-full text-sm">
-                <thead className="border-b border-gray-200 bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">#</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Popis z PDF</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Kód klienta</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Kód IG</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-700">Produkt</th>
-                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Množství</th>
-                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Cena/ks</th>
-                    <th className="px-3 py-2 text-right font-semibold text-gray-700">Mezisoučet</th>
-                    <th className="px-3 py-2" />
-                  </tr>
-                </thead>
+                {itemsTableHead("Popis z PDF")}
                 <tbody>
-                  {rows.map((row, index) => {
-                    const matched = !!row.productId;
-                    const selectedId = row.productId ? parseInt(row.productId, 10) : null;
-                    const showFallbackOption =
-                      selectedId != null && !customerProductIds.has(selectedId);
-                    const rowProducts: ImlSearchableProduct[] = showFallbackOption
-                      ? [
-                          {
-                            id: selectedId!,
-                            ig_code: row.yourMaterialNo,
-                            client_code: row.customerMaterialNo,
-                            client_name: row.productLabel,
-                            ig_short_name: row.productLabel,
-                          },
-                          ...customerProducts,
-                        ]
-                      : customerProducts;
-                    const searchHint =
-                      row.yourMaterialNo?.trim() || row.customerMaterialNo?.trim() || "";
-                    return (
-                      <tr
-                        key={`${row.itemNo}-${index}`}
-                        className={`border-b border-gray-100 ${matched ? "" : "bg-amber-50/60"}`}
-                      >
-                        <td className="px-3 py-2 font-mono text-xs">{row.itemNo}</td>
-                        <td className="max-w-[240px] px-3 py-2">
-                          <span className="block truncate" title={row.description}>
-                            {row.description}
-                          </span>
-                          {row.deliveryDate && (
-                            <span className="text-xs text-gray-500">Dodání: {row.deliveryDate}</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 font-mono text-xs">
-                          {row.customerMaterialNo ?? "—"}
-                        </td>
-                        <td className="px-3 py-2 font-mono text-xs">{row.yourMaterialNo ?? "—"}</td>
-                        <td className="px-3 py-2">
-                          <ImlProductCombobox
-                            products={rowProducts}
-                            value={row.productId}
-                            onChange={(v) => setRowField(index, "productId", v)}
-                            defaultQuery={searchHint}
-                            placeholder="Hledat podle IG / kódu / názvu…"
-                            inputClassName={
-                              matched ? "" : "border-amber-400 bg-white focus:border-amber-500"
-                            }
-                          />
-                          {row.matchedBy && (
-                            <span className="text-xs text-gray-500">
-                              Spárováno dle {row.matchedBy === "client_code" ? "kódu klienta" : "kódu IG"}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <input
-                            type="number"
-                            min="0"
-                            value={row.quantity}
-                            onChange={(e) => setRowField(index, "quantity", e.target.value)}
-                            className="w-24 rounded border border-gray-300 px-2 py-1 text-right"
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-right text-gray-600">
-                          {formatCzk(rowUnitPrice(row))}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <input
-                            type="text"
-                            value={row.subtotal}
-                            onChange={(e) => setRowField(index, "subtotal", e.target.value)}
-                            className="w-28 rounded border border-gray-300 px-2 py-1 text-right"
-                          />
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <button
-                            type="button"
-                            onClick={() => removeRow(index)}
-                            className="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50"
-                          >
-                            Odebrat
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {rows.length === 0 && (
+                  {pdfRows.map(({ row, index }) => renderItemRow(row, index))}
+                  {pdfRows.length === 0 && (
                     <tr>
                       <td colSpan={9} className="px-3 py-4 text-center text-sm text-gray-500">
-                        Žádné položky.
+                        Žádné položky z PDF.
                       </td>
                     </tr>
                   )}
                 </tbody>
               </table>
             </div>
-            {!form.customer_id && unmatchedCount > 0 && (
-              <p className="mt-2 text-xs text-amber-700">
-                Pro ruční spárování položek nejdřív vyberte zákazníka.
-              </p>
-            )}
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={addManualRow}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+              >
+                <Plus className="h-4 w-4" />
+                Přidat produkt
+              </button>
+              {!form.customer_id && (
+                <p className="text-xs text-amber-700">
+                  Pro výběr produktu nejdřív vyberte zákazníka.
+                </p>
+              )}
+            </div>
           </div>
+
+          {manualRows.length > 0 && (
+            <div className="rounded-xl border border-red-100 bg-white p-6 shadow-sm">
+              <h3 className="mb-4 text-sm font-semibold text-red-700">
+                Přidané ručně ({manualRows.length})
+              </h3>
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="w-full text-sm">
+                  {itemsTableHead("Popis")}
+                  <tbody>{manualRows.map(({ row, index }) => renderItemRow(row, index))}</tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           <div className="flex gap-2">
             <button
