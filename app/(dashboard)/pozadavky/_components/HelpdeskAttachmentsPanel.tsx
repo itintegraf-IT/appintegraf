@@ -23,7 +23,7 @@ function filesApiUrl(ticketId: number, commentId?: number): string {
   return `/api/helpdesk/tickets/${ticketId}/files`;
 }
 
-function deleteApiUrl(ticketId: number, fileId: number, commentId?: number): string {
+function fileApiUrl(ticketId: number, fileId: number, commentId?: number): string {
   if (commentId != null) {
     return `/api/helpdesk/tickets/${ticketId}/comments/${commentId}/files/${fileId}`;
   }
@@ -99,7 +99,7 @@ export function HelpdeskAttachmentsPanel({
 
   const onDelete = async (fileId: number) => {
     if (!confirm("Smazat přílohu?")) return;
-    const res = await fetch(deleteApiUrl(ticketId, fileId, commentId), { method: "DELETE" });
+    const res = await fetch(fileApiUrl(ticketId, fileId, commentId), { method: "DELETE" });
     if (res.ok) await load();
   };
 
@@ -143,7 +143,7 @@ export function HelpdeskAttachmentsPanel({
           {files.map((f) => (
             <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 text-xs">
               <a
-                href={f.file_path}
+                href={fileApiUrl(ticketId, f.id, commentId)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="break-all text-red-600 hover:underline"

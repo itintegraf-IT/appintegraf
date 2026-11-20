@@ -7,7 +7,48 @@ import {
   canDeleteFile,
   canViewTicket,
   resolveHelpdeskFileDiskPath,
+  serveHelpdeskFile,
 } from "@/lib/helpdesk/files";
+
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string; fileId: string }> }
+) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
+  }
+
+  const userId = parseInt(session.user.id, 10);
+  const ticketId = parseInt((await params).id, 10);
+  const fileId = parseInt((await params).fileId, 10);
+  if (Number.isNaN(ticketId) || Number.isNaN(fileId)) {
+    return NextResponse.json({ error: "Neplatné ID" }, { status: 400 });
+  }
+
+  const ticket = await prisma.helpdesk_tickets.findUnique({ where: { id: ticketId } });
+  if (!ticket) {
+    return NextResponse.json({ error: "Ticket nenalezen" }, { status: 404 });
+  }
+
+  if (!(await canViewTicket(userId, ticket))) {
+    return NextResponse.json({ error: "Nemáte přístup" }, { status: 403 });
+  }
+
+  const fileRow = await prisma.file_uploads.findFirst({
+    where: {
+      id: fileId,
+      module: HELPDESK_FILE_MODULE,
+      record_id: ticketId,
+    },
+  });
+
+  if (!fileRow) {
+    return NextResponse.json({ error: "Soubor nenalezen" }, { status: 404 });
+  }
+
+  return serveHelpdeskFile(fileRow);
+}
 
 export async function DELETE(
   _req: NextRequest,

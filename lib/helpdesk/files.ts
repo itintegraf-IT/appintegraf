@@ -1,5 +1,8 @@
 import path from "path";
-import { mkdir, writeFile } from "fs/promises";
+import { createReadStream } from "fs";
+import { access, mkdir, writeFile } from "fs/promises";
+import { Readable } from "stream";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { canManageHelpdesk } from "@/lib/helpdesk/access";
 import type { helpdesk_status } from "@prisma/client";
@@ -108,6 +111,44 @@ export function resolveHelpdeskFileDiskPath(filePath: string): string | null {
     return path.join(process.cwd(), "public", normalized);
   }
   return null;
+}
+
+/** Servírování přes API — Next.js v produkci neobslouží soubory přidané do public/ po startu. */
+export async function serveHelpdeskFile(fileRow: {
+  id: number;
+  file_path: string;
+  original_filename: string;
+  mime_type: string | null;
+  file_size: number;
+}): Promise<NextResponse> {
+  const abs = resolveHelpdeskFileDiskPath(fileRow.file_path);
+  if (!abs) {
+    return NextResponse.json({ error: "Neplatná cesta k souboru" }, { status: 500 });
+  }
+  try {
+    await access(abs);
+  } catch {
+    return NextResponse.json({ error: "Soubor na disku chybí" }, { status: 404 });
+  }
+
+  const nodeStream = createReadStream(abs);
+  const webStream = Readable.toWeb(nodeStream) as ReadableStream;
+
+  await prisma.file_uploads.update({
+    where: { id: fileRow.id },
+    data: { last_accessed_at: new Date() },
+  });
+
+  const asciiName = fileRow.original_filename.replace(/[^\x20-\x7E]/g, "_");
+  const contentType = fileRow.mime_type || "application/octet-stream";
+
+  return new NextResponse(webStream, {
+    headers: {
+      "Content-Type": contentType,
+      "Content-Disposition": `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileRow.original_filename)}`,
+      "Content-Length": String(fileRow.file_size),
+    },
+  });
 }
 
 export async function countHelpdeskFiles(module: string, recordId: number): Promise<number> {

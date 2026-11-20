@@ -55,6 +55,7 @@ IT fronta API: `GET /api/helpdesk/tickets?status=open|uzavreno|all` (default `op
 - Typy: PDF, obrázky, log/txt/csv, ZIP, Word, Excel · max. 20 MB · max. 20 souborů na ticket/komentář
 - Uzavřený ticket (`uzavreno`): přílohy jen ke čtení
 - Přílohy interních komentářů vidí pouze IT
+- Otevření/stažení vždy přes API (`GET .../files/[fileId]`), nikoli přímou cestou do `public/uploads/` — Next.js v produkci neobslouží soubory přidané po startu procesu
 
 ## API
 
@@ -66,9 +67,9 @@ IT fronta API: `GET /api/helpdesk/tickets?status=open|uzavreno|all` (default `op
 | `/api/helpdesk/tickets/[id]` | GET, PATCH | Detail, změna stavu, uzavření |
 | `/api/helpdesk/tickets/[id]/comments` | POST | Komentář |
 | `/api/helpdesk/tickets/[id]/files` | GET, POST | Přílohy ticketu |
-| `/api/helpdesk/tickets/[id]/files/[fileId]` | DELETE | Smazání přílohy ticketu |
+| `/api/helpdesk/tickets/[id]/files/[fileId]` | GET, DELETE | Stažení / smazání přílohy ticketu |
 | `/api/helpdesk/tickets/[id]/comments/[commentId]/files` | GET, POST | Přílohy komentáře |
-| `/api/helpdesk/tickets/[id]/comments/[commentId]/files/[fileId]` | DELETE | Smazání přílohy komentáře |
+| `/api/helpdesk/tickets/[id]/comments/[commentId]/files/[fileId]` | GET, DELETE | Stažení / smazání přílohy komentáře |
 | `/api/helpdesk/context` | GET | Kontext UI (`canManageHelpdesk`, členové IT) |
 
 ## Notifikace
