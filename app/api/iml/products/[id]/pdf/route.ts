@@ -121,7 +121,7 @@ export async function GET(
         downloadName,
         asDownload || confirmLocked ? "attachment" : "inline"
       ),
-      "Cache-Control": "private, max-age=3600",
+      "Cache-Control": "private, no-store",
       "X-PDF-Version": String(resolved.version),
       "X-PDF-Source": resolved.source,
       "X-Filename": downloadName,

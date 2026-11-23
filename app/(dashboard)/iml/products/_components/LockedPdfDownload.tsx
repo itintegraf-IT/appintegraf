@@ -50,7 +50,7 @@ export function LockedPdfDownload({
   const openBlob = async (confirm: boolean) => {
     setBusy(true);
     try {
-      const res = await fetch(buildUrl(confirm));
+      const res = await fetch(buildUrl(confirm), { cache: "no-store" });
       if (res.status === 409) {
         setStep(1);
         return;
