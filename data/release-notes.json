@@ -1,6 +1,25 @@
 {
   "releases": [
     {
+      "id": "2026-11-24-novinky",
+      "date": "2026-11-24",
+      "title": "Aktualizace systému (20.–24. 11. 2026)",
+      "items": [
+        {
+          "modules": ["equipment"],
+          "text": "Helpdesk: kompletní správa ticketů na /pozadavky/helpdesk — filtry (stav, žadatel, řešitel, priorita, kategorie), tabulka a stránkování."
+        },
+        {
+          "modules": ["equipment"],
+          "text": "Helpdesk: oprava příloh — otevření přes API (konec 404 u nahraných souborů v produkci)."
+        },
+        {
+          "modules": ["iml"],
+          "text": "IML: stahování aktuálního výrobního PDF bez cache prohlížeče."
+        }
+      ]
+    },
+    {
       "id": "2026-11-20-novinky-2",
       "date": "2026-11-20",
       "title": "Aktualizace systému (20. 11. 2026)",
