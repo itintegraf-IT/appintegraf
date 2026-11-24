@@ -15,6 +15,7 @@ export const IML_TOOL_TECHNOLOGIES = [
   "PROTLACOVAK_ATLAS",
   "PROTLACOVAK_RUCNI",
   "PRIKLOP",
+  "REZACKA",
   "LOMBARDI",
 ] as const;
 export type ImlToolTechnology = (typeof IML_TOOL_TECHNOLOGIES)[number];
@@ -24,6 +25,7 @@ export const IML_TOOL_TECHNOLOGY_LABELS: Record<ImlToolTechnology, string> = {
   PROTLACOVAK_ATLAS: "Protlačovák Atlas",
   PROTLACOVAK_RUCNI: "Ruční protlačovák",
   PRIKLOP: "Příklop",
+  REZACKA: "Řezačka",
   LOMBARDI: "Lombardi",
 };
 
@@ -43,6 +45,8 @@ export const LEGACY_MACHINE_TO_TECHNOLOGY: Record<string, ImlToolTechnology> = {
   zelezo: "PROTLACOVAK_RUCNI",
   příklop: "PRIKLOP",
   priklop: "PRIKLOP",
+  řezačka: "REZACKA",
+  rezacka: "REZACKA",
   lombardi: "LOMBARDI",
 };
 

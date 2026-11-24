@@ -58,7 +58,7 @@ export default async function TechnologieCiselnikyHubPage() {
           >
             <span className="font-medium text-gray-900">Výsekové zařízení</span>
             <span className="mt-1 block text-sm text-gray-500">
-              Montex, Atlas, Ruční protlačovák, Příklop…
+              Montex, Atlas, Ruční protlačovák, Příklop, Řezačka…
             </span>
           </Link>
         </li>
