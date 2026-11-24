@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DEFAULT_VISIBLE_COLUMN_IDS,
   LOCKED_COLUMN_IDS,
   PRODUCT_LIST_COLUMNS,
+  PRODUCT_LIST_COLUMNS_PREF_KEY,
   PRODUCT_LIST_COLUMNS_STORAGE_KEY,
   applyLegacyThumbnailPref,
   getProductListColumnMeta,
@@ -17,6 +18,7 @@ import {
   type ProductListColumnMeta,
   type ProductListColumnPrefs,
 } from "./product-list-columns";
+import { loadUserUiPref, saveUserUiPref } from "@/lib/user-ui-prefs-client";
 
 export type UseProductListColumnsResult = {
   visibleColumnIds: ProductListColumnId[];
@@ -26,12 +28,11 @@ export type UseProductListColumnsResult = {
   setVisibleColumnIds: (ids: ProductListColumnId[]) => void;
   reorderColumns: (activeId: ProductListColumnId, overId: ProductListColumnId) => void;
   resetToDefaults: () => void;
-  /** Pro budoucí sync do API – stejný tvar jako localStorage. */
   prefs: ProductListColumnPrefs;
   ready: boolean;
 };
 
-function persistColumnIds(ids: ProductListColumnId[]) {
+function persistColumnIdsLocal(ids: ProductListColumnId[]) {
   try {
     localStorage.setItem(PRODUCT_LIST_COLUMNS_STORAGE_KEY, serializeColumnPrefs(ids));
   } catch {
@@ -39,21 +40,80 @@ function persistColumnIds(ids: ProductListColumnId[]) {
   }
 }
 
+function persistColumnIds(ids: ProductListColumnId[]) {
+  persistColumnIdsLocal(ids);
+  void saveUserUiPref(PRODUCT_LIST_COLUMNS_PREF_KEY, {
+    version: 1,
+    visibleColumnIds: ids,
+  });
+}
+
+function prefsValueToIds(value: unknown): ProductListColumnId[] | null {
+  if (!value) return null;
+  if (Array.isArray(value)) {
+    return parseStoredColumnPrefs(JSON.stringify(value));
+  }
+  if (typeof value === "object") {
+    return parseStoredColumnPrefs(JSON.stringify(value));
+  }
+  if (typeof value === "string") {
+    return parseStoredColumnPrefs(value);
+  }
+  return null;
+}
+
 export function useProductListColumns(): UseProductListColumnsResult {
   const [visibleColumnIds, setVisibleColumnIdsState] = useState<ProductListColumnId[]>(
     DEFAULT_VISIBLE_COLUMN_IDS
   );
   const [ready, setReady] = useState(false);
+  const syncDoneRef = useRef(false);
 
   useEffect(() => {
-    try {
-      const stored = parseStoredColumnPrefs(localStorage.getItem(PRODUCT_LIST_COLUMNS_STORAGE_KEY));
-      const withLegacy = applyLegacyThumbnailPref(stored ?? DEFAULT_VISIBLE_COLUMN_IDS);
-      setVisibleColumnIdsState(withLegacy);
-    } catch {
-      setVisibleColumnIdsState(DEFAULT_VISIBLE_COLUMN_IDS);
-    }
-    setReady(true);
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      let localIds: ProductListColumnId[] | null = null;
+      try {
+        localIds = parseStoredColumnPrefs(
+          localStorage.getItem(PRODUCT_LIST_COLUMNS_STORAGE_KEY)
+        );
+      } catch {
+        localIds = null;
+      }
+      const localResolved = applyLegacyThumbnailPref(localIds ?? DEFAULT_VISIBLE_COLUMN_IDS);
+      if (!cancelled) {
+        setVisibleColumnIdsState(localResolved);
+        setReady(true);
+      }
+
+      if (syncDoneRef.current) return;
+      syncDoneRef.current = true;
+
+      const remote = await loadUserUiPref(PRODUCT_LIST_COLUMNS_PREF_KEY);
+      if (cancelled) return;
+
+      const remoteIds = prefsValueToIds(remote);
+      if (remoteIds && remoteIds.length > 0) {
+        const resolved = applyLegacyThumbnailPref(remoteIds);
+        setVisibleColumnIdsState(resolved);
+        persistColumnIdsLocal(resolved);
+        return;
+      }
+
+      if (localIds && localIds.length > 0) {
+        const resolved = applyLegacyThumbnailPref(localIds);
+        void saveUserUiPref(PRODUCT_LIST_COLUMNS_PREF_KEY, {
+          version: 1,
+          visibleColumnIds: resolved,
+        });
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const setVisibleColumnIds = useCallback((ids: ProductListColumnId[]) => {

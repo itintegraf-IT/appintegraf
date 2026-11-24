@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  PRODUCT_LIST_COLUMN_WIDTHS_PREF_KEY,
   PRODUCT_LIST_COLUMN_WIDTHS_STORAGE_KEY,
   clampColumnWidth,
   getDefaultColumnWidth,
@@ -11,6 +12,11 @@ import {
   type ProductListColumnId,
   type ProductListColumnWidths,
 } from "./product-list-columns";
+import {
+  createDebouncedUiPrefSaver,
+  loadUserUiPref,
+  saveUserUiPref,
+} from "@/lib/user-ui-prefs-client";
 
 export type UseProductListColumnWidthsResult = {
   columnWidths: ProductListColumnWidths;
@@ -21,7 +27,7 @@ export type UseProductListColumnWidthsResult = {
   ready: boolean;
 };
 
-function persistWidths(widths: ProductListColumnWidths) {
+function persistWidthsLocal(widths: ProductListColumnWidths) {
   try {
     localStorage.setItem(PRODUCT_LIST_COLUMN_WIDTHS_STORAGE_KEY, serializeColumnWidths(widths));
   } catch {
@@ -29,22 +35,75 @@ function persistWidths(widths: ProductListColumnWidths) {
   }
 }
 
+function clearWidthsLocal() {
+  try {
+    localStorage.removeItem(PRODUCT_LIST_COLUMN_WIDTHS_STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+function prefsValueToWidths(value: unknown): ProductListColumnWidths | null {
+  if (!value) return null;
+  if (typeof value === "string") return parseStoredColumnWidths(value);
+  if (typeof value === "object" && !Array.isArray(value)) {
+    return parseStoredColumnWidths(JSON.stringify(value));
+  }
+  return null;
+}
+
 export function useProductListColumnWidths(
   visibleColumnIds: ProductListColumnId[]
 ): UseProductListColumnWidthsResult {
   const [storedWidths, setStoredWidths] = useState<ProductListColumnWidths | null>(null);
   const [ready, setReady] = useState(false);
+  const syncDoneRef = useRef(false);
+  const debouncedSaver = useRef(createDebouncedUiPrefSaver(400));
 
   useEffect(() => {
-    try {
-      const parsed = parseStoredColumnWidths(
-        localStorage.getItem(PRODUCT_LIST_COLUMN_WIDTHS_STORAGE_KEY)
-      );
-      setStoredWidths(parsed);
-    } catch {
-      setStoredWidths(null);
-    }
-    setReady(true);
+    const saver = debouncedSaver.current;
+    return () => saver.cancel();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      let local: ProductListColumnWidths | null = null;
+      try {
+        local = parseStoredColumnWidths(
+          localStorage.getItem(PRODUCT_LIST_COLUMN_WIDTHS_STORAGE_KEY)
+        );
+      } catch {
+        local = null;
+      }
+      if (!cancelled) {
+        setStoredWidths(local);
+        setReady(true);
+      }
+
+      if (syncDoneRef.current) return;
+      syncDoneRef.current = true;
+
+      const remote = await loadUserUiPref(PRODUCT_LIST_COLUMN_WIDTHS_PREF_KEY);
+      if (cancelled) return;
+
+      const remoteWidths = prefsValueToWidths(remote);
+      if (remoteWidths && Object.keys(remoteWidths).length > 0) {
+        setStoredWidths(remoteWidths);
+        persistWidthsLocal(remoteWidths);
+        return;
+      }
+
+      if (local && Object.keys(local).length > 0) {
+        void saveUserUiPref(PRODUCT_LIST_COLUMN_WIDTHS_PREF_KEY, local);
+      }
+    };
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const columnWidths = useMemo(
@@ -62,7 +121,8 @@ export function useProductListColumnWidths(
     setStoredWidths((prev) => {
       const base = prev ?? {};
       const next = { ...base, [id]: clamped };
-      persistWidths(next);
+      persistWidthsLocal(next);
+      debouncedSaver.current.schedule(PRODUCT_LIST_COLUMN_WIDTHS_PREF_KEY, next);
       return next;
     });
   }, []);
@@ -72,25 +132,20 @@ export function useProductListColumnWidths(
       const next = { ...(prev ?? {}) };
       delete next[id];
       if (Object.keys(next).length === 0) {
-        try {
-          localStorage.removeItem(PRODUCT_LIST_COLUMN_WIDTHS_STORAGE_KEY);
-        } catch {
-          /* ignore */
-        }
+        clearWidthsLocal();
+        void saveUserUiPref(PRODUCT_LIST_COLUMN_WIDTHS_PREF_KEY, null);
         return null;
       }
-      persistWidths(next);
+      persistWidthsLocal(next);
+      void saveUserUiPref(PRODUCT_LIST_COLUMN_WIDTHS_PREF_KEY, next);
       return next;
     });
   }, []);
 
   const resetWidths = useCallback(() => {
     setStoredWidths(null);
-    try {
-      localStorage.removeItem(PRODUCT_LIST_COLUMN_WIDTHS_STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
+    clearWidthsLocal();
+    void saveUserUiPref(PRODUCT_LIST_COLUMN_WIDTHS_PREF_KEY, null);
   }, []);
 
   return {
