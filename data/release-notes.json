@@ -1,86 +1,21 @@
 {
   "releases": [
     {
-      "id": "2026-11-24-novinky",
+      "id": "2026-11-24-včera-dnes",
       "date": "2026-11-24",
-      "title": "Aktualizace systému (20.–24. 11. 2026)",
-      "items": [
-        {
-          "modules": ["equipment"],
-          "text": "Helpdesk: kompletní správa ticketů na /pozadavky/helpdesk — filtry (stav, žadatel, řešitel, priorita, kategorie), tabulka a stránkování."
-        },
-        {
-          "modules": ["equipment"],
-          "text": "Helpdesk: oprava příloh — otevření přes API (konec 404 u nahraných souborů v produkci)."
-        },
-        {
-          "modules": ["iml"],
-          "text": "IML: stahování aktuálního výrobního PDF bez cache prohlížeče."
-        }
-      ]
-    },
-    {
-      "id": "2026-11-20-novinky-2",
-      "date": "2026-11-20",
-      "title": "Aktualizace systému (20. 11. 2026)",
-      "items": [
-        {
-          "modules": ["technologie"],
-          "text": "Technologie: číselník výsekového zařízení Příklop."
-        },
-        {
-          "modules": ["iml"],
-          "text": "IML: při PDF importu objednávky lze produkt přidat ručně."
-        }
-      ]
-    },
-    {
-      "id": "2026-11-20-novinky",
-      "date": "2026-11-20",
-      "title": "Aktualizace systému (19.–20. 11. 2026)",
-      "items": [
-        {
-          "modules": ["equipment"],
-          "text": "Helpdesk: archiv uzavřených ticketů — přepínač Otevřené / Archiv / Vše u IT fronty i Moje tickety."
-        },
-        {
-          "modules": ["makety"],
-          "text": "Makety: možnost vrátit grafiku grafikovi ze stavu prepress_approved."
-        },
-        {
-          "modules": ["iml"],
-          "text": "IML: verze tiskových dat je nabídka AK1–AK6 (místo volného textu)."
-        },
-        {
-          "modules": ["iml"],
-          "text": "IML: z detailu objednávky odstraněno hromadné přiřazení tvaru a výseku."
-        },
-        {
-          "modules": ["iml"],
-          "text": "IML: v seznamu produktů se zobrazuje alternativní výsekový nástroj."
-        }
-      ]
-    },
-    {
-      "id": "2026-11-19-novinky",
-      "date": "2026-11-19",
-      "title": "Aktualizace systému (16.–19. 11. 2026)",
+      "title": "Aktualizace systému (23.–24. 11. 2026)",
       "items": [
         {
           "modules": ["iml"],
-          "text": "Při změně tvaru etikety se správně synchronizuje výsek na produktu."
+          "text": "Import objednávky z PDF: round-trip — založení produktu a návrat bez ztráty náhledu; export objednávky pojmenovaný podle zákazníka a čísla zakázky."
         },
         {
           "modules": ["iml"],
-          "text": "Oprava SFA importu: dual multiline položky se zalomeným popisem (IK261735)."
-        },
-        {
-          "modules": ["iml"],
-          "text": "Tiskové PDF už nepřepisuje softproof náhled — softproof zůstane oddělený od tiskových dat."
+          "text": "Stahování aktuálního výrobního PDF bez cache prohlížeče."
         },
         {
           "modules": ["iml", "makety"],
-          "text": "Stabilnější náhledy PDF (sjednocený pdf.js worker, oprava převodu softproofů Makety→IML)."
+          "text": "Nastavení sloupců (IML produkty, Makety) se ukládá k uživateli do DB a pamatuje se napříč zařízeními."
         }
       ]
     }
