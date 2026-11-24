@@ -2,11 +2,19 @@
 
 import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FileText, Upload, AlertTriangle, Plus } from "lucide-react";
 import { ORDER_PDF_TEMPLATES } from "@/lib/iml/order-pdf/registry";
 import { CONFIRM_WITHOUT_JOB_NUMBER_MESSAGE } from "@/lib/iml/order-job-number";
 import ImlProductCombobox from "@/app/(dashboard)/iml/_components/ImlProductCombobox";
 import type { ImlSearchableProduct } from "@/lib/iml-product-search";
+import {
+  clearPdfOrderImportDraft,
+  loadPdfOrderImportDraft,
+  PDF_ORDER_IMPORT_RETURN_PATH,
+  savePdfOrderImportDraft,
+} from "@/lib/iml/pdf-order-import-draft";
+import { withReturnTo } from "@/lib/navigation/return-to";
 
 type Customer = { id: number; name: string };
 type ProductOption = {
@@ -80,8 +88,27 @@ function productDisplayLabel(p: ProductOption): string {
   return p.client_name || p.ig_short_name || p.ig_code || `#${p.id}`;
 }
 
+function emptyManualRow(existing: EditableRow[]): EditableRow {
+  return {
+    itemNo: nextItemNo(existing),
+    description: "",
+    customerMaterialNo: null,
+    yourMaterialNo: null,
+    deliveryDate: null,
+    quantity: "",
+    subtotal: "",
+    productId: "",
+    productLabel: null,
+    matchedBy: null,
+    source: "manual",
+  };
+}
+
 export function PdfOrderImport() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const restoreDoneRef = useRef(false);
   const [templateKey, setTemplateKey] = useState("auto");
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -104,6 +131,11 @@ export function PdfOrderImport() {
     notes: "",
   });
   const [confirmedWithoutJobNumber, setConfirmedWithoutJobNumber] = useState(false);
+  const [restoredBanner, setRestoredBanner] = useState(false);
+  const [pendingAssign, setPendingAssign] = useState<{
+    itemNo: string | null;
+    productId: string;
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/iml/customers?scope=units")
@@ -123,12 +155,127 @@ export function PdfOrderImport() {
       .catch(() => setCustomerProducts([]));
   }, [form.customer_id]);
 
+  useEffect(() => {
+    if (restoreDoneRef.current) return;
+    restoreDoneRef.current = true;
+    const draft = loadPdfOrderImportDraft();
+    if (!draft) return;
+
+    setTemplateKey(draft.templateKey);
+    setForm(draft.form);
+    setConfirmedWithoutJobNumber(draft.confirmedWithoutJobNumber);
+    setRows(draft.rows);
+    setPreview(draft.preview as PreviewResponse);
+    setWarnings(draft.warnings);
+    setDuplicate(draft.duplicate);
+    setRestoredBanner(true);
+    setFile(null);
+
+    const createdProductId = searchParams.get("createdProductId");
+    if (createdProductId) {
+      setPendingAssign({
+        itemNo: draft.pendingManualItemNo,
+        productId: createdProductId,
+      });
+      router.replace(PDF_ORDER_IMPORT_RETURN_PATH, { scroll: false });
+    }
+  }, [router, searchParams]);
+
+  useEffect(() => {
+    if (!pendingAssign) return;
+    let cancelled = false;
+
+    const applyProduct = async () => {
+      const productIdNum = parseInt(pendingAssign.productId, 10);
+      if (!Number.isFinite(productIdNum)) {
+        setPendingAssign(null);
+        return;
+      }
+
+      let product: ProductOption | undefined = customerProducts.find((p) => p.id === productIdNum);
+      if (!product) {
+        try {
+          const res = await fetch(`/api/iml/products/${productIdNum}`);
+          if (res.ok) {
+            const data = await res.json();
+            product = {
+              id: data.id,
+              ig_code: data.ig_code ?? null,
+              ig_short_name: data.ig_short_name ?? null,
+              client_code: data.client_code ?? null,
+              client_name: data.client_name ?? null,
+            };
+          }
+        } catch {
+          /* wait for customer products */
+        }
+      }
+      if (!product || cancelled) return;
+
+      const label = productDisplayLabel(product);
+      setRows((prev) => {
+        const targetIndex = pendingAssign.itemNo
+          ? prev.findIndex((r) => r.itemNo === pendingAssign.itemNo && r.source === "manual")
+          : prev.findIndex((r) => r.source === "manual" && !r.productId);
+        if (targetIndex < 0) return prev;
+        const current = prev[targetIndex];
+        const next = [...prev];
+        next[targetIndex] = {
+          ...current,
+          productId: String(product!.id),
+          productLabel: label,
+          description: current.description.trim() ? current.description : label,
+          yourMaterialNo: current.yourMaterialNo || product!.ig_code,
+          customerMaterialNo: current.customerMaterialNo || product!.client_code,
+          matchedBy: null,
+        };
+        return next;
+      });
+
+      const draft = loadPdfOrderImportDraft();
+      if (draft) {
+        savePdfOrderImportDraft({
+          ...draft,
+          pendingManualItemNo: null,
+          rows: (() => {
+            const prev = draft.rows;
+            const targetIndex = pendingAssign.itemNo
+              ? prev.findIndex((r) => r.itemNo === pendingAssign.itemNo && r.source === "manual")
+              : prev.findIndex((r) => r.source === "manual" && !r.productId);
+            if (targetIndex < 0) return prev;
+            const current = prev[targetIndex];
+            const next = [...prev];
+            next[targetIndex] = {
+              ...current,
+              productId: String(product!.id),
+              productLabel: label,
+              description: current.description.trim() ? current.description : label,
+              yourMaterialNo: current.yourMaterialNo || product!.ig_code,
+              customerMaterialNo: current.customerMaterialNo || product!.client_code,
+              matchedBy: null,
+            };
+            return next;
+          })(),
+        });
+      }
+      setPendingAssign(null);
+    };
+
+    void applyProduct();
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingAssign, customerProducts]);
+
   const customerProductIds = useMemo(
     () => new Set(customerProducts.map((p) => p.id)),
     [customerProducts]
   );
 
   const acceptFile = (f: File | null) => {
+    clearPdfOrderImportDraft();
+    setRestoredBanner(false);
+    setPendingAssign(null);
     setFile(f);
     setPreview(null);
     setRows([]);
@@ -224,22 +371,48 @@ export function PdfOrderImport() {
   };
 
   const addManualRow = () => {
-    setRows((prev) => [
-      ...prev,
-      {
-        itemNo: nextItemNo(prev),
-        description: "",
-        customerMaterialNo: null,
-        yourMaterialNo: null,
-        deliveryDate: null,
-        quantity: "",
-        subtotal: "",
-        productId: "",
-        productLabel: null,
-        matchedBy: null,
-        source: "manual",
-      },
-    ]);
+    setRows((prev) => [...prev, emptyManualRow(prev)]);
+  };
+
+  const persistDraft = (
+    nextRows: EditableRow[],
+    pendingManualItemNo: string | null
+  ) => {
+    if (!preview) return;
+    savePdfOrderImportDraft({
+      templateKey,
+      form,
+      confirmedWithoutJobNumber,
+      rows: nextRows,
+      preview,
+      warnings,
+      duplicate,
+      pendingManualItemNo,
+    });
+  };
+
+  const goCreateProduct = () => {
+    if (!preview) return;
+    if (!form.customer_id) {
+      setError("Pro založení produktu nejdřív vyberte zákazníka.");
+      return;
+    }
+    setError("");
+    let nextRows = rows;
+    let emptyManual = nextRows.find((r) => r.source === "manual" && !r.productId);
+    if (!emptyManual) {
+      const created = emptyManualRow(nextRows);
+      nextRows = [...nextRows, created];
+      setRows(nextRows);
+      emptyManual = created;
+    }
+    persistDraft(nextRows, emptyManual.itemNo);
+    router.push(
+      withReturnTo(
+        `/iml/products/add?customer_id=${encodeURIComponent(form.customer_id)}`,
+        PDF_ORDER_IMPORT_RETURN_PATH
+      )
+    );
   };
 
   const rowUnitPrice = (row: EditableRow): number | null => {
@@ -403,6 +576,8 @@ export function PdfOrderImport() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Chyba při importu");
+      clearPdfOrderImportDraft();
+      setRestoredBanner(false);
       setSuccess({ id: data.id, order_number: data.order_number });
       setPreview(null);
       setRows([]);
@@ -418,6 +593,11 @@ export function PdfOrderImport() {
   return (
     <div className="space-y-6">
       {error && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+      {restoredBanner && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          Náhled obnoven — můžete pokračovat v importu.
+        </div>
+      )}
       {success && (
         <div className="rounded-lg bg-green-50 p-3 text-sm text-green-800">
           Objednávka <strong>{success.order_number}</strong> byla vytvořena.{" "}
@@ -663,6 +843,13 @@ export function PdfOrderImport() {
                 <Plus className="h-4 w-4" />
                 Přidat produkt
               </button>
+              <button
+                type="button"
+                onClick={goCreateProduct}
+                className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Založit nový produkt
+              </button>
               {!form.customer_id && (
                 <p className="text-xs text-amber-700">
                   Pro výběr produktu nejdřív vyberte zákazníka.
@@ -697,6 +884,7 @@ export function PdfOrderImport() {
             </button>
             <Link
               href="/iml/orders"
+              onClick={() => clearPdfOrderImportDraft()}
               className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
             >
               Zrušit

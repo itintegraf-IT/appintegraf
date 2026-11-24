@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { ProductFilesUpload } from "../_components/ProductFilesUpload";
 import { ProductFilesUploadPlaceholder } from "../_components/ProductFilesUploadPlaceholder";
@@ -12,8 +13,17 @@ import ProductFormSections, {
 } from "../_components/ProductFormSections";
 import type { ProductColorRow } from "../_components/ProductPantoneEditor";
 import { cmykFlagsToDb, defaultProductCmykFlags } from "@/lib/iml-print-colors-summary";
+import { resolveBackHref } from "@/lib/navigation/return-to";
+import { appendCreatedProductIdToReturn } from "@/lib/iml/pdf-order-import-draft";
 
 export default function ImlProductAddPage() {
+  const searchParams = useSearchParams();
+  const backHref = useMemo(
+    () => resolveBackHref(searchParams.get("returnTo"), "/iml/products"),
+    [searchParams]
+  );
+  const isReturnToImport = backHref.includes("/iml/orders/import");
+
   const [customers, setCustomers] = useState<CustomerOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -22,6 +32,7 @@ export default function ImlProductAddPage() {
   const [hasPdf, setHasPdf] = useState(false);
   const [form, setForm] = useState<ProductFormState>(emptyProductForm);
   const [colors, setColors] = useState<ProductColorRow[]>([]);
+  const [customerPrefillDone, setCustomerPrefillDone] = useState(false);
 
   const setField = <K extends keyof ProductFormState>(k: K, v: ProductFormState[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -32,6 +43,17 @@ export default function ImlProductAddPage() {
       .then((data) => setCustomers(data.customers ?? []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (customerPrefillDone) return;
+    const customerId = searchParams.get("customer_id");
+    if (!customerId) {
+      setCustomerPrefillDone(true);
+      return;
+    }
+    setForm((f) => ({ ...f, customer_id: customerId }));
+    setCustomerPrefillDone(true);
+  }, [searchParams, customerPrefillDone]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +144,11 @@ export default function ImlProductAddPage() {
     }
   };
 
+  const importReturnHref =
+    createdProductId != null && isReturnToImport
+      ? appendCreatedProductIdToReturn(backHref, createdProductId)
+      : backHref;
+
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
@@ -130,11 +157,11 @@ export default function ImlProductAddPage() {
           <p className="mt-1 text-gray-600">Nový produkt do katalogu IML</p>
         </div>
         <Link
-          href="/iml/products"
+          href={backHref}
           className="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
         >
           <ArrowLeft className="h-4 w-4" />
-          Zpět
+          {isReturnToImport ? "Zpět k importu" : "Zpět"}
         </Link>
       </div>
 
@@ -156,10 +183,22 @@ export default function ImlProductAddPage() {
               onImageDelete={() => setHasImage(false)}
               onPdfDelete={() => setHasPdf(false)}
             />
-            <div className="mt-4 flex gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
+              {isReturnToImport && (
+                <Link
+                  href={importReturnHref}
+                  className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
+                >
+                  Zpět k importu objednávky
+                </Link>
+              )}
               <Link
                 href={`/iml/products/${createdProductId}`}
-                className="rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
+                className={
+                  isReturnToImport
+                    ? "rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                    : "rounded-lg bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700"
+                }
               >
                 Zobrazit produkt
               </Link>
@@ -169,12 +208,14 @@ export default function ImlProductAddPage() {
               >
                 Upravit produkt
               </Link>
-              <Link
-                href="/iml/products/add"
-                className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
-              >
-                Přidat další
-              </Link>
+              {!isReturnToImport && (
+                <Link
+                  href="/iml/products/add"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                >
+                  Přidat další
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -203,7 +244,7 @@ export default function ImlProductAddPage() {
               {loading ? "Ukládám…" : "Uložit"}
             </button>
             <Link
-              href="/iml/products"
+              href={backHref}
               className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
             >
               Zrušit

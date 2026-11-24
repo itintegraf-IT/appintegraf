@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Upload, FileSpreadsheet, GripVertical } from "lucide-react";
 import * as XLSX from "xlsx";
 import { PdfOrderImport } from "./PdfOrderImport";
@@ -559,7 +560,14 @@ function CsvOrdersImport() {
 }
 
 export default function ImlOrdersImportPage() {
-  const [mode, setMode] = useState<"csv" | "pdf">("csv");
+  const searchParams = useSearchParams();
+  const [mode, setMode] = useState<"csv" | "pdf">(
+    searchParams.get("mode") === "pdf" ? "pdf" : "csv"
+  );
+
+  useEffect(() => {
+    if (searchParams.get("mode") === "pdf") setMode("pdf");
+  }, [searchParams]);
 
   return (
     <>

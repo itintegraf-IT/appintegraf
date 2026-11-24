@@ -24,8 +24,30 @@ import {
   type ProductAssetPathMap,
 } from "@/lib/iml-export-products-assets";
 import { buildProductExportZip } from "@/lib/iml-export-products-zip";
+import { sanitizeFilenameSegment } from "@/lib/iml-product-pdf-filename";
 
 const MAX_ORDERS = 2000;
+
+/** Basename exportovaného souboru: zákazník_číslo_zakázky (1 objednávka), jinak datovaný fallback. */
+export function buildOrderExportBasename(rows: OrderLineExportSourceRow[]): string {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const fallback = `iml-objednavky-${stamp}`;
+
+  const byOrderId = new Map<number, OrderLineExportSourceRow>();
+  for (const row of rows) {
+    if (!byOrderId.has(row.order_id)) byOrderId.set(row.order_id, row);
+  }
+  if (byOrderId.size !== 1) return fallback;
+
+  const order = [...byOrderId.values()][0]!;
+  const parts = [
+    sanitizeFilenameSegment(order.customer_name ?? ""),
+    sanitizeFilenameSegment(order.job_number ?? ""),
+  ].filter(Boolean);
+
+  if (parts.length === 0) return fallback;
+  return parts.join("_").slice(0, 150);
+}
 
 export type LoadOrderLinesForExportOptions = {
   withAssets?: boolean;
@@ -184,7 +206,7 @@ export function renderOrderLineExport(
   assetOpts?: ProductExportAssetOptions,
   assetPaths?: ProductAssetPathMap
 ): { body: string; contentType: string; filename: string } {
-  const stamp = new Date().toISOString().slice(0, 10);
+  const basename = buildOrderExportBasename(rows);
   const useAssets =
     assetOpts && assetPaths && hasProductExportAssets(assetOpts);
 
@@ -194,7 +216,7 @@ export function renderOrderLineExport(
         ? buildOrderLineExportXmlWithAssetPaths(rows, columns, assetPaths, assetOpts)
         : buildOrderLineExportXml(rows, columns),
       contentType: "application/xml; charset=utf-8",
-      filename: `iml-objednavky-${stamp}.xml`,
+      filename: `${basename}.xml`,
     };
   }
   return {
@@ -202,7 +224,7 @@ export function renderOrderLineExport(
       ? buildOrderLineExportCsvWithAssetPaths(rows, columns, assetPaths, assetOpts)
       : buildOrderLineExportCsv(rows, columns),
     contentType: "text/csv; charset=utf-8",
-    filename: `iml-objednavky-${stamp}.csv`,
+    filename: `${basename}.csv`,
   };
 }
 
@@ -237,12 +259,11 @@ export async function renderOrderExportWithOptionalZip(
     "utf-8"
   );
 
-  const stamp = new Date().toISOString().slice(0, 10);
   const zip = await buildProductExportZip({
     tableBuffer,
     tableFilename: rendered.filename,
     assets: files,
-    zipFilename: `iml-objednavky-${stamp}.zip`,
+    zipFilename: `${buildOrderExportBasename(rows)}.zip`,
     manifest: {
       exportedAt: new Date().toISOString(),
       rowCount: rows.length,
