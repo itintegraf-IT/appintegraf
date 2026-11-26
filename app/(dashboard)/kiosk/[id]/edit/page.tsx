@@ -104,6 +104,24 @@ export default function KioskEditPage() {
     }
   };
 
+  const handleToggleVisible = async (slideId: number, next: boolean) => {
+    setError("");
+    const prev = slides;
+    setSlides((s) => s.map((x) => (x.id === slideId ? { ...x, visible: next } : x)));
+    try {
+      const res = await fetch(`/api/kiosk/slides/${slideId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visible: next }),
+      });
+      if (!res.ok) throw new Error("Chyba při změně viditelnosti");
+      router.refresh();
+    } catch {
+      setSlides(prev);
+      setError("Chyba při zapnutí/vypnutí snímku");
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -255,10 +273,14 @@ export default function KioskEditPage() {
               </div>
               {slides.length > 0 ? (
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {slides.map((slide) => (
+                  {slides.map((slide) => {
+                    const isOn = slide.visible !== false;
+                    return (
                     <div
                       key={slide.id}
-                      className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2"
+                      className={`flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-2 ${
+                        isOn ? "" : "opacity-50"
+                      }`}
                     >
                       <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-gray-200">
                         {slide.file_type === "image" ? (
@@ -284,6 +306,15 @@ export default function KioskEditPage() {
                           {slide.title || slide.filename}
                         </p>
                         <p className="truncate text-xs text-gray-500">{slide.filename}</p>
+                        <label className="mt-1 flex items-center gap-1.5 text-xs text-gray-600">
+                          <input
+                            type="checkbox"
+                            checked={isOn}
+                            onChange={(e) => handleToggleVisible(slide.id, e.target.checked)}
+                            className="rounded"
+                          />
+                          Zapnuto v prezentaci
+                        </label>
                       </div>
                       <button
                         type="button"
@@ -294,7 +325,8 @@ export default function KioskEditPage() {
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-sm text-gray-500">Žádné snímky. Klikněte na „Přidat snímky“.</p>
