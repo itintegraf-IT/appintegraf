@@ -276,7 +276,7 @@ export function ImpositionsClient({
                           positions_on_sheet: s.positions_on_sheet,
                           is_primary: s.is_primary,
                         })),
-                      }));
+                      });
                       return;
                     }
                     void fetch(`/api/iml/impositions/${a.id}`)
