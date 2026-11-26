@@ -251,6 +251,7 @@ export default function KioskEditPage() {
                   <Upload className="h-4 w-4" />
                   {uploading ? "Nahrávám…" : "Přidat snímky"}
                 </button>
+                <span className="text-xs text-gray-500">JPG, PNG, PDF — max 10 MB</span>
               </div>
               {slides.length > 0 ? (
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -261,11 +262,17 @@ export default function KioskEditPage() {
                     >
                       <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-gray-200">
                         {slide.file_type === "image" ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={slide.file_path}
                             alt=""
                             className="h-full w-full object-cover"
                           />
+                        ) : slide.file_type === "pdf" ? (
+                          <div className="flex h-full w-full flex-col items-center justify-center bg-red-50">
+                            <Image className="h-5 w-5 text-red-500" />
+                            <span className="mt-0.5 text-[9px] font-semibold text-red-600">PDF</span>
+                          </div>
                         ) : (
                           <div className="flex h-full w-full items-center justify-center">
                             <Image className="h-6 w-6 text-gray-400" />

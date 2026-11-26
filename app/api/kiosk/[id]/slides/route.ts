@@ -3,9 +3,13 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
-
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
-const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+import {
+  extensionForKioskMime,
+  kioskFileTypeFromMime,
+  kioskUploadRejectMessage,
+  validateKioskFile,
+  type KioskFileRejectReason,
+} from "@/lib/kiosk/upload";
 
 export async function POST(
   req: NextRequest,
@@ -46,18 +50,19 @@ export async function POST(
 
   let sortOrder = maxOrder;
   const created: { id: number }[] = [];
+  const rejectReasons: KioskFileRejectReason[] = [];
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
     if (!(file instanceof File)) continue;
 
-    const mime = file.type;
-    if (!ALLOWED_TYPES.includes(mime)) {
+    const check = validateKioskFile(file);
+    if (!check.ok) {
+      rejectReasons.push(check.reason);
       continue;
     }
-    if (file.size > MAX_SIZE) continue;
 
-    const ext = path.extname(file.name) || (mime === "application/pdf" ? ".pdf" : ".jpg");
+    const ext = extensionForKioskMime(check.mime, file.name);
     const newFilename = `${Date.now()}_${Math.random().toString(36).slice(2)}${ext}`;
     const filePath = path.join(uploadDir, newFilename);
 
@@ -65,7 +70,6 @@ export async function POST(
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
 
-    const fileType = mime === "application/pdf" ? "pdf" : "image";
     const webPath = `/uploads/kiosk/${newFilename}`;
 
     const slide = await prisma.slides.create({
@@ -73,7 +77,7 @@ export async function POST(
         presentation_id: id,
         filename: file.name,
         file_path: webPath,
-        file_type: fileType,
+        file_type: kioskFileTypeFromMime(check.mime),
         title: null,
         duration: presentation.display_duration,
         transition_effect: presentation.transition_effect ?? "fade",
@@ -86,7 +90,7 @@ export async function POST(
 
   if (created.length === 0) {
     return NextResponse.json(
-      { error: "Nepodařilo se nahrát žádné soubory (JPG, PNG, PDF, max 10 MB)" },
+      { error: kioskUploadRejectMessage(rejectReasons) },
       { status: 400 }
     );
   }

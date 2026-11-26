@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { ArrowLeft, Pencil, Image as ImageIcon } from "lucide-react";
+import { ensurePresentationPublicToken } from "@/lib/kiosk/public-token";
+import { ArrowLeft, Pencil, Image as ImageIcon, Monitor } from "lucide-react";
+import { KioskMonitorUrl } from "./KioskMonitorUrl";
 
 export default async function KioskViewPage({
   params,
@@ -17,6 +19,9 @@ export default async function KioskViewPage({
   });
 
   if (!presentation) notFound();
+
+  const token = await ensurePresentationPublicToken(id);
+  const monitorPath = `/public/kiosk/${token}`;
 
   type SlideRow = { id: number; file_type: string; file_path: string; title: string | null; filename: string };
   const slidesTyped = presentation.slides as SlideRow[];
@@ -55,6 +60,17 @@ export default async function KioskViewPage({
           </p>
         </div>
 
+        <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mb-3 flex items-center gap-2">
+            <Monitor className="h-5 w-5 text-gray-500" />
+            <h2 className="text-lg font-semibold text-gray-900">URL pro monitor (RPi kiosk)</h2>
+          </div>
+          <p className="mb-3 text-sm text-gray-600">
+            Tuto adresu otevřete na Raspberry Pi v kiosk režimu — nevyžaduje přihlášení a zobrazí jen prezentaci.
+          </p>
+          <KioskMonitorUrl path={monitorPath} />
+        </div>
+
         {slidesTyped.length > 0 ? (
           <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold text-gray-900">Snímky</h2>
@@ -71,6 +87,12 @@ export default async function KioskViewPage({
                         src={slide.file_path}
                         alt={slide.title ?? slide.filename}
                         className="h-full w-full object-contain"
+                      />
+                    ) : slide.file_type === "pdf" ? (
+                      <iframe
+                        title={slide.title ?? slide.filename}
+                        src={`${slide.file_path}#page=1&view=FitH&toolbar=0`}
+                        className="h-full w-full border-0"
                       />
                     ) : (
                       <div className="flex h-full w-full items-center justify-center">

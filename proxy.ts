@@ -11,6 +11,7 @@ const publicPaths = [
   "/public",
   "/api/public",
   "/api/makety/softproof",
+  "/uploads/kiosk",
 ];
 
 /** Stránky pro přihlášení/registraci, na kterých nemá smysl být, pokud je uživatel přihlášen. */

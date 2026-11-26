@@ -3,9 +3,14 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
-
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/jpg", "application/pdf"];
-const MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+import {
+  extensionForKioskMime,
+  kioskFileTypeFromMime,
+  kioskUploadRejectMessage,
+  newKioskPublicToken,
+  validateKioskFile,
+  type KioskFileRejectReason,
+} from "@/lib/kiosk/upload";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -52,6 +57,7 @@ export async function POST(req: NextRequest) {
         transition_time,
         display_duration,
         is_active: true,
+        active_url: newKioskPublicToken(),
         created_by: userId,
       },
     });
@@ -60,36 +66,53 @@ export async function POST(req: NextRequest) {
       const uploadDir = path.join(process.cwd(), "public", "uploads", "kiosk");
       await mkdir(uploadDir, { recursive: true });
 
+      const rejectReasons: KioskFileRejectReason[] = [];
+      let createdCount = 0;
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const mime = file.type;
-        if (!ALLOWED_TYPES.includes(mime)) continue;
-        if (file.size > MAX_SIZE) continue;
+        const check = validateKioskFile(file);
+        if (!check.ok) {
+          rejectReasons.push(check.reason);
+          continue;
+        }
 
-        const ext = path.extname(file.name) || (mime === "application/pdf" ? ".pdf" : ".jpg");
+        const ext = extensionForKioskMime(check.mime, file.name);
         const newFilename = `${Date.now()}_${i}_${Math.random().toString(36).slice(2)}${ext}`;
         const filePath = path.join(uploadDir, newFilename);
 
         const bytes = await file.arrayBuffer();
         await writeFile(filePath, Buffer.from(bytes));
 
-        const fileType = mime === "application/pdf" ? "pdf" : "image";
         await prisma.slides.create({
           data: {
             presentation_id: presentation.id,
             filename: file.name,
             file_path: `/uploads/kiosk/${newFilename}`,
-            file_type: fileType,
+            file_type: kioskFileTypeFromMime(check.mime),
             duration: display_duration,
             transition_effect,
             visible: true,
-            sort_order: i,
+            sort_order: createdCount,
           },
         });
+        createdCount++;
+      }
+
+      if (createdCount === 0) {
+        await prisma.presentations.delete({ where: { id: presentation.id } });
+        return NextResponse.json(
+          { error: kioskUploadRejectMessage(rejectReasons) },
+          { status: 400 }
+        );
       }
     }
 
-    return NextResponse.json({ success: true, id: presentation.id });
+    return NextResponse.json({
+      success: true,
+      id: presentation.id,
+      active_url: presentation.active_url,
+    });
   } catch (e) {
     console.error("Kiosk POST error:", e);
     return NextResponse.json({ error: "Chyba při vytváření prezentace" }, { status: 500 });

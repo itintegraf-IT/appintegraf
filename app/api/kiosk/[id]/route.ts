@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
+import { ensurePresentationPublicToken } from "@/lib/kiosk/public-token";
 
 export async function GET(
   _req: NextRequest,
@@ -25,7 +26,9 @@ export async function GET(
     return NextResponse.json({ error: "Prezentace nenalezena" }, { status: 404 });
   }
 
-  return NextResponse.json(presentation);
+  const active_url = await ensurePresentationPublicToken(id);
+
+  return NextResponse.json({ ...presentation, active_url });
 }
 
 export async function PUT(
