@@ -36,6 +36,8 @@ type Props = {
   softproofViaOverride?: boolean;
   /** Předvyplnění z posledního softproof odkazu. */
   lastSoftproofPrefill?: SoftproofResendPrefill | null;
+  /** Klient schválil — předvybrat finální schválení. */
+  awaitingFinalApproval?: boolean;
 };
 
 export function GrafikaStatusPanel({
@@ -45,6 +47,7 @@ export function GrafikaStatusPanel({
   canResendSoftproof = false,
   softproofViaOverride = false,
   lastSoftproofPrefill = null,
+  awaitingFinalApproval = false,
 }: Props) {
   const router = useRouter();
   const [transitions, setTransitions] = useState<TransitionOption[]>([]);
@@ -110,6 +113,21 @@ export function GrafikaStatusPanel({
   useEffect(() => {
     void load();
   }, [load, initialStatus]);
+
+  useEffect(() => {
+    if (!awaitingFinalApproval || transitions.length === 0) return;
+    const final = transitions.find((t) => t.toStatus === "approved");
+    if (final) setSelected("approved");
+  }, [awaitingFinalApproval, transitions]);
+
+  useEffect(() => {
+    function onSelectFinal() {
+      const final = transitions.find((t) => t.toStatus === "approved");
+      if (final) setSelected("approved");
+    }
+    window.addEventListener("makety:select-final-approve", onSelectFinal);
+    return () => window.removeEventListener("makety:select-final-approve", onSelectFinal);
+  }, [transitions]);
 
   useEffect(() => {
     void loadFiles();
@@ -242,7 +260,10 @@ export function GrafikaStatusPanel({
 
   if (loading) {
     return (
-      <div className="w-full max-w-xs rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500 sm:w-72">
+      <div
+        id="grafika-status-panel"
+        className="w-full max-w-xs rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500 sm:w-72"
+      >
         Načítám workflow…
       </div>
     );
@@ -259,7 +280,10 @@ export function GrafikaStatusPanel({
 
   return (
     <>
-      <div className="w-full max-w-md rounded-lg border border-gray-200 bg-gray-50 p-3 sm:w-80">
+      <div
+        id="grafika-status-panel"
+        className="w-full max-w-md rounded-lg border border-gray-200 bg-gray-50 p-3 sm:w-80"
+      >
         <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-600">
           Workflow grafiky
         </h3>

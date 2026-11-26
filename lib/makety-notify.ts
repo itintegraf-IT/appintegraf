@@ -34,6 +34,7 @@ export type MaketaNotifyKind =
   | "sent_for_client"
   | "client_approved"
   | "client_rejected"
+  | "final_approval_reminder"
   | "approved"
   | "data_problem"
   | "returned_to_dtp"
@@ -127,6 +128,11 @@ function notifyCopy(
       return {
         title: "Klient schválil softproof",
         intro: `Klient schválil softproof grafiky${zak}. Stav zakázky se nemění – dokončete finální schválení v aplikaci.`,
+      };
+    case "final_approval_reminder":
+      return {
+        title: "Připomínka: finální schválení grafiky",
+        intro: `Grafika${zak} má softproof schválený klientem a stále čeká na finální schválení. Dokončete schválení v aplikaci.`,
       };
     case "client_rejected":
       return {
@@ -273,6 +279,7 @@ export async function notifyMaketaUsers(params: {
         assignee_user_id: true,
         prepress_user_id: true,
         created_by: true,
+        final_approver_user_id: true,
       },
     });
     emailIds = emailIds.filter((uid) =>
@@ -284,6 +291,7 @@ export async function notifyMaketaUsers(params: {
           assigneeUserId: maketa?.assignee_user_id,
           prepressUserId: maketa?.prepress_user_id,
           creatorUserId: maketa?.created_by,
+          finalApproverUserId: maketa?.final_approver_user_id,
         }),
       })
     );

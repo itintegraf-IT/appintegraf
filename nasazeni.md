@@ -152,6 +152,7 @@ Produkce musí pravidelně volat cron endpointy s `CRON_SECRET` (hlavička `Auth
 | Endpoint | Doporučený interval | Účel |
 |----------|---------------------|------|
 | `POST /api/cron/makety-softproof-reminders` | denně | Softproof: po vypršení odkazu pošle klientovi připomínku s novým odkazem (zapnout v Makety → Nastavení → Softproof) |
+| `POST /api/cron/makety-final-approval-reminders` | denně | Grafika: připomínka finálního schválení po softproof approve klientem (interval výchozí 24 h; Makety → Nastavení → Softproof) |
 | `POST /api/cron/contracts-expiry` | denně | Končící smlouvy |
 | `POST /api/cron/training-reminders` | denně | Termíny testů školení |
 | `GET/POST /api/cron/calendar-reminders` | 1–5 min | Připomínky kalendáře |

@@ -52,8 +52,10 @@ import { SoftproofLinkStatusBox } from "./SoftproofLinkStatusBox";
 import { GrafikaAutomationPanel } from "./GrafikaAutomationPanel";
 import { MaketyFileEventsPanel } from "./MaketyFileEventsPanel";
 import { GrafikaWorkflowPicker } from "../GrafikaWorkflowPicker";
+import { AwaitingFinalApprovalBanner } from "./AwaitingFinalApprovalBanner";
 import { buildMaketyCommentParticipants } from "@/lib/makety-comment-participants";
 import { getMaketyImlFileTransferStatus } from "@/lib/makety-transfer-product-files";
+import { isMaketaAwaitingFinalApproval } from "@/lib/makety/awaiting-final-approval";
 
 export const dynamic = "force-dynamic";
 
@@ -193,6 +195,8 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
           },
         })
       : null;
+  const awaitingFinalApproval =
+    workType === "grafika" ? await isMaketaAwaitingFinalApproval(id) : false;
   const commentParticipants = buildMaketyCommentParticipants({
     workType,
     excludeUserId: userId,
@@ -218,6 +222,12 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
       <Link href="/makety" className="inline-block text-sm text-violet-600 hover:underline">
         ← Zpět na přehled
       </Link>
+
+      {awaitingFinalApproval && (
+        <AwaitingFinalApprovalBanner
+          clientEmail={clientSoftproofDecision?.sent_to_email ?? null}
+        />
+      )}
 
       <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">
@@ -412,6 +422,7 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
                   canGrafikaAutomation && maketa.status === "sent_for_approval"
                 }
                 softproofViaOverride={grafikaAutomation.viaOverride}
+                awaitingFinalApproval={awaitingFinalApproval}
                 lastSoftproofPrefill={
                   lastSoftproofLink
                     ? {
@@ -468,7 +479,8 @@ export default async function MaketaDetailPage({ params, searchParams }: PagePro
         )}
       </div>
 
-      {clientSoftproofDecision?.used_action === "approved" && (
+      {!awaitingFinalApproval &&
+        clientSoftproofDecision?.used_action === "approved" && (
         <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 dark:border-green-800 dark:bg-green-950/40 dark:text-green-100">
           Klient schválil softproof
           {clientSoftproofDecision.sent_to_email

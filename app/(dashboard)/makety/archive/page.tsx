@@ -109,6 +109,7 @@ export default async function MaketyArchivePage({
       can_edit: false,
       can_copy: canCopyRow,
       needs_attention: false,
+      awaiting_final_approval: false,
     };
   });
 

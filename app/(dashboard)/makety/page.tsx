@@ -23,6 +23,7 @@ import {
 } from "@/lib/makety-status";
 import type { MaketyListRow } from "@/lib/makety/makety-list-columns";
 import { loadMaketyListNeedsAttentionMap } from "@/lib/makety/makety-list-attention";
+import { loadAwaitingFinalApprovalMap } from "@/lib/makety/awaiting-final-approval";
 import { MaketyActiveTableClient } from "./_components/MaketyActiveTableClient";
 
 export const dynamic = "force-dynamic";
@@ -59,7 +60,7 @@ function buildListQuery(
   term: string,
   status?: string,
   workType?: string,
-  extra?: { q?: string; priority?: string }
+  extra?: { q?: string; priority?: string; awaitingFinal?: boolean }
 ): string {
   const p = new URLSearchParams();
   if (workType) p.set("work_type", workType);
@@ -67,6 +68,7 @@ function buildListQuery(
   if (status) p.set("status", status);
   if (extra?.q) p.set("q", extra.q);
   if (extra?.priority) p.set("priority", extra.priority);
+  if (extra?.awaitingFinal) p.set("awaiting_final", "1");
   const q = p.toString();
   return q ? `/makety?${q}` : "/makety";
 }
@@ -92,6 +94,7 @@ export default async function MaketyListPage({
     completed?: string;
     q?: string;
     priority?: string;
+    awaiting_final?: string;
   }>;
 }) {
   const session = await auth();
@@ -114,6 +117,7 @@ export default async function MaketyListPage({
     params.priority === "urgent" || params.priority === "high" || params.priority === "normal"
       ? params.priority
       : "";
+  const awaitingFinalOnly = params.awaiting_final === "1";
   const created = params.created === "1";
   const grafikaCreated = params.grafika_created === "1";
   const commentSent = params.comment_sent === "1";
@@ -181,7 +185,7 @@ export default async function MaketyListPage({
     };
   });
 
-  const rows = selectedStatus
+  const rowsBase = selectedStatus
     ? allForTerm.filter((r) => r.status === selectedStatus)
     : allForTerm.filter((r) => {
         const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
@@ -192,8 +196,15 @@ export default async function MaketyListPage({
       });
 
   const attentionMap = await loadMaketyListNeedsAttentionMap(
-    rows.map((r) => ({ id: r.id, status: r.status }))
+    rowsBase.map((r) => ({ id: r.id, status: r.status }))
   );
+  const awaitingMap = await loadAwaitingFinalApprovalMap(
+    rowsBase.map((r) => ({ id: r.id, status: r.status, work_type: r.work_type }))
+  );
+
+  const rows = awaitingFinalOnly
+    ? rowsBase.filter((r) => awaitingMap.get(r.id) === true)
+    : rowsBase;
 
   const tableRows: MaketyListRow[] = rows.map((r) => {
     const wt = (r.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
@@ -226,14 +237,19 @@ export default async function MaketyListPage({
       can_edit: canEditRow,
       can_copy: canCopyRow,
       needs_attention: attentionMap.get(r.id) === true,
+      awaiting_final_approval: awaitingMap.get(r.id) === true,
     };
   });
 
-  const tableHeading = selectedStatus
-    ? maketaStatusLabel(selectedStatus, labelWorkType)
-    : canModuleAdmin
-      ? "Přehled aktivních zakázek"
-      : "Aktivní zakázky";
+  const awaitingFinalCount = [...awaitingMap.values()].filter(Boolean).length;
+
+  const tableHeading = awaitingFinalOnly
+    ? "Ke finálnímu schválení"
+    : selectedStatus
+      ? maketaStatusLabel(selectedStatus, labelWorkType)
+      : canModuleAdmin
+        ? "Přehled aktivních zakázek"
+        : "Aktivní zakázky";
 
   const headingExtraParts: string[] = [];
   if (selectedWorkType) {
@@ -318,6 +334,7 @@ export default async function MaketyListPage({
           href={buildListQuery(selectedTerm, selectedStatus || undefined, undefined, {
             q: searchQ || undefined,
             priority: selectedPriority || undefined,
+            awaitingFinal: awaitingFinalOnly || undefined,
           })}
           className={workTypeToggleClass(!selectedWorkType)}
         >
@@ -327,6 +344,7 @@ export default async function MaketyListPage({
           href={buildListQuery(selectedTerm, selectedStatus || undefined, "maketa", {
             q: searchQ || undefined,
             priority: selectedPriority || undefined,
+            awaitingFinal: awaitingFinalOnly || undefined,
           })}
           className={workTypeToggleClass(selectedWorkType === "maketa")}
         >
@@ -336,10 +354,31 @@ export default async function MaketyListPage({
           href={buildListQuery(selectedTerm, selectedStatus || undefined, "grafika", {
             q: searchQ || undefined,
             priority: selectedPriority || undefined,
+            awaitingFinal: awaitingFinalOnly || undefined,
           })}
           className={workTypeToggleClass(selectedWorkType === "grafika")}
         >
           Grafika
+        </Link>
+        <Link
+          href={buildListQuery(
+            selectedTerm,
+            selectedStatus || undefined,
+            selectedWorkType || undefined,
+            {
+              q: searchQ || undefined,
+              priority: selectedPriority || undefined,
+              awaitingFinal: !awaitingFinalOnly,
+            }
+          )}
+          className={`rounded-lg border px-4 py-2 text-sm font-medium ${
+            awaitingFinalOnly
+              ? "border-teal-300 bg-teal-50 text-teal-800"
+              : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+          }`}
+        >
+          Ke finálnímu schválení
+          {awaitingFinalCount > 0 ? ` (${awaitingFinalCount})` : ""}
         </Link>
       </div>
 
@@ -351,6 +390,9 @@ export default async function MaketyListPage({
         {selectedStatus ? <input type="hidden" name="status" value={selectedStatus} /> : null}
         {selectedWorkType ? (
           <input type="hidden" name="work_type" value={selectedWorkType} />
+        ) : null}
+        {awaitingFinalOnly ? (
+          <input type="hidden" name="awaiting_final" value="1" />
         ) : null}
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[200px] flex-1">
@@ -409,7 +451,7 @@ export default async function MaketyListPage({
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         {grouped.map((g) => {
-          const active = selectedStatus === g.status;
+          const active = selectedStatus === g.status && !awaitingFinalOnly;
           return (
             <Link
               key={g.status}

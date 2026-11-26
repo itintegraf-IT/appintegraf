@@ -60,6 +60,8 @@ export type MaketyListRow = {
   can_copy: boolean;
   /** Pozastaveno / vráceno grafikovi — zvýraznit řádek. */
   needs_attention: boolean;
+  /** Klient schválil softproof — čeká finální schválení. */
+  awaiting_final_approval: boolean;
 };
 
 /**

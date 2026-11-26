@@ -1,0 +1,50 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { canViewAllMaketyTypes } from "@/lib/makety-access";
+import { canAccessMaketyModule } from "@/lib/makety-module-access";
+import {
+  loadFinalApprovalReminderSettings,
+  saveFinalApprovalReminderSettings,
+} from "@/lib/makety-final-approval-reminder-settings";
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
+  }
+  const userId = parseInt(session.user.id, 10);
+  if (!(await canAccessMaketyModule(userId))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
+  }
+  const settings = await loadFinalApprovalReminderSettings();
+  return NextResponse.json({ settings });
+}
+
+export async function PUT(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Neautorizováno" }, { status: 401 });
+  }
+  const userId = parseInt(session.user.id, 10);
+  if (!(await canViewAllMaketyTypes(userId))) {
+    return NextResponse.json({ error: "Nemáte oprávnění" }, { status: 403 });
+  }
+
+  try {
+    const body = (await req.json()) as {
+      enabled?: boolean;
+      interval_hours?: number;
+    };
+    const saved = await saveFinalApprovalReminderSettings(
+      {
+        enabled: body.enabled !== false,
+        interval_hours: Number(body.interval_hours) || 24,
+      },
+      userId
+    );
+    return NextResponse.json({ success: true, settings: saved });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Chyba při ukládání";
+    return NextResponse.json({ error: msg }, { status: 400 });
+  }
+}

@@ -182,10 +182,17 @@ function renderCell(
     case "status": {
       const wt = (row.work_type === "grafika" ? "grafika" : "maketa") as MaketyWorkType;
       return (
-        <span
-          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(row.status, wt)}`}
-        >
-          {maketaStatusLabel(row.status, wt)}
+        <span className="inline-flex flex-wrap items-center gap-1">
+          <span
+            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${maketaStatusBadgeClass(row.status, wt)}`}
+          >
+            {maketaStatusLabel(row.status, wt)}
+          </span>
+          {row.awaiting_final_approval && (
+            <span className="inline-flex rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-900">
+              Klient schválil — finále
+            </span>
+          )}
         </span>
       );
     }
@@ -499,7 +506,9 @@ export function MaketyActiveTableClient({
                   "cursor-pointer border-b border-gray-100 transition-colors " +
                   (row.needs_attention
                     ? "border-l-4 border-l-amber-400 bg-amber-50 hover:bg-amber-100"
-                    : "hover:bg-violet-50 hover:shadow-[inset_4px_0_0_0_rgb(139,92,246)]")
+                    : row.awaiting_final_approval
+                      ? "border-l-4 border-l-teal-400 bg-teal-50/70 hover:bg-teal-100/80"
+                      : "hover:bg-violet-50 hover:shadow-[inset_4px_0_0_0_rgb(139,92,246)]")
                 }
               >
                 {visibleColumns.map((col) => (

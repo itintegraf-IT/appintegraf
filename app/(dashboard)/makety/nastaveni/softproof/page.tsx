@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { canViewAllMaketyTypes } from "@/lib/makety-access";
 import { SoftproofTemplatesForm } from "./SoftproofTemplatesForm";
 import { SoftproofReminderSettingsForm } from "./SoftproofReminderSettingsForm";
+import { FinalApprovalReminderSettingsForm } from "./FinalApprovalReminderSettingsForm";
 
 export default async function MaketySoftproofTemplatesPage() {
   const session = await auth();
@@ -20,6 +21,7 @@ export default async function MaketySoftproofTemplatesPage() {
         Texty e-mailu a veřejné stránky náhledu v jednotlivých jazycích (CZ, EN, DE, …)
       </p>
       <SoftproofReminderSettingsForm />
+      <FinalApprovalReminderSettingsForm />
       <SoftproofTemplatesForm />
     </div>
   );

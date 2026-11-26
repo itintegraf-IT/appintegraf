@@ -1,5 +1,5 @@
 /** Role vůči konkrétní maketě/grafice (pro matici e-mailů §4.5). */
-export type MaketaPartyRole = "grafik" | "prepress" | "zadavatel" | "other";
+export type MaketaPartyRole = "grafik" | "prepress" | "zadavatel" | "final" | "other";
 
 /**
  * Které role smí dostat e-mail pro daný typ události (grafika).
@@ -15,6 +15,7 @@ const GRAFIKA_EMAIL_MATRIX: Partial<Record<string, MaketaPartyRole[]>> = {
   done: ["prepress"],
   prepress_ok: ["zadavatel"],
   client_approved: ["zadavatel"],
+  final_approval_reminder: ["zadavatel", "final"],
   approved: ["zadavatel"],
   sent_for_client: ["zadavatel"],
   // Založení / přiřazení: jen příslušná role (ne spam na všechny)
@@ -28,10 +29,12 @@ export function partyRoleForMaketa(params: {
   assigneeUserId: number | null | undefined;
   prepressUserId: number | null | undefined;
   creatorUserId: number | null | undefined;
+  finalApproverUserId?: number | null | undefined;
 }): MaketaPartyRole {
   if (params.assigneeUserId === params.userId) return "grafik";
   if (params.prepressUserId === params.userId) return "prepress";
   if (params.creatorUserId === params.userId) return "zadavatel";
+  if (params.finalApproverUserId === params.userId) return "final";
   return "other";
 }
 

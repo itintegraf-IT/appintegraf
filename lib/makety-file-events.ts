@@ -11,6 +11,7 @@ export const MAKETY_FILE_EVENT_TYPES = [
   "softproof_downloaded",
   "client_approved",
   "client_rejected",
+  "final_approval_reminder_sent",
   "workflow_transition",
 ] as const;
 
@@ -65,6 +66,8 @@ export function maketyFileEventLabel(eventType: string): string {
       return "Klient schválil softproof";
     case "client_rejected":
       return "Klient zamítl softproof";
+    case "final_approval_reminder_sent":
+      return "Připomínka finálního schválení";
     case "workflow_transition":
       return "Změna stavu workflow";
     default:
