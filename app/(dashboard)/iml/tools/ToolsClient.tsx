@@ -11,6 +11,7 @@ import {
   type ImlToolTechnology,
 } from "@/lib/iml/shape-tool-constants";
 import { CatalogAttachments } from "../_components/CatalogAttachments";
+import { VysekyWorkflowNav } from "../vyseky/VysekyWorkflowNav";
 
 type ToolRow = {
   id: number;
@@ -104,7 +105,7 @@ export function ToolsClient() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Výsekové nástroje</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Fyzická železa / plechy (úroveň 2).{" "}
+            Krok 2 — železo / planžeta (výsek).{" "}
             <Link href="/iml/vyseky" className="text-violet-700 hover:underline">
               ← Výseky
             </Link>
@@ -125,6 +126,8 @@ export function ToolsClient() {
           onChange={(e) => setQ(e.target.value)}
         />
       </div>
+
+      <VysekyWorkflowNav current="tools" />
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

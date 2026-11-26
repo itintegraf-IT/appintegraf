@@ -7,6 +7,7 @@ import {
   type ImlImpositionLayoutType,
 } from "@/lib/iml/shape-tool-constants";
 import { impositionCodePrefixHint } from "@/lib/iml/shape-tool-parse";
+import { VysekyWorkflowNav } from "../vyseky/VysekyWorkflowNav";
 
 type ToolOpt = { id: number; tool_code_new: string; tool_code_orig: string };
 type NamedOpt = { id: number; name: string };
@@ -219,7 +220,7 @@ export function ImpositionsClient({
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Montáže / mustery</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Předpisy archů (úroveň 3).{" "}
+          Krok 4 — rozvržení archu a užitky.{" "}
           <Link href="/iml/vyseky" className="text-violet-700 hover:underline">
             ← Výseky
           </Link>
@@ -233,6 +234,8 @@ export function ImpositionsClient({
           </Link>
         </p>
       </div>
+
+      <VysekyWorkflowNav current="impositions" />
 
       {error && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">

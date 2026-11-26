@@ -210,13 +210,18 @@ export function ShapeExtrasPanel({
       <p className="text-xs font-medium text-violet-900">
         Detail tvaru {shapeCode}: přílohy, zákazníci a materiálová matice
       </p>
+      <p className="rounded border border-violet-200 bg-white/80 px-2 py-1 text-[11px] text-violet-800">
+        Krok 5 — Náhledy: nahrajte výkres / PDF kontury níže.
+      </p>
 
-      <CatalogAttachments
-        kind="shape"
-        recordId={shapeId}
-        title="Přílohy kontury (PDF / JPG / CAD)"
-        onChanged={onAttachmentsChanged}
-      />
+      <div id="nahledy">
+        <CatalogAttachments
+          kind="shape"
+          recordId={shapeId}
+          title="Přílohy kontury (PDF / JPG / CAD)"
+          onChanged={onAttachmentsChanged}
+        />
+      </div>
 
       <div>
         <h4 className="mb-2 text-xs font-semibold uppercase text-gray-600">

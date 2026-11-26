@@ -9,6 +9,8 @@ import {
   type ImlToolTechnology,
 } from "@/lib/iml/shape-tool-constants";
 import { ShapeExtrasPanel } from "./ShapeExtrasPanel";
+import { VysekyWorkflowNav } from "../vyseky/VysekyWorkflowNav";
+import type { VysekyWorkflowStepId } from "../vyseky/vyseky-workflow";
 
 type ToolOpt = {
   id: number;
@@ -78,6 +80,19 @@ export function ShapesClient() {
   const [newTypeCode, setNewTypeCode] = useState("");
   const [newTypeName, setNewTypeName] = useState("");
   const [showAddType, setShowAddType] = useState(false);
+  const [workflowStep, setWorkflowStep] = useState<VysekyWorkflowStepId>("shapes");
+
+  useEffect(() => {
+    const syncHash = () => {
+      const h = window.location.hash.replace("#", "");
+      if (h === "vazby") setWorkflowStep("bindings");
+      else if (h === "nahledy") setWorkflowStep("previews");
+      else setWorkflowStep("shapes");
+    };
+    syncHash();
+    window.addEventListener("hashchange", syncHash);
+    return () => window.removeEventListener("hashchange", syncHash);
+  }, []);
 
   const typeLabel = (code: string) =>
     shapeTypes.find((t) => t.code === code)?.name ?? code;
@@ -231,7 +246,7 @@ export function ShapesClient() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Tvary etiket</h1>
           <p className="mt-1 text-sm text-gray-600">
-            Číselník geometrie (úroveň 1).{" "}
+            Krok 1 — geometrie etikety.{" "}
             <Link href="/iml/vyseky" className="text-violet-700 hover:underline">
               ← Výseky
             </Link>
@@ -242,6 +257,8 @@ export function ShapesClient() {
           </p>
         </div>
       </div>
+
+      <VysekyWorkflowNav current={workflowStep} />
 
       <div className="flex flex-wrap items-end gap-3 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         <label className="text-sm">
@@ -472,8 +489,12 @@ export function ShapesClient() {
                   Výška{sortIndicator("height_mm")}
                 </button>
               </th>
-              <th className="px-3 py-2">Nástroje</th>
-              <th className="px-3 py-2">Příloha</th>
+              <th className="px-3 py-2" id="vazby">
+                Nástroje (vazby)
+              </th>
+              <th className="px-3 py-2" id="nahledy">
+                Příloha
+              </th>
               <th className="px-3 py-2">Prod.</th>
               <th className="px-3 py-2">Akce</th>
             </tr>
@@ -488,6 +509,11 @@ export function ShapesClient() {
                     {Number(row.width_mm)} × {Number(row.height_mm)} mm
                   </td>
                   <td className="px-3 py-2">
+                    {row.tool_assignments.length === 0 && assignShapeId !== row.id && (
+                      <p className="mb-1 text-[11px] text-amber-700">
+                        Krok 3 — přiřaď PRIMARY nástroj
+                      </p>
+                    )}
                     <ul className="space-y-1">
                       {row.tool_assignments.map((a) => (
                         <li key={a.id} className="flex items-center gap-2 text-xs">
