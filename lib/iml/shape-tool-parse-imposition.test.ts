@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { parseImpositionBody } from "@/lib/iml/shape-tool-parse";
+import {
+  impositionCodePrefixHint,
+  parseImpositionBody,
+} from "@/lib/iml/shape-tool-parse";
 
 describe("parseImpositionBody", () => {
   it("přijme cut-only bez tool_id a sečte užitky", () => {
@@ -33,5 +36,11 @@ describe("parseImpositionBody", () => {
     expect(parsed).toEqual({
       error: "SOLO montáž může mít nejvýše jeden tvar v užitcích.",
     });
+  });
+
+  it("prefix hint jen bez Montáž/MT", () => {
+    expect(impositionCodePrefixHint("A23A")).toMatch(/Doporučený/);
+    expect(impositionCodePrefixHint("Montáž A23A")).toBeNull();
+    expect(impositionCodePrefixHint("MT097+078")).toBeNull();
   });
 });

@@ -120,3 +120,57 @@ export const IMPOSITION_INCLUDE = {
     orderBy: { id: "asc" as const },
   },
 } as const;
+
+/**
+ * Montáže s tool_id, které nemají žádný řádek užitku a nelze je jednoznačně
+ * backfillnout (0 nebo >1 tvar s PRIMARY na stejném nástroji).
+ */
+export async function listAmbiguousImpositionsForBackfill(): Promise<
+  Array<{
+    id: number;
+    imposition_code: string;
+    tool_id: number;
+    tool_code_new: string | null;
+    primary_shape_count: number;
+  }>
+> {
+  const withoutShapes = await prisma.iml_imposition_catalog.findMany({
+    where: {
+      tool_id: { not: null },
+      shapes: { none: {} },
+    },
+    select: {
+      id: true,
+      imposition_code: true,
+      tool_id: true,
+      tool: { select: { tool_code_new: true } },
+    },
+    orderBy: { imposition_code: "asc" },
+    take: 500,
+  });
+
+  const out: Array<{
+    id: number;
+    imposition_code: string;
+    tool_id: number;
+    tool_code_new: string | null;
+    primary_shape_count: number;
+  }> = [];
+
+  for (const row of withoutShapes) {
+    if (row.tool_id == null) continue;
+    const primary_shape_count = await prisma.iml_shape_tool_assignment.count({
+      where: { tool_id: row.tool_id, priority: "PRIMARY" },
+    });
+    if (primary_shape_count === 1) continue; // mělo by jít dojet backfillem
+    out.push({
+      id: row.id,
+      imposition_code: row.imposition_code,
+      tool_id: row.tool_id,
+      tool_code_new: row.tool?.tool_code_new ?? null,
+      primary_shape_count,
+    });
+  }
+
+  return out;
+}

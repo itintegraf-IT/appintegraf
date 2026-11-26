@@ -6,6 +6,7 @@ import {
   IML_IMPOSITION_LAYOUT_TYPES,
   type ImlImpositionLayoutType,
 } from "@/lib/iml/shape-tool-constants";
+import { impositionCodePrefixHint } from "@/lib/iml/shape-tool-parse";
 
 type ToolOpt = { id: number; tool_code_new: string; tool_code_orig: string };
 type NamedOpt = { id: number; name: string };
@@ -72,7 +73,19 @@ function isCutDeviceName(name: string | null | undefined): boolean {
   return n === "řezačka" || n === "rezacka" || n === "řezání" || n === "rezani";
 }
 
-export function ImpositionsClient() {
+type AmbiguousItem = {
+  id: number;
+  imposition_code: string;
+  tool_id: number;
+  tool_code_new: string | null;
+  primary_shape_count: number;
+};
+
+export function ImpositionsClient({
+  initialShapeId = "",
+}: {
+  initialShapeId?: string;
+}) {
   const [rows, setRows] = useState<Row[]>([]);
   const [tools, setTools] = useState<ToolOpt[]>([]);
   const [dieCutDevices, setDieCutDevices] = useState<NamedOpt[]>([]);
@@ -82,23 +95,27 @@ export function ImpositionsClient() {
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [shapeFilter, setShapeFilter] = useState("");
+  const [shapeFilter, setShapeFilter] = useState(initialShapeId);
+  const [ambiguous, setAmbiguous] = useState<AmbiguousItem[]>([]);
 
   const selectedDevice = dieCutDevices.find(
     (d) => String(d.id) === form.die_cut_device_id
   );
   const cutMode = form.is_cut_only || isCutDeviceName(selectedDevice?.name);
+  const codeHint = impositionCodePrefixHint(form.imposition_code);
 
   const load = useCallback(async () => {
     const qs = shapeFilter ? `?shape_id=${encodeURIComponent(shapeFilter)}` : "";
-    const [impRes, toolsRes, lookupsRes] = await Promise.all([
+    const [impRes, toolsRes, lookupsRes, ambRes] = await Promise.all([
       fetch(`/api/iml/impositions${qs}`),
       fetch("/api/iml/tools"),
       fetch("/api/iml/impositions/lookups"),
+      fetch("/api/iml/impositions/ambiguous"),
     ]);
     const impData = await impRes.json().catch(() => ({}));
     const toolsData = await toolsRes.json().catch(() => ({}));
     const lookups = await lookupsRes.json().catch(() => ({}));
+    const ambData = await ambRes.json().catch(() => ({}));
     if (!impRes.ok) {
       setError(impData.error ?? "Nelze načíst montáže");
       return;
@@ -117,9 +134,11 @@ export function ImpositionsClient() {
       setPrintMachines(lookups.printMachines ?? []);
       setShapes(lookups.shapes ?? []);
     }
+    if (ambRes.ok) {
+      setAmbiguous(ambData.items ?? []);
+    }
     setError(null);
   }, [shapeFilter]);
-
   useEffect(() => {
     void load();
   }, [load]);
@@ -221,6 +240,86 @@ export function ImpositionsClient() {
         </div>
       )}
 
+      {ambiguous.length > 0 && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+          <p className="font-medium">
+            Montáže bez užitků k ručnímu doplnění ({ambiguous.length})
+          </p>
+          <p className="mt-1 text-amber-800">
+            Auto-backfill doplnil jen případy s právě jedním PRIMARY tvarem na nástroji.
+            Tyto montáže otevřete a doplňte tabulku užitků.
+          </p>
+          <ul className="mt-2 max-h-40 list-inside list-disc overflow-y-auto text-xs">
+            {ambiguous.map((a) => (
+              <li key={a.id}>
+                <button
+                  type="button"
+                  className="font-mono text-amber-900 underline hover:no-underline"
+                  onClick={() => {
+                    const row = rows.find((r) => r.id === a.id);
+                    if (row) {
+                      setEditingId(row.id);
+                      setForm({
+                        tool_id: row.tool_id != null ? String(row.tool_id) : "",
+                        imposition_code: row.imposition_code,
+                        layout_type: row.layout_type as ImlImpositionLayoutType,
+                        description: row.description ?? "",
+                        sheet_size_id:
+                          row.sheet_size_id != null ? String(row.sheet_size_id) : "",
+                        print_machine_id:
+                          row.print_machine_id != null ? String(row.print_machine_id) : "",
+                        die_cut_device_id:
+                          row.die_cut_device_id != null ? String(row.die_cut_device_id) : "",
+                        is_cut_only: row.is_cut_only,
+                        shapes: (row.shapes ?? []).map((s) => ({
+                          shape_id: s.shape_id,
+                          positions_on_sheet: s.positions_on_sheet,
+                          is_primary: s.is_primary,
+                        })),
+                      }));
+                      return;
+                    }
+                    void fetch(`/api/iml/impositions/${a.id}`)
+                      .then((r) => r.json())
+                      .then((d) => {
+                        const imp = d.imposition as Row | undefined;
+                        if (!imp) return;
+                        setEditingId(imp.id);
+                        setForm({
+                          tool_id: imp.tool_id != null ? String(imp.tool_id) : "",
+                          imposition_code: imp.imposition_code,
+                          layout_type: imp.layout_type as ImlImpositionLayoutType,
+                          description: imp.description ?? "",
+                          sheet_size_id:
+                            imp.sheet_size_id != null ? String(imp.sheet_size_id) : "",
+                          print_machine_id:
+                            imp.print_machine_id != null
+                              ? String(imp.print_machine_id)
+                              : "",
+                          die_cut_device_id:
+                            imp.die_cut_device_id != null
+                              ? String(imp.die_cut_device_id)
+                              : "",
+                          is_cut_only: imp.is_cut_only,
+                          shapes: (imp.shapes ?? []).map((s) => ({
+                            shape_id: s.shape_id,
+                            positions_on_sheet: s.positions_on_sheet,
+                            is_primary: s.is_primary,
+                          })),
+                        });
+                      });
+                  }}
+                >
+                  {a.imposition_code}
+                </button>
+                {a.tool_code_new ? ` · nástroj ${a.tool_code_new}` : ""}
+                {` · PRIMARY tvarů: ${a.primary_shape_count}`}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm space-y-4">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           <label className="text-sm sm:col-span-2 lg:col-span-1">
@@ -231,6 +330,9 @@ export function ImpositionsClient() {
               value={form.imposition_code}
               onChange={(e) => setForm((f) => ({ ...f, imposition_code: e.target.value }))}
             />
+            {codeHint && (
+              <p className="mt-1 text-xs text-amber-700">{codeHint}</p>
+            )}
           </label>
           <label className="text-sm">
             <span className="mb-1 block text-gray-600">Formát archu</span>

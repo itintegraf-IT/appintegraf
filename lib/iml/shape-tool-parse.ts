@@ -210,6 +210,17 @@ function parseImpositionShapes(raw: unknown): ParsedImpositionShapeRow[] | { err
   return out;
 }
 
+/** Soft tip: doporučený prefix kódu montáže (ne blokující). */
+export function impositionCodePrefixHint(code: string): string | null {
+  const trimmed = code.trim();
+  if (!trimmed) return null;
+  const lower = trimmed.toLocaleLowerCase("cs");
+  if (lower.startsWith("montáž ") || lower.startsWith("montaz ") || lower.startsWith("mt")) {
+    return null;
+  }
+  return "Doporučený tvar kódu: „Montáž A23A“ nebo „MT097+078“ (kvůli odlišení od kódu tvaru).";
+}
+
 export function parseImpositionBody(
   body: Record<string, unknown>
 ): ParsedImpositionBody | { error: string } {

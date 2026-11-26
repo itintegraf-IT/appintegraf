@@ -618,6 +618,12 @@ export function ShapesClient() {
                     >
                       {detailShapeId === row.id ? "Skrýt" : "Detail"}
                     </button>
+                    <Link
+                      href={`/iml/impositions?shape_id=${row.id}`}
+                      className="text-violet-700 hover:underline"
+                    >
+                      Montáže
+                    </Link>
                     <button
                       type="button"
                       className="text-red-600 hover:underline"
