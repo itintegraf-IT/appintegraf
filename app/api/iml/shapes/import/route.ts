@@ -43,7 +43,7 @@ async function ensureDefaultImposition(toolId: number, toolCode: string): Promis
   await prisma.iml_imposition_catalog.create({
     data: {
       tool_id: toolId,
-      imposition_code: `${toolCode}-SOLO`.slice(0, 30),
+      imposition_code: `${toolCode}-SOLO`.slice(0, 60),
       positions_count: 1,
       layout_type: "SOLO",
       description: "Výchozí montáž z importu tvarů",

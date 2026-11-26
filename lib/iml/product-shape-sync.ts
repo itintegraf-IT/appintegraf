@@ -47,17 +47,33 @@ export async function buildProductFieldsFromShapeSelection(params: {
     if (tool) {
       data.die_cut_tool_code = tool.tool_code_orig || tool.tool_code_new;
     }
+  } else {
+    data.die_cut_tool_code = null;
   }
 
   if (params.impositionId != null) {
     const imp = await prisma.iml_imposition_catalog.findUnique({
       where: { id: params.impositionId },
-      select: { imposition_code: true, positions_count: true },
+      select: {
+        imposition_code: true,
+        positions_count: true,
+        is_cut_only: true,
+        shapes: {
+          where: { shape_id: params.shapeId },
+          select: { positions_on_sheet: true },
+          take: 1,
+        },
+      },
     });
     if (imp) {
       data.assembly_code = imp.imposition_code;
-      data.positions_on_sheet = imp.positions_count;
-      data.labels_per_sheet = imp.positions_count;
+      const fromUtility = imp.shapes?.[0]?.positions_on_sheet;
+      const count = fromUtility ?? imp.positions_count;
+      data.positions_on_sheet = count;
+      data.labels_per_sheet = count;
+      if (imp.is_cut_only && params.toolId == null) {
+        data.die_cut_tool_code = "Řezání";
+      }
     }
   }
 
@@ -144,7 +160,7 @@ export async function resolveDefaultToolAndImposition(shapeId: number): Promise<
 }
 
 /**
- * Ověří, že nástroj patří k tvaru a montáž k nástroji.
+ * Ověří, že nástroj patří k tvaru a montáž k nástroji (nebo cut-only montáž obsahuje tvar).
  * Stalé ID z předchozího tvaru (typicky po změně ve formuláři) nahradí výchozími.
  */
 export async function resolveValidatedShapeSelection(params: {
@@ -155,6 +171,23 @@ export async function resolveValidatedShapeSelection(params: {
   let toolId = params.toolId;
   let impositionId = params.impositionId;
 
+  if (impositionId != null) {
+    const cutImp = await prisma.iml_imposition_catalog.findFirst({
+      where: {
+        id: impositionId,
+        OR: [
+          { is_cut_only: true },
+          { tool_id: null },
+        ],
+        shapes: { some: { shape_id: params.shapeId } },
+      },
+      select: { id: true, tool_id: true },
+    });
+    if (cutImp) {
+      return { toolId: cutImp.tool_id, impositionId: cutImp.id };
+    }
+  }
+
   if (toolId != null) {
     const assigned = await prisma.iml_shape_tool_assignment.findFirst({
       where: { shape_id: params.shapeId, tool_id: toolId },
@@ -164,6 +197,18 @@ export async function resolveValidatedShapeSelection(params: {
   }
 
   if (toolId == null) {
+    const primaryCut = await prisma.iml_imposition_shapes.findFirst({
+      where: { shape_id: params.shapeId, is_primary: true },
+      select: {
+        imposition: { select: { id: true, tool_id: true, is_cut_only: true } },
+      },
+    });
+    if (primaryCut?.imposition && (primaryCut.imposition.is_cut_only || primaryCut.imposition.tool_id == null)) {
+      return {
+        toolId: primaryCut.imposition.tool_id,
+        impositionId: primaryCut.imposition.id,
+      };
+    }
     const defaults = await resolveDefaultToolAndImposition(params.shapeId);
     return { toolId: defaults.toolId, impositionId: defaults.impositionId };
   }
@@ -249,25 +294,31 @@ export async function resyncProductsForTool(toolId: number): Promise<number> {
   return result.count;
 }
 
-/** Obnoví montážní skaláry u produktů s daným selected_imposition_id. */
+/** Obnoví montážní skaláry u produktů s daným selected_imposition_id (užitek dle shape_id). */
 export async function resyncProductsForImposition(
   impositionId: number
 ): Promise<number> {
-  const imp = await prisma.iml_imposition_catalog.findUnique({
-    where: { id: impositionId },
-    select: { imposition_code: true, positions_count: true },
-  });
-  if (!imp) return 0;
-
-  const result = await prisma.iml_products.updateMany({
+  const products = await prisma.iml_products.findMany({
     where: { selected_imposition_id: impositionId },
-    data: {
-      assembly_code: imp.imposition_code,
-      positions_on_sheet: imp.positions_count,
-      labels_per_sheet: imp.positions_count,
-    },
+    select: { id: true, shape_id: true, selected_tool_id: true },
   });
-  return result.count;
+  if (products.length === 0) return 0;
+
+  let updated = 0;
+  for (const product of products) {
+    if (product.shape_id == null) continue;
+    const scalars = await buildProductFieldsFromShapeSelection({
+      shapeId: product.shape_id,
+      toolId: product.selected_tool_id,
+      impositionId,
+    });
+    await prisma.iml_products.update({
+      where: { id: product.id },
+      data: scalars,
+    });
+    updated++;
+  }
+  return updated;
 }
 
 /**

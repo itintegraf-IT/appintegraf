@@ -5,6 +5,7 @@ const findShapeToolPrimary = vi.fn();
 const findShapeToolAny = vi.fn();
 const findImpositionForTool = vi.fn();
 const findImpositionFirst = vi.fn();
+const findImpositionShape = vi.fn();
 const findShape = vi.fn();
 const findTool = vi.fn();
 const findImposition = vi.fn();
@@ -24,10 +25,14 @@ vi.mock("@/lib/db", () => ({
     iml_imposition_catalog: {
       findFirst: (...args: unknown[]) => {
         const where = (args[0] as { where?: Record<string, unknown> })?.where ?? {};
+        if (where.OR != null) return Promise.resolve(null); // cut-only check
         if (where.id != null) return findImpositionForTool(...args);
         return findImpositionFirst(...args);
       },
       findUnique: (...args: unknown[]) => findImposition(...args),
+    },
+    iml_imposition_shapes: {
+      findFirst: (...args: unknown[]) => findImpositionShape(...args),
     },
     iml_shape_catalog: {
       findUnique: (...args: unknown[]) => findShape(...args),
@@ -70,6 +75,7 @@ describe("resolveValidatedShapeSelection", () => {
 
   it("při nástroji nepatřícím k tvaru resetuje na PRIMARY + první montáž", async () => {
     findShapeTool.mockResolvedValue(null);
+    findImpositionShape.mockResolvedValue(null);
     findShapeToolPrimary.mockResolvedValue({ tool_id: 5 });
     findImpositionFirst.mockResolvedValue({ id: 7 });
 
@@ -101,6 +107,8 @@ describe("buildProductFieldsFromShapeSelection po validaci", () => {
     findImposition.mockResolvedValue({
       imposition_code: "0009A-48",
       positions_count: 48,
+      is_cut_only: false,
+      shapes: [],
     });
 
     const synced = await buildProductFieldsFromShapeSelection({

@@ -1404,6 +1404,7 @@ model shared_machines {
   updated_at     DateTime       @default(now()) @db.Timestamp(0)
   vykresy        vykresy[]
   technologie    technologie[]
+  iml_imposition_catalog iml_imposition_catalog[]
 
   @@index([is_active], map: "idx_shared_machines_active")
   @@index([sort_order], map: "idx_shared_machines_sort")
@@ -1456,6 +1457,7 @@ model technologie_sheet_sizes {
   created_at  DateTime      @default(now()) @db.Timestamp(0)
   updated_at  DateTime      @default(now()) @db.Timestamp(0)
   technologie technologie[]
+  iml_imposition_catalog iml_imposition_catalog[]
 
   @@index([is_active], map: "idx_technologie_sheet_sizes_active")
   @@index([sort_order], map: "idx_technologie_sheet_sizes_sort")
@@ -1471,6 +1473,7 @@ model technologie_die_cut_devices {
   created_at  DateTime      @default(now()) @db.Timestamp(0)
   updated_at  DateTime      @default(now()) @db.Timestamp(0)
   technologie technologie[]
+  iml_imposition_catalog iml_imposition_catalog[]
 
   @@index([is_active], map: "idx_technologie_die_cut_devices_active")
   @@index([sort_order], map: "idx_technologie_die_cut_devices_sort")
@@ -2032,6 +2035,7 @@ model iml_shape_catalog {
   tool_assignments     iml_shape_tool_assignment[]
   customer_assignments iml_shape_customer_assignment[]
   material_packaging   iml_shape_material_packaging[]
+  imposition_shapes    iml_imposition_shapes[]
   iml_products         iml_products[]
   makety               makety[]
 
@@ -2116,23 +2120,53 @@ model iml_shape_tool_assignment {
   @@map("iml_shape_tool_assignment")
 }
 
-/// Číselník montáží / musterů na nástroji (úroveň 3).
+/// Číselník montáží / musterů (úroveň 3; nástroj volitelný u režimu řezání).
 model iml_imposition_catalog {
-  id              Int     @id @default(autoincrement())
-  tool_id         Int
-  imposition_code String  @db.VarChar(30)
-  positions_count Int
-  layout_type     String  @default("SOLO") @db.VarChar(10)
-  description     String? @db.VarChar(255)
-  created_at      DateTime @default(now()) @db.DateTime(0)
-  updated_at      DateTime @updatedAt @db.DateTime(0)
+  id                 Int      @id @default(autoincrement())
+  tool_id            Int?
+  imposition_code    String   @unique @db.VarChar(60)
+  positions_count    Int
+  layout_type        String   @default("SOLO") @db.VarChar(10)
+  description        String?  @db.VarChar(255)
+  sheet_size_id      Int?
+  print_machine_id   Int?
+  die_cut_device_id  Int?
+  /// Řezání bez fyzického výsekového nástroje.
+  is_cut_only        Boolean  @default(false)
+  created_at         DateTime @default(now()) @db.DateTime(0)
+  updated_at         DateTime @updatedAt @db.DateTime(0)
 
-  tool         iml_tool_catalog @relation(fields: [tool_id], references: [id], onDelete: Cascade)
-  iml_products iml_products[]
+  tool                    iml_tool_catalog?              @relation(fields: [tool_id], references: [id], onDelete: SetNull)
+  sheet_size              technologie_sheet_sizes?       @relation(fields: [sheet_size_id], references: [id], onDelete: SetNull)
+  print_machine           shared_machines?               @relation(fields: [print_machine_id], references: [id], onDelete: SetNull)
+  die_cut_device          technologie_die_cut_devices?   @relation(fields: [die_cut_device_id], references: [id], onDelete: SetNull)
+  shapes                  iml_imposition_shapes[]
+  iml_products            iml_products[]
 
-  @@index([imposition_code])
   @@index([tool_id])
+  @@index([sheet_size_id])
+  @@index([print_machine_id])
+  @@index([die_cut_device_id])
+  @@index([is_cut_only])
   @@map("iml_imposition_catalog")
+}
+
+/// Užitky montáže: které tvary a kolikrát na archu (sety bez fiktivních tvarů).
+model iml_imposition_shapes {
+  id                 Int     @id @default(autoincrement())
+  imposition_id      Int
+  shape_id           Int
+  positions_on_sheet Int
+  /// Primární montáž pro daný tvar (max. jedna napříč katalogem — vynucuje API).
+  is_primary         Boolean @default(false)
+
+  imposition iml_imposition_catalog @relation(fields: [imposition_id], references: [id], onDelete: Cascade)
+  shape      iml_shape_catalog      @relation(fields: [shape_id], references: [id], onDelete: Restrict)
+
+  @@unique([imposition_id, shape_id])
+  @@index([shape_id])
+  @@index([shape_id, is_primary])
+  @@map("iml_imposition_shapes")
 }
 
 model iml_orders {

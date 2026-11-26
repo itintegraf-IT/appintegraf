@@ -166,34 +166,90 @@ export function parseAssignmentBody(
   return { shape_id, tool_id, priority: priority_raw };
 }
 
+export type ParsedImpositionShapeRow = {
+  shape_id: number;
+  positions_on_sheet: number;
+  is_primary: boolean;
+};
+
 export type ParsedImpositionBody = {
-  tool_id: number;
+  tool_id: number | null;
   imposition_code: string;
   positions_count: number;
   layout_type: ImlImpositionLayoutType;
   description: string | null;
+  sheet_size_id: number | null;
+  print_machine_id: number | null;
+  die_cut_device_id: number | null;
+  is_cut_only: boolean;
+  shapes: ParsedImpositionShapeRow[];
 };
+
+function parseImpositionShapes(raw: unknown): ParsedImpositionShapeRow[] | { error: string } {
+  if (raw == null) return [];
+  if (!Array.isArray(raw)) return { error: "Pole shapes musí být pole." };
+  const out: ParsedImpositionShapeRow[] = [];
+  const seen = new Set<number>();
+  for (const row of raw) {
+    if (!row || typeof row !== "object") return { error: "Neplatný řádek užitku." };
+    const obj = row as Record<string, unknown>;
+    const shape_id = parseOptionalInt(obj.shape_id);
+    const positions_on_sheet = parseOptionalInt(obj.positions_on_sheet);
+    if (shape_id == null) return { error: "U užitku chybí tvar." };
+    if (positions_on_sheet == null || positions_on_sheet < 1) {
+      return { error: "Násobnost na archu musí být kladné číslo." };
+    }
+    if (seen.has(shape_id)) return { error: "Stejný tvar je v užitcích víckrát." };
+    seen.add(shape_id);
+    out.push({
+      shape_id,
+      positions_on_sheet,
+      is_primary: obj.is_primary === true || obj.is_primary === 1 || obj.is_primary === "1",
+    });
+  }
+  return out;
+}
 
 export function parseImpositionBody(
   body: Record<string, unknown>
 ): ParsedImpositionBody | { error: string } {
   const tool_id = parseOptionalInt(body.tool_id);
-  if (tool_id == null) return { error: "Chybí nástroj." };
-  const imposition_code = parseRequiredStr(body.imposition_code, 30);
+  const imposition_code = parseRequiredStr(body.imposition_code, 60);
   if (!imposition_code) return { error: "Kód montáže je povinný." };
-  const positions_count = parseOptionalInt(body.positions_count);
-  if (positions_count == null || positions_count < 1) {
-    return { error: "Počet užitků musí být kladné číslo." };
-  }
+
   const layout_raw = parseOptionalStr(body.layout_type, 10) ?? "SOLO";
   if (!isImlImpositionLayoutType(layout_raw)) {
     return { error: "Neplatný typ montáže (SOLO / SET)." };
   }
+
+  const shapesParsed = parseImpositionShapes(body.shapes);
+  if ("error" in shapesParsed) return shapesParsed;
+
+  let positions_count = parseOptionalInt(body.positions_count);
+  if (shapesParsed.length > 0) {
+    positions_count = shapesParsed.reduce((a, s) => a + s.positions_on_sheet, 0);
+  }
+  if (positions_count == null || positions_count < 1) {
+    return { error: "Počet užitků musí být kladné číslo (nebo doplňte tabulku užitků)." };
+  }
+
+  if (layout_raw === "SOLO" && shapesParsed.length > 1) {
+    return { error: "SOLO montáž může mít nejvýše jeden tvar v užitcích." };
+  }
+
+  const is_cut_only =
+    body.is_cut_only === true || body.is_cut_only === 1 || body.is_cut_only === "1";
+
   return {
     tool_id,
     imposition_code,
     positions_count,
     layout_type: layout_raw,
     description: parseOptionalStr(body.description, 255),
+    sheet_size_id: parseOptionalInt(body.sheet_size_id),
+    print_machine_id: parseOptionalInt(body.print_machine_id),
+    die_cut_device_id: parseOptionalInt(body.die_cut_device_id),
+    is_cut_only,
+    shapes: shapesParsed,
   };
 }

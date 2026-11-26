@@ -4,6 +4,12 @@ import { prisma } from "@/lib/db";
 import { hasModuleAccess } from "@/lib/auth-utils";
 import { canManageImlImpositions } from "@/lib/iml-permissions";
 import { parseImpositionBody } from "@/lib/iml/shape-tool-parse";
+import {
+  assertImpositionCodeAvailable,
+  IMPOSITION_INCLUDE,
+  replaceImpositionShapes,
+  resolveCutOnlyAllowed,
+} from "@/lib/iml/imposition-shapes";
 import type { Prisma } from "@prisma/client";
 
 export async function GET(req: NextRequest) {
@@ -19,10 +25,15 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const toolIdRaw = url.searchParams.get("tool_id");
   const toolId = toolIdRaw ? parseInt(toolIdRaw, 10) : null;
+  const shapeIdRaw = url.searchParams.get("shape_id");
+  const shapeId = shapeIdRaw ? parseInt(shapeIdRaw, 10) : null;
   const q = (url.searchParams.get("q") ?? "").trim();
 
   const where: Prisma.iml_imposition_catalogWhereInput = {
     ...(toolId != null && !Number.isNaN(toolId) ? { tool_id: toolId } : {}),
+    ...(shapeId != null && !Number.isNaN(shapeId)
+      ? { shapes: { some: { shape_id: shapeId } } }
+      : {}),
     ...(q
       ? {
           OR: [
@@ -35,13 +46,9 @@ export async function GET(req: NextRequest) {
 
   const impositions = await prisma.iml_imposition_catalog.findMany({
     where,
-    orderBy: [{ tool_id: "asc" }, { imposition_code: "asc" }],
+    orderBy: [{ imposition_code: "asc" }],
     take: 2000,
-    include: {
-      tool: {
-        select: { id: true, tool_code_new: true, tool_code_orig: true, technology: true },
-      },
-    },
+    include: IMPOSITION_INCLUDE,
   });
 
   return NextResponse.json({ impositions });
@@ -63,9 +70,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
+  const codeErr = await assertImpositionCodeAvailable(parsed.imposition_code);
+  if (codeErr) return NextResponse.json({ error: codeErr }, { status: 400 });
+
+  const cutCheck = await resolveCutOnlyAllowed({
+    is_cut_only: parsed.is_cut_only,
+    die_cut_device_id: parsed.die_cut_device_id,
+    tool_id: parsed.tool_id,
+  });
+  if ("error" in cutCheck) {
+    return NextResponse.json({ error: cutCheck.error }, { status: 400 });
+  }
+
+  const { shapes, ...header } = parsed;
+
   try {
-    const created = await prisma.iml_imposition_catalog.create({ data: parsed });
-    return NextResponse.json({ success: true, imposition: created });
+    const created = await prisma.iml_imposition_catalog.create({ data: header });
+    if (shapes.length > 0) {
+      await replaceImpositionShapes(created.id, shapes);
+    }
+    const imposition = await prisma.iml_imposition_catalog.findUnique({
+      where: { id: created.id },
+      include: IMPOSITION_INCLUDE,
+    });
+    return NextResponse.json({ success: true, imposition });
   } catch (e) {
     console.error("POST /api/iml/impositions", e);
     return NextResponse.json({ error: "Uložení selhalo" }, { status: 500 });
