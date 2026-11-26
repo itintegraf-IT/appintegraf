@@ -54,6 +54,10 @@ export const HELP_DOC_SLUGS: Record<
     file: "MODUL_IML.md",
     title: "Modul IML – dokumentace",
   },
+  "iml-vyseky": {
+    file: "IML_VYSEKY.md",
+    title: "IML – katalog výseků (postup 1–5)",
+  },
   "iml-newsec": {
     file: "IML_NEWSEC_IMPLEMENTATION.md",
     title: "IML – implementační plán (newsec)",

@@ -92,8 +92,21 @@ Modul IML poskytuje:
 
 ### 3.3 Výseky a montáže
 
-- Kódové označení tvaru etikety, Kód výsekového nástroje, Kód montáže
-- Počet pozic na Tiskovém Archu, Počet etiket na TA, Počet kusů v krabici, Počet KS/krabic na paletě
+Katalog výseků má hub **`/iml/vyseky`** s očíslovaným postupem:
+
+1. **Tvary** (`/iml/shapes`) — kód a rozměry etikety  
+2. **Nástroje** (`/iml/tools`) — železo / planžeta  
+3. **Vazby** — PRIMARY / ALT nástroj k tvaru  
+4. **Montáže** (`/iml/impositions`) — arch, tiskový stroj, výsek/zařízení, užitky; řezání bez nástroje; vazba na Technologie  
+5. **Náhledy** — přílohy u tvaru  
+
+Uživatelský návod: [`IML_VYSEKY.md`](IML_VYSEKY.md) (nápověda `/help/iml-vyseky`).
+
+Na produktu:
+
+- Kódové označení tvaru etikety, Kód výsekového nástroje, Kód montáže  
+- Počet pozic na Tiskovém Archu, Počet etiket na TA, Počet kusů v krabici, Počet KS/krabic na paletě  
+- Alternativní výsekový nástroj (pokud je u tvaru ALT vazba)  
 
 ### 3.4 Materiály
 

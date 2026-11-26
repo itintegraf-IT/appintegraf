@@ -1,6 +1,25 @@
 {
   "releases": [
     {
+      "id": "2026-11-26-vyseky",
+      "date": "2026-11-26",
+      "title": "Aktualizace systému (24.–26. 11. 2026) — výseky a technologie",
+      "items": [
+        {
+          "modules": ["iml"],
+          "text": "IML Výseky: hub /iml/vyseky s jasným postupem 1–5 (tvar → nástroj → vazby → montáž → náhledy) a stejnou navigací na tvarech, nástrojích a montážích."
+        },
+        {
+          "modules": ["iml", "technologie"],
+          "text": "IML montáže: hlavička (arch, tiskový stroj, výsek), tabulka užitků, řezání bez nástroje a vazba na Technologie; odkaz montáží z tvaru."
+        },
+        {
+          "modules": ["technologie", "iml"],
+          "text": "Technologie: do číselníku výsekových zařízení přibyly Příklop a Řezačka (použitelné i v IML montážích)."
+        }
+      ]
+    },
+    {
       "id": "2026-11-24-včera-dnes",
       "date": "2026-11-24",
       "title": "Aktualizace systému (23.–24. 11. 2026)",

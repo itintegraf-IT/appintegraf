@@ -36,6 +36,13 @@ Náhled v seznamu: `GET /api/technologie/[id]/preview` (JPEG). PDF inline: `GET 
 
 Stroje API: `GET/POST /api/shared-machines` (alias `/api/technologie/print-machines`).
 
+## Výseková zařízení a IML
+
+Číselník výsekových zařízení (mimo jiné **Příklop**, **Řezačka**) se používá v Technologii i v **IML montážích** (`/iml/impositions`).
+
+- Katalog výseků IML a postup 1–5: [`IML_VYSEKY.md`](IML_VYSEKY.md) / nápověda `/help/iml-vyseky`
+- Montáž může mít hlavičku (arch, tiskový stroj, výsek), tabulku užitků a režim řezání bez nástroje
+
 ## Migrace
 
 ```bash
@@ -54,4 +61,4 @@ Skript přesunu starých `vykresy_machines` / `technologie_print_machines`: `npm
 
 - Sjednocení s Plánováním (`XL_105` / `XL_106` jako enum)
 - Ruční upload náhledu
-- Vazba na zakázku / IML produkt
+- Přímá vazba rozkresu na konkrétní zakázku / IML produkt (montáže IML už zařízení a stroje používají)

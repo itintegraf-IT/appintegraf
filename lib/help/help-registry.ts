@@ -365,6 +365,8 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
       "Dashboard se statistikami a konverzí poptávek.",
       "Zákazníci – kontakty, dodací adresy, import/export.",
       "Produkty – taby (výseky, fólie, barvy), verzování PDF, náhled obrázku.",
+      "Katalog výseků (/iml/vyseky): postup 1–5 — tvar → nástroj → vazby → montáž → náhledy.",
+      "Montáže s užitky, řezáním bez nástroje a vazbou na Technologie.",
       "Poptávky – evidence a konverze na objednávku.",
       "Objednávky – položky, snapshot adresy, tisk, export CSV/Excel/XML.",
       "Report Pantone – plánovaná spotřeba barev.",
@@ -372,18 +374,20 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     ],
     quickSteps: [
       "Otevřete IML dashboard a zvolte sekci (Zákazníci / Produkty / Poptávky / Objednávky).",
+      "Výseky: na /iml/vyseky projděte kroky 1–5 (tvar, nástroj, vazby, montáž, náhledy).",
       "Založte zákazníka a produkt; nahrajte PDF tiskových dat a nastavte Pantone.",
-      "V produktu vyberte materiály z katalogu (fólie, barva, …), pokud máte přístup.",
+      "V produktu vyberte tvar (výsek) a materiály z katalogu.",
       "Vytvořte poptávku nebo rovnou objednávku; u poptávky použijte Konvertovat na objednávku.",
-      "Pro hromadné změny použijte import na příslušné stránce.",
     ],
     tips: [
+      "Katalog výseků vyplňujte v pořadí z hubu — montáž potřebuje tvar a (obvykle) nástroj.",
       "Před importem exportujte aktuální data jako zálohu.",
       "Historii verzí PDF najdete v detailu produktu.",
       "Uživatelé s pouze iml:read vidí katalog materiálů, ale nemusí ho editovat.",
     ],
     docs: [
       { label: "Kompletní dokumentace modulu IML", href: "/help/modul-iml" },
+      { label: "Výseky – postup 1–5", href: "/help/iml-vyseky" },
       { label: "Implementační plán rozšíření (newsec)", href: "/help/iml-newsec" },
     ],
   },
@@ -424,25 +428,30 @@ export const HELP_REGISTRY: Record<string, HelpEntry> = {
     title: "Technologie – rozkresy",
     path: "/technologie",
     intro:
-      "Evidence rozkresů tiskových archů s kódem, formátem, typem archu a tiskovým strojem. PDF na disku, náhled z 1. stránky.",
+      "Evidence rozkresů tiskových archů s kódem, formátem, typem archu a tiskovým strojem. PDF na disku, náhled z 1. stránky. Číselník výsekových zařízení (Příklop, Řezačka, …) sdílený s IML montážemi.",
     features: [
       "Tabulka: kód, název, typ, formát, velikost archu, stroj, poznámka, miniatura.",
       "Jedno primární PDF na záznam; po nahrání se vygeneruje JPEG náhled.",
       "Číselník typů archů (jen Technologie) + společný číselník strojů s Výkresy (Press / Postpress).",
+      "Výseková zařízení včetně Příklop a Řezačka — vazba na IML montáže.",
       "Filtry podle textu, typu archu a stroje.",
     ],
     quickSteps: [
       "V Administraci přiřaďte modul Technologie (read/write).",
-      "V Číselnících doplňte typy archů; stroje spravujte na /stroje.",
+      "V Číselnících doplňte typy archů a výseková zařízení; stroje spravujte na /stroje.",
       "Vytvořte rozkres a v detailu nahrajte PDF.",
       "Miniatura se zobrazí v seznamu po úspěšném vygenerování.",
     ],
     tips: [
       "Soubory: public/uploads/technologie/ (modul file_uploads, document_type pdf | thumbnail).",
       "Stroje jsou společné s modulem Výkresy (shared_machines).",
+      "IML montáže mohou odkazovat na rozkresy a výseková zařízení z Technologií.",
       "Generování náhledu vyžaduje @napi-rs/canvas na serveru (stejně jako IML).",
     ],
-    docs: [{ label: "Dokumentace modulu", href: "/help/modul-technologie" }],
+    docs: [
+      { label: "Dokumentace modulu", href: "/help/modul-technologie" },
+      { label: "IML výseky – postup", href: "/help/iml-vyseky" },
+    ],
   },
 
   vykresy: {
