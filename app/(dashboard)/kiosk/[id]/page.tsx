@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { ensurePresentationPublicToken } from "@/lib/kiosk/public-token";
+import { adminKioskSlideFileUrl } from "@/lib/kiosk/files";
 import { ArrowLeft, Pencil, Image as ImageIcon, Monitor } from "lucide-react";
 import { KioskMonitorUrl } from "./KioskMonitorUrl";
 
@@ -84,14 +85,14 @@ export default async function KioskViewPage({
                     {slide.file_type === "image" ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
-                        src={slide.file_path}
+                        src={adminKioskSlideFileUrl(slide.id)}
                         alt={slide.title ?? slide.filename}
                         className="h-full w-full object-contain"
                       />
                     ) : slide.file_type === "pdf" ? (
                       <iframe
                         title={slide.title ?? slide.filename}
-                        src={`${slide.file_path}#page=1&view=FitH&toolbar=0`}
+                        src={`${adminKioskSlideFileUrl(slide.id)}#page=1&view=FitH&toolbar=0`}
                         className="h-full w-full border-0"
                       />
                     ) : (

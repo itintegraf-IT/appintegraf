@@ -251,7 +251,7 @@ export default function KioskEditPage() {
                   <Upload className="h-4 w-4" />
                   {uploading ? "Nahrávám…" : "Přidat snímky"}
                 </button>
-                <span className="text-xs text-gray-500">JPG, PNG, PDF — max 10 MB</span>
+                <span className="text-xs text-gray-500">JPG, PNG, PDF — max 25 MB</span>
               </div>
               {slides.length > 0 ? (
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -264,7 +264,7 @@ export default function KioskEditPage() {
                         {slide.file_type === "image" ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={slide.file_path}
+                            src={`/api/kiosk/slides/${slide.id}/file`}
                             alt=""
                             className="h-full w-full object-cover"
                           />

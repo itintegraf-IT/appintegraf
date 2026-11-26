@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { publicKioskSlideFileUrl } from "@/lib/kiosk/files";
 
 export async function GET(
   _req: NextRequest,
@@ -26,7 +27,6 @@ export async function GET(
         orderBy: { sort_order: "asc" },
         select: {
           id: true,
-          file_path: true,
           file_type: true,
           title: true,
           filename: true,
@@ -47,6 +47,9 @@ export async function GET(
     transition_effect: presentation.transition_effect ?? "fade",
     transition_time: presentation.transition_time ?? 5,
     display_duration: presentation.display_duration ?? 10,
-    slides: presentation.slides,
+    slides: presentation.slides.map((slide) => ({
+      ...slide,
+      url: publicKioskSlideFileUrl(token, slide.id),
+    })),
   });
 }

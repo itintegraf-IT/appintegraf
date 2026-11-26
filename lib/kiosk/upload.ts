@@ -8,7 +8,7 @@ export const KIOSK_ALLOWED_MIMES = [
   "application/pdf",
 ] as const;
 
-export const KIOSK_MAX_SIZE = 10 * 1024 * 1024; // 10 MB
+export const KIOSK_MAX_SIZE = 25 * 1024 * 1024; // 25 MB (TV JPG často ~13 MB)
 
 const EXT_TO_MIME: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -58,8 +58,8 @@ export function kioskUploadRejectMessage(reasons: KioskFileRejectReason[]): stri
   const hasType = reasons.includes("type");
   const hasSize = reasons.includes("size");
   if (hasType && hasSize) {
-    return "Nepodařilo se nahrát soubory (povolené: JPG, PNG, PDF; max 10 MB)";
+    return "Nepodařilo se nahrát soubory (povolené: JPG, PNG, PDF; max 25 MB)";
   }
-  if (hasSize) return "Soubor je větší než 10 MB";
+  if (hasSize) return "Soubor je větší než 25 MB";
   return "Nepodporovaný typ souboru (povolené: JPG, PNG, PDF)";
 }

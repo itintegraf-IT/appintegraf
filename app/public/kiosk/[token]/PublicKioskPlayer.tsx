@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 
 type Slide = {
   id: number;
-  file_path: string;
+  url: string;
   file_type: string;
   title: string | null;
   filename: string;
@@ -107,13 +107,13 @@ export function PublicKioskPlayer({ token }: { token: string }) {
             {slide.file_type === "pdf" ? (
               <iframe
                 title={slide.title ?? slide.filename}
-                src={`${slide.file_path}#toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
+                src={`${slide.url}#toolbar=0&navpanes=0&scrollbar=0&view=Fit`}
                 className="h-full w-full border-0 bg-black"
               />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={slide.file_path}
+                src={slide.url}
                 alt={slide.title ?? slide.filename}
                 className="max-h-full max-w-full object-contain"
                 draggable={false}

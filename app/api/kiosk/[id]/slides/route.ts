@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import {
   extensionForKioskMime,
@@ -10,6 +10,7 @@ import {
   validateKioskFile,
   type KioskFileRejectReason,
 } from "@/lib/kiosk/upload";
+import { verifyKioskFileOnDisk } from "@/lib/kiosk/files";
 
 export async function POST(
   req: NextRequest,
@@ -51,6 +52,7 @@ export async function POST(
   let sortOrder = maxOrder;
   const created: { id: number }[] = [];
   const rejectReasons: KioskFileRejectReason[] = [];
+  let writeFailed = false;
 
   for (let i = 0; i < files.length; i++) {
     const file = files[i];
@@ -69,6 +71,16 @@ export async function POST(
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
     await writeFile(filePath, buffer);
+
+    if (!(await verifyKioskFileOnDisk(filePath))) {
+      writeFailed = true;
+      try {
+        await unlink(filePath);
+      } catch {
+        /* ignore */
+      }
+      continue;
+    }
 
     const webPath = `/uploads/kiosk/${newFilename}`;
 
@@ -90,7 +102,11 @@ export async function POST(
 
   if (created.length === 0) {
     return NextResponse.json(
-      { error: kioskUploadRejectMessage(rejectReasons) },
+      {
+        error: writeFailed
+          ? "Soubor se nepodařilo uložit na disk"
+          : kioskUploadRejectMessage(rejectReasons),
+      },
       { status: 400 }
     );
   }

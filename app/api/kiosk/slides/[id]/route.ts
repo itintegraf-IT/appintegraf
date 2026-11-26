@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
 import { unlink } from "fs/promises";
-import path from "path";
+import { resolveKioskDiskPath } from "@/lib/kiosk/files";
 
 export async function DELETE(
   _req: NextRequest,
@@ -26,10 +26,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Snímek nenalezen" }, { status: 404 });
   }
 
-  // Smazat soubor z disku (pokud je v public/uploads)
-  const filePath = slide.file_path;
-  if (filePath.startsWith("/uploads/")) {
-    const fullPath = path.join(process.cwd(), "public", filePath);
+  const fullPath = resolveKioskDiskPath(slide.file_path);
+  if (fullPath) {
     try {
       await unlink(fullPath);
     } catch {

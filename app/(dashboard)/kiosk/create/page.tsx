@@ -143,7 +143,7 @@ export default function CreateKioskPage() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2 file:mr-2 file:rounded file:border-0 file:bg-red-50 file:px-3 file:py-1 file:text-sm file:font-medium file:text-red-600"
             />
             <p className="mt-1 text-xs text-gray-500">
-              Můžete nahrát více souborů najednou. Max 10 MB na soubor.
+              Můžete nahrát více souborů najednou. Max 25 MB na soubor.
             </p>
             {files.length > 0 && (
               <p className="mt-1 text-sm text-gray-600">Vybráno: {files.length} souborů</p>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/db";
-import { writeFile, mkdir } from "fs/promises";
+import { writeFile, mkdir, unlink } from "fs/promises";
 import path from "path";
 import {
   extensionForKioskMime,
@@ -11,6 +11,7 @@ import {
   validateKioskFile,
   type KioskFileRejectReason,
 } from "@/lib/kiosk/upload";
+import { verifyKioskFileOnDisk } from "@/lib/kiosk/files";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
 
       const rejectReasons: KioskFileRejectReason[] = [];
       let createdCount = 0;
+      let writeFailed = false;
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
@@ -83,6 +85,16 @@ export async function POST(req: NextRequest) {
 
         const bytes = await file.arrayBuffer();
         await writeFile(filePath, Buffer.from(bytes));
+
+        if (!(await verifyKioskFileOnDisk(filePath))) {
+          writeFailed = true;
+          try {
+            await unlink(filePath);
+          } catch {
+            /* ignore */
+          }
+          continue;
+        }
 
         await prisma.slides.create({
           data: {
@@ -102,7 +114,11 @@ export async function POST(req: NextRequest) {
       if (createdCount === 0) {
         await prisma.presentations.delete({ where: { id: presentation.id } });
         return NextResponse.json(
-          { error: kioskUploadRejectMessage(rejectReasons) },
+          {
+            error: writeFailed
+              ? "Soubor se nepodařilo uložit na disk"
+              : kioskUploadRejectMessage(rejectReasons),
+          },
           { status: 400 }
         );
       }
