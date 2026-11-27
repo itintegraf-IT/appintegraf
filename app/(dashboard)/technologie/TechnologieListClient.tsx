@@ -67,9 +67,9 @@ function isSortDir(value: string): value is SortDir {
 function parseImlFilter(raw: string | null): ImLFilter {
   const v = (raw ?? "").trim().toLowerCase();
   if (v === "1" || v === "true") return "iml";
-  if (v === "all") return "all";
-  // default: klasické (včetně chybějícího / is_iml=0)
-  return "classic";
+  if (v === "0" || v === "false") return "classic";
+  // default: Vše (chybějící / is_iml=all)
+  return "all";
 }
 
 function itemProducts(item: Item): Product[] {
