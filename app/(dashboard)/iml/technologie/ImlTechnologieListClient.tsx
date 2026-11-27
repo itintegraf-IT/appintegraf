@@ -193,41 +193,30 @@ export function ImlTechnologieListClient() {
                       className="border-b border-gray-100 hover:bg-gray-50"
                     >
                       {pi === 0 && (
-                        <td className="px-3 py-3 text-sm font-mono align-top" rowSpan={span}>
+                        <td className="px-3 py-3 text-sm align-top" rowSpan={span}>
                           <Link
                             href={`/iml/technologie/${item.id}`}
-                            className="text-gray-800 hover:text-red-700 hover:underline"
+                            className="font-mono font-medium text-red-700 hover:underline"
                           >
                             {item.code}
                           </Link>
                         </td>
                       )}
-                      <td className="px-3 py-3 align-top">
-                        <Link
-                          href={`/iml/technologie/${item.id}`}
-                          className="font-medium text-red-700 hover:underline"
-                        >
-                          {product.name || "—"}
-                        </Link>
+                      <td className="px-3 py-3 text-sm text-gray-800 align-top">
+                        {product.name || "—"}
                       </td>
-                      {pi === 0 && (
-                        <td className="px-3 py-3 text-sm text-gray-700 align-top" rowSpan={span}>
-                          {item.technologie_sheet_types?.name ?? "—"}
-                        </td>
-                      )}
+                      <td className="px-3 py-3 text-sm text-gray-700 align-top">
+                        {item.technologie_sheet_types?.name ?? "—"}
+                      </td>
                       <td className="px-3 py-3 text-sm text-gray-600 align-top">
                         {product.format_text ?? "—"}
                       </td>
-                      {pi === 0 && (
-                        <>
-                          <td className="px-3 py-3 text-sm text-gray-600 align-top" rowSpan={span}>
-                            {item.technologie_sheet_sizes?.name ?? "—"}
-                          </td>
-                          <td className="px-3 py-3 text-sm text-gray-600 align-top" rowSpan={span}>
-                            {item.shared_machines?.name ?? "—"}
-                          </td>
-                        </>
-                      )}
+                      <td className="px-3 py-3 text-sm text-gray-600 align-top">
+                        {item.technologie_sheet_sizes?.name ?? "—"}
+                      </td>
+                      <td className="px-3 py-3 text-sm text-gray-600 align-top">
+                        {item.shared_machines?.name ?? "—"}
+                      </td>
                       <td className="max-w-[160px] px-3 py-3 text-sm text-gray-500 align-top">
                         {truncateNote(product.note)}
                       </td>
