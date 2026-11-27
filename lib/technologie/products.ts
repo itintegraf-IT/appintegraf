@@ -59,7 +59,7 @@ export const technologieProductsInclude = {
     note: true,
     sort_order: true,
   },
-} as const;
+};
 
 /** Primární název / formát / poznámka z prvního produktu (pro kompatibilitu UI). */
 export function primaryProductFields(

@@ -22,7 +22,7 @@ const detailInclude = {
   technologie_die_cut_devices: { select: { id: true, name: true } },
   users_created_by: { select: { id: true, first_name: true, last_name: true } },
   technologie_products: technologieProductsInclude,
-} as const;
+};
 
 function serializeItem<T extends { technologie_products: Array<{ name: string; format_text: string | null; note: string | null }> }>(
   item: T
