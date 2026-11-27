@@ -82,7 +82,7 @@ export function CatalogAttachments({
   kind,
   recordId,
   canUpload = true,
-  title = "Přílohy (PDF / JPG / CAD)",
+  title = "Přílohy (PDF / CF2 / CAD)",
   onChanged,
 }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -167,8 +167,8 @@ export function CatalogAttachments({
       <div>
         <p className="mb-1 text-sm font-medium text-gray-700">{title}</p>
         <p className="text-xs text-gray-500">
-          Max. {IML_CATALOG_ATTACHMENT_MAX_FILES} · PDF / JPG / PNG / DXF / DWG / CAD ·{" "}
-          {IML_CATALOG_ATTACHMENT_MAX_MB} MB / soubor
+          Max. {IML_CATALOG_ATTACHMENT_MAX_FILES} souborů najednou · PDF, CAD .cf2 (Phoenix), DXF /
+          DWG, JPG / PNG · {IML_CATALOG_ATTACHMENT_MAX_MB} MB / soubor
         </p>
       </div>
 
@@ -185,7 +185,7 @@ export function CatalogAttachments({
             type="file"
             className="hidden"
             multiple
-            accept=".pdf,.jpg,.jpeg,.png,.dxf,.dwg,.cad,application/pdf,image/jpeg,image/png"
+            accept=".pdf,.cf2,.jpg,.jpeg,.png,.dxf,.dwg,.cad,application/pdf,image/jpeg,image/png"
             onChange={(e) => void uploadFiles(e.target.files)}
             disabled={uploading}
           />

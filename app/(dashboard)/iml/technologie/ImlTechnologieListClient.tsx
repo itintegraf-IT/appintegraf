@@ -5,6 +5,13 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Search, Wrench } from "lucide-react";
 
+type Product = {
+  id?: number;
+  name: string;
+  format_text: string | null;
+  note: string | null;
+};
+
 type Item = {
   id: number;
   code: string;
@@ -12,10 +19,16 @@ type Item = {
   format_text: string | null;
   note: string | null;
   preview_updated_at: string | null;
+  products?: Product[];
   technologie_sheet_types: { id: number; name: string } | null;
   technologie_sheet_sizes: { id: number; name: string } | null;
   shared_machines: { id: number; name: string } | null;
 };
+
+function itemProducts(item: Item): Product[] {
+  if (Array.isArray(item.products) && item.products.length > 0) return item.products;
+  return [{ name: item.name, format_text: item.format_text, note: item.note }];
+}
 
 function truncateNote(note: string | null, max = 48): string {
   const t = note?.trim() ?? "";
@@ -171,44 +184,61 @@ export function ImlTechnologieListClient() {
                   </td>
                 </tr>
               ) : (
-                items.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-3 py-3 text-sm font-mono">
-                      <Link
-                        href={`/iml/technologie/${item.id}`}
-                        className="text-gray-800 hover:text-red-700 hover:underline"
-                      >
-                        {item.code}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link
-                        href={`/iml/technologie/${item.id}`}
-                        className="font-medium text-red-700 hover:underline"
-                      >
-                        {item.name}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-700">
-                      {item.technologie_sheet_types?.name ?? "—"}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-600">
-                      {item.format_text ?? "—"}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-600">
-                      {item.technologie_sheet_sizes?.name ?? "—"}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-600">
-                      {item.shared_machines?.name ?? "—"}
-                    </td>
-                    <td className="max-w-[160px] px-3 py-3 text-sm text-gray-500">
-                      {truncateNote(item.note)}
-                    </td>
-                    <td className="px-3 py-3">
-                      <PreviewThumb id={item.id} updatedAt={item.preview_updated_at} />
-                    </td>
-                  </tr>
-                ))
+                items.flatMap((item) => {
+                  const products = itemProducts(item);
+                  const span = products.length;
+                  return products.map((product, pi) => (
+                    <tr
+                      key={`${item.id}-${product.id ?? pi}`}
+                      className="border-b border-gray-100 hover:bg-gray-50"
+                    >
+                      {pi === 0 && (
+                        <td className="px-3 py-3 text-sm font-mono align-top" rowSpan={span}>
+                          <Link
+                            href={`/iml/technologie/${item.id}`}
+                            className="text-gray-800 hover:text-red-700 hover:underline"
+                          >
+                            {item.code}
+                          </Link>
+                        </td>
+                      )}
+                      <td className="px-3 py-3 align-top">
+                        <Link
+                          href={`/iml/technologie/${item.id}`}
+                          className="font-medium text-red-700 hover:underline"
+                        >
+                          {product.name || "—"}
+                        </Link>
+                      </td>
+                      {pi === 0 && (
+                        <td className="px-3 py-3 text-sm text-gray-700 align-top" rowSpan={span}>
+                          {item.technologie_sheet_types?.name ?? "—"}
+                        </td>
+                      )}
+                      <td className="px-3 py-3 text-sm text-gray-600 align-top">
+                        {product.format_text ?? "—"}
+                      </td>
+                      {pi === 0 && (
+                        <>
+                          <td className="px-3 py-3 text-sm text-gray-600 align-top" rowSpan={span}>
+                            {item.technologie_sheet_sizes?.name ?? "—"}
+                          </td>
+                          <td className="px-3 py-3 text-sm text-gray-600 align-top" rowSpan={span}>
+                            {item.shared_machines?.name ?? "—"}
+                          </td>
+                        </>
+                      )}
+                      <td className="max-w-[160px] px-3 py-3 text-sm text-gray-500 align-top">
+                        {truncateNote(product.note)}
+                      </td>
+                      {pi === 0 && (
+                        <td className="px-3 py-3 align-top" rowSpan={span}>
+                          <PreviewThumb id={item.id} updatedAt={item.preview_updated_at} />
+                        </td>
+                      )}
+                    </tr>
+                  ));
+                })
               )}
             </tbody>
           </table>

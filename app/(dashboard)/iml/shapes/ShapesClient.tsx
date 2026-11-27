@@ -80,19 +80,7 @@ export function ShapesClient() {
   const [newTypeCode, setNewTypeCode] = useState("");
   const [newTypeName, setNewTypeName] = useState("");
   const [showAddType, setShowAddType] = useState(false);
-  const [workflowStep, setWorkflowStep] = useState<VysekyWorkflowStepId>("shapes");
-
-  useEffect(() => {
-    const syncHash = () => {
-      const h = window.location.hash.replace("#", "");
-      if (h === "vazby") setWorkflowStep("bindings");
-      else if (h === "nahledy") setWorkflowStep("previews");
-      else setWorkflowStep("shapes");
-    };
-    syncHash();
-    window.addEventListener("hashchange", syncHash);
-    return () => window.removeEventListener("hashchange", syncHash);
-  }, []);
+  const workflowStep: VysekyWorkflowStepId = "shapes";
 
   const typeLabel = (code: string) =>
     shapeTypes.find((t) => t.code === code)?.name ?? code;

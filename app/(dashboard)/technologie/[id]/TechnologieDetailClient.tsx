@@ -19,6 +19,13 @@ type FileRow = {
   users?: { first_name: string; last_name: string };
 };
 
+type Product = {
+  id?: number;
+  name: string;
+  format_text: string | null;
+  note: string | null;
+};
+
 type Item = {
   id: number;
   code: string;
@@ -28,6 +35,7 @@ type Item = {
   note: string | null;
   preview_updated_at: string | null;
   updated_at: string;
+  products?: Product[];
   technologie_sheet_types: { id: number; name: string } | null;
   technologie_sheet_sizes: { id: number; name: string } | null;
   shared_machines: { id: number; name: string; machine_group?: string } | null;
@@ -202,6 +210,11 @@ export function TechnologieDetailClient({
   const previewQ = item.preview_updated_at
     ? `?t=${encodeURIComponent(item.preview_updated_at)}`
     : "";
+  const products: Product[] =
+    Array.isArray(item.products) && item.products.length > 0
+      ? item.products
+      : [{ name: item.name, format_text: item.format_text, note: item.note }];
+  const titleNames = products.map((p) => p.name).filter(Boolean).join(", ");
 
   return (
     <div className="space-y-6">
@@ -217,7 +230,7 @@ export function TechnologieDetailClient({
           <h1 className="mt-2 text-2xl font-bold text-gray-900">
             <span className="font-mono text-lg text-gray-600">{item.code}</span>
             <span className="mx-2 text-gray-300">·</span>
-            {item.name}
+            {titleNames || item.name}
             {item.is_iml ? (
               <span className="ml-2 align-middle rounded bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700">
                 IML
@@ -269,10 +282,6 @@ export function TechnologieDetailClient({
             </dd>
           </div>
           <div>
-            <dt className="text-gray-500">Formát</dt>
-            <dd className="font-medium text-gray-900">{item.format_text ?? "—"}</dd>
-          </div>
-          <div>
             <dt className="text-gray-500">Velikost archu</dt>
             <dd className="font-medium text-gray-900">
               {item.technologie_sheet_sizes?.name ?? "—"}
@@ -294,11 +303,33 @@ export function TechnologieDetailClient({
             <dt className="text-gray-500">Technologie IML</dt>
             <dd className="font-medium text-gray-900">{item.is_iml ? "Ano" : "Ne"}</dd>
           </div>
-          <div className="sm:col-span-2">
-            <dt className="text-gray-500">Poznámka</dt>
-            <dd className="mt-1 whitespace-pre-wrap text-gray-800">{item.note?.trim() || "—"}</dd>
-          </div>
         </dl>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-3 text-sm font-semibold text-gray-800">Produkty na archu</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 text-left text-xs font-semibold uppercase text-gray-500">
+                <th className="pb-2 pr-3">Název</th>
+                <th className="pb-2 pr-3">Formát</th>
+                <th className="pb-2">Poznámka</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map((p, i) => (
+                <tr key={p.id ?? i} className="border-b border-gray-100">
+                  <td className="py-2 pr-3 font-medium text-gray-900">{p.name || "—"}</td>
+                  <td className="py-2 pr-3 text-gray-700">{p.format_text ?? "—"}</td>
+                  <td className="py-2 whitespace-pre-wrap text-gray-700">
+                    {p.note?.trim() || "—"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">

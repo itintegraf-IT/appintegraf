@@ -19,6 +19,12 @@ import { MachineSelectOptions } from "@/components/shared-machines/MachineSelect
 type SheetType = { id: number; name: string };
 type SheetSize = { id: number; name: string };
 type PrintMachine = { id: number; name: string; machine_group?: string };
+type Product = {
+  id?: number;
+  name: string;
+  format_text: string | null;
+  note: string | null;
+};
 type Item = {
   id: number;
   code: string;
@@ -28,11 +34,14 @@ type Item = {
   note: string | null;
   preview_updated_at: string | null;
   updated_at: string;
+  products?: Product[];
   technologie_sheet_types: { id: number; name: string } | null;
   technologie_sheet_sizes: { id: number; name: string } | null;
   shared_machines: { id: number; name: string; machine_group?: string } | null;
   technologie_die_cut_devices?: { id: number; name: string } | null;
 };
+
+type ImLFilter = "classic" | "iml" | "all";
 
 const SORT_KEYS = [
   "code",
@@ -55,6 +64,25 @@ function isSortDir(value: string): value is SortDir {
   return value === "asc" || value === "desc";
 }
 
+function parseImlFilter(raw: string | null): ImLFilter {
+  const v = (raw ?? "").trim().toLowerCase();
+  if (v === "1" || v === "true") return "iml";
+  if (v === "all") return "all";
+  // default: klasické (včetně chybějícího / is_iml=0)
+  return "classic";
+}
+
+function itemProducts(item: Item): Product[] {
+  if (Array.isArray(item.products) && item.products.length > 0) return item.products;
+  return [
+    {
+      name: item.name,
+      format_text: item.format_text,
+      note: item.note,
+    },
+  ];
+}
+
 function truncateNote(note: string | null, max = 48): string {
   const t = note?.trim() ?? "";
   if (!t) return "—";
@@ -62,15 +90,16 @@ function truncateNote(note: string | null, max = 48): string {
 }
 
 function sortValue(item: Item, key: SortKey): string {
+  const products = itemProducts(item);
   switch (key) {
     case "code":
       return item.code ?? "";
     case "name":
-      return item.name ?? "";
+      return products.map((p) => p.name).join(" ") || item.name || "";
     case "type":
       return item.technologie_sheet_types?.name ?? "";
     case "format":
-      return item.format_text ?? "";
+      return products.map((p) => p.format_text ?? "").join(" ") || item.format_text || "";
     case "sheet_size":
       return item.technologie_sheet_sizes?.name ?? "";
     case "machine":
@@ -78,7 +107,7 @@ function sortValue(item: Item, key: SortKey): string {
     case "die_cut":
       return item.technologie_die_cut_devices?.name ?? "";
     case "note":
-      return item.note?.trim() ?? "";
+      return products.map((p) => p.note?.trim() ?? "").join(" ") || item.note?.trim() || "";
   }
 }
 
@@ -172,9 +201,8 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
   const [printMachineId, setPrintMachineId] = useState(
     searchParams.get("print_machine_id") ?? ""
   );
-  const isImlParam = (searchParams.get("is_iml") ?? "").trim().toLowerCase();
-  const [onlyIml, setOnlyIml] = useState(
-    isImlParam === "1" || isImlParam === "true"
+  const [imlFilter, setImlFilter] = useState<ImLFilter>(() =>
+    parseImlFilter(searchParams.get("is_iml"))
   );
 
   const sortParam = searchParams.get("sort") ?? "";
@@ -192,9 +220,23 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
     if (sheetTypeId) sp.set("sheet_type_id", sheetTypeId);
     if (sheetSizeId) sp.set("sheet_size_id", sheetSizeId);
     if (printMachineId) sp.set("print_machine_id", printMachineId);
-    if (onlyIml) sp.set("is_iml", "1");
+    if (imlFilter === "iml") sp.set("is_iml", "1");
+    else if (imlFilter === "classic") sp.set("is_iml", "0");
+    else sp.set("is_iml", "all");
     return sp.toString();
-  }, [q, sheetTypeId, sheetSizeId, printMachineId, onlyIml]);
+  }, [q, sheetTypeId, sheetSizeId, printMachineId, imlFilter]);
+
+  const apiQueryString = useMemo(() => {
+    const sp = new URLSearchParams();
+    if (q.trim()) sp.set("q", q.trim());
+    if (sheetTypeId) sp.set("sheet_type_id", sheetTypeId);
+    if (sheetSizeId) sp.set("sheet_size_id", sheetSizeId);
+    if (printMachineId) sp.set("print_machine_id", printMachineId);
+    if (imlFilter === "iml") sp.set("is_iml", "1");
+    else if (imlFilter === "classic") sp.set("is_iml", "0");
+    // "all" → bez is_iml
+    return sp.toString();
+  }, [q, sheetTypeId, sheetSizeId, printMachineId, imlFilter]);
 
   const urlQueryString = useMemo(() => {
     const sp = new URLSearchParams(filterQueryString);
@@ -210,7 +252,7 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
     setError("");
     try {
       const [rItems, rTypes, rSizes, rMach] = await Promise.all([
-        fetch(`/api/technologie${filterQueryString ? `?${filterQueryString}` : ""}`),
+        fetch(`/api/technologie${apiQueryString ? `?${apiQueryString}` : ""}`),
         fetch("/api/technologie/sheet-types"),
         fetch("/api/technologie/sheet-sizes"),
         fetch("/api/shared-machines"),
@@ -244,7 +286,7 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, [filterQueryString]);
+  }, [apiQueryString]);
 
   useEffect(() => {
     void load();
@@ -275,7 +317,12 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
   };
 
   const onDelete = async (item: Item) => {
-    if (!confirm(`Trvale smazat rozkres „${item.code} – ${item.name}“ včetně PDF?`)) {
+    const label =
+      itemProducts(item)
+        .map((p) => p.name)
+        .filter(Boolean)
+        .join(", ") || item.name;
+    if (!confirm(`Trvale smazat rozkres „${item.code} – ${label}“ včetně PDF?`)) {
       return;
     }
     setDeletingId(item.id);
@@ -331,7 +378,7 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
       </div>
 
       <form
-        className="mb-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-4"
+        className="mb-4 grid gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:grid-cols-2 lg:grid-cols-5"
         onSubmit={(e) => {
           e.preventDefault();
           void load();
@@ -390,14 +437,17 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
             <MachineSelectOptions machines={printMachines} />
           </select>
         </label>
-        <label className="flex items-end gap-2 pb-2 text-sm sm:col-span-2 lg:col-span-1">
-          <input
-            type="checkbox"
-            checked={onlyIml}
-            onChange={(e) => setOnlyIml(e.target.checked)}
-            className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
-          />
-          <span className="text-gray-700">Jen IML</span>
+        <label className="block text-sm">
+          <span className="mb-1 block text-gray-600">Zobrazení</span>
+          <select
+            value={imlFilter}
+            onChange={(e) => setImlFilter(e.target.value as ImLFilter)}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+          >
+            <option value="classic">Klasické</option>
+            <option value="iml">IML</option>
+            <option value="all">Vše</option>
+          </select>
         </label>
       </form>
 
@@ -488,77 +538,96 @@ export function TechnologieListClient({ canWrite }: { canWrite: boolean }) {
                   </td>
                 </tr>
               ) : (
-                displayedItems.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="px-3 py-3 text-sm font-mono">
-                      <Link
-                        href={`/technologie/${item.id}`}
-                        className="text-gray-800 hover:text-red-700 hover:underline"
-                      >
-                        {item.code}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Link
-                        href={`/technologie/${item.id}`}
-                        className="font-medium text-red-700 hover:underline"
-                      >
-                        {item.name}
-                      </Link>
-                      {item.is_iml ? (
-                        <span className="ml-2 inline-block rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700">
-                          IML
-                        </span>
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-700">
-                      {item.technologie_sheet_types?.name ?? "—"}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-600">{item.format_text ?? "—"}</td>
-                    <td className="px-3 py-3 text-sm text-gray-600">
-                      {item.technologie_sheet_sizes?.name ?? "—"}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-600">
-                      {item.shared_machines?.name ?? "—"}
-                    </td>
-                    <td className="px-3 py-3 text-sm text-gray-600">
-                      {item.technologie_die_cut_devices?.name ?? "—"}
-                    </td>
-                    <td className="max-w-[160px] px-3 py-3 text-sm text-gray-500">
-                      {truncateNote(item.note)}
-                    </td>
-                    <td className="px-3 py-3">
-                      <TechnologiePreviewThumb
-                        id={item.id}
-                        updatedAt={item.preview_updated_at}
-                      />
-                    </td>
-                    {canWrite && (
-                      <td className="px-3 py-3 text-right">
-                        <div className="inline-flex flex-wrap justify-end gap-1">
+                displayedItems.flatMap((item) => {
+                  const products = itemProducts(item);
+                  const span = products.length;
+                  return products.map((product, pi) => (
+                    <tr
+                      key={`${item.id}-${product.id ?? pi}`}
+                      className="border-b border-gray-100 hover:bg-gray-50"
+                    >
+                      {pi === 0 && (
+                        <td className="px-3 py-3 text-sm font-mono align-top" rowSpan={span}>
                           <Link
-                            href={`/technologie/${item.id}/edit`}
-                            className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
-                            title="Upravit"
+                            href={`/technologie/${item.id}`}
+                            className="text-gray-800 hover:text-red-700 hover:underline"
                           >
-                            <Pencil className="h-3.5 w-3.5" />
-                            Upravit
+                            {item.code}
                           </Link>
-                          <button
-                            type="button"
-                            onClick={() => void onDelete(item)}
-                            disabled={deletingId === item.id}
-                            className="inline-flex items-center gap-1 rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
-                            title="Smazat"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            {deletingId === item.id ? "…" : "Smazat"}
-                          </button>
-                        </div>
+                          {item.is_iml ? (
+                            <span className="mt-1 block rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-700 w-fit">
+                              IML
+                            </span>
+                          ) : null}
+                        </td>
+                      )}
+                      <td className="px-3 py-3 align-top">
+                        <Link
+                          href={`/technologie/${item.id}`}
+                          className="font-medium text-red-700 hover:underline"
+                        >
+                          {product.name || "—"}
+                        </Link>
                       </td>
-                    )}
-                  </tr>
-                ))
+                      {pi === 0 && (
+                        <td className="px-3 py-3 text-sm text-gray-700 align-top" rowSpan={span}>
+                          {item.technologie_sheet_types?.name ?? "—"}
+                        </td>
+                      )}
+                      <td className="px-3 py-3 text-sm text-gray-600 align-top">
+                        {product.format_text ?? "—"}
+                      </td>
+                      {pi === 0 && (
+                        <>
+                          <td className="px-3 py-3 text-sm text-gray-600 align-top" rowSpan={span}>
+                            {item.technologie_sheet_sizes?.name ?? "—"}
+                          </td>
+                          <td className="px-3 py-3 text-sm text-gray-600 align-top" rowSpan={span}>
+                            {item.shared_machines?.name ?? "—"}
+                          </td>
+                          <td className="px-3 py-3 text-sm text-gray-600 align-top" rowSpan={span}>
+                            {item.technologie_die_cut_devices?.name ?? "—"}
+                          </td>
+                        </>
+                      )}
+                      <td className="max-w-[160px] px-3 py-3 text-sm text-gray-500 align-top">
+                        {truncateNote(product.note)}
+                      </td>
+                      {pi === 0 && (
+                        <td className="px-3 py-3 align-top" rowSpan={span}>
+                          <TechnologiePreviewThumb
+                            id={item.id}
+                            updatedAt={item.preview_updated_at}
+                          />
+                        </td>
+                      )}
+                      {canWrite && pi === 0 && (
+                        <td className="px-3 py-3 text-right align-top" rowSpan={span}>
+                          <div className="inline-flex flex-wrap justify-end gap-1">
+                            <Link
+                              href={`/technologie/${item.id}/edit`}
+                              className="inline-flex items-center gap-1 rounded border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50"
+                              title="Upravit"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                              Upravit
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => void onDelete(item)}
+                              disabled={deletingId === item.id}
+                              className="inline-flex items-center gap-1 rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                              title="Smazat"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                              {deletingId === item.id ? "…" : "Smazat"}
+                            </button>
+                          </div>
+                        </td>
+                      )}
+                    </tr>
+                  ));
+                })
               )}
             </tbody>
           </table>

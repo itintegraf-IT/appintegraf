@@ -211,7 +211,7 @@ export function ShapeExtrasPanel({
         Detail tvaru {shapeCode}: přílohy, zákazníci a materiálová matice
       </p>
       <p className="rounded border border-violet-200 bg-white/80 px-2 py-1 text-[11px] text-violet-800">
-        Krok 5 — Náhledy: nahrajte výkres / PDF kontury níže.
+        Přílohy tvaru: nahrajte výkres / PDF kontury níže.
       </p>
 
       <div id="nahledy">

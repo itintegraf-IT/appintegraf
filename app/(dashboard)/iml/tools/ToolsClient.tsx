@@ -2,6 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { FileText } from "lucide-react";
 import {
   IML_TOOL_STATUSES,
   IML_TOOL_STATUS_LABELS,
@@ -25,6 +26,10 @@ type ToolRow = {
   note: string | null;
   products_count: number;
   shapes_count: number;
+  attachments_count?: number;
+  preview_file_id?: number | null;
+  preview_mime_type?: string | null;
+  preview_filename?: string | null;
   impositions: Array<{
     id: number;
     imposition_code: string;
@@ -244,6 +249,7 @@ export function ToolsClient() {
               <th className="px-3 py-2">Stroj</th>
               <th className="px-3 py-2">Stav</th>
               <th className="px-3 py-2">Montáže</th>
+              <th className="px-3 py-2">Příloha</th>
               <th className="px-3 py-2">Akce</th>
             </tr>
           </thead>
@@ -267,6 +273,32 @@ export function ToolsClient() {
                       : row.impositions
                           .map((i) => `${i.imposition_code} (${i.positions_count})`)
                           .join(", ")}
+                  </td>
+                  <td className="px-3 py-2">
+                    {(row.attachments_count ?? 0) > 0 ? (
+                      <button
+                        type="button"
+                        title="Otevřít přílohy (PDF / CF2 …)"
+                        className="inline-flex items-center gap-1 rounded border border-gray-200 px-2 py-1 text-violet-700 hover:bg-violet-50"
+                        onClick={() =>
+                          setDetailToolId((id) => (id === row.id ? null : row.id))
+                        }
+                      >
+                        <FileText className="h-4 w-4" />
+                        {(row.attachments_count ?? 0) > 1 ? (
+                          <span className="text-xs">{row.attachments_count}</span>
+                        ) : null}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        title="Nahrát přílohy"
+                        className="text-xs text-gray-400 hover:text-violet-700 hover:underline"
+                        onClick={() => setDetailToolId(row.id)}
+                      >
+                        —
+                      </button>
+                    )}
                   </td>
                   <td className="px-3 py-2 space-x-2 whitespace-nowrap">
                     <button
@@ -306,11 +338,12 @@ export function ToolsClient() {
                 </tr>
                 {detailToolId === row.id && (
                   <tr className="border-b border-gray-100">
-                    <td colSpan={7} className="bg-violet-50/40 px-3 py-3">
+                    <td colSpan={8} className="bg-violet-50/40 px-3 py-3">
                       <CatalogAttachments
                         kind="tool"
                         recordId={row.id}
-                        title="Přílohy výkresu archu (PDF / JPG / CAD)"
+                        title="Přílohy výkresu archu (PDF / CF2 / CAD)"
+                        onChanged={() => void load()}
                       />
                     </td>
                   </tr>
@@ -319,7 +352,7 @@ export function ToolsClient() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-gray-500">
+                <td colSpan={8} className="px-3 py-8 text-center text-gray-500">
                   Žádné nástroje
                 </td>
               </tr>

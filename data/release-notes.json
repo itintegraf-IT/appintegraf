@@ -1,6 +1,33 @@
 {
   "releases": [
     {
+      "id": "2026-11-27-kiosk-makety-technologie-vyseky",
+      "date": "2026-11-27",
+      "title": "Aktualizace systému (26.–27. 11. 2026) — kiosk, makety, technologie a výseky",
+      "items": [
+        {
+          "modules": ["kiosk"],
+          "text": "Kiosk: veřejný player pro Raspberry Pi bez přihlášení (/public/kiosk/[token]); média se servírují přes API (oprava 404 v produkci), limit 25 MB."
+        },
+        {
+          "modules": ["kiosk"],
+          "text": "Kiosk: kopírování URL funguje i na HTTP; u jednotlivých snímků lze zapnout/vypnout zobrazení."
+        },
+        {
+          "modules": ["makety"],
+          "text": "Makety: připomínky finálního schválení po softproofu klienta — trvalý úkol v UI a notifikace v nastavitelném intervalu (výchozí 24 h), dokud chybí finále."
+        },
+        {
+          "modules": ["technologie"],
+          "text": "Technologie: u jednoho kódu rozkresu lze zadat více produktů (název, formát, poznámka); společný zůstává stroj, arch, typ a výsek. Filtr Klasické / IML / Vše."
+        },
+        {
+          "modules": ["iml"],
+          "text": "IML Výseky: postup zjednodušen na 3 kroky (tvar → nástroj → montáž). U nástrojů multi přílohy včetně CAD .cf2 z Phoenixu a sloupec Příloha."
+        }
+      ]
+    },
+    {
       "id": "2026-11-26-vyseky",
       "date": "2026-11-26",
       "title": "Aktualizace systému (24.–26. 11. 2026) — výseky a technologie",

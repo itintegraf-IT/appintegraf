@@ -32,7 +32,7 @@ export default async function ImVysekyHubPage() {
         <p className="mt-1 max-w-2xl text-gray-600">
           Vyplňujte v tomto pořadí — každý krok potřebuje data z předchozího:{" "}
           <span className="font-medium text-gray-800">
-            tvar → nástroj → vazby → montáž → náhledy
+            tvar → nástroj → montáž
           </span>
           .
         </p>

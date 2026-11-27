@@ -94,11 +94,9 @@ Modul IML poskytuje:
 
 Katalog výseků má hub **`/iml/vyseky`** s očíslovaným postupem:
 
-1. **Tvary** (`/iml/shapes`) — kód a rozměry etikety  
-2. **Nástroje** (`/iml/tools`) — železo / planžeta  
-3. **Vazby** — PRIMARY / ALT nástroj k tvaru  
-4. **Montáže** (`/iml/impositions`) — arch, tiskový stroj, výsek/zařízení, užitky; řezání bez nástroje; vazba na Technologie  
-5. **Náhledy** — přílohy u tvaru  
+1. **Tvary** (`/iml/shapes`) — kód a rozměry etikety (vazby a přílohy zůstávají u tvaru)  
+2. **Nástroje** (`/iml/tools`) — železo / planžeta; multi přílohy PDF / CAD `.cf2`  
+3. **Montáže** (`/iml/impositions`) — arch, tiskový stroj, výsek/zařízení, užitky; řezání bez nástroje; vazba na Technologie  
 
 Uživatelský návod: [`IML_VYSEKY.md`](IML_VYSEKY.md) (nápověda `/help/iml-vyseky`).
 

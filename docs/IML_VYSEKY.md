@@ -2,17 +2,15 @@
 
 Návod k vyplnění tvarů, nástrojů a montáží. Vstupní bod: **[/iml/vyseky](/iml/vyseky)**.
 
-## Postup vyplnění (1–5)
+## Postup vyplnění (1–3)
 
 Vyplňujte v tomto pořadí — každý krok potřebuje data z předchozího:
 
 | Krok | Co | Cesta | Poznámka |
 |------|-----|--------|----------|
-| 1 | **Tvary** | `/iml/shapes` | Kód a rozměry etikety (Š × V) |
-| 2 | **Nástroje** | `/iml/tools` | Železo / planžeta (u řezání lze nástroj u montáže vynechat) |
-| 3 | **Vazby** | `/iml/shapes` → vazby | PRIMARY / ALT přiřazení nástroje k tvaru |
-| 4 | **Montáže** | `/iml/impositions` | Formát archu, zařízení, užitky, primární montáž |
-| 5 | **Náhledy** | detail tvaru | Výkresy / PDF u tvaru |
+| 1 | **Tvary** | `/iml/shapes` | Kód a rozměry etikety (Š × V); vazby a přílohy zůstávají u tvaru |
+| 2 | **Nástroje** | `/iml/tools` | Železo / planžeta; multi přílohy PDF / CAD `.cf2` (Phoenix) |
+| 3 | **Montáže** | `/iml/impositions` | Formát archu, zařízení, užitky, primární montáž |
 
 Stejná očíslovaná navigace je i na stránkách tvarů, nástrojů a montáží.
 

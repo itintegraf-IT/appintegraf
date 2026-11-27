@@ -18,8 +18,25 @@ export default async function TechnologieEditPage({
   const id = parseInt((await params).id, 10);
   if (Number.isNaN(id)) notFound();
 
-  const row = await prisma.technologie.findUnique({ where: { id } });
+  const row = await prisma.technologie.findUnique({
+    where: { id },
+    include: {
+      technologie_products: {
+        orderBy: [{ sort_order: "asc" }, { id: "asc" }],
+        select: { name: true, format_text: true, note: true },
+      },
+    },
+  });
   if (!row) notFound();
+
+  const products =
+    row.technologie_products.length > 0
+      ? row.technologie_products.map((p) => ({
+          name: p.name,
+          format_text: p.format_text ?? "",
+          note: p.note ?? "",
+        }))
+      : [{ name: "", format_text: "", note: "" }];
 
   return (
     <TechnologieForm
@@ -27,14 +44,12 @@ export default async function TechnologieEditPage({
       id={id}
       initial={{
         code: row.code,
-        name: row.name,
         sheet_type_id: row.sheet_type_id != null ? String(row.sheet_type_id) : "",
-        format_text: row.format_text ?? "",
         sheet_size_id: row.sheet_size_id != null ? String(row.sheet_size_id) : "",
         print_machine_id: row.print_machine_id != null ? String(row.print_machine_id) : "",
         die_cut_device_id: row.die_cut_device_id != null ? String(row.die_cut_device_id) : "",
         is_iml: row.is_iml === true,
-        note: row.note ?? "",
+        products,
       }}
     />
   );

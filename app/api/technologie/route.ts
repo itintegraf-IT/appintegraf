@@ -11,6 +11,11 @@ import {
   parseOptionalSheetSizeId,
   parseOptionalSheetTypeId,
 } from "@/lib/technologie/parse-body";
+import {
+  parseTechnologieProducts,
+  primaryProductFields,
+  technologieProductsInclude,
+} from "@/lib/technologie/products";
 import type { Prisma } from "@prisma/client";
 
 const listInclude = {
@@ -19,7 +24,21 @@ const listInclude = {
   shared_machines: { select: { id: true, name: true, machine_group: true } },
   technologie_die_cut_devices: { select: { id: true, name: true } },
   users_created_by: { select: { id: true, first_name: true, last_name: true } },
+  technologie_products: technologieProductsInclude,
 } as const;
+
+function serializeItem<T extends { technologie_products: Array<{ name: string; format_text: string | null; note: string | null }> }>(
+  item: T
+) {
+  const primary = primaryProductFields(item.technologie_products);
+  return {
+    ...item,
+    name: primary.name,
+    format_text: primary.format_text,
+    note: primary.note,
+    products: item.technologie_products,
+  };
+}
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -43,8 +62,8 @@ export async function GET(req: NextRequest) {
   if (q) {
     where.OR = [
       { code: { contains: q } },
-      { name: { contains: q } },
-      { format_text: { contains: q } },
+      { technologie_products: { some: { name: { contains: q } } } },
+      { technologie_products: { some: { format_text: { contains: q } } } },
     ];
   }
   if (Number.isFinite(sheetTypeId) && sheetTypeId > 0) {
@@ -65,13 +84,13 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const items = await prisma.technologie.findMany({
+    const rows = await prisma.technologie.findMany({
       where,
       orderBy: { updated_at: "desc" },
       take: 200,
       include: listInclude,
     });
-    return NextResponse.json({ items });
+    return NextResponse.json({ items: rows.map(serializeItem) });
   } catch (e) {
     console.error("technologie GET:", e);
     return NextResponse.json({ error: "Chyba při načítání" }, { status: 500 });
@@ -90,14 +109,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
+    const body = (await req.json()) as Record<string, unknown>;
     const code = typeof body.code === "string" ? body.code.trim() : "";
-    const name = typeof body.name === "string" ? body.name.trim() : "";
     if (!code) {
       return NextResponse.json({ error: "Vyplňte kód." }, { status: 400 });
     }
-    if (!name) {
-      return NextResponse.json({ error: "Vyplňte název." }, { status: 400 });
+
+    const productsParsed = parseTechnologieProducts(body);
+    if (!productsParsed.ok) {
+      return NextResponse.json({ error: productsParsed.error }, { status: 400 });
     }
 
     const existingCode = await prisma.technologie.findUnique({
@@ -125,28 +145,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: dieCutDevice.error }, { status: 400 });
     }
 
-    const format_text =
-      typeof body.format_text === "string" ? body.format_text.trim().slice(0, 64) || null : null;
-    const note = typeof body.note === "string" ? body.note.trim() || null : null;
     const is_iml = body.is_iml === true || body.is_iml === 1 || body.is_iml === "1";
 
     const item = await prisma.technologie.create({
       data: {
         code: code.slice(0, 32),
-        name: name.slice(0, 255),
         sheet_type_id: sheetType.value,
         sheet_size_id: sheetSize.value,
         print_machine_id: printMachine.value,
         die_cut_device_id: dieCutDevice.value,
-        format_text,
         is_iml,
-        note,
         created_by: userId,
+        technologie_products: {
+          create: productsParsed.products.map((p) => ({
+            name: p.name,
+            format_text: p.format_text,
+            note: p.note,
+            sort_order: p.sort_order,
+          })),
+        },
       },
       include: listInclude,
     });
 
-    return NextResponse.json({ item });
+    return NextResponse.json({ item: serializeItem(item) });
   } catch (e) {
     console.error("technologie POST:", e);
     return NextResponse.json({ error: "Chyba při ukládání" }, { status: 500 });

@@ -130,8 +130,10 @@ export const BACKUP_MODULES: Record<BackupModuleId, BackupModuleDef> = {
     dependsOn: ["system"],
     tables: [
       prisma("technologie"),
+      prisma("technologie_products"),
       prisma("technologie_sheet_types"),
       prisma("technologie_sheet_sizes"),
+      prisma("technologie_die_cut_devices"),
       prisma("shared_machines"),
       prisma("file_uploads"),
     ],

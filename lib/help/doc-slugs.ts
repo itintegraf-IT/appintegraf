@@ -56,7 +56,7 @@ export const HELP_DOC_SLUGS: Record<
   },
   "iml-vyseky": {
     file: "IML_VYSEKY.md",
-    title: "IML – katalog výseků (postup 1–5)",
+    title: "IML – katalog výseků (postup 1–3)",
   },
   "iml-newsec": {
     file: "IML_NEWSEC_IMPLEMENTATION.md",

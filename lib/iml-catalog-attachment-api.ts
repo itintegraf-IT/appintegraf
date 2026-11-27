@@ -134,7 +134,7 @@ export async function handleCatalogAttachmentsPost(
   const mime = file.type || "application/octet-stream";
   if (!isAllowedCatalogAttachment(file.name, mime)) {
     return NextResponse.json(
-      { error: "Nepovolený typ (PDF, JPG, PNG, DXF, DWG, CAD)." },
+      { error: "Nepovolený typ (PDF, CF2, JPG, PNG, DXF, DWG, CAD)." },
       { status: 400 }
     );
   }

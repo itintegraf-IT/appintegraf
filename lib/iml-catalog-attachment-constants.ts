@@ -10,6 +10,7 @@ export const IML_CATALOG_ATTACHMENT_MAX_MB =
 
 export const IML_CATALOG_ATTACHMENT_EXTENSIONS = new Set([
   ".pdf",
+  ".cf2",
   ".dxf",
   ".dwg",
   ".cad",
@@ -67,6 +68,7 @@ export function mimeForCatalogAttachment(
   const m = String(mime ?? "").trim();
   if (m && m !== "application/octet-stream") return m.slice(0, 100);
   if (ext === ".pdf") return "application/pdf";
+  if (ext === ".cf2") return "application/octet-stream";
   if (ext === ".dxf") return "application/dxf";
   if (ext === ".dwg") return "application/dwg";
   if (ext === ".cad") return "application/octet-stream";

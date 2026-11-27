@@ -13,11 +13,14 @@ Modul klíč: `technologie` (Admin → uživatelé).
 
 ## Datový model
 
-- **`technologie`** – kód (unikátní), název, typ archu, formát, velikost archu, tiskový stroj, poznámka, `preview_updated_at`
+- **`technologie`** – hlavička rozkresu: kód (unikátní), typ archu, velikost archu, tiskový stroj, výsek, `is_iml`, `preview_updated_at`
+- **`technologie_products`** – produktové řádky pod kódem: `name`, `format_text`, `note` (např. počet kusů na archu), `sort_order`
 - **`technologie_sheet_types`** – číselník typů archu (volný list, V1, …) – jen Technologie
 - **`technologie_sheet_sizes`** – číselník velikostí archu (1020x720, 1000x700, …) – jen Technologie
 - **`shared_machines`** – **společný** číselník strojů s modulem Výkresy (`machine_group`: `press` \| `postpress`)
-- **`file_uploads`** – `module = technologie`, `document_type`: `pdf` \| `thumbnail`
+- **`file_uploads`** – `module = technologie`, `document_type`: `pdf` \| `thumbnail` (jeden PDF na kód)
+
+Jeden kód = společná technologie (stroj/arch/výsek/IML/PDF) + **N produktů** (název / formát / poznámka).
 
 Soubory: `public/uploads/technologie/`. Limit PDF 50 MB.
 
@@ -25,12 +28,13 @@ Soubory: `public/uploads/technologie/`. Limit PDF 50 MB.
 
 | Cesta | Popis |
 |-------|--------|
-| `/technologie` | Seznam + filtry |
-| `/technologie/new` | Nový rozkres |
-| `/technologie/[id]` | Detail + upload PDF |
-| `/technologie/[id]/edit` | Úprava metadat |
+| `/technologie` | Seznam + filtry; výchozí zobrazení **Klasické**, volitelně IML / Vše |
+| `/technologie/new` | Nový rozkres (společná pole + tabulka produktů) |
+| `/technologie/[id]` | Detail + produkty + upload PDF |
+| `/technologie/[id]/edit` | Úprava hlavičky a produktů |
 | `/technologie/ciselniky` | Typy archů, velikosti archů + odkaz na společné stroje |
 | `/stroje` | Společný číselník strojů (Press / Postpress) |
+| `/iml/technologie` | Read-only seznam IML rozkresů |
 
 Náhled v seznamu: `GET /api/technologie/[id]/preview` (JPEG). PDF inline: `GET /api/technologie/[id]/files/[fileId]?inline=1`.
 
@@ -40,7 +44,7 @@ Stroje API: `GET/POST /api/shared-machines` (alias `/api/technologie/print-machi
 
 Číselník výsekových zařízení (mimo jiné **Příklop**, **Řezačka**) se používá v Technologii i v **IML montážích** (`/iml/impositions`).
 
-- Katalog výseků IML a postup 1–5: [`IML_VYSEKY.md`](IML_VYSEKY.md) / nápověda `/help/iml-vyseky`
+- Katalog výseků IML a postup 1–3: [`IML_VYSEKY.md`](IML_VYSEKY.md) / nápověda `/help/iml-vyseky`
 - Montáž může mít hlavičku (arch, tiskový stroj, výsek), tabulku užitků a režim řezání bez nástroje
 
 ## Migrace
