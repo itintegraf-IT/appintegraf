@@ -26,6 +26,10 @@ export const HELP_DOC_SLUGS: Record<
     file: "MODUL_MAJETEK_POZADAVKY.md",
     title: "Majetek – požadavky na techniku",
   },
+  "modul-it-vendor-requests": {
+    file: "MODUL_IT_VENDOR_REQUESTS.md",
+    title: "IT požadavky – externí dodavatelé",
+  },
   "modul-ukoly": {
     file: "MODUL_UKOLY.md",
     title: "Modul Úkoly – dokumentace",

@@ -1196,3 +1196,184 @@ ${ipLine}
     return { success: false, error: msg };
   }
 }
+
+export type SendItVendorRequestLinkEmailParams = {
+  toEmail: string;
+  toName: string;
+  requestNumber: string;
+  projectName: string | null;
+  dueDate: string | null;
+  pageUrl: string;
+  message?: string | null;
+};
+
+/** Odkaz pro externího dodavatele k vyplnění IT síťového formuláře. */
+export async function sendItVendorRequestLinkEmail(
+  params: SendItVendorRequestLinkEmailParams
+): Promise<{ success: boolean; error?: string }> {
+  const settings = await getEmailSettings();
+  if (!settings.enabled) return { success: true };
+
+  if (!settings.user || !settings.password || !settings.from) {
+    return {
+      success: false,
+      error: "E-mail není nakonfigurován (chybí SMTP údaje nebo odesílatel)",
+    };
+  }
+
+  const projectLine = params.projectName
+    ? `<p><strong>Projekt / technologie:</strong> ${escHtml(params.projectName)}</p>`
+    : "";
+  const dueLine = params.dueDate
+    ? `<p><strong>Požadovaný termín:</strong> ${escHtml(params.dueDate)}</p>`
+    : "";
+  const extra = params.message?.trim()
+    ? `<p>${escHtml(params.message.trim()).replace(/\n/g, "<br>")}</p>`
+    : "";
+
+  const subject = `INTEGRAF – IT požadavky ${params.requestNumber}`;
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333;">
+  <p>Dobrý den, ${escHtml(params.toName || "kolego")},</p>
+  <p>společnost INTEGRAF Vás žádá o vyplnění formuláře IT požadavků pro připojení / servis technologie.</p>
+  <p><strong>Evidenční číslo:</strong> ${escHtml(params.requestNumber)}</p>
+  ${projectLine}
+  ${dueLine}
+  ${extra}
+  <p>Formulář (4 sekce) vyplňte a odešlete prostřednictvím tohoto odkazu (platnost 30 dní). IP adresy a VLAN přidělí IT — uvádějte jen požadavky a porty.</p>
+  <p><a href="${escHtml(params.pageUrl)}" style="display:inline-block;background:#dc2626;color:#fff;padding:10px 16px;border-radius:6px;text-decoration:none;">Otevřít formulář</a></p>
+  <p style="font-size:12px;color:#666;">Pokud tlačítko nefunguje, zkopírujte odkaz:<br>${escHtml(params.pageUrl)}</p>
+  <p>Odkaz umožňuje pouze vyplnění tohoto formuláře – nemáte přístup do zbytku aplikace.</p>
+  <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+  <p style="color: #999; font-size: 11px;">Tento e-mail byl odeslán automaticky z aplikace INTEGRAF.</p>
+</body>
+</html>
+  `.trim();
+
+  const text = [
+    `Dobrý den, ${params.toName || "kolego"},`,
+    `INTEGRAF – formulář IT požadavků ${params.requestNumber}.`,
+    params.projectName ? `Projekt: ${params.projectName}` : null,
+    params.dueDate ? `Termín: ${params.dueDate}` : null,
+    params.message?.trim() || null,
+    `Odkaz: ${params.pageUrl}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  try {
+    const transporter = withTestMailPolicy(
+      nodemailer.createTransport({
+        host: settings.host,
+        port: settings.port,
+        secure: settings.secure,
+        auth: { user: settings.user, pass: settings.password },
+        tls:
+          settings.host.includes("office365") || settings.host.includes("outlook")
+            ? { ciphers: "SSLv3", rejectUnauthorized: false }
+            : undefined,
+      })
+    );
+
+    await transporter.sendMail({
+      from: settings.fromName ? `"${settings.fromName}" <${settings.from}>` : settings.from,
+      to: params.toEmail,
+      subject,
+      text,
+      html,
+    });
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("sendItVendorRequestLinkEmail error:", msg);
+    return { success: false, error: msg };
+  }
+}
+
+export type SendItVendorReportEmailParams = {
+  toEmail: string;
+  toName: string;
+  requestNumber: string;
+  projectName: string | null;
+  reportHtml: string;
+  approved: boolean;
+};
+
+/** HTML report přidělené sítě pro externího dodavatele. */
+export async function sendItVendorReportEmail(
+  params: SendItVendorReportEmailParams
+): Promise<{ success: boolean; error?: string }> {
+  const settings = await getEmailSettings();
+  if (!settings.enabled) return { success: true };
+
+  if (!settings.user || !settings.password || !settings.from) {
+    return {
+      success: false,
+      error: "E-mail není nakonfigurován (chybí SMTP údaje nebo odesílatel)",
+    };
+  }
+
+  const previewNote = params.approved
+    ? ""
+    : `<p style="background:#fffbeb;border:1px solid #fcd34d;padding:10px 12px;border-radius:6px;color:#92400e">Poznámka: požadavek ještě není ve stavu schváleno – zasíláme aktuální náhled.</p>`;
+
+  const subject = `INTEGRAF – IT síťový report ${params.requestNumber}`;
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: Arial, sans-serif; line-height: 1.5; color: #333; max-width: 900px; margin: 0 auto; padding: 16px;">
+  <p>Dobrý den, ${escHtml(params.toName || "kolego")},</p>
+  <p>zasíláme přehled přidělených síťových parametrů k požadavku <strong>${escHtml(params.requestNumber)}</strong>${
+    params.projectName ? ` (${escHtml(params.projectName)})` : ""
+  }.</p>
+  ${previewNote}
+  ${params.reportHtml}
+  <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+  <p style="color: #999; font-size: 11px;">Tento e-mail byl odeslán automaticky z aplikace INTEGRAF.</p>
+</body>
+</html>
+  `.trim();
+
+  const text = [
+    `Dobrý den, ${params.toName || "kolego"},`,
+    `INTEGRAF – IT síťový report ${params.requestNumber}.`,
+    params.projectName ? `Projekt: ${params.projectName}` : null,
+    "Podrobnosti jsou v HTML části e-mailu (tabulky zařízení, IP a firewall).",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+
+  try {
+    const transporter = withTestMailPolicy(
+      nodemailer.createTransport({
+        host: settings.host,
+        port: settings.port,
+        secure: settings.secure,
+        auth: { user: settings.user, pass: settings.password },
+        tls:
+          settings.host.includes("office365") || settings.host.includes("outlook")
+            ? { ciphers: "SSLv3", rejectUnauthorized: false }
+            : undefined,
+      })
+    );
+
+    await transporter.sendMail({
+      from: settings.fromName ? `"${settings.fromName}" <${settings.from}>` : settings.from,
+      to: params.toEmail,
+      subject,
+      text,
+      html,
+    });
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("sendItVendorReportEmail error:", msg);
+    return { success: false, error: msg };
+  }
+}
+
+

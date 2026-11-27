@@ -493,6 +493,13 @@ const navItems: NavItem[] = [
   },
   { href: "/kiosk", icon: Tv, label: "Kiosk Monitory", module: "kiosk" },
   { href: "/phone-list", icon: Phone, label: "Telefonní seznam", module: null },
+  {
+    href: "/pozadavky",
+    icon: Wrench,
+    label: "IT požadavky",
+    module: null,
+    isActive: (p) => p.startsWith("/pozadavky"),
+  },
   { href: "/training", icon: GraduationCap, label: "IT Školení", module: "training" },
 ];
 

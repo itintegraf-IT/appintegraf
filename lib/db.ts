@@ -9,7 +9,7 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 /** Zvyšte po změně prisma/schema.prisma, aby dev server načetl nový klient */
-const PRISMA_CACHE_KEY = "20261111-system-release-announcements";
+const PRISMA_CACHE_KEY = "20261127-it-vendor-assigned-it";
 
 function parseDatabaseUrl(url: string): mariadb.PoolConfig | string {
   try {

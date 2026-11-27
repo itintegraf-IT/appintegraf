@@ -876,6 +876,284 @@ model helpdesk_comments {
   @@index([author_id], map: "idx_helpdesk_comments_author")
 }
 
+/// IT požadavky externích dodavatelů – síť / firewall / servis technologií
+model it_vendor_requests {
+  id                          Int                     @id @default(autoincrement())
+  request_number              String                  @unique @db.VarChar(24)
+  status                      it_vendor_request_status @default(draft)
+  request_date                DateTime?               @db.Date
+  due_date                    DateTime?               @db.Date
+  project_name                String?                 @db.VarChar(255)
+  vendor_company              String?                 @db.VarChar(255)
+  contact_name                String?                 @db.VarChar(150)
+  contact_phone               String?                 @db.VarChar(50)
+  contact_email               String?                 @db.VarChar(190)
+  device_vendor_type          String?                 @db.VarChar(255)
+  install_location            String?                 @db.VarChar(255)
+  preferred_network_placement String?                 @db.VarChar(255)
+  purpose                     String?                 @db.Text
+  tech_description            String?                 @db.Text
+  requested_services          String?                 @db.Text
+  connection_type             String?                 @db.VarChar(100)
+  devices_needing_ip          Int?
+  dhcp_mode                   String?                 @db.VarChar(50)
+  requested_ip_range          String?                 @db.VarChar(255)
+  notes                       String?                 @db.Text
+  requested_vlan              String?                 @db.VarChar(255)
+  vlan_reason                 String?                 @db.Text
+  remote_access_needed        String?                 @db.VarChar(50)
+  remote_access_method        String?                 @db.VarChar(100)
+  vendor_public_ips           String?                 @db.Text
+  has_own_router              String?                 @db.VarChar(50)
+  /// IT-only
+  internal_notes              String?                 @db.Text
+  assigned_vlan               String?                 @db.VarChar(255)
+  assigned_vlan_id            Int?
+  it_network_notes            String?                 @db.Text
+  rejection_reason            String?                 @db.Text
+  vendor_signer_name          String?                 @db.VarChar(150)
+  vendor_signed_at            DateTime?               @db.DateTime(0)
+  pm_name                     String?                 @db.VarChar(150)
+  pm_signed_at                DateTime?               @db.DateTime(0)
+  it_name                     String?                 @db.VarChar(150)
+  it_signed_at                DateTime?               @db.DateTime(0)
+  assigned_it_user_id         Int?
+  created_by                  Int
+  submitted_at                DateTime?               @db.DateTime(0)
+  approved_at                 DateTime?               @db.DateTime(0)
+  created_at                  DateTime                @default(now()) @db.Timestamp(0)
+  updated_at                  DateTime                @default(now()) @updatedAt @db.Timestamp(0)
+  users_created               users                   @relation("it_vendor_requests_created", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_vendor_requests_created_fk")
+  users_assigned_it           users?                  @relation("it_vendor_requests_assigned_it", fields: [assigned_it_user_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "it_vendor_assigned_it_fk")
+  network_vlan                it_network_vlans?       @relation("it_vendor_assigned_vlan", fields: [assigned_vlan_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "it_vendor_assigned_vlan_fk")
+  interfaces                  it_vendor_request_interfaces[]
+  ips                         it_vendor_request_ips[]
+  firewall_rules              it_vendor_request_firewall_rules[]
+  protocols                   it_vendor_request_protocols[]
+  security_answers            it_vendor_request_security[]
+  docs                        it_vendor_request_docs[]
+  contacts                    it_vendor_request_contacts[]
+  links                       it_vendor_request_links[]
+  network_ips                 it_network_ips[]
+  network_ip_ports            it_network_ip_ports[]
+
+  @@index([status], map: "idx_it_vendor_req_status")
+  @@index([created_by], map: "idx_it_vendor_req_created_by")
+  @@index([created_at], map: "idx_it_vendor_req_created")
+  @@index([vendor_company], map: "idx_it_vendor_req_vendor")
+  @@index([assigned_vlan_id], map: "idx_it_vendor_req_vlan")
+  @@index([assigned_it_user_id], map: "idx_it_vendor_req_assigned_it")
+}
+
+/// Katalog VLAN pro registr IP
+model it_network_vlans {
+  id          Int                 @id @default(autoincrement())
+  vlan_number Int
+  name        String              @db.VarChar(150)
+  description String?             @db.Text
+  active      Boolean             @default(true)
+  created_at  DateTime            @default(now()) @db.Timestamp(0)
+  updated_at  DateTime            @default(now()) @updatedAt @db.Timestamp(0)
+  subnets     it_network_subnets[]
+  requests    it_vendor_requests[] @relation("it_vendor_assigned_vlan")
+
+  @@unique([vlan_number], map: "it_network_vlans_number_unique")
+  @@index([active], map: "idx_it_network_vlans_active")
+}
+
+model it_network_subnets {
+  id         Int              @id @default(autoincrement())
+  vlan_id    Int
+  cidr       String           @db.VarChar(50)
+  gateway    String?          @db.VarChar(50)
+  note       String?          @db.Text
+  created_at DateTime         @default(now()) @db.Timestamp(0)
+  updated_at DateTime         @default(now()) @updatedAt @db.Timestamp(0)
+  vlan       it_network_vlans @relation(fields: [vlan_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_network_subnet_vlan_fk")
+  ips        it_network_ips[]
+
+  @@unique([cidr], map: "it_network_subnets_cidr_unique")
+  @@index([vlan_id], map: "idx_it_network_subnet_vlan")
+}
+
+enum it_network_ip_status {
+  free
+  allocated
+}
+
+model it_network_ips {
+  id           Int                  @id @default(autoincrement())
+  subnet_id    Int
+  ip_address   String               @db.VarChar(50)
+  status       it_network_ip_status @default(free)
+  request_id   Int?
+  /// Ruční přidělení (server, tiskárna…)
+  device_kind  String?              @db.VarChar(80)
+  label        String?              @db.VarChar(150)
+  description  String?              @db.Text
+  note         String?              @db.VarChar(255)
+  allocated_at DateTime?            @db.DateTime(0)
+  created_at   DateTime             @default(now()) @db.Timestamp(0)
+  updated_at   DateTime             @default(now()) @updatedAt @db.Timestamp(0)
+  subnet       it_network_subnets   @relation(fields: [subnet_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_network_ip_subnet_fk")
+  request      it_vendor_requests?  @relation(fields: [request_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "it_network_ip_request_fk")
+  ports        it_network_ip_ports[]
+
+  @@unique([ip_address], map: "it_network_ips_address_unique")
+  @@index([subnet_id], map: "idx_it_network_ip_subnet")
+  @@index([status], map: "idx_it_network_ip_status")
+  @@index([request_id], map: "idx_it_network_ip_request")
+}
+
+model it_network_ip_ports {
+  id           Int                 @id @default(autoincrement())
+  ip_id        Int
+  request_id   Int?
+  protocol     String?             @db.VarChar(50)
+  port         String?             @db.VarChar(100)
+  service_name String?             @db.VarChar(255)
+  direction    String?             @db.VarChar(80)
+  purpose      String?             @db.Text
+  created_at   DateTime            @default(now()) @db.Timestamp(0)
+  ip           it_network_ips      @relation(fields: [ip_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_network_port_ip_fk")
+  request      it_vendor_requests? @relation(fields: [request_id], references: [id], onDelete: SetNull, onUpdate: NoAction, map: "it_network_port_request_fk")
+
+  @@index([ip_id], map: "idx_it_network_port_ip")
+  @@index([request_id], map: "idx_it_network_port_request")
+}
+
+model it_vendor_request_contacts {
+  id         Int                @id @default(autoincrement())
+  request_id Int
+  sort_order Int                @default(0)
+  role       String?            @db.VarChar(100)
+  name       String?            @db.VarChar(150)
+  phone      String?            @db.VarChar(50)
+  email      String?            @db.VarChar(190)
+  request    it_vendor_requests @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_vendor_contact_req_fk")
+
+  @@index([request_id], map: "idx_it_vendor_contact_request")
+}
+
+model it_vendor_request_interfaces {
+  id                Int                @id @default(autoincrement())
+  request_id        Int
+  sort_order        Int                @default(0)
+  device_group      String?            @db.VarChar(255)
+  interface_type    String?            @db.VarChar(150)
+  speed_mbps        Int?
+  port_count        Int?
+  poe               String?            @db.VarChar(20)
+  requested_vlan    String?            @db.VarChar(150)
+  connection_place  String?            @db.VarChar(255)
+  max_distance_m    Int?
+  note              String?            @db.Text
+  request           it_vendor_requests @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_vendor_if_req_fk")
+
+  @@index([request_id], map: "idx_it_vendor_if_request")
+}
+
+model it_vendor_request_ips {
+  id               Int                @id @default(autoincrement())
+  request_id       Int
+  sort_order       Int                @default(0)
+  device_service   String?            @db.VarChar(255)
+  allocation_mode  String?            @db.VarChar(80)
+  ip_count         Int?
+  ip_from          String?            @db.VarChar(100)
+  ip_to            String?            @db.VarChar(100)
+  mask_cidr        String?            @db.VarChar(50)
+  gateway          String?            @db.VarChar(100)
+  dns              String?            @db.VarChar(100)
+  mac_address      String?            @db.VarChar(50)
+  note             String?            @db.Text
+  /// IT-only assigned values
+  assigned_ip_from String?            @db.VarChar(100)
+  assigned_ip_to   String?            @db.VarChar(100)
+  assigned_note    String?            @db.Text
+  request          it_vendor_requests @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_vendor_ip_req_fk")
+
+  @@index([request_id], map: "idx_it_vendor_ip_request")
+}
+
+model it_vendor_request_firewall_rules {
+  id               Int                @id @default(autoincrement())
+  request_id       Int
+  sort_order       Int                @default(0)
+  service_name     String?            @db.VarChar(255)
+  source_kind      String?            @db.VarChar(150)
+  source_host      String?            @db.VarChar(255)
+  target_kind      String?            @db.VarChar(150)
+  target_host      String?            @db.VarChar(255)
+  protocol         String?            @db.VarChar(50)
+  target_ports     String?            @db.VarChar(100)
+  direction        String?            @db.VarChar(80)
+  purpose          String?            @db.Text
+  encrypted        String?            @db.VarChar(50)
+  validity         String?            @db.VarChar(80)
+  note             String?            @db.Text
+  /// IT-only
+  implemented      Boolean            @default(false)
+  assigned_ip      String?            @db.VarChar(100)
+  assigned_note    String?            @db.Text
+  request          it_vendor_requests @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_vendor_fw_req_fk")
+
+  @@index([request_id], map: "idx_it_vendor_fw_request")
+}
+
+model it_vendor_request_protocols {
+  id           Int                @id @default(autoincrement())
+  request_id   Int
+  protocol_key String             @db.VarChar(50)
+  used         String?            @db.VarChar(20)
+  used_ports   String?            @db.VarChar(100)
+  note         String?            @db.Text
+  request      it_vendor_requests @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_vendor_proto_req_fk")
+
+  @@unique([request_id, protocol_key], map: "it_vendor_proto_unique")
+  @@index([request_id], map: "idx_it_vendor_proto_request")
+}
+
+model it_vendor_request_security {
+  id          Int                @id @default(autoincrement())
+  request_id  Int
+  question_key String            @db.VarChar(50)
+  answer      String?            @db.VarChar(50)
+  note        String?            @db.Text
+  request     it_vendor_requests @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_vendor_sec_req_fk")
+
+  @@unique([request_id, question_key], map: "it_vendor_sec_unique")
+  @@index([request_id], map: "idx_it_vendor_sec_request")
+}
+
+model it_vendor_request_docs {
+  id         Int                @id @default(autoincrement())
+  request_id Int
+  doc_key    String             @db.VarChar(50)
+  delivered  String?            @db.VarChar(50)
+  file_ref   String?            @db.VarChar(500)
+  request    it_vendor_requests @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_vendor_doc_req_fk")
+
+  @@unique([request_id, doc_key], map: "it_vendor_doc_unique")
+  @@index([request_id], map: "idx_it_vendor_doc_request")
+}
+
+model it_vendor_request_links {
+  id            Int                @id @default(autoincrement())
+  request_id    Int
+  token_hash    String             @unique(map: "it_vendor_links_token_hash") @db.VarChar(64)
+  sent_to_email String             @db.VarChar(190)
+  expires_at    DateTime           @db.DateTime(0)
+  revoked_at    DateTime?          @db.DateTime(0)
+  created_by    Int
+  created_at    DateTime           @default(now()) @db.Timestamp(0)
+  request       it_vendor_requests @relation(fields: [request_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_vendor_link_req_fk")
+  users_created users              @relation("it_vendor_links_created", fields: [created_by], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "it_vendor_link_user_fk")
+
+  @@index([request_id], map: "idx_it_vendor_link_request")
+  @@index([expires_at], map: "idx_it_vendor_link_expires")
+}
+
 model equipment_transfers {
   id                                              Int                               @id @default(autoincrement())
   equipment_id                                    Int
@@ -1318,6 +1596,9 @@ model users {
   helpdesk_tickets_requester                                     helpdesk_tickets[]            @relation("helpdesk_tickets_requester")
   helpdesk_tickets_assigned                                      helpdesk_tickets[]            @relation("helpdesk_tickets_assigned")
   helpdesk_comments_authored                                     helpdesk_comments[]           @relation("helpdesk_comments_author")
+  it_vendor_requests_created                                     it_vendor_requests[]          @relation("it_vendor_requests_created")
+  it_vendor_requests_assigned_it                                 it_vendor_requests[]          @relation("it_vendor_requests_assigned_it")
+  it_vendor_links_created                                        it_vendor_request_links[]     @relation("it_vendor_links_created")
   equipment_transfers_equipment_transfers_from_user_idTousers    equipment_transfers[]         @relation("equipment_transfers_from_user_idTousers")
   equipment_transfers_equipment_transfers_to_user_idTousers      equipment_transfers[]         @relation("equipment_transfers_to_user_idTousers")
   equipment_transfers_equipment_transfers_transferred_byTousers  equipment_transfers[]         @relation("equipment_transfers_transferred_byTousers")
@@ -1610,6 +1891,16 @@ enum helpdesk_status {
   resi_se
   vyreseno
   uzavreno
+}
+
+enum it_vendor_request_status {
+  draft
+  sent
+  submitted
+  in_review
+  approved
+  rejected
+  cancelled
 }
 
 enum questions_correct_answer {

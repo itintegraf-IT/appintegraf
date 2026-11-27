@@ -6,7 +6,9 @@ import { Home, LogIn, Phone } from "lucide-react";
 
 export function PublicSiteHeader() {
   const pathname = usePathname();
-  const isSoftproof = pathname.startsWith("/public/softproof");
+  const hideNav =
+    pathname.startsWith("/public/softproof") ||
+    pathname.startsWith("/public/it-vendor-request");
 
   return (
     <header className="border-b border-gray-200 bg-white">
@@ -17,12 +19,12 @@ export function PublicSiteHeader() {
           </div>
           <div>
             <h1 className="font-bold text-gray-900">INTEGRAF</h1>
-            {!isSoftproof && (
+            {!hideNav && (
               <p className="text-sm text-gray-500">Modulární intranetová aplikace</p>
             )}
           </div>
         </div>
-        {!isSoftproof && (
+        {!hideNav && (
           <nav className="flex gap-2">
             <Link
               href="/"

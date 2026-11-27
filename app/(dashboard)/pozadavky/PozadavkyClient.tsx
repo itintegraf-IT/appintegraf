@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ClipboardList, Headphones, BookOpen } from "lucide-react";
+import { ClipboardList, Headphones, BookOpen, Building2, Network } from "lucide-react";
 import { TechnikaTab } from "./_components/TechnikaTab";
 import { HelpdeskTab } from "./_components/HelpdeskTab";
 import { ReseniProblemuTab } from "./_components/ReseniProblemuTab";
+import { ExterniDodavateleTab } from "./_components/ExterniDodavateleTab";
+import { SitIpTab } from "./_components/SitIpTab";
 import type { TroubleCategory } from "@/lib/helpdesk/parse-trouble-kb";
 
 type UserProfile = {
@@ -17,7 +19,7 @@ type UserProfile = {
   position: string | null;
 };
 
-type TabId = "technika" | "helpdesk" | "reseni";
+type TabId = "technika" | "helpdesk" | "reseni" | "externi" | "sit";
 
 function tabHref(tab: string, extra?: Record<string, string>) {
   const q = new URLSearchParams({ tab });
@@ -30,6 +32,8 @@ function tabHref(tab: string, extra?: Record<string, string>) {
 function resolveTab(raw: string | null): TabId {
   if (raw === "helpdesk") return "helpdesk";
   if (raw === "reseni") return "reseni";
+  if (raw === "externi") return "externi";
+  if (raw === "sit") return "sit";
   return "technika";
 }
 
@@ -46,6 +50,8 @@ export function PozadavkyClient({
   const tabs: { id: TabId; label: string; icon: typeof ClipboardList }[] = [
     { id: "technika", label: "Technika", icon: ClipboardList },
     { id: "helpdesk", label: "Helpdesk", icon: Headphones },
+    { id: "externi", label: "Externí dodavatelé", icon: Building2 },
+    { id: "sit", label: "Síť / IP", icon: Network },
     { id: "reseni", label: "Řešení problémů", icon: BookOpen },
   ];
 
@@ -57,7 +63,7 @@ export function PozadavkyClient({
           IT požadavky
         </h1>
         <p className="mt-1 text-gray-600">
-          Požadavky na techniku, helpdesk IT servis a řešení běžných problémů
+          Požadavky na techniku, helpdesk, externí dodavatele a řešení běžných problémů
         </p>
       </div>
 
@@ -80,6 +86,8 @@ export function PozadavkyClient({
 
       {tab === "technika" && <TechnikaTab profile={profile} />}
       {tab === "helpdesk" && <HelpdeskTab />}
+      {tab === "externi" && <ExterniDodavateleTab />}
+      {tab === "sit" && <SitIpTab />}
       {tab === "reseni" && <ReseniProblemuTab categories={troubleCategories} />}
     </>
   );
