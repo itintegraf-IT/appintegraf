@@ -80,10 +80,21 @@ function nonEmptyContact(r: NonNullable<VendorFormData["contacts"]>[number]) {
   return Boolean(r.role || r.name || r.phone || r.email);
 }
 
+/** Jen child tabulky – create může poslat jen defaults bez hlavičky. */
+type ChildTablesInput = {
+  interfaces?: VendorFormData["interfaces"];
+  ips?: VendorFormData["ips"] | InternalPatchData["ips"];
+  firewall_rules?: VendorFormData["firewall_rules"] | InternalPatchData["firewall_rules"];
+  protocols?: VendorFormData["protocols"];
+  security_answers?: VendorFormData["security_answers"];
+  docs?: VendorFormData["docs"];
+  contacts?: VendorFormData["contacts"];
+};
+
 async function writeChildren(
   db: DbClient,
   requestId: number,
-  data: VendorFormData | InternalPatchData,
+  data: ChildTablesInput,
   opts: { includeItAssigned: boolean; replace: boolean }
 ) {
   const interfaces = (data.interfaces ?? []).filter(nonEmptyInterface);
@@ -220,7 +231,7 @@ async function writeChildren(
 
 async function replaceChildren(
   requestId: number,
-  data: VendorFormData | InternalPatchData,
+  data: ChildTablesInput,
   opts: { includeItAssigned: boolean }
 ) {
   await writeChildren(prisma, requestId, data, {
