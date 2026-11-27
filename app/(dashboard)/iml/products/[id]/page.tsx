@@ -3,8 +3,10 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { hasModuleAccess } from "@/lib/auth-utils";
+import { getImlProductEditAccess } from "@/lib/iml/product-sample-flags-access";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
+import { ProductSampleFlagsEditor } from "../_components/ProductSampleFlagsEditor";
 import {
   Boxes,
   CircleCheckBig,
@@ -48,8 +50,8 @@ export default async function ImlProductDetailPage({
   if (!session?.user?.id) redirect("/login");
 
   const userId = parseInt(session.user.id, 10);
-  const canRead = await hasModuleAccess(userId, "iml", "read");
-  const canWrite = await hasModuleAccess(userId, "iml", "write");
+  const { canRead, canWrite, canEditSampleFlagsOnly } =
+    await getImlProductEditAccess(userId);
   const canAdmin = await hasModuleAccess(userId, "iml", "admin");
 
   if (!canRead) redirect("/iml");
@@ -363,8 +365,26 @@ export default async function ImlProductDetailPage({
               />
             )}
             <InfoField label="EAN kód" value={fmt(product.ean_code)} mono />
-            <InfoField label="Vzor min. tisku" value={product.has_print_sample ? "Ano" : "Ne"} />
-            <InfoField label="Nátisk" value={product.has_print_proof ? "Ano" : "Ne"} />
+            {canEditSampleFlagsOnly ? (
+              <div className="sm:col-span-2">
+                <ProductSampleFlagsEditor
+                  productId={product.id}
+                  hasPrintSample={!!product.has_print_sample}
+                  hasPrintProof={!!product.has_print_proof}
+                />
+              </div>
+            ) : (
+              <>
+                <InfoField
+                  label="Vzor min. tisku"
+                  value={product.has_print_sample ? "Ano" : "Ne"}
+                />
+                <InfoField
+                  label="Nátisk"
+                  value={product.has_print_proof ? "Ano" : "Ne"}
+                />
+              </>
+            )}
             <InfoField label="Naposledy editoval" value={fmt(product.last_edited_by)} />
             {product.realization_log && (
               <InfoField label="LOG realizací" value={product.realization_log} span={2} pre />

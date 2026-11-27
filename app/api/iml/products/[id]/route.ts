@@ -18,6 +18,7 @@ import {
 } from "@/lib/iml-product-save-errors";
 import { toImlProductUpdateData } from "@/lib/iml/product-prisma-payload";
 import { findConflictingProductByIgCode } from "@/lib/makety-iml-product-lookup";
+import { getImlProductEditAccess } from "@/lib/iml/product-sample-flags-access";
 
 export async function GET(
   _req: NextRequest,
@@ -82,7 +83,8 @@ export async function PUT(
   }
 
   const userId = parseInt(session.user.id, 10);
-  if (!(await hasModuleAccess(userId, "iml", "write"))) {
+  const access = await getImlProductEditAccess(userId);
+  if (!access.canEditSampleFlags) {
     return NextResponse.json({ error: "Nemáte oprávnění k úpravám IML" }, { status: 403 });
   }
 
@@ -104,6 +106,40 @@ export async function PUT(
 
   try {
     const body = await req.json();
+
+    // Správa vzorků bez iml:write — smí měnit jen has_print_sample / has_print_proof.
+    if (access.canEditSampleFlagsOnly) {
+      const has_print_sample = !!body.has_print_sample;
+      const has_print_proof = !!body.has_print_proof;
+
+      await prisma.iml_products.update({
+        where: { id },
+        data: {
+          has_print_sample,
+          has_print_proof,
+          last_edited_by: editorName,
+        },
+      });
+
+      await logImlAudit({
+        userId,
+        action: "update",
+        tableName: "iml_products",
+        recordId: id,
+        oldValues: {
+          has_print_sample: existing.has_print_sample,
+          has_print_proof: existing.has_print_proof,
+        },
+        newValues: { has_print_sample, has_print_proof },
+      });
+
+      return NextResponse.json({ success: true });
+    }
+
+    if (!access.canWrite) {
+      return NextResponse.json({ error: "Nemáte oprávnění k úpravám IML" }, { status: 403 });
+    }
+
     let data: Awaited<ReturnType<typeof parseImlProductBodyForSave>>;
     try {
       data = await parseImlProductBodyForSave(body);
